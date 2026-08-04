@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Prototype de demonstration - donnees entierement fictives.">
+
+<title>PRAXIS — Gestion de cabinet de médecine esthétique</title>
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f4f5f8;
+  --bg-grad:radial-gradient(1200px 600px at 12% -10%, #e9edfb 0%, rgba(233,237,251,0) 60%),
+            radial-gradient(900px 500px at 92% -20%, #f6e9f3 0%, rgba(246,233,243,0) 55%);
+  --panel:#ffffff;
+  --panel-2:#fafbfd;
+  --panel-3:#f2f4f8;
+  --ink:#0d0e14;
+  --ink-2:#565a68;
+  --ink-3:#8b8f9e;
+  --line:rgba(13,14,20,.075);
+  --line-2:rgba(13,14,20,.14);
+  --accent:#2a78d6;
+  --accent-2:#4a3aa7;
+  --accent-ink:#1c5cab;
+  --accent-wash:#eef4fe;
+  --series-1:#2a78d6;
+  --toxine:#2a78d6;
+  --ah:#eb6834;
+  --grid:#e9ebf1;
+  --good:#0ca30c;--warn:#fab219;--crit:#d03b3b;
+  --good-w:#e9f7e9;--warn-w:#fdf4de;--crit-w:#fceaea;
+  --sh-1:0 1px 2px rgba(13,14,20,.05);
+  --sh-2:0 1px 3px rgba(13,14,20,.05), 0 8px 24px -8px rgba(13,14,20,.10);
+  --sh-3:0 20px 60px -12px rgba(13,14,20,.28), 0 4px 12px rgba(13,14,20,.08);
+  --r-s:9px;--r-m:13px;--r-l:18px;
+  --sans:-apple-system,BlinkMacSystemFont,"Inter","SF Pro Display","Segoe UI",system-ui,sans-serif;
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0a0b0f;
+  --bg-grad:radial-gradient(1200px 600px at 12% -10%, #141a2e 0%, rgba(20,26,46,0) 60%),
+            radial-gradient(900px 500px at 92% -20%, #1e1526 0%, rgba(30,21,38,0) 55%);
+  --panel:#14161d;
+  --panel-2:#181b23;
+  --panel-3:#1e222c;
+  --ink:#f2f3f7;
+  --ink-2:#a4a9ba;
+  --ink-3:#767c8d;
+  --line:rgba(255,255,255,.08);
+  --line-2:rgba(255,255,255,.16);
+  --accent:#3987e5;
+  --accent-2:#9085e9;
+  --accent-ink:#7fb3f0;
+  --accent-wash:#16243a;
+  --series-1:#3987e5;
+  --toxine:#3987e5;
+  --ah:#e07a4a;
+  --grid:#242833;
+  --good-w:#122a12;--warn-w:#2c2410;--crit-w:#2e1616;
+  --sh-2:0 1px 3px rgba(0,0,0,.5), 0 8px 24px -8px rgba(0,0,0,.6);
+  --sh-3:0 24px 70px -12px rgba(0,0,0,.75);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:var(--sans);background:var(--bg);background-image:var(--bg-grad);background-attachment:fixed;
+  color:var(--ink);font-size:13.5px;line-height:1.5;-webkit-font-smoothing:antialiased;letter-spacing:-.005em}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+a{color:var(--accent);text-decoration:none;cursor:pointer}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:9px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ============ SHELL ============ */
+.app{display:grid;grid-template-columns:238px 1fr;height:100vh;overflow:hidden}
+.side{display:flex;flex-direction:column;padding:14px 12px;gap:2px;overflow-y:auto}
+.logo{display:flex;align-items:center;gap:10px;padding:6px 8px 16px}
+.logo .m{width:32px;height:32px;border-radius:10px;background:linear-gradient(140deg,var(--accent),var(--accent-2));
+  display:grid;place-items:center;color:#fff;font-weight:750;font-size:13px;letter-spacing:-.02em;box-shadow:0 4px 12px -2px rgba(42,120,214,.45)}
+.logo b{display:block;font-size:14px;font-weight:680;letter-spacing:.02em}
+.logo span{display:block;font-size:11px;color:var(--ink-3);margin-top:-2px}
+
+.cmdk{display:flex;align-items:center;gap:8px;width:100%;height:36px;padding:0 10px;margin-bottom:14px;
+  border-radius:var(--r-s);background:var(--panel);border:1px solid var(--line);color:var(--ink-3);
+  box-shadow:var(--sh-1);transition:.15s}
+.cmdk:hover{border-color:var(--line-2);color:var(--ink-2)}
+.cmdk kbd{margin-left:auto;font:600 10.5px var(--sans);border:1px solid var(--line);border-radius:5px;padding:1px 5px;color:var(--ink-3)}
+
+.sgroup{font-size:10px;font-weight:650;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);padding:14px 10px 5px}
+.side nav a{display:flex;align-items:center;gap:10px;padding:7.5px 10px;border-radius:var(--r-s);color:var(--ink-2);
+  font-weight:520;transition:.12s;position:relative}
+.side nav a:hover{background:var(--panel);color:var(--ink)}
+.side nav a.on{background:var(--panel);color:var(--ink);font-weight:620;box-shadow:var(--sh-1)}
+.side nav a.on::before{content:"";position:absolute;left:-12px;top:50%;transform:translateY(-50%);width:3px;height:17px;
+  border-radius:0 3px 3px 0;background:linear-gradient(var(--accent),var(--accent-2))}
+.side nav a .i{width:16px;text-align:center;opacity:.8;font-size:13px}
+.side nav a .n{margin-left:auto;min-width:19px;height:18px;padding:0 5px;border-radius:6px;background:var(--crit);color:#fff;
+  font-size:10.5px;font-weight:750;display:grid;place-items:center}
+.side nav a.soon{opacity:.45;pointer-events:none}
+.side nav a.soon .n{background:var(--panel-3);color:var(--ink-3);font-weight:600;font-size:9.5px}
+.side-foot{margin-top:auto;padding-top:14px;display:flex;align-items:center;gap:9px;border-top:1px solid var(--line)}
+.side-foot .av{width:30px;height:30px;border-radius:9px;background:linear-gradient(140deg,#e87ba4,#4a3aa7);color:#fff;
+  display:grid;place-items:center;font-size:11px;font-weight:700}
+.side-foot .who{font-size:12.5px;font-weight:600;line-height:1.25}
+.side-foot .who small{display:block;font-weight:500;color:var(--ink-3);font-size:11px}
+.rolebtn{margin-left:auto;width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:var(--ink-3)}
+.rolebtn:hover{background:var(--panel);color:var(--ink)}
+
+.main{overflow-y:auto;padding:18px 22px 70px;position:relative}
+.head{display:flex;align-items:flex-end;gap:14px;margin-bottom:18px;flex-wrap:wrap}
+.head h1{margin:0;font-size:23px;font-weight:680;letter-spacing:-.035em}
+.head p{margin:2px 0 0;color:var(--ink-3);font-size:12.5px}
+.head .r{margin-left:auto;display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+
+/* ============ ATOMS ============ */
+.btn{height:33px;padding:0 13px;border-radius:var(--r-s);background:var(--panel);color:var(--ink);font-weight:560;
+  display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);box-shadow:var(--sh-1);transition:.13s;white-space:nowrap}
+.btn:hover{border-color:var(--line-2);transform:translateY(-1px)}
+.btn:active{transform:none}
+.btn.p{background:linear-gradient(140deg,var(--accent),var(--accent-2));color:#fff;border-color:transparent;
+  box-shadow:0 4px 14px -3px rgba(42,120,214,.5)}
+.btn.p:hover{filter:brightness(1.07)}
+.btn.g{background:transparent;box-shadow:none;border-color:transparent;color:var(--ink-2)}
+.btn.g:hover{background:var(--panel);color:var(--ink)}
+.btn.s{height:28px;padding:0 10px;font-size:12.5px;border-radius:8px}
+.btn.xs{height:24px;padding:0 8px;font-size:11.5px;border-radius:7px}
+.btn[disabled]{opacity:.4;pointer-events:none}
+
+.seg{display:inline-flex;background:var(--panel-3);border-radius:10px;padding:3px;gap:2px}
+.seg button{padding:5px 11px;border-radius:7px;font-size:12.5px;font-weight:560;color:var(--ink-2);transition:.13s}
+.seg button.on{background:var(--panel);color:var(--ink);font-weight:650;box-shadow:var(--sh-1)}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-l);box-shadow:var(--sh-2);overflow:hidden}
+.card>.h{padding:13px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)}
+.card>.h h2{margin:0;font-size:13.5px;font-weight:660;letter-spacing:-.015em}
+.card>.h .s{font-size:12px;color:var(--ink-3)}
+.card>.h .r{margin-left:auto;display:flex;gap:6px;align-items:center}
+.card>.b{padding:16px}
+
+.grid{display:grid;gap:13px}
+.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}.g5{grid-template-columns:repeat(5,1fr)}
+@media(max-width:1400px){.g5{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:1150px){.g4,.g3{grid-template-columns:repeat(2,1fr)}.g2{grid-template-columns:1fr}}
+
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-m);padding:13px 15px;box-shadow:var(--sh-2);position:relative;overflow:hidden}
+.kpi .k{font-size:11.5px;color:var(--ink-3);font-weight:520;display:flex;align-items:center;gap:6px}
+.kpi .v{font-size:26px;font-weight:700;letter-spacing:-.045em;margin-top:4px;line-height:1.1}
+.kpi .d{font-size:11.5px;margin-top:2px;color:var(--ink-3);display:flex;align-items:center;gap:4px}
+.kpi .d.up{color:#0a7a0a}.kpi .d.dn{color:var(--crit)}
+:root[data-theme="dark"] .kpi .d.up{color:#5fd45f}
+
+.bdg{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:640;border-radius:7px;padding:2.5px 7px;white-space:nowrap;letter-spacing:-.005em}
+.b-good{background:var(--good-w);color:#0a7a0a}.b-warn{background:var(--warn-w);color:#8a6100}
+.b-crit{background:var(--crit-w);color:#a52a2a}.b-info{background:var(--accent-wash);color:var(--accent-ink)}
+.b-neu{background:var(--panel-3);color:var(--ink-2)}
+:root[data-theme="dark"] .b-good{color:#5fd45f}:root[data-theme="dark"] .b-warn{color:#f6c65e}
+:root[data-theme="dark"] .b-crit{color:#f08b8b}
+
+table{width:100%;border-collapse:collapse;font-size:12.8px}
+thead th{text-align:left;font-weight:600;color:var(--ink-3);font-size:10.5px;letter-spacing:.055em;text-transform:uppercase;
+  padding:9px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+tbody td{padding:9.5px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr.c{cursor:pointer;transition:.1s}
+tbody tr.c:hover{background:var(--panel-2)}
+tbody tr.sel{background:var(--accent-wash)}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.mono{font-variant-numeric:tabular-nums}
+.nm{font-weight:620}
+.mu{color:var(--ink-3)}
+.tw{overflow-x:auto}
+
+.inp{height:33px;border:1px solid var(--line);background:var(--panel);border-radius:var(--r-s);padding:0 11px;
+  box-shadow:var(--sh-1);transition:.13s;outline:none}
+.inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-wash)}
+select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238b8f9e' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center}
+.fbar{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:13px}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 12px;font-size:12.5px;
+  color:var(--ink-2);font-weight:540;box-shadow:var(--sh-1);transition:.12s}
+.chip:hover{border-color:var(--line-2)}
+.chip.on{background:var(--ink);border-color:var(--ink);color:var(--bg);font-weight:640}
+
+.empty{padding:40px;text-align:center;color:var(--ink-3);font-size:12.5px}
+.tip{background:linear-gradient(120deg,var(--accent-wash),transparent 70%);border:1px solid var(--line);
+  border-radius:var(--r-m);padding:11px 14px;font-size:12.5px;color:var(--ink-2);display:flex;gap:10px;align-items:flex-start;margin-bottom:14px}
+.tip b{color:var(--ink)}
+.tip .e{font-size:15px;line-height:1}
+
+/* ============ COMMAND PALETTE ============ */
+.scrim{position:fixed;inset:0;background:rgba(10,11,15,.4);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:.16s;z-index:90}
+.scrim.on{opacity:1;pointer-events:auto}
+.pal{position:fixed;top:14vh;left:50%;transform:translateX(-50%) scale(.97);width:min(620px,92vw);background:var(--panel);
+  border:1px solid var(--line);border-radius:var(--r-l);box-shadow:var(--sh-3);z-index:95;opacity:0;pointer-events:none;transition:.16s;overflow:hidden}
+.pal.on{opacity:1;pointer-events:auto;transform:translateX(-50%) scale(1)}
+.pal input{width:100%;height:52px;border:none;background:none;padding:0 18px;font-size:15px;outline:none;border-bottom:1px solid var(--line)}
+.pal .list{max-height:52vh;overflow:auto;padding:6px}
+.pal .it{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;cursor:pointer}
+.pal .it.k{background:var(--accent-wash)}
+.pal .it .ic{width:26px;height:26px;border-radius:8px;background:var(--panel-3);display:grid;place-items:center;font-size:12px;flex:none}
+.pal .it .t{font-weight:600;font-size:13px}
+.pal .it .s{font-size:11.5px;color:var(--ink-3)}
+.pal .it .tag{margin-left:auto;font-size:10.5px;color:var(--ink-3);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+.pal .sec{font-size:10px;font-weight:650;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);padding:9px 12px 4px}
+
+/* ============ SLIDE-OVER ============ */
+.over{position:fixed;top:0;right:0;bottom:0;width:min(1080px,96vw);background:var(--panel);z-index:96;
+  box-shadow:var(--sh-3);transform:translateX(100%);transition:transform .24s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
+.over.on{transform:none}
+.over .oh{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line)}
+.over .oh h2{margin:0;font-size:16px;font-weight:670;letter-spacing:-.02em}
+.over .ob{flex:1;overflow-y:auto;padding:18px 20px}
+.over .of{padding:13px 20px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px;background:var(--panel-2)}
+
+/* ============ FACE MAP ============ */
+.facewrap{display:grid;grid-template-columns:1fr 320px;gap:16px}
+@media(max-width:900px){.facewrap{grid-template-columns:1fr}}
+.facebox{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r-m);padding:8px;position:relative}
+.face{width:100%;height:auto;max-height:min(600px,calc(100vh - 290px));display:block;touch-action:manipulation}
+.zone{fill:var(--ink);fill-opacity:.03;stroke:var(--ink);stroke-opacity:.16;stroke-width:1;stroke-dasharray:3 4;cursor:pointer;transition:fill-opacity .12s,stroke-opacity .12s}
+.zone:hover{fill-opacity:.15;stroke-opacity:.55;stroke-dasharray:none;stroke-width:1.5}
+.zone.ro{cursor:default}
+.zone.ro:not(.act-tox):not(.act-ah){fill-opacity:0;stroke-opacity:.25}
+.zone.ro:hover{fill-opacity:inherit}
+.zone.act-tox{fill:var(--toxine);fill-opacity:.30;stroke:var(--toxine);stroke-dasharray:none;stroke-width:1.6;stroke-opacity:.9}
+.zone.act-ah{fill:var(--ah);fill-opacity:.30;stroke:var(--ah);stroke-dasharray:none;stroke-width:1.6;stroke-opacity:.9}
+.guide{fill:none;stroke:var(--ink);stroke-opacity:.26;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.guidef{fill:var(--ink);fill-opacity:.07;pointer-events:none}
+.pupil{fill:var(--ink);fill-opacity:.28;pointer-events:none}
+.neck{fill:var(--ink);fill-opacity:.028;stroke:var(--ink);stroke-opacity:.20;stroke-width:1.6;pointer-events:none}
+.zlabel{font:700 11px var(--sans);fill:#fff;text-anchor:middle;pointer-events:none;paint-order:stroke;
+  stroke:rgba(0,0,0,.28);stroke-width:2.4px}
+.face-legend{display:flex;gap:14px;align-items:center;justify-content:center;padding:8px 0 2px;font-size:12px;color:var(--ink-2)}
+.face-legend i{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:-1px}
+.zrow{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:10px;background:var(--panel-2);
+  border:1px solid var(--line);margin-bottom:6px}
+.zrow .zd{width:8px;height:8px;border-radius:3px;flex:none}
+.zrow .zn{font-size:12.3px;font-weight:570;line-height:1.2;flex:1;min-width:0}
+.zrow .zn small{display:block;color:var(--ink-3);font-size:10.5px;font-weight:500}
+.step{display:flex;align-items:center;gap:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden;flex:none}
+.step button{width:23px;height:25px;color:var(--ink-2);font-size:14px;line-height:1;display:grid;place-items:center}
+.step button:hover{background:var(--panel-3);color:var(--ink)}
+.step span{min-width:52px;text-align:center;font-size:12px;font-weight:660;font-variant-numeric:tabular-nums}
+.zrow .rm{width:22px;height:22px;border-radius:6px;color:var(--ink-3);display:grid;place-items:center;flex:none}
+.zrow .rm:hover{background:var(--crit-w);color:var(--crit)}
+.totbox{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.totbox>div{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+.totbox .k{font-size:10.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.totbox .v{font-size:18px;font-weight:700;letter-spacing:-.03em;margin-top:1px}
+.preset{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+
+/* mini face used in tables */
+.minif{width:32px;height:42px;flex:none}
+.minif .mz{fill:var(--ah);fill-opacity:.85}
+.minif .mz.t{fill:var(--toxine)}
+.minif .mo{fill:none;stroke:var(--ink);stroke-opacity:.45;stroke-width:9}
+
+/* charts */
+.ch .gl{stroke:var(--grid)}
+.ch .ax{fill:var(--ink-3);font-size:10.5px}
+.ch .cbar{fill:var(--series-1)}
+.ch .cbar:hover{opacity:.78}
+.ch .vl{fill:var(--ink-2);font-size:10.5px;font-variant-numeric:tabular-nums;font-weight:600}
+.hb{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.hb .l{width:170px;font-size:12.2px;color:var(--ink-2)}
+.hb .t{flex:1;background:var(--grid);border-radius:5px;height:15px;overflow:hidden}
+.hb .t i{display:block;height:100%;background:var(--series-1);border-radius:5px}
+.hb .v{width:76px;text-align:right;font-size:12.2px;font-weight:640;font-variant-numeric:tabular-nums}
+
+/* before-after */
+.ba{position:relative;width:100%;aspect-ratio:4/3;border-radius:var(--r-m);overflow:hidden;user-select:none;background:#000}
+.ba img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.ba .af{clip-path:inset(0 0 0 50%)}
+.ba .hd{position:absolute;top:0;bottom:0;left:50%;width:2px;background:#fff;cursor:ew-resize}
+.ba .hd::after{content:"⇄";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:30px;height:30px;
+  border-radius:50%;background:#fff;color:#333;display:grid;place-items:center;font-size:13px;box-shadow:0 3px 10px rgba(0,0,0,.35)}
+.ba .tg{position:absolute;bottom:9px;font-size:10.5px;font-weight:700;letter-spacing:.08em;background:rgba(0,0,0,.6);
+  color:#fff;padding:3px 8px;border-radius:6px}
+.ba .tg.l{left:9px}.ba .tg.r{right:9px}
+
+/* master-detail */
+.md{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:13px;align-items:start}
+@media(max-width:1250px){.md{grid-template-columns:1fr}}
+.rowline{display:flex;gap:10px;align-items:center}
+.pav{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:700;flex:none;
+  background:linear-gradient(140deg,#e87ba4,#4a3aa7)}
+.tabs{display:flex;gap:3px;padding:3px;background:var(--panel-3);border-radius:10px;overflow-x:auto}
+.tabs button{padding:6px 12px;border-radius:7px;font-size:12.3px;font-weight:560;color:var(--ink-2);white-space:nowrap}
+.tabs button.on{background:var(--panel);color:var(--ink);font-weight:650;box-shadow:var(--sh-1)}
+.fld{margin-bottom:11px}
+.fld label{display:block;font-size:10.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.055em;font-weight:600;margin-bottom:2px}
+.fld .v{font-size:13px}
+.note{width:100%;min-height:104px;border:1px solid var(--line);border-radius:var(--r-s);padding:10px;background:var(--panel-2);resize:vertical;line-height:1.6;outline:none}
+.note:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-wash)}
+.tl{display:flex;gap:11px;padding:10px 0;border-bottom:1px solid var(--line)}
+.tl:last-child{border-bottom:none}
+.tl .ic{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;flex:none;font-size:12px}
+.tl .t{font-weight:600;font-size:12.5px}
+.tl .d{font-size:11.5px;color:var(--ink-3)}
+.tl .a{margin-left:auto}
+.sw{position:relative;width:36px;height:20px;border-radius:999px;background:var(--line-2);flex:none;transition:.16s}
+.sw.on{background:var(--good)}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.16s}
+.sw.on::after{transform:translateX(16px)}
+.bar{height:5px;border-radius:3px;background:var(--grid);overflow:hidden;min-width:64px}
+.bar i{display:block;height:100%;border-radius:3px}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);
+  padding:10px 16px;border-radius:11px;font-size:12.5px;font-weight:560;box-shadow:var(--sh-3);opacity:0;pointer-events:none;transition:.2s;z-index:120}
+.toast.on{opacity:1;transform:translateX(-50%)}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="logo">
+      <div class="m">Px</div>
+      <div><b>PRAXIS</b><span>Cabinet Dr Baroudi</span></div>
+    </div>
+    <button class="cmdk" onclick="openPal()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+      Rechercher ou agir…<kbd>⌘K</kbd>
+    </button>
+    <nav id="nav">
+      <div class="sgroup">Pilotage</div>
+      <a data-v="dash" class="on"><span class="i">◈</span>Tableau de bord</a>
+      <a data-v="stats"><span class="i">◔</span>Statistiques</a>
+      <div class="sgroup">Soins</div>
+      <a data-v="patients"><span class="i">◍</span>Patients</a>
+      <a data-v="actes"><span class="i">✚</span>Actes &amp; schémas</a>
+      <a class="soon"><span class="i">▤</span>Agenda<span class="n">Phase 2</span></a>
+      <div class="sgroup">Facturation</div>
+      <a data-v="devis"><span class="i">◫</span>Devis &amp; factures<span class="n" id="n-devis">0</span></a>
+      <a data-v="encaiss"><span class="i">€</span>Encaissements</a>
+      <a data-v="relances"><span class="i">↻</span>Relances auto<span class="n" id="n-rel">0</span></a>
+      <div class="sgroup">Logistique</div>
+      <a data-v="stock"><span class="i">▧</span>Stock &amp; lots<span class="n" id="n-stock">0</span></a>
+      <div class="sgroup">Admin</div>
+      <a data-v="equipe"><span class="i">◎</span>Équipe &amp; droits</a>
+    </nav>
+    <div class="side-foot">
+      <div class="av" id="avat">OB</div>
+      <div class="who" id="who">Dr O. Baroudi<small>Praticien</small></div>
+      <button class="rolebtn" onclick="cycleRole()" title="Changer de rôle (voir les droits)">⇄</button>
+      <button class="rolebtn" onclick="toggleTheme()" title="Thème clair / sombre">◐</button>
+    </div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+
+<div class="scrim" id="scrim" onclick="closeAll()"></div>
+<div class="pal" id="pal">
+  <input id="palq" placeholder="Patient, devis, lot… ou une action (« nouvel acte », « relancer »)" autocomplete="off">
+  <div class="list" id="palist"></div>
+</div>
+<div class="over" id="over"><div class="oh" id="overh"></div><div class="ob" id="overb"></div><div class="of" id="overf"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ==========================================================================
+   PRAXIS — prototype. Données 100 % fictives, en mémoire. Aucun stockage.
+   ========================================================================== */
+const EUR=n=>new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(n);
+const NUM=n=>new Intl.NumberFormat('fr-FR').format(n);
+const DF=d=>new Date(d).toLocaleDateString('fr-FR');
+const DFS=d=>new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});
+const TODAY=new Date('2026-08-03T17:30:00');
+const TODAYS='2026-08-03';
+const days=(a,b)=>Math.round((new Date(b)-new Date(a))/864e5);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const toast=m=>{const t=document.getElementById('toast');t.textContent=m;t.classList.add('on');clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove('on'),2200)};
+
+/* ---------- SCHÉMA DE VISAGE : référentiel des zones ---------- */
+/* p = produit par défaut : 'tox' (toxine, unités) ou 'ah' (acide hyaluronique, ml) */
+const ZDEF=[
+ {id:'front',   n:'Front — rides frontales',   k:'Front',        p:'tox',d:12,s:4,  cx:200,cy:130,rx:72,ry:30},
+ {id:'glab',    n:'Glabelle — ride du lion',   k:'Glabelle',     p:'tox',d:20,s:4,  cx:200,cy:178,rx:19,ry:17},
+ {id:'tempe',   n:'Tempe',                     k:'Tempe',        p:'ah', d:.5,s:.25,cx:106,cy:172,rx:21,ry:27,m:1},
+ {id:'sourcil', n:'Queue du sourcil',          k:'Sourcil',      p:'tox',d:4, s:2,  cx:151,cy:170,rx:26,ry:10,m:1},
+ {id:'patte',   n:'Patte d’oie',               k:'Patte d’oie',  p:'tox',d:10,s:2,  cx:121,cy:209,rx:19,ry:19,m:1},
+ {id:'cerne',   n:'Cerne — vallée des larmes', k:'Cerne',        p:'ah', d:.5,s:.1, cx:157,cy:231,rx:26,ry:12,m:1},
+ {id:'pomm',    n:'Pommette — malaire',        k:'Pommette',     p:'ah', d:.5,s:.25,cx:136,cy:256,rx:29,ry:20,m:1},
+ {id:'nez',     n:'Nez — profiloplastie',      k:'Nez',          p:'ah', d:.3,s:.1, cx:200,cy:244,rx:16,ry:34},
+ {id:'smal',    n:'Creux sous-malaire',        k:'Sous-malaire', p:'ah', d:.5,s:.25,cx:134,cy:300,rx:22,ry:22,m:1},
+ {id:'sillon',  n:'Sillon nasogénien',         k:'Sillon',       p:'ah', d:.5,s:.25,cx:168,cy:299,rx:14,ry:26,m:1},
+ {id:'perib',   n:'Rides péribuccales',        k:'Péribuccal',   p:'ah', d:.3,s:.1, cx:200,cy:304,rx:34,ry:11},
+ {id:'levres',  n:'Lèvres',                    k:'Lèvres',       p:'ah', d:1, s:.25,cx:200,cy:328,rx:36,ry:16},
+ {id:'amert',   n:'Pli d’amertume',            k:'Amertume',     p:'ah', d:.3,s:.1, cx:169,cy:352,rx:14,ry:13,m:1},
+ {id:'mand',    n:'Mandibule — ovale',         k:'Mandibule',    p:'ah', d:1, s:.25,cx:129,cy:344,rx:21,ry:34,m:1},
+ {id:'menton',  n:'Menton',                    k:'Menton',       p:'ah', d:.5,s:.25,cx:200,cy:386,rx:32,ry:22},
+ {id:'cou',     n:'Cou — bandes platysmales',  k:'Cou',          p:'tox',d:20,s:5,  cx:200,cy:478,rx:40,ry:24},
+];
+/* dépliage gauche/droite (côté PATIENT : l'image de gauche = côté droit du patient) */
+const ZONES=[];
+ZDEF.forEach(z=>{
+  if(z.m){
+    ZONES.push({...z, id:z.id+'_d', n:z.n+' — droite', k:z.k+' D', side:'D'});
+    ZONES.push({...z, id:z.id+'_g', n:z.n+' — gauche', k:z.k+' G', side:'G', cx:400-z.cx});
+  } else ZONES.push({...z, side:''});
+});
+const zoneById=id=>ZONES.find(z=>z.id===id);
+const UNIT=p=>p==='tox'?'U':'ml';
+const PU={tox:4.5, ah:350};           /* tarif : 4,50 €/U de toxine, 350 €/ml d'AH */
+const PLABEL={tox:'Toxine botulique', ah:'Acide hyaluronique'};
+const fmtQ=(q,p)=>p==='tox'?`${q} U`:`${q.toFixed(2).replace(/0$/,'').replace(/\.$/,'')} ml`;
+
+/* protocoles = 1 clic pour une ordonnance complète de zones */
+const PROTOS=[
+ {n:'Haut du visage', z:{front:12, glab:20, patte_d:10, patte_g:10}},
+ {n:'Lèvres + menton', z:{levres:1, menton:.5, amert_d:.3, amert_g:.3}},
+ {n:'Restructuration', z:{pomm_d:1, pomm_g:1, mand_d:1, mand_g:1, menton:.5}},
+ {n:'Regard', z:{cerne_d:.5, cerne_g:.5, tempe_d:.5, tempe_g:.5, sourcil_d:4, sourcil_g:4}},
+];
+
+/* ---------- Référentiels ---------- */
+const PRATICIENS=['Dr O. Baroudi','Dr A. Merlin'];
+const OPERATEURS=['L. Roche','S. Vidal'];
+const CATS=['Injections','Laser','Peeling','Mésothérapie','Radiofréquence'];
+const CATALOGUE=[
+ {id:'AH', n:'Acide hyaluronique', cat:'Injections', conso:'AH-VOLB', cons:true, zoned:true},
+ {id:'BTX',n:'Toxine botulique',   cat:'Injections', conso:'BTX-100', cons:true, zoned:true},
+ {id:'SKB',n:'Skinbooster',        cat:'Injections', conso:'SKB-PRO', cons:true, zoned:true, prix:320},
+ {id:'MESO',n:'Mésothérapie',      cat:'Mésothérapie',conso:'MESO-K', cons:false,zoned:false,prix:180},
+ {id:'PEEL',n:'Peeling superficiel',cat:'Peeling',   conso:'PEEL-S', cons:false,zoned:false,prix:160},
+ {id:'LAS1',n:'Laser épilation',   cat:'Laser',      conso:null,     cons:false,zoned:false,prix:120},
+ {id:'LAS2',n:'Photorajeunissement',cat:'Laser',     conso:null,     cons:true, zoned:false,prix:280},
+ {id:'RF', n:'Radiofréquence',     cat:'Radiofréquence',conso:null,  cons:false,zoned:false,prix:220},
+];
+const catById=id=>CATALOGUE.find(c=>c.id===id);
+
+/* ---------- Patients (fictifs) ---------- */
+const PATIENTS=[
+ [1041,'MARTIN','Claire','1984-03-12','06 12 34 56 78','claire.martin@example.fr','Dr O. Baroudi','2022-09-14','Souhaite un résultat naturel, redoute les lèvres trop volumineuses.',[]],
+ [1042,'DUBOIS','Sophie','1991-07-25','06 22 88 41 09','s.dubois@example.fr','Dr O. Baroudi','2023-02-03','Peau réactive : test 48 h avant tout peeling.',['Eczéma de contact','Allergie nickel']],
+ [1043,'NGUYEN','Linh','1997-11-04','07 61 02 55 30','linh.nguyen@example.fr','Dr A. Merlin','2024-05-21','Première consultation orientée cernes.',[]],
+ [1044,'BENALI','Yasmine','1978-01-30','06 45 71 12 84','y.benali@example.fr','Dr O. Baroudi','2021-06-08','Suivi toxine 2×/an, très régulière.',['Migraines chroniques']],
+ [1045,'ROUSSEAU','Émilie','1975-09-17','06 09 33 27 51','emilie.r@example.fr','Dr A. Merlin','2023-10-12','Projet global visage sur 12 mois.',['Hypertension traitée']],
+ [1046,'GARCIA','Laura','1988-04-02','07 82 19 64 03','laura.garcia@example.fr','Dr O. Baroudi','2024-01-19','',[]],
+ [1047,'LEFEVRE','Camille','1999-12-08','06 74 55 90 22','camille.lf@example.fr','Dr O. Baroudi','2025-03-06','Budget serré — proposer un étalement.',[]],
+ [1048,'MOREAU','Julien','1982-06-21','06 51 40 73 18','j.moreau@example.fr','Dr A. Merlin','2022-11-29','',['Tabagisme actif']],
+ [1049,'PETIT','Nadia','1993-02-14','07 08 62 31 47','nadia.petit@example.fr','Dr O. Baroudi','2024-08-30','Allaitement — injections reportées.',['Allaitement jusqu’à 12/2026']],
+ [1050,'FONTAINE','Alice','1970-05-06','06 33 92 18 05','alice.fontaine@example.fr','Dr O. Baroudi','2020-04-15','Patiente fidèle, 3 parrainages.',['Thyroïdite d’Hashimoto']],
+ [1051,'CHEVALIER','Marc','1979-08-11','06 60 27 84 39','m.chevalier@example.fr','Dr A. Merlin','2023-06-02','',[]],
+ [1052,'SANCHEZ','Elena','1995-10-23','07 55 13 06 92','elena.s@example.fr','Dr O. Baroudi','2025-01-08','',[]],
+ [1053,'BOUVIER','Hélène','1964-03-29','06 18 47 62 10','h.bouvier@example.fr','Dr O. Baroudi','2019-11-20','Ne souhaite pas de toxine — volumateurs uniquement.',['Anticoagulant (Kardégic)']],
+ [1054,'ADAMS','Rachel','1990-09-15','07 41 30 58 76','rachel.adams@example.fr','Dr A. Merlin','2024-11-04','',[]],
+].map(r=>({id:r[0],nom:r[1],prenom:r[2],ddn:r[3],tel:r[4],mail:r[5],prat:r[6],depuis:r[7],notes:r[8],ant:r[9]}));
+const pById=id=>PATIENTS.find(p=>p.id===id);
+const fn=p=>`${p.nom} ${p.prenom}`;
+const age=p=>Math.floor(days(p.ddn,TODAY)/365.25);
+const ini=p=>p.prenom[0]+p.nom[0];
+
+/* ---------- Actes (avec zones injectées) ---------- */
+let ACTES=[];
+(function(){
+ const R=[
+  [1041,'AH','2026-07-28','Dr O. Baroudi','L. Roche','L-AH2409',{levres:1,amert_d:.3,amert_g:.3},true,''],
+  [1041,'BTX','2026-04-14','Dr O. Baroudi','L. Roche','L-BX2601',{front:12,glab:20},true,''],
+  [1041,'AH','2025-11-06','Dr O. Baroudi',null,'L-AH2331',{sillon_d:.5,sillon_g:.5},true,''],
+  [1042,'PEEL','2026-07-21','Dr O. Baroudi','S. Vidal','L-PE2604',null,false,'Érythème 24 h (attendu)'],
+  [1042,'MESO','2026-05-12','Dr O. Baroudi','S. Vidal','L-MK2602',null,false,''],
+  [1043,'AH','2026-07-30','Dr A. Merlin','L. Roche','L-AH2409',{cerne_d:.5,cerne_g:.5},false,''],
+  [1044,'BTX','2026-06-18','Dr O. Baroudi','L. Roche','L-BX2601',{front:14,glab:20,patte_d:12,patte_g:12},true,'Ecchymose légère J+2, résorbée à J+7'],
+  [1044,'BTX','2026-01-22','Dr O. Baroudi','L. Roche','L-BX2512',{front:12,glab:20,patte_d:10,patte_g:10},true,''],
+  [1044,'AH','2025-09-09','Dr O. Baroudi',null,'L-AH2331',{pomm_d:1,pomm_g:1},true,''],
+  [1045,'AH','2026-07-15','Dr A. Merlin','S. Vidal','L-RL2502',{pomm_d:1,pomm_g:1,mand_d:1,mand_g:1},true,'Œdème modéré 48 h'],
+  [1045,'SKB','2026-06-02','Dr A. Merlin','S. Vidal','L-PF2603',{pomm_d:.5,pomm_g:.5},true,''],
+  [1046,'LAS1','2026-07-24','Dr O. Baroudi','L. Roche',null,null,false,''],
+  [1046,'LAS1','2026-06-26','Dr O. Baroudi','L. Roche',null,null,false,''],
+  [1047,'AH','2026-07-09','Dr O. Baroudi','L. Roche','L-AH2409',{levres:1},true,''],
+  [1048,'BTX','2026-07-02','Dr A. Merlin',null,'L-BX2601',{front:16},true,''],
+  [1049,'PEEL','2026-03-17','Dr O. Baroudi','S. Vidal','L-PE2511',null,false,''],
+  [1050,'AH','2026-07-22','Dr O. Baroudi','L. Roche','L-RL2502',{pomm_d:1,pomm_g:1},true,''],
+  [1050,'SKB','2026-05-28','Dr O. Baroudi','L. Roche','L-PF2603',{smal_d:.5,smal_g:.5},true,''],
+  [1050,'BTX','2026-02-11','Dr O. Baroudi','L. Roche','L-BX2512',{front:12,glab:20},true,''],
+  [1051,'RF','2026-07-17','Dr A. Merlin','S. Vidal',null,null,false,''],
+  [1052,'AH','2026-06-11','Dr O. Baroudi',null,'L-AH2331',{menton:.5,mand_d:.5,mand_g:.5},true,''],
+  [1053,'AH','2026-07-31','Dr O. Baroudi','L. Roche','L-RL2502',{sillon_d:.5,sillon_g:.5,pomm_d:1,pomm_g:1},true,''],
+  [1053,'AH','2026-03-05','Dr O. Baroudi','L. Roche','L-AH2331',{levres:1},true,''],
+  [1054,'LAS2','2026-07-08','Dr A. Merlin','S. Vidal',null,null,true,''],
+  [1054,'MESO','2026-04-23','Dr A. Merlin','S. Vidal','L-MK2510',null,false,''],
+ ];
+ ACTES=R.map((r,i)=>{
+   const c=catById(r[1]);
+   const zones=r[6]||null;
+   let prix=c.prix||0;
+   if(zones) prix=Object.entries(zones).reduce((s,[z,q])=>{const Z=zoneById(z);return s+q*PU[Z.p]},0);
+   if(r[1]==='SKB') prix=320;
+   return {id:5000+i,patient:r[0],type:r[1],nom:c.n,cat:c.cat,date:r[2],praticien:r[3],operateur:r[4],
+           lot:r[5],conso:c.conso,zones,consent:r[7],effets:r[8],prix:Math.round(prix/5)*5};
+ });
+ /* Volume complémentaire (fictif, déterministe) pour que les mois précédents ne soient pas vides */
+ let sd=7; const rnd=()=>{sd=(sd*1103515245+12345)%2147483648;return sd/2147483648};
+ const PZ=[{front:12,glab:20},{front:14,glab:20,patte_d:10,patte_g:10},{levres:1},{pomm_d:1,pomm_g:1},
+  {cerne_d:.5,cerne_g:.5},{sillon_d:.5,sillon_g:.5},{menton:.5,mand_d:.5,mand_g:.5},
+  {levres:1,amert_d:.3,amert_g:.3},{smal_d:.5,smal_g:.5},{front:12,glab:16,patte_d:8,patte_g:8}];
+ const LOTS={AH:['L-AH2409','L-AH2331','L-RL2502'],BTX:['L-BX2601','L-BX2512'],SKB:['L-PF2603']};
+ let nid=6000;
+ for(let m=5;m>=0;m--){
+  const dt=new Date(2026,7-m,1), n=m===0?4:(9+Math.floor(rnd()*5));
+  for(let i=0;i<n;i++){
+   const day=1+Math.floor(rnd()*(m===0?3:27));
+   const date=new Date(dt.getFullYear(),dt.getMonth(),day).toISOString().slice(0,10);
+   const inj=rnd()<.68;
+   let type, zones=null;
+   if(inj){
+    if(rnd()<.18){ type='SKB'; }
+    else { zones=PZ[Math.floor(rnd()*PZ.length)];
+      /* le type découle du produit dominant des zones sélectionnées */
+      type=Object.keys(zones).every(z=>zoneById(z).p==='tox')?'BTX':'AH'; }
+   } else type=['MESO','PEEL','LAS1','LAS2','RF'][Math.floor(rnd()*5)];
+   const c=catById(type);
+   let prix=c.prix||0;
+   if(zones) prix=Object.entries(zones).reduce((s,[z,q])=>s+q*PU[zoneById(z).p],0);
+   if(type==='SKB') prix=320;
+   ACTES.push({id:nid++,patient:PATIENTS[Math.floor(rnd()*PATIENTS.length)].id,type,nom:c.n,cat:c.cat,date,
+    praticien:PRATICIENS[rnd()<.7?0:1],operateur:rnd()<.6?OPERATEURS[Math.floor(rnd()*2)]:null,
+    lot:LOTS[type]?LOTS[type][Math.floor(rnd()*LOTS[type].length)]:null,conso:c.conso,zones,
+    consent:!c.cons||rnd()<.94,effets:'',prix:Math.round(prix/5)*5});
+  }
+ }
+})();
+const zonesOf=a=>a.zones?Object.entries(a.zones):[];
+const zoneSummary=a=>{
+  if(!a.zones) return '—';
+  const e=zonesOf(a);
+  const tox=e.filter(([z])=>zoneById(z).p==='tox').reduce((s,[,q])=>s+q,0);
+  const ah=e.filter(([z])=>zoneById(z).p==='ah').reduce((s,[,q])=>s+q,0);
+  return [tox?`${tox} U`:null, ah?`${ah.toFixed(2).replace(/0$/,'').replace(/\.$/,'')} ml`:null].filter(Boolean).join(' · ');
+};
+
+/* ---------- Devis / factures / stock / règles ---------- */
+const DEVIS=[
+ {id:'D-2606-011',patient:1043,date:'2026-06-08',montant:1180,statut:'relance2',envoye:'2026-06-08',relances:2,derniere:'2026-07-13',lignes:[['AH','Cernes + pommettes',2,350],['LAS2','Photorajeunissement',1,280],['SKB','Skinbooster',1,200]]},
+ {id:'D-2607-004',patient:1047,date:'2026-07-11',montant:700, statut:'relance1',envoye:'2026-07-11',relances:1,derniere:'2026-07-14',lignes:[['AH','Lèvres — 2 séances',2,350]]},
+ {id:'D-2607-009',patient:1051,date:'2026-07-19',montant:1320,statut:'envoye',  envoye:'2026-07-19',relances:0,derniere:null,lignes:[['RF','Radiofréquence ×3',3,220],['LAS2','Photorajeunissement ×2',2,280],['SKB','Skinbooster',1,100]]},
+ {id:'D-2607-012',patient:1046,date:'2026-07-24',montant:960, statut:'envoye',  envoye:'2026-07-24',relances:0,derniere:null,lignes:[['LAS1','Forfait 8 séances',8,120]]},
+ {id:'D-2607-015',patient:1054,date:'2026-07-28',montant:840, statut:'envoye',  envoye:'2026-07-28',relances:0,derniere:null,lignes:[['LAS2','Cure 3 séances',3,280]]},
+ {id:'D-2605-006',patient:1052,date:'2026-05-14',montant:390, statut:'expire',  envoye:'2026-05-14',relances:3,derniere:'2026-06-25',lignes:[['BTX','Haut du visage',1,390]]},
+ {id:'D-2607-002',patient:1045,date:'2026-07-06',montant:970, statut:'accepte', envoye:'2026-07-06',relances:0,derniere:null,lignes:[['AH','Pommettes + mandibule',2,325],['SKB','Skinbooster',1,320]]},
+ {id:'D-2606-018',patient:1050,date:'2026-06-20',montant:970, statut:'accepte', envoye:'2026-06-20',relances:1,derniere:'2026-06-24',lignes:[['AH','Pommettes',2,325],['SKB','Skinbooster',1,320]]},
+ {id:'D-2607-021',patient:1042,date:'2026-07-30',montant:340, statut:'brouillon',envoye:null,relances:0,derniere:null,lignes:[['MESO','Mésothérapie',1,180],['PEEL','Peeling',1,160]]},
+ {id:'D-2604-007',patient:1048,date:'2026-04-15',montant:390, statut:'refuse',  envoye:'2026-04-15',relances:2,derniere:'2026-05-06',lignes:[['BTX','Haut du visage',1,390]]},
+];
+const SD={brouillon:['Brouillon','b-neu'],envoye:['Envoyé','b-info'],relance1:['Relancé ×1','b-warn'],
+ relance2:['Relancé ×2','b-warn'],accepte:['Accepté','b-good'],refuse:['Refusé','b-crit'],expire:['Expiré','b-crit']};
+
+const FACTURES=ACTES.map((a,i)=>{
+ const paye=a.date<'2026-07-20'?a.prix:(i%4===0?0:(i%5===0?Math.round(a.prix*.5):a.prix));
+ return {id:'F-'+(2600+i),patient:a.patient,acte:a.id,date:a.date,montant:a.prix,paye,
+         moyen:paye===0?null:['CB','Espèces','Chèque','Virement'][i%4]};
+});
+const rdu=f=>f.montant-f.paye;
+
+const STOCK=[
+ {ref:'AH-VOLB',n:'Acide hyaluronique — volumateur 1 ml',cat:'Injectable',u:'seringue',q:11,s:8,lot:'L-AH2409',per:'2027-03-31',pu:78,f:'Allergan France'},
+ {ref:'AH-LYFT',n:'Acide hyaluronique — comblement profond 1 ml',cat:'Injectable',u:'seringue',q:4,s:6,lot:'L-RL2502',per:'2027-01-31',pu:82,f:'Galderma'},
+ {ref:'BTX-100',n:'Toxine botulique 100 U',cat:'Injectable',u:'flacon',q:3,s:5,lot:'L-BX2601',per:'2026-11-30',pu:210,f:'Allergan France'},
+ {ref:'SKB-PRO',n:'Skinbooster 2 ml',cat:'Injectable',u:'seringue',q:9,s:5,lot:'L-PF2603',per:'2027-05-31',pu:96,f:'IBSA'},
+ {ref:'MESO-K',n:'Cocktail mésothérapie',cat:'Injectable',u:'flacon',q:14,s:6,lot:'L-MK2602',per:'2026-09-30',pu:34,f:'Filorga'},
+ {ref:'PEEL-S',n:'Peeling — acide glycolique',cat:'Topique',u:'flacon',q:6,s:3,lot:'L-PE2604',per:'2027-02-28',pu:41,f:'SkinCeuticals'},
+ {ref:'ANE-EML',n:'Crème anesthésiante 30 g',cat:'Topique',u:'tube',q:5,s:4,lot:'L-EM2508',per:'2026-08-31',pu:12,f:'Cooper'},
+ {ref:'AIG-30G',n:'Aiguilles 30 G',cat:'Consommable',u:'boîte 100',q:9,s:4,lot:null,per:'2028-06-30',pu:14,f:'B. Braun'},
+ {ref:'CAN-25G',n:'Canules 25 G × 50 mm',cat:'Consommable',u:'boîte 20',q:2,s:4,lot:null,per:'2028-01-31',pu:46,f:'TSK'},
+ {ref:'CMP-ST',n:'Compresses stériles',cat:'Consommable',u:'boîte 100',q:18,s:6,lot:null,per:'2029-04-30',pu:6,f:'Hartmann'},
+];
+const sst=s=>{const p=days(TODAY,s.per);
+ if(s.q===0)return{k:'rupture',l:'Rupture',c:'b-crit'};
+ if(s.q<s.s)return{k:'bas',l:'Sous le seuil',c:'b-crit'};
+ if(p<90)return{k:'per',l:'Péremption < 3 mois',c:'b-warn'};
+ if(s.q<s.s*1.4)return{k:'surv',l:'À surveiller',c:'b-warn'};
+ return{k:'ok',l:'OK',c:'b-good'}};
+
+let RULES=[
+ {id:1,j:3, c:'E-mail',l:'Rappel doux + récapitulatif du devis',on:true},
+ {id:2,j:10,c:'SMS',   l:'« Votre devis est toujours valable, on en reparle ? »',on:true},
+ {id:3,j:21,c:'E-mail',l:'Dernière relance + proposition de rappel téléphonique',on:true},
+ {id:4,j:30,c:'Tâche', l:'Devis marqué expiré → tâche pour le secrétariat',on:true},
+];
+const ROLES={
+ praticien:{l:'Praticien',u:'Dr O. Baroudi',i:'OB',v:['dash','stats','patients','actes','devis','encaiss','relances','stock','equipe'],med:true,prix:true},
+ assistante:{l:'Assistante',u:'L. Roche',i:'LR',v:['dash','patients','actes','stock','relances'],med:true,prix:false},
+ secretariat:{l:'Secrétariat',u:'N. Faure',i:'NF',v:['dash','patients','devis','encaiss','relances','stock'],med:false,prix:true},
+};
+let role='praticien';
+
+/* ---------- Agrégats ---------- */
+const mk=d=>String(d).slice(0,7);
+const MF=['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+const ml=k=>MF[+k.slice(5,7)-1]+' '+k.slice(2,4);
+const serie=(n,fn2)=>{const o=[];for(let i=n-1;i>=0;i--){const d=new Date(TODAY.getFullYear(),TODAY.getMonth()-i,1);
+ const k=mk(d.toISOString());o.push({k,label:ml(k),v:fn2(k)})}return o};
+const caMois=serie(6,k=>FACTURES.filter(f=>mk(f.date)===k).reduce((s,f)=>s+f.paye,0));
+const acMois=serie(6,k=>ACTES.filter(a=>mk(a.date)===k).length);
+const in30=d=>d<=TODAYS&&days(d,TODAY)<=30;
+const inP30=d=>days(d,TODAY)>30&&days(d,TODAY)<=60;
+const CAM=FACTURES.filter(f=>in30(f.date)).reduce((s,f)=>s+f.paye,0);
+const CAP=FACTURES.filter(f=>inP30(f.date)).reduce((s,f)=>s+f.paye,0);
+const ACTM=ACTES.filter(a=>in30(a.date)).length;
+const RESTE=FACTURES.reduce((s,f)=>s+rdu(f),0);
+const ATT=DEVIS.filter(d=>['envoye','relance1','relance2'].includes(d.statut));
+const MATT=ATT.reduce((s,d)=>s+d.montant,0);
+const ALERTES=STOCK.filter(s=>['bas','rupture','per'].includes(sst(s).k));
+function fileRelances(){
+ const o=[];
+ ATT.forEach(d=>{const R=RULES.filter(x=>x.on), r=R[d.relances]; if(!r)return;
+  /* échéance = dernière relance (ou envoi) + écart avec l'étape précédente */
+  const prevJ=d.relances>0?R[d.relances-1].j:0, base=d.derniere||d.envoye;
+  const e=new Date(new Date(base).getTime()+(r.j-prevJ)*864e5).toISOString().slice(0,10);
+  o.push({d,r,e,du:e<=TODAYS})});
+ return o.sort((a,b)=>a.e.localeCompare(b.e));
+}
+const RELS=fileRelances();
+const RDUE=RELS.filter(r=>r.du);
+const CONSENT_KO=ACTES.filter(a=>catById(a.type).cons&&!a.consent);
+
+/* ==========================================================================
+   Composants
+   ========================================================================== */
+const kpi=(k,v,d,c)=>`<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div>${d?`<div class="d ${c||''}">${d}</div>`:''}</div>`;
+const bdg=(c,l)=>`<span class="bdg ${c}">${l}</span>`;
+
+function bars(data,{h=180,fmt=EUR,suf=''}={}){
+ const w=700,pl=6,pr=6,pb=24,pt=22,max=Math.max(...data.map(d=>d.v),1);
+ const bw=(w-pl-pr)/data.length, bar=Math.min(46,bw*.5), y=v=>pt+(h-pt-pb)*(1-v/max);
+ return `<svg class="ch" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:${h}px">
+ ${[0,.5,1].map(f=>`<line class="gl" x1="${pl}" x2="${w-pr}" y1="${y(max*f)}" y2="${y(max*f)}" stroke-width="1"/>`).join('')}
+ ${data.map((d,i)=>{const x=pl+i*bw+(bw-bar)/2, bh=Math.max(3,(h-pt-pb)-(y(d.v)-pt));
+   return `<g><title>${d.label} — ${fmt(d.v)}${suf}</title>
+   <rect class="cbar" x="${x}" y="${y(d.v)}" width="${bar}" height="${bh}" rx="5"/>
+   <text class="vl" x="${x+bar/2}" y="${y(d.v)-6}" text-anchor="middle">${fmt(d.v)}${suf}</text>
+   <text class="ax" x="${x+bar/2}" y="${h-7}" text-anchor="middle">${d.label}</text></g>`}).join('')}</svg>`;
+}
+const hbars=(d,{fmt=EUR}={})=>{const m=Math.max(...d.map(x=>x.v),1);
+ return d.map(x=>`<div class="hb"><div class="l">${esc(x.label)}</div><div class="t"><i style="width:${(x.v/m*100).toFixed(1)}%"></i></div><div class="v">${fmt(x.v)}</div></div>`).join('')};
+
+/* mini schéma de visage pour les tableaux */
+function miniFace(zones){
+ if(!zones) return '<span class="mu">—</span>';
+ return `<svg class="minif" viewBox="0 0 400 520"><ellipse class="mo" cx="200" cy="255" rx="112" ry="150"/>
+ ${Object.keys(zones).map(id=>{const z=zoneById(id); if(!z)return'';
+  return `<ellipse class="mz ${z.p==='tox'?'t':''}" cx="${z.cx}" cy="${z.cy}" rx="${z.rx*.85}" ry="${z.ry*.85}"/>`}).join('')}</svg>`;
+}
+
+/* ---- Schéma de visage interactif ---- */
+function faceSVG(state,{editable=true}={}){
+ const g=`
+ <path class="neck" d="M160 404 C160 444 152 460 128 470 C110 478 96 492 88 520 L312 520 C304 492 290 478 272 470 C248 460 240 444 240 404 Z"/>
+ <path class="guide" d="M200 68 C284 68 328 126 328 204 C328 244 322 278 312 310 C298 354 270 398 242 420 C228 431 212 438 200 438 C188 438 172 431 158 420 C130 398 102 354 88 310 C78 278 72 244 72 204 C72 126 116 68 200 68 Z"/>
+ <path class="guide" d="M73 194 C58 189 51 208 58 225 C64 240 76 247 83 245"/>
+ <path class="guide" d="M327 194 C342 189 349 208 342 225 C336 240 324 247 317 245"/>
+ <ellipse class="guidef" cx="157" cy="211" rx="25" ry="11"/><ellipse class="guidef" cx="243" cy="211" rx="25" ry="11"/>
+ <path class="guide" d="M132 211 C142 200 172 200 182 211 C172 222 142 222 132 211 Z"/>
+ <path class="guide" d="M268 211 C258 200 228 200 218 211 C228 222 258 222 268 211 Z"/>
+ <circle class="pupil" cx="157" cy="211" r="5.5"/><circle class="pupil" cx="243" cy="211" r="5.5"/>
+ <path class="guide" d="M129 185 C143 173 172 172 183 180"/><path class="guide" d="M271 185 C257 173 228 172 217 180"/>
+ <path class="guide" d="M200 216 L196 262 C190 271 184 272 180 267 M200 216 L204 262 C210 271 216 272 220 267"/>
+ <path class="guide" d="M164 328 C180 316 190 320 200 325 C210 320 220 316 236 328 C220 341 210 344 200 339 C190 344 180 341 164 328 Z"/>
+ <path class="guide" d="M164 328 L236 328" stroke-opacity=".12"/>`;
+ const zs=ZONES.map(z=>{
+  const q=state[z.id]||0, cls=(q>0?(z.p==='tox'?'zone act-tox':'zone act-ah'):'zone')+(editable?'':' ro');
+  const ev=editable?`onclick="zClick(event,'${z.id}')" oncontextmenu="zClick(event,'${z.id}',-1);return false"`:'';
+  return `<ellipse class="${cls}" cx="${z.cx}" cy="${z.cy}" rx="${z.rx}" ry="${z.ry}" ${ev}><title>${esc(z.n)} — ${PLABEL[z.p]}</title></ellipse>`;
+ }).join('');
+ const lbl=ZONES.filter(z=>state[z.id]>0).map(z=>
+  `<text class="zlabel" x="${z.cx}" y="${z.cy+4}">${fmtQ(state[z.id],z.p)}</text>`).join('');
+ return `<svg class="face" viewBox="0 0 400 530">${g}${zs}${lbl}</svg>`;
+}
+
+/* ==========================================================================
+   Vues
+   ========================================================================== */
+const V={};
+let view='dash';
+
+/* ---------------- Tableau de bord ---------------- */
+V.dash=()=>{
+ const ev=CAP?Math.round((CAM-CAP)/CAP*100):0;
+ const todo=[];
+ RDUE.forEach(r=>todo.push({i:'↻',b:'var(--warn-w)',c:'#8a6100',
+   t:`Relance ${r.r.c} — ${fn(pById(r.d.patient))}`,
+   d:`${r.d.id} · ${EUR(r.d.montant)} · envoyé il y a ${days(r.d.envoye,TODAY)} j`,
+   a:`<button class="btn s p" onclick="sendRel('${r.d.id}')">Envoyer</button>`}));
+ ALERTES.forEach(s=>todo.push({i:'▧',b:'var(--crit-w)',c:'#a52a2a',t:`${sst(s).l} — ${s.n}`,
+   d:`${s.q} ${s.u} en stock · seuil ${s.s} · ${s.f}`,
+   a:`<button class="btn s" onclick="toast('Bon de commande préparé pour ${esc(s.f)}')">Commander</button>`}));
+ CONSENT_KO.forEach(a=>todo.push({i:'✎',b:'var(--accent-wash)',c:'var(--accent-ink)',
+   t:`Consentement manquant — ${fn(pById(a.patient))}`,d:`${a.nom} du ${DF(a.date)}`,
+   a:`<button class="btn s" onclick="toast('Lien de signature envoyé par SMS')">Faire signer</button>`}));
+
+ const top=CATALOGUE.map(c=>({label:c.n,v:ACTES.filter(a=>a.type===c.id).reduce((s,a)=>s+a.prix,0)}))
+   .filter(x=>x.v>0).sort((a,b)=>b.v-a.v).slice(0,6);
+
+ return `<div class="head">
+   <div><h1>Bonjour Dr Baroudi</h1><p>Lundi 3 août 2026 · ${todo.length} chose${todo.length>1?'s':''} à traiter</p></div>
+   <div class="r">
+     <button class="btn" onclick="openActe()">✚ Nouvel acte <kbd style="opacity:.55;font-size:10px">A</kbd></button>
+     <button class="btn p" onclick="openPal()">⌘K Tout faire d'ici</button>
+   </div></div>
+
+ <div class="grid g5" style="margin-bottom:13px">
+   ${kpi('CA encaissé — 30 j',EUR(CAM),`${ev>=0?'▲':'▼'} ${Math.abs(ev)} % vs 30 j précédents`,ev>=0?'up':'dn')}
+   ${kpi('Actes — 30 j',ACTM,`${ACTES.length} au total`)}
+   ${kpi('Devis en attente',EUR(MATT),`${ATT.length} devis · ${RDUE.length} à relancer`,RDUE.length?'dn':'')}
+   ${kpi('Reste dû',EUR(RESTE),`${FACTURES.filter(f=>rdu(f)>0).length} factures partielles`,RESTE?'dn':'')}
+   ${kpi('Alertes stock',ALERTES.length,ALERTES.length?'réappro à lancer':'tout est au vert',ALERTES.length?'dn':'up')}
+ </div>
+
+ <div class="grid g2" style="margin-bottom:13px">
+  <div class="card"><div class="h"><h2>À traiter</h2><span class="s">tout se règle sans quitter cet écran</span>
+    <div class="r"><button class="btn s" onclick="allRel()">Tout envoyer</button></div></div>
+   <div class="b" style="max-height:296px;overflow:auto;padding-top:4px">
+    ${todo.length?todo.map(t=>`<div class="tl"><div class="ic" style="background:${t.b};color:${t.c}">${t.i}</div>
+      <div><div class="t">${esc(t.t)}</div><div class="d">${esc(t.d)}</div></div><div class="a">${t.a}</div></div>`).join('')
+      :'<div class="empty">Rien à traiter. 🎉</div>'}
+   </div></div>
+  <div class="card"><div class="h"><h2>Chiffre d'affaires encaissé</h2><span class="s">6 derniers mois</span></div>
+   <div class="b">${bars(caMois)}</div></div>
+ </div>
+
+ <div class="grid g2">
+  <div class="card"><div class="h"><h2>Derniers actes</h2>
+    <div class="r"><button class="btn s g" onclick="go('actes')">Tout voir →</button></div></div>
+   <div class="tw"><table><thead><tr><th>Schéma</th><th>Patient</th><th>Acte</th><th>Zones</th><th>Date</th></tr></thead><tbody>
+    ${ACTES.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6).map(a=>`
+     <tr class="c" onclick="openPatient(${a.patient})"><td>${miniFace(a.zones)}</td>
+      <td class="nm">${esc(fn(pById(a.patient)))}</td><td>${esc(a.nom)}</td>
+      <td class="mono mu">${zoneSummary(a)}</td><td class="mono mu">${DFS(a.date)}</td></tr>`).join('')}
+   </tbody></table></div></div>
+  <div class="card"><div class="h"><h2>CA par type d'acte</h2></div><div class="b">${hbars(top)}</div></div>
+ </div>`;
+};
+
+/* ---------------- Patients (maître-détail) ---------------- */
+let pq='',pPrat='',pSel=null,pTab='resume';
+V.patients=()=>{
+ let L=PATIENTS.filter(p=>{const q=pq.toLowerCase();
+  return (!q||[p.nom,p.prenom,p.mail,p.tel,String(p.id)].join(' ').toLowerCase().includes(q))&&(!pPrat||p.prat===pPrat)});
+ const nA=p=>ACTES.filter(a=>a.patient===p.id).length;
+ const last=p=>ACTES.filter(a=>a.patient===p.id).map(a=>a.date).sort().pop();
+ L.sort((a,b)=>(last(b)||'').localeCompare(last(a)||''));
+ if(!pSel&&L.length) pSel=L[0].id;
+ return `<div class="head"><div><h1>Patients</h1><p>${L.length} sur ${PATIENTS.length} · la fiche s'ouvre à droite, sans changer de page</p></div>
+  <div class="r"><button class="btn" onclick="toast('Recherche de doublons : 0 doublon détecté')">Doublons</button>
+   <button class="btn p" onclick="toast('Prototype : formulaire de création')">+ Patient</button></div></div>
+ <div class="md">
+  <div class="card" style="position:sticky;top:0">
+   <div class="h" style="gap:7px">
+     <input class="inp" style="flex:1;box-shadow:none" placeholder="Nom, e-mail, téléphone…" value="${esc(pq)}"
+       oninput="pq=this.value;paint();const e=document.querySelector('.md .inp');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
+     <select class="inp" style="box-shadow:none;width:130px" onchange="pPrat=this.value;paint()">
+       <option value="">Tous</option>${PRATICIENS.map(x=>`<option ${pPrat===x?'selected':''}>${x}</option>`).join('')}</select>
+   </div>
+   <div class="tw" style="max-height:calc(100vh - 190px);overflow:auto"><table><tbody>
+    ${L.map(p=>`<tr class="c ${pSel===p.id?'sel':''}" onclick="pSel=${p.id};paint()">
+      <td><div class="rowline"><div class="pav">${esc(ini(p))}</div>
+       <div style="min-width:0"><div class="nm">${esc(p.nom)} ${esc(p.prenom)}</div>
+        <div class="mu" style="font-size:11.5px">${age(p)} ans · ${nA(p)} acte${nA(p)>1?'s':''} · ${last(p)?DFS(last(p)):'jamais'}</div></div>
+       ${p.ant.length?`<span class="bdg b-warn" style="margin-left:auto">⚠ ${p.ant.length}</span>`:''}</div></td></tr>`).join('')}
+   </tbody></table>${L.length?'':'<div class="empty">Aucun résultat.</div>'}</div>
+  </div>
+  ${pSel?pDetail(pById(pSel)):'<div class="card"><div class="empty">Sélectionnez un patient.</div></div>'}
+ </div>`;
+};
+
+function pDetail(p){
+ const A=ACTES.filter(a=>a.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
+ const F=FACTURES.filter(f=>f.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
+ const D=DEVIS.filter(d=>d.patient===p.id);
+ const ca=F.reduce((s,f)=>s+f.paye,0), rd=F.reduce((s,f)=>s+rdu(f),0);
+ const cumul={}; A.forEach(a=>zonesOf(a).forEach(([z,q])=>cumul[z]=(cumul[z]||0)+q));
+ const TB=[['resume','Résumé'],['schema','Schéma cumulé'],['actes',`Actes ${A.length}`],['photos','Avant / après'],['facture','Devis & factures']];
+
+ const body={
+  resume:()=>`<div class="grid g2" style="gap:13px">
+    <div>
+     <div class="fld"><label>Notes</label>${ROLES[role].med?`<textarea class="note">${esc(p.notes||'—')}</textarea>`:'<div class="v mu">🔒 non accessible à ce rôle</div>'}</div>
+    </div>
+    <div>
+     <div class="fld"><label>Antécédents &amp; contre-indications</label>
+      ${p.ant.length?p.ant.map(a=>`<div class="bdg b-warn" style="margin:0 5px 5px 0">⚠ ${esc(a)}</div>`).join(''):'<div class="v mu">Aucun</div>'}</div>
+     <div class="fld"><label>Coordonnées</label><div class="v">${esc(p.tel)}<br>${esc(p.mail)}</div></div>
+     <div class="fld"><label>Suivi</label><div class="v">Patient depuis le ${DF(p.depuis)} · réf. ${esc(p.prat)}</div></div>
+    </div></div>
+   ${p.ant.some(a=>/Allaitement|Anticoagulant/.test(a))?`<div class="tip" style="margin:4px 0 0;background:var(--warn-w)"><span class="e">⚠</span><div><b>Blocage automatique.</b> Un antécédent bloquant est présent : le logiciel affiche un avertissement avant toute saisie d'acte injectable.</div></div>`:''}`,
+
+  schema:()=>`<div class="facewrap">
+    <div><div class="facebox">${faceSVG(cumul,{editable:false})}</div>
+     <div class="face-legend"><span><i style="background:var(--toxine)"></i>Toxine</span><span><i style="background:var(--ah)"></i>Acide hyaluronique</span></div></div>
+    <div>
+     <div class="tip" style="margin-bottom:10px"><span class="e">🗺️</span><div><b>Cumul historique.</b> Toutes les injections de ce patient, toutes séances confondues, sur un seul schéma.</div></div>
+     ${Object.keys(cumul).length?Object.entries(cumul).sort((a,b)=>b[1]-a[1]).map(([z,q])=>{const Z=zoneById(z);
+       return `<div class="zrow"><span class="zd" style="background:var(--${Z.p==='tox'?'toxine':'ah'})"></span>
+       <div class="zn">${esc(Z.k)}<small>${PLABEL[Z.p]}</small></div>
+       <b class="mono" style="font-size:12.5px">${fmtQ(q,Z.p)}</b></div>`}).join(''):'<div class="empty">Aucune injection enregistrée.</div>'}
+    </div></div>`,
+
+  actes:()=>`<div class="tw"><table><thead><tr><th>Schéma</th><th>Date</th><th>Acte</th><th>Zones injectées</th><th>Lot</th><th>Consent.</th>${ROLES[role].prix?'<th class="num">Montant</th>':''}</tr></thead><tbody>
+   ${A.map(a=>`<tr class="c" onclick="openActe(${a.patient},${a.id})"><td>${miniFace(a.zones)}</td>
+     <td class="mono">${DF(a.date)}</td><td><b>${esc(a.nom)}</b><div class="mu" style="font-size:11px">${esc(a.praticien)}</div></td>
+     <td style="max-width:230px">${a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneById(z);
+        return `<span class="bdg ${Z.p==='tox'?'b-info':'b-warn'}" style="margin:0 3px 3px 0">${esc(Z.k)} ${fmtQ(q,Z.p)}</span>`}).join(''):'<span class="mu">—</span>'}</td>
+     <td class="mono mu" style="font-size:11.5px">${a.lot||'—'}</td>
+     <td>${catById(a.type).cons?(a.consent?bdg('b-good','Signé'):bdg('b-crit','⚠ manquant')):'<span class="mu">n/a</span>'}</td>
+     ${ROLES[role].prix?`<td class="num">${EUR(a.prix)}</td>`:''}</tr>`).join('')}
+   </tbody></table>${A.length?'':'<div class="empty">Aucun acte.</div>'}</div>`,
+
+  photos:()=>`<div class="grid g2">
+    <div><div class="ba" id="ba">
+      <img src="${ph('AVANT — 14/04/2026',22,0)}" alt="avant simulé">
+      <img class="af" id="baA" src="${ph('APRÈS — 28/07/2026',26,8)}" alt="après simulé">
+      <div class="hd" id="baH" style="left:50%"></div><div class="tg l">AVANT</div><div class="tg r">APRÈS</div></div>
+     <input type="range" min="0" max="100" value="50" style="width:100%;margin-top:8px" oninput="setBA(this.value)"></div>
+    <div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      ${[['J0',22,0],['J+7',24,3],['J+30',25,6],['J+90',26,8],['J+180',27,9],['J+365',28,10]].map(([l,h,s])=>
+       `<div><img src="${ph(l,h,s)}" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px" alt="${l}">
+        <div style="font-size:11px;color:var(--ink-3);text-align:center;margin-top:3px">${l}</div></div>`).join('')}</div>
+     <div class="tip" style="margin:12px 0 0"><span class="e">📷</span><div><b>Import en 1 geste :</b> QR code affiché à l'écran, vous photographiez avec le téléphone, la photo arrive datée et recadrée dans la fiche.</div></div></div></div>`,
+
+  facture:()=>!ROLES[role].prix?'<div class="empty">🔒 Non accessible à ce rôle.</div>':`
+    <div class="grid g4" style="margin-bottom:12px">${kpi('CA cumulé',EUR(ca))}${kpi('Reste dû',EUR(rd),rd?'à recouvrer':'soldé',rd?'dn':'up')}
+     ${kpi('Devis en cours',D.filter(d=>['envoye','relance1','relance2'].includes(d.statut)).length)}${kpi('Factures',F.length)}</div>
+    <div class="tw"><table><thead><tr><th>Pièce</th><th>Date</th><th class="num">Montant</th><th class="num">Payé</th><th>Statut</th></tr></thead><tbody>
+     ${D.map(d=>`<tr class="c" onclick="go('devis','${d.id}')"><td class="mono">${d.id}</td><td class="mono">${DF(d.date)}</td>
+       <td class="num">${EUR(d.montant)}</td><td class="num mu">—</td><td>${bdg(SD[d.statut][1],SD[d.statut][0])}</td></tr>`).join('')}
+     ${F.map(f=>`<tr><td class="mono">${f.id}</td><td class="mono">${DF(f.date)}</td><td class="num">${EUR(f.montant)}</td>
+       <td class="num">${rdu(f)>0?`<span style="color:var(--crit);font-weight:660">${EUR(f.paye)}</span>`:EUR(f.paye)}</td>
+       <td>${rdu(f)>0?bdg('b-crit','reste '+EUR(rdu(f))):bdg('b-good','Soldée · '+f.moyen)}</td></tr>`).join('')}
+    </tbody></table></div>`
+ };
+
+ return `<div class="card">
+  <div class="h" style="padding:14px 16px">
+   <div class="pav" style="width:38px;height:38px;font-size:13px">${esc(ini(p))}</div>
+   <div><h2 style="font-size:16px">${esc(p.nom)} ${esc(p.prenom)}</h2>
+    <div class="mu" style="font-size:11.5px">${age(p)} ans · dossier ${p.id} · ${A.length} actes${ROLES[role].prix?` · ${EUR(ca)}`:''}${rd?` · <span style="color:var(--crit);font-weight:600">reste ${EUR(rd)}</span>`:''}</div></div>
+   <div class="r">
+    <button class="btn s" onclick="toast('SMS ouvert')">💬</button>
+    <button class="btn s" onclick="toast('E-mail ouvert')">✉</button>
+    <button class="btn s p" onclick="openActe(${p.id})">✚ Acte</button></div>
+  </div>
+  <div class="b" style="padding-bottom:0"><div class="tabs">${TB.map(([k,l])=>`<button class="${pTab===k?'on':''}" onclick="pTab='${k}';paint()">${l}</button>`).join('')}</div></div>
+  <div class="b">${body[pTab]()}</div></div>`;
+}
+
+/* ---------------- Actes ---------------- */
+let aq='',aCat='',aPrat='';
+V.actes=()=>{
+ const L=ACTES.filter(a=>{const q=aq.toLowerCase();
+  return (!aCat||a.cat===aCat)&&(!aPrat||a.praticien===aPrat)&&
+   (!q||[a.nom,a.lot||'',fn(pById(a.patient)),...(a.zones?Object.keys(a.zones).map(z=>zoneById(z).n):[])].join(' ').toLowerCase().includes(q))
+ }).sort((a,b)=>b.date.localeCompare(a.date));
+ const tox=L.reduce((s,a)=>s+zonesOf(a).filter(([z])=>zoneById(z).p==='tox').reduce((x,[,q])=>x+q,0),0);
+ const ah=L.reduce((s,a)=>s+zonesOf(a).filter(([z])=>zoneById(z).p==='ah').reduce((x,[,q])=>x+q,0),0);
+ return `<div class="head"><div><h1>Actes &amp; schémas</h1><p>${L.length} actes · ${tox} U de toxine · ${ah.toFixed(1)} ml d'AH</p></div>
+  <div class="r"><button class="btn" onclick="toast('Export CSV généré')">Exporter</button>
+   <button class="btn p" onclick="openActe()">✚ Saisir un acte</button></div></div>
+ <div class="fbar">
+  <input class="inp" style="min-width:280px" id="aqi" placeholder="Patient, zone anatomique, n° de lot…" value="${esc(aq)}"
+    oninput="aq=this.value;paint();const e=document.getElementById('aqi');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
+  <div class="seg"><button class="${!aCat?'on':''}" onclick="aCat='';paint()">Tout</button>
+   ${CATS.map(c=>`<button class="${aCat===c?'on':''}" onclick="aCat='${c}';paint()">${c}</button>`).join('')}</div>
+  <select class="inp" onchange="aPrat=this.value;paint()"><option value="">Tous praticiens</option>
+   ${PRATICIENS.map(x=>`<option ${aPrat===x?'selected':''}>${x}</option>`).join('')}</select>
+ </div>
+ <div class="card"><div class="tw"><table>
+  <thead><tr><th>Schéma</th><th>Date</th><th>Patient</th><th>Acte</th><th>Zones &amp; quantités</th><th>Lot</th><th>Effets</th>${ROLES[role].prix?'<th class="num">Montant</th>':''}</tr></thead>
+  <tbody>${L.map(a=>`<tr class="c" onclick="openActe(${a.patient},${a.id})">
+   <td>${miniFace(a.zones)}</td><td class="mono">${DF(a.date)}</td>
+   <td class="nm">${esc(fn(pById(a.patient)))}</td>
+   <td>${esc(a.nom)}<div class="mu" style="font-size:11px">${esc(a.praticien)}${a.operateur?' · '+esc(a.operateur):''}</div></td>
+   <td style="max-width:300px">${a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneById(z);
+     return `<span class="bdg ${Z.p==='tox'?'b-info':'b-warn'}" style="margin:0 3px 3px 0">${esc(Z.k)} · ${fmtQ(q,Z.p)}</span>`}).join(''):'<span class="mu">acte non injectable</span>'}</td>
+   <td class="mono mu" style="font-size:11.5px">${a.lot||'—'}</td>
+   <td class="mu" style="font-size:11.5px;max-width:150px">${a.effets||'—'}</td>
+   ${ROLES[role].prix?`<td class="num">${EUR(a.prix)}</td>`:''}</tr>`).join('')}</tbody></table>
+  ${L.length?'':'<div class="empty">Aucun acte.</div>'}</div></div>`;
+};
+
+/* ---------------- Devis ---------------- */
+let dF='tous',dSel=null;
+V.devis=()=>{
+ if(dSel){const d=DEVIS.find(x=>x.id===dSel),p=pById(d.patient);
+  const h=[]; if(d.envoye)h.push([d.envoye,'Devis envoyé par e-mail','✉']);
+  for(let i=0;i<d.relances;i++){const r=RULES.filter(x=>x.on)[i];
+   h.push([new Date(new Date(d.envoye).getTime()+r.j*864e5).toISOString().slice(0,10),`Relance ${r.c} — ${r.l}`,'↻'])}
+  if(d.statut==='accepte')h.push([d.derniere||d.date,'Devis accepté','✓']);
+  if(d.statut==='refuse')h.push([d.derniere||d.date,'Devis refusé','✕']);
+  if(d.statut==='expire')h.push([d.derniere||d.date,'Expiré (30 j sans réponse)','⏱']);
+  const nx=RELS.find(r=>r.d.id===d.id);
+  return `<div class="head"><div><h1>${d.id}</h1><p>${esc(fn(p))} · ${DF(d.date)} · ${bdg(SD[d.statut][1],SD[d.statut][0])}</p></div>
+   <div class="r"><button class="btn g" onclick="dSel=null;paint()">← Retour</button>
+    <button class="btn" onclick="openPatient(${p.id})">Fiche patient</button>
+    <button class="btn" onclick="toast('PDF généré')">PDF</button>
+    <button class="btn p" onclick="sendRel('${d.id}')">Relancer maintenant</button></div></div>
+  <div class="grid g2">
+   <div class="card"><div class="h"><h2>Détail</h2></div><div class="tw"><table>
+    <thead><tr><th>Prestation</th><th class="num">Qté</th><th class="num">P.U.</th><th class="num">Total</th></tr></thead><tbody>
+    ${d.lignes.map(l=>`<tr><td>${esc(l[1])}</td><td class="num">${l[2]}</td><td class="num">${EUR(l[3])}</td><td class="num">${EUR(l[2]*l[3])}</td></tr>`).join('')}
+    <tr><td colspan="3" class="num"><b>Total TTC</b></td><td class="num"><b>${EUR(d.montant)}</b></td></tr></tbody></table></div>
+    <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">Devis valable 30 jours. Délai de réflexion légal de 15 jours applicable — le logiciel bloque la prise de RDV avant son terme.</div></div></div>
+   <div class="card"><div class="h"><h2>Historique &amp; relances</h2><div class="r">${nx?bdg('b-warn','Prochaine : '+DF(nx.e)):bdg('b-neu','Aucune')}</div></div>
+    <div class="b">${h.sort((a,b)=>a[0].localeCompare(b[0])).map(x=>`<div class="tl">
+     <div class="ic" style="background:var(--accent-wash);color:var(--accent-ink)">${x[2]}</div>
+     <div><div class="t">${esc(x[1])}</div><div class="d">${DF(x[0])}</div></div></div>`).join('')}
+     ${nx?`<div class="tip" style="margin-top:12px"><span class="e">↻</span><div><b>${nx.r.c} programmé le ${DF(nx.e)}</b> — ${esc(nx.r.l)}${nx.du?' <b style="color:var(--crit)">· échu</b>':''}</div></div>`:''}</div></div>
+  </div>`;}
+
+ const L=DEVIS.filter(d=>dF==='tous'||(dF==='attente'?['envoye','relance1','relance2'].includes(d.statut):d.statut===dF))
+  .sort((a,b)=>b.date.localeCompare(a.date));
+ const tx=Math.round(DEVIS.filter(d=>d.statut==='accepte').length/DEVIS.filter(d=>d.statut!=='brouillon').length*100);
+ return `<div class="head"><div><h1>Devis &amp; factures</h1><p>${EUR(MATT)} en attente de réponse</p></div>
+  <div class="r"><button class="btn" onclick="go('relances')">Régler les relances</button><button class="btn p" onclick="toast('Nouveau devis')">+ Devis</button></div></div>
+ <div class="grid g4" style="margin-bottom:14px">
+  ${kpi('Taux d’acceptation',tx+' %','objectif 60 %',tx>=60?'up':'dn')}
+  ${kpi('En attente',EUR(MATT),ATT.length+' devis')}
+  ${kpi('Relances échues',RDUE.length,RDUE.length?'à envoyer':'à jour',RDUE.length?'dn':'up')}
+  ${kpi('Perdus',EUR(DEVIS.filter(d=>['refuse','expire'].includes(d.statut)).reduce((s,d)=>s+d.montant,0)))}</div>
+ <div class="fbar"><div class="seg">${[['tous','Tous'],['attente','En attente'],['accepte','Acceptés'],['refuse','Refusés'],['expire','Expirés'],['brouillon','Brouillons']]
+  .map(([k,l])=>`<button class="${dF===k?'on':''}" onclick="dF='${k}';paint()">${l}</button>`).join('')}</div></div>
+ <div class="card"><div class="tw"><table>
+  <thead><tr><th>N°</th><th>Patient</th><th>Date</th><th class="num">Montant</th><th>Statut</th><th>Âge</th><th>Prochaine action</th><th></th></tr></thead>
+  <tbody>${L.map(d=>{const nx=RELS.find(r=>r.d.id===d.id),ag=d.envoye?days(d.envoye,TODAY):null;
+   return `<tr class="c" onclick="dSel='${d.id}';paint()"><td class="mono">${d.id}</td>
+    <td class="nm">${esc(fn(pById(d.patient)))}</td><td class="mono">${DF(d.date)}</td>
+    <td class="num">${EUR(d.montant)}</td><td>${bdg(SD[d.statut][1],SD[d.statut][0])}</td>
+    <td class="mono" ${ag>21?'style="color:var(--crit);font-weight:620"':'class="mono mu"'}>${ag!==null?ag+' j':'—'}</td>
+    <td>${nx?(nx.du?bdg('b-crit','⚠ '+nx.r.c+' échu'):bdg('b-info',nx.r.c+' le '+DFS(nx.e))):'<span class="mu">—</span>'}</td>
+    <td class="num">${nx&&nx.du?`<button class="btn xs p" onclick="event.stopPropagation();sendRel('${d.id}')">Envoyer</button>`:''}</td></tr>`}).join('')}
+  </tbody></table>${L.length?'':'<div class="empty">Aucun devis.</div>'}</div></div>`;
+};
+
+/* ---------------- Encaissements ---------------- */
+V.encaiss=()=>{
+ const im=FACTURES.filter(f=>rdu(f)>0).sort((a,b)=>a.date.localeCompare(b.date));
+ const pm=['CB','Espèces','Chèque','Virement'].map(m=>({label:m,v:FACTURES.filter(f=>f.moyen===m).reduce((s,f)=>s+f.paye,0)})).filter(x=>x.v);
+ return `<div class="head"><div><h1>Encaissements</h1><p>Caisse, restes dus et moyens de paiement</p></div>
+  <div class="r"><button class="btn" onclick="toast('Clôture de caisse enregistrée')">Clôture du jour</button>
+   <button class="btn p" onclick="toast('Encaissement saisi')">+ Encaissement</button></div></div>
+ <div class="grid g4" style="margin-bottom:14px">
+  ${kpi('Encaissé — 30 j',EUR(CAM),`${CAP?Math.round((CAM-CAP)/CAP*100):0} % vs 30 j précédents`,CAM>=CAP?'up':'dn')}
+  ${kpi('Reste dû',EUR(RESTE),im.length+' factures',RESTE?'dn':'up')}
+  ${kpi('Chèques à encaisser',EUR(FACTURES.filter(f=>f.moyen==='Chèque'&&f.date>'2026-07-01').reduce((s,f)=>s+f.paye,0)))}
+  ${kpi('Espèces en caisse',EUR(FACTURES.filter(f=>f.moyen==='Espèces'&&f.date>'2026-07-25').reduce((s,f)=>s+f.paye,0)))}</div>
+ <div class="grid g2" style="margin-bottom:13px">
+  <div class="card"><div class="h"><h2>Par moyen de paiement</h2></div><div class="b">${hbars(pm)}</div></div>
+  <div class="card"><div class="h"><h2>Encaissé par mois</h2></div><div class="b">${bars(caMois,{h:170})}</div></div></div>
+ <div class="card"><div class="h"><h2>Restes dus</h2><div class="r">${bdg('b-warn',EUR(RESTE)+' à recouvrer')}
+   <button class="btn s" onclick="toast('${im.length} relances de paiement envoyées')">Tout relancer</button></div></div>
+  <div class="tw"><table><thead><tr><th>Facture</th><th>Patient</th><th>Date</th><th class="num">Montant</th><th class="num">Payé</th><th class="num">Reste</th><th>Âge</th><th></th></tr></thead>
+  <tbody>${im.map(f=>`<tr><td class="mono">${f.id}</td><td class="nm">${esc(fn(pById(f.patient)))}</td>
+   <td class="mono">${DF(f.date)}</td><td class="num">${EUR(f.montant)}</td><td class="num">${EUR(f.paye)}</td>
+   <td class="num" style="color:var(--crit);font-weight:660">${EUR(rdu(f))}</td><td class="mono">${days(f.date,TODAY)} j</td>
+   <td class="num"><button class="btn xs" onclick="toast('Relance envoyée')">Relancer</button></td></tr>`).join('')}</tbody></table>
+   ${im.length?'':'<div class="empty">Aucun impayé 🎉</div>'}</div></div>`;
+};
+
+/* ---------------- Relances ---------------- */
+V.relances=()=>`<div class="head"><div><h1>Relances automatiques</h1><p>Le devis part, le logiciel relance seul. Vous n'intervenez que si le patient répond.</p></div>
+ <div class="r"><button class="btn p" onclick="allRel()">Envoyer les ${RDUE.length} relance${RDUE.length>1?'s':''} échue${RDUE.length>1?'s':''}</button></div></div>
+ <div class="tip"><span class="e">⚙️</span><div><b>Le point que vous avez demandé.</b> Une règle par étape suffit : le système calcule l'échéance depuis la date d'envoi, prépare le message avec le récapitulatif du devis, et s'arrête net dès que le patient accepte, refuse ou reprend RDV.</div></div>
+ <div class="grid g2">
+  <div class="card"><div class="h"><h2>Scénario</h2><span class="s">appliqué à tout devis envoyé</span></div><div class="b">
+   ${RULES.map(r=>`<div class="zrow" style="padding:10px 11px">
+    <span class="bdg b-info" style="font-weight:750">J+${r.j}</span>
+    <div class="zn" style="font-size:12.8px"><b>${r.c}</b> — ${esc(r.l)}<small>échéance calculée depuis l'envoi</small></div>
+    <button class="sw ${r.on?'on':''}" onclick="RULES.find(x=>x.id===${r.id}).on=!RULES.find(x=>x.id===${r.id}).on;paint()"></button></div>`).join('')}
+   <button class="btn s" style="margin-top:4px">+ Étape</button>
+   <div style="margin-top:15px;padding-top:13px;border-top:1px solid var(--line)">
+    <div style="font-weight:650;font-size:12.5px;margin-bottom:7px">Arrêt automatique si…</div>
+    ${['le patient accepte le devis','le patient refuse','un RDV est pris pour un acte du devis','le patient se désinscrit (obligation RGPD)']
+     .map(c=>`<div style="display:flex;gap:8px;font-size:12.5px;padding:4px 0;color:var(--ink-2)"><span style="color:var(--good)">✓</span>${c}</div>`).join('')}</div>
+  </div></div>
+  <div class="card"><div class="h"><h2>File d'attente</h2><span class="s">${RELS.length} programmée${RELS.length>1?'s':''}</span></div>
+   <div class="tw"><table><thead><tr><th>Échéance</th><th>Patient</th><th class="num">Montant</th><th>Canal</th><th>Statut</th><th></th></tr></thead>
+   <tbody>${RELS.map(r=>`<tr class="c" onclick="go('devis','${r.d.id}')"><td class="mono">${DF(r.e)}</td>
+    <td class="nm">${esc(fn(pById(r.d.patient)))}</td><td class="num">${EUR(r.d.montant)}</td><td>${r.r.c}</td>
+    <td>${r.du?bdg('b-crit','⚠ Échue'):bdg('b-info','Programmée')}</td>
+    <td class="num">${r.du?`<button class="btn xs p" onclick="event.stopPropagation();sendRel('${r.d.id}')">Envoyer</button>`:''}</td></tr>`).join('')}</tbody></table>
+    ${RELS.length?'':'<div class="empty">Rien en attente.</div>'}</div>
+   <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">Sur les ${ATT.length} devis en attente (${EUR(MATT)}), une relance structurée récupère typiquement 15 à 25 % de plus qu'une relance manuelle irrégulière — soit <b style="color:var(--ink)">${EUR(Math.round(MATT*.2))}</b> par cycle.</div></div></div>
+ </div>`;
+
+/* ---------------- Stock ---------------- */
+let sF='tous',lotSel='';
+V.stock=()=>{
+ const L=STOCK.filter(s=>sF==='tous'||(sF==='alerte'?['bas','rupture','per'].includes(sst(s).k):s.cat===sF));
+ const val=STOCK.reduce((a,s)=>a+s.q*s.pu,0);
+ return `<div class="head"><div><h1>Stock &amp; lots</h1><p>${STOCK.length} références · ${EUR(val)} immobilisés</p></div>
+  <div class="r"><button class="btn" onclick="toast('Bon de commande généré')">Bon de commande</button>
+   <button class="btn p" onclick="toast('Entrée de stock')">+ Entrée</button></div></div>
+ <div class="tip"><span class="e">📦</span><div><b>Le stock se décrémente tout seul.</b> Chaque zone injectée consomme la quantité correspondante et rattache le n° de lot au patient. Vous ne comptez plus les seringues : vous validez une commande quand le logiciel vous le dit.</div></div>
+ <div class="grid g4" style="margin-bottom:14px">
+  ${kpi('Valeur du stock',EUR(val))}
+  ${kpi('Sous le seuil',STOCK.filter(s=>s.q<s.s).length,'à recommander',STOCK.filter(s=>s.q<s.s).length?'dn':'up')}
+  ${kpi('Péremption < 3 mois',STOCK.filter(s=>days(TODAY,s.per)<90).length,'à écouler')}
+  ${kpi('Lots tracés',[...new Set(ACTES.filter(a=>a.lot).map(a=>a.lot))].length,'rappel produit possible en 1 clic')}</div>
+ <div class="fbar"><div class="seg">${[['tous','Toutes'],['alerte','⚠ Alertes'],['Injectable','Injectables'],['Topique','Topiques'],['Consommable','Consommables']]
+  .map(([k,l])=>`<button class="${sF===k?'on':''}" onclick="sF='${k}';paint()">${l}</button>`).join('')}</div></div>
+ <div class="card" style="margin-bottom:13px"><div class="tw"><table>
+  <thead><tr><th>Référence</th><th class="num">Stock</th><th>Niveau</th><th>Lot</th><th>Péremption</th><th class="num">À commander</th><th>Statut</th><th>Fournisseur</th></tr></thead>
+  <tbody>${L.map(s=>{const st=sst(s),pct=Math.min(100,s.q/(s.s*2)*100),
+   col=st.k==='ok'?'var(--good)':(st.k==='surv'||st.k==='per')?'var(--warn)':'var(--crit)',
+   per=days(TODAY,s.per),bes=Math.max(0,s.s*2-s.q);
+   return `<tr><td><b>${esc(s.n)}</b><div class="mu mono" style="font-size:11px">${s.ref} · ${EUR(s.pu)}/${s.u}</div></td>
+    <td class="num"><b>${s.q}</b> <span class="mu" style="font-size:11px">/ ${s.s}</span></td>
+    <td><div class="bar"><i style="width:${pct}%;background:${col}"></i></div></td>
+    <td class="mono" style="font-size:11.5px">${s.lot||'<span class="mu">n/a</span>'}</td>
+    <td class="mono" ${per<90?'style="color:var(--warn);font-weight:620"':'class="mono mu"'}>${DF(s.per)}</td>
+    <td class="num">${bes?`<b>${bes}</b>`:'<span class="mu">—</span>'}</td>
+    <td>${bdg(st.c,st.l)}</td><td class="mu" style="font-size:11.5px">${esc(s.f)}</td></tr>`}).join('')}
+  </tbody></table></div></div>
+ <div class="card"><div class="h"><h2>Traçabilité — lot → patients</h2><span class="s">rappel produit / matériovigilance</span>
+   <div class="r"><select class="inp" style="box-shadow:none" onchange="lotSel=this.value;paint()">
+    <option value="">Choisir un lot…</option>
+    ${[...new Set(ACTES.filter(a=>a.lot).map(a=>a.lot))].sort().map(l=>`<option ${lotSel===l?'selected':''}>${l}</option>`).join('')}
+   </select></div></div>
+  <div class="b">${lotSel?(()=>{const R=ACTES.filter(a=>a.lot===lotSel);
+   return `<div class="tw"><table><thead><tr><th>Patient</th><th>Date</th><th>Acte</th><th>Zones</th><th>Effets</th></tr></thead><tbody>
+   ${R.map(a=>`<tr class="c" onclick="openPatient(${a.patient})"><td class="nm">${esc(fn(pById(a.patient)))}</td>
+    <td class="mono">${DF(a.date)}</td><td>${esc(a.nom)}</td><td class="mu">${zoneSummary(a)}</td>
+    <td class="mu">${a.effets||'—'}</td></tr>`).join('')}</tbody></table></div>
+   <div style="margin-top:10px">${bdg('b-info',R.length+' patient(s) exposé(s)')} <button class="btn s" style="margin-left:6px" onclick="toast('${R.length} SMS envoyés')">Notifier par SMS</button></div>`})()
+   :'<div class="mu" style="font-size:12.5px">Sélectionnez un lot pour obtenir la liste des patients exposés — c\'est ce qu\'on vous demandera en cas de rappel produit.</div>'}</div></div>`;
+};
+
+/* ---------------- Statistiques ---------------- */
+V.stats=()=>{
+ const pc=CATS.map(c=>({label:c,v:ACTES.filter(a=>a.cat===c).reduce((s,a)=>s+a.prix,0)})).filter(x=>x.v).sort((a,b)=>b.v-a.v);
+ const pp=PRATICIENS.map(p=>({label:p,v:ACTES.filter(a=>a.praticien===p).reduce((s,a)=>s+a.prix,0)}));
+ const zc={}; ACTES.forEach(a=>zonesOf(a).forEach(([z])=>{const n=ZDEF.find(x=>z.startsWith(x.id)).k;zc[n]=(zc[n]||0)+1}));
+ const pz=Object.entries(zc).map(([label,v])=>({label,v})).sort((a,b)=>b.v-a.v).slice(0,8);
+ const fid=PATIENTS.filter(p=>ACTES.filter(a=>a.patient===p.id).length>=2).length;
+ return `<div class="head"><div><h1>Statistiques</h1><p>Sur l'ensemble des données du prototype</p></div>
+  <div class="r"><div class="seg"><button class="on">6 mois</button><button>12 mois</button><button>Année</button></div></div></div>
+ <div class="grid g4" style="margin-bottom:14px">
+  ${kpi('Panier moyen',EUR(Math.round(ACTES.reduce((s,a)=>s+a.prix,0)/ACTES.length)))}
+  ${kpi('Patients fidélisés',fid+' / '+PATIENTS.length,Math.round(fid/PATIENTS.length*100)+' % ont ≥ 2 actes','up')}
+  ${kpi('Actes par patient',(ACTES.length/PATIENTS.length).toFixed(1))}
+  ${kpi('CA total',EUR(FACTURES.reduce((s,f)=>s+f.paye,0)))}</div>
+ <div class="grid g2" style="margin-bottom:13px">
+  <div class="card"><div class="h"><h2>CA encaissé</h2><span class="s">par mois</span></div><div class="b">${bars(caMois)}</div></div>
+  <div class="card"><div class="h"><h2>Nombre d'actes</h2><span class="s">par mois</span></div><div class="b">${bars(acMois,{fmt:NUM})}</div></div></div>
+ <div class="grid g3">
+  <div class="card"><div class="h"><h2>CA par catégorie</h2></div><div class="b">${hbars(pc)}</div></div>
+  <div class="card"><div class="h"><h2>CA par praticien</h2></div><div class="b">${hbars(pp)}</div></div>
+  <div class="card"><div class="h"><h2>Zones les plus traitées</h2><span class="s">inédit vs Gemelia</span></div><div class="b">${hbars(pz,{fmt:NUM})}</div></div></div>`;
+};
+
+/* ---------------- Équipe ---------------- */
+V.equipe=()=>{
+ const M=[['Voir les patients',1,1,1],['Créer / modifier un patient',1,1,1],['Lire les notes médicales',1,1,0],
+  ['Saisir un acte &amp; le schéma',1,1,0],['Voir tarifs et CA',1,0,1],['Créer devis / facture',1,0,1],
+  ['Encaisser',1,0,1],['Gérer le stock',1,1,0],['Exporter les données',1,0,0],['Gérer les utilisateurs',1,0,0]];
+ const U=[['Dr O. Baroudi','Praticien — admin','OB','2026-08-03',1],['Dr A. Merlin','Praticien','AM','2026-08-01',1],
+  ['L. Roche','Assistante','LR','2026-08-03',1],['S. Vidal','Assistante','SV','2026-07-31',0],['N. Faure','Secrétariat','NF','2026-08-03',0]];
+ return `<div class="head"><div><h1>Équipe &amp; droits</h1><p>5 utilisateurs · 3 rôles</p></div>
+  <div class="r"><button class="btn p" onclick="toast('Invitation envoyée')">+ Inviter</button></div></div>
+ <div class="tip"><span class="e">👥</span><div>Cliquez sur <b>⇄</b> en bas de la barre latérale pour voir l'application telle que la voit chaque membre : menu, tarifs et notes médicales s'adaptent au rôle.</div></div>
+ <div class="grid g2">
+  <div class="card"><div class="h"><h2>Utilisateurs</h2></div><div class="tw"><table>
+   <thead><tr><th>Nom</th><th>Rôle</th><th>Dernière connexion</th><th>2FA</th></tr></thead>
+   <tbody>${U.map(u=>`<tr><td><div class="rowline"><div class="pav" style="width:26px;height:26px;font-size:10px">${u[2]}</div><b>${u[0]}</b></div></td>
+    <td class="mu">${u[1]}</td><td class="mono mu">${DF(u[3])}</td><td>${u[4]?bdg('b-good','Activée'):bdg('b-warn','⚠ à activer')}</td></tr>`).join('')}</tbody></table></div></div>
+  <div class="card"><div class="h"><h2>Matrice des droits</h2></div><div class="tw"><table>
+   <thead><tr><th>Action</th><th style="text-align:center">Praticien</th><th style="text-align:center">Assistante</th><th style="text-align:center">Secrétariat</th></tr></thead>
+   <tbody>${M.map(m=>`<tr><td>${m[0]}</td>${[1,2,3].map(i=>`<td style="text-align:center">${m[i]?'<span style="color:var(--good);font-weight:750">✓</span>':'<span class="mu">—</span>'}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+   <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">Chaque accès à une donnée de santé est journalisé (utilisateur, patient, horodatage). Obligation de l'agrément HDS et de l'article 9 du RGPD.</div></div></div>
+ </div>`;
+};
+
+/* ==========================================================================
+   SLIDE-OVER : saisie d'acte avec schéma de visage
+   ========================================================================== */
+let AS=null;   /* état de saisie */
+function openActe(pid,aid){
+ const a=aid?ACTES.find(x=>x.id===aid):null;
+ AS={pid:pid||(a?a.patient:PATIENTS[0].id), aid:aid||null, ro:!!a,
+     type:a?a.type:'AH', date:a?a.date:TODAYS, prat:a?a.praticien:PRATICIENS[0],
+     oper:a?a.operateur:'', z:a&&a.zones?{...a.zones}:{}, effets:a?a.effets:'', consent:a?a.consent:false};
+ renderOver();
+ document.getElementById('over').classList.add('on');
+ document.getElementById('scrim').classList.add('on');
+}
+function renderOver(){
+ const p=pById(AS.pid);
+ const ent=Object.entries(AS.z).filter(([,q])=>q>0);
+ const tox=ent.filter(([z])=>zoneById(z).p==='tox').reduce((s,[,q])=>s+q,0);
+ const ah =ent.filter(([z])=>zoneById(z).p==='ah').reduce((s,[,q])=>s+q,0);
+ const prix=Math.round((tox*PU.tox+ah*PU.ah)/5)*5;
+ const lotTox=STOCK.find(s=>s.ref==='BTX-100'), lotAH=STOCK.find(s=>s.ref==='AH-VOLB');
+
+ document.getElementById('overh').innerHTML=`
+  <button class="btn g s" onclick="closeAll()">✕</button>
+  <div><h2>${AS.ro?'Acte du '+DF(AS.date):'Nouvel acte'} — ${esc(fn(p))}</h2>
+   <div class="mu" style="font-size:11.5px">${age(p)} ans · dossier ${p.id}${p.ant.length?' · <span style="color:var(--warn);font-weight:600">⚠ '+esc(p.ant[0])+'</span>':''}</div></div>
+  <div style="margin-left:auto;display:flex;gap:7px">
+   ${AS.ro?'<span class="bdg b-neu">lecture seule</span>':''}
+   <button class="btn s" onclick="openPatient(${p.id})">Fiche complète</button></div>`;
+
+ document.getElementById('overb').innerHTML=`
+  ${AS.ro?'':`<div class="fbar" style="margin-bottom:14px">
+    <select class="inp" onchange="AS.pid=+this.value;renderOver()">${PATIENTS.map(x=>`<option value="${x.id}" ${x.id===AS.pid?'selected':''}>${esc(fn(x))}</option>`).join('')}</select>
+    <input class="inp" type="date" value="${AS.date}" onchange="AS.date=this.value">
+    <select class="inp" onchange="AS.prat=this.value">${PRATICIENS.map(x=>`<option ${AS.prat===x?'selected':''}>${x}</option>`).join('')}</select>
+    <select class="inp" onchange="AS.oper=this.value"><option value="">Sans opérateur</option>${OPERATEURS.map(x=>`<option ${AS.oper===x?'selected':''}>${x}</option>`).join('')}</select>
+   </div>`}
+  <div class="facewrap">
+   <div>
+    ${AS.ro?'':`<div class="preset">
+      <span class="mu" style="font-size:11.5px;align-self:center;margin-right:2px">Protocole en 1 clic :</span>
+      ${PROTOS.map((x,i)=>`<button class="chip" onclick="applyProto(${i})">${x.n}</button>`).join('')}
+      <button class="chip" onclick="mirrorZ()">⇄ Symétriser</button>
+      ${ent.length?`<button class="chip" onclick="AS.z={};renderOver()">Effacer</button>`:''}</div>`}
+    <div class="facebox">${faceSVG(AS.z,{editable:!AS.ro})}</div>
+    <div class="face-legend">
+      <span><i style="background:var(--toxine)"></i>Toxine botulique (U)</span>
+      <span><i style="background:var(--ah)"></i>Acide hyaluronique (ml)</span>
+      ${AS.ro?'':'<span class="mu">clic = ajouter · clic droit = retirer</span>'}</div>
+   </div>
+   <div>
+    <div class="totbox">
+     <div><div class="k">Toxine</div><div class="v" style="color:var(--toxine)">${tox} U</div></div>
+     <div><div class="k">Acide hyaluronique</div><div class="v" style="color:var(--ah)">${ah.toFixed(2).replace(/0$/,'').replace(/\.$/,'')} ml</div></div>
+    </div>
+    ${ROLES[role].prix?`<div class="zrow" style="background:var(--accent-wash);border-color:transparent">
+      <div class="zn" style="font-weight:640">Montant calculé<small>4,50 €/U · 350 €/ml</small></div>
+      <b style="font-size:17px;letter-spacing:-.03em">${EUR(prix)}</b></div>`:''}
+    <div style="max-height:340px;overflow:auto;margin:8px 0">
+     ${ent.length?ent.map(([z,q])=>{const Z=zoneById(z);
+       return `<div class="zrow"><span class="zd" style="background:var(--${Z.p==='tox'?'toxine':'ah'})"></span>
+        <div class="zn">${esc(Z.k)}<small>${PLABEL[Z.p]}</small></div>
+        ${AS.ro?`<b class="mono">${fmtQ(q,Z.p)}</b>`:`<div class="step">
+          <button onclick="bump('${z}',-1)">−</button><span>${fmtQ(q,Z.p)}</span><button onclick="bump('${z}',1)">+</button></div>
+         <button class="rm" onclick="delZ('${z}')">✕</button>`}</div>`}).join('')
+      :'<div class="empty" style="padding:28px">Cliquez sur une zone du visage.</div>'}
+    </div>
+    ${ent.length?`<div class="zrow" style="display:block">
+      <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);font-weight:600;margin-bottom:5px">Lots consommés (auto)</div>
+      ${tox?`<div style="font-size:12px;display:flex;gap:6px;align-items:center;margin-bottom:3px"><span class="zd" style="background:var(--toxine)"></span>${lotTox.lot} · ${lotTox.n} <span class="bdg ${lotTox.q<lotTox.s?'b-crit':'b-good'}" style="margin-left:auto">reste ${lotTox.q}</span></div>`:''}
+      ${ah?`<div style="font-size:12px;display:flex;gap:6px;align-items:center"><span class="zd" style="background:var(--ah)"></span>${lotAH.lot} · ${lotAH.n} <span class="bdg ${lotAH.q<lotAH.s?'b-crit':'b-good'}" style="margin-left:auto">reste ${lotAH.q}</span></div>`:''}
+     </div>`:''}
+    <div class="fld" style="margin-top:10px"><label>Effets secondaires observés</label>
+     <input class="inp" style="width:100%" value="${esc(AS.effets||'')}" ${AS.ro?'disabled':''} oninput="AS.effets=this.value" placeholder="aucun"></div>
+   </div>
+  </div>`;
+
+ document.getElementById('overf').innerHTML=AS.ro?
+  `<div class="mu" style="font-size:12px">Acte clôturé et signé · toute modification serait tracée</div>
+   <div style="margin-left:auto"><button class="btn" onclick="closeAll()">Fermer</button></div>`
+  :`<label style="display:flex;gap:7px;align-items:center;font-size:12.5px;cursor:pointer">
+     <input type="checkbox" ${AS.consent?'checked':''} onchange="AS.consent=this.checked"> Consentement éclairé signé</label>
+   <span class="mu" style="font-size:11.5px">le stock se décrémente et le devis lié est soldé automatiquement</span>
+   <div style="margin-left:auto;display:flex;gap:8px">
+    <button class="btn" onclick="closeAll()">Annuler</button>
+    <button class="btn p" onclick="saveActe()">Enregistrer l'acte${ROLES[role].prix?' · '+EUR(prix):''}</button></div>`;
+}
+function zClick(ev,id,dir){
+ if(AS?.ro) return;
+ ev.preventDefault();
+ const z=zoneById(id), cur=AS.z[id]||0;
+ const d=(dir||(ev.shiftKey||ev.altKey?-1:1));
+ const nv=+(cur+d*(cur===0&&d>0?z.d:z.s)).toFixed(2);
+ if(nv<=0) delete AS.z[id]; else AS.z[id]=nv;
+ renderOver();
+}
+function bump(id,d){const z=zoneById(id);const nv=+((AS.z[id]||0)+d*z.s).toFixed(2);
+ if(nv<=0)delete AS.z[id];else AS.z[id]=nv;renderOver()}
+function delZ(id){delete AS.z[id];renderOver()}
+function applyProto(i){Object.entries(PROTOS[i].z).forEach(([k,v])=>AS.z[k]=v);renderOver();toast('Protocole « '+PROTOS[i].n+' » appliqué')}
+function mirrorZ(){
+ Object.keys({...AS.z}).forEach(k=>{
+  if(k.endsWith('_d')) AS.z[k.slice(0,-2)+'_g']=AS.z[k];
+  else if(k.endsWith('_g')) AS.z[k.slice(0,-2)+'_d']=AS.z[k];
+ });
+ renderOver(); toast('Zones symétrisées');
+}
+function saveActe(){
+ const ent=Object.entries(AS.z).filter(([,q])=>q>0);
+ if(!ent.length){toast('Sélectionnez au moins une zone');return}
+ const tox=ent.filter(([z])=>zoneById(z).p==='tox').reduce((s,[,q])=>s+q,0);
+ const ah=ent.filter(([z])=>zoneById(z).p==='ah').reduce((s,[,q])=>s+q,0);
+ const type=ah>=tox*0.05?'AH':'BTX';
+ ACTES.unshift({id:Date.now(),patient:AS.pid,type,nom:CATALOGUE.find(c=>c.id===type).n,cat:'Injections',
+  date:AS.date,praticien:AS.prat,operateur:AS.oper||null,lot:type==='AH'?'L-AH2409':'L-BX2601',
+  conso:type==='AH'?'AH-VOLB':'BTX-100',zones:{...AS.z},consent:AS.consent,effets:AS.effets||'',
+  prix:Math.round((tox*PU.tox+ah*PU.ah)/5)*5});
+ if(tox){const s=STOCK.find(x=>x.ref==='BTX-100');s.q=Math.max(0,s.q-Math.ceil(tox/100))}
+ if(ah){const s=STOCK.find(x=>x.ref==='AH-VOLB');s.q=Math.max(0,s.q-Math.ceil(ah))}
+ closeAll(); pSel=AS.pid; pTab='actes'; go('patients');
+ toast('Acte enregistré · stock mis à jour · consentement '+(AS.consent?'signé':'à faire signer'));
+}
+
+/* ==========================================================================
+   Command palette / navigation
+   ========================================================================== */
+let palIdx=0, palItems=[];
+function openPal(){document.getElementById('pal').classList.add('on');document.getElementById('scrim').classList.add('on');
+ const q=document.getElementById('palq');q.value='';q.focus();buildPal('')}
+function closeAll(){['pal','over'].forEach(i=>document.getElementById(i).classList.remove('on'));
+ document.getElementById('scrim').classList.remove('on')}
+function buildPal(q){
+ q=q.toLowerCase().trim(); const it=[];
+ const ACT=[
+  {t:'Nouvel acte + schéma de visage',s:'saisir une séance d’injection',ic:'✚',k:'Action',go:()=>{closeAll();openActe()}},
+  {t:'Envoyer toutes les relances échues',s:RDUE.length+' devis',ic:'↻',k:'Action',go:()=>{closeAll();allRel()}},
+  {t:'Bon de commande fournisseurs',s:ALERTES.length+' références sous le seuil',ic:'▧',k:'Action',go:()=>{closeAll();toast('Bon de commande généré')}},
+  {t:'Tableau de bord',s:'',ic:'◈',k:'Aller à',go:()=>{closeAll();go('dash')}},
+  {t:'Patients',s:'',ic:'◍',k:'Aller à',go:()=>{closeAll();go('patients')}},
+  {t:'Actes & schémas',s:'',ic:'✚',k:'Aller à',go:()=>{closeAll();go('actes')}},
+  {t:'Devis & factures',s:'',ic:'◫',k:'Aller à',go:()=>{closeAll();go('devis')}},
+  {t:'Stock & lots',s:'',ic:'▧',k:'Aller à',go:()=>{closeAll();go('stock')}},
+  {t:'Statistiques',s:'',ic:'◔',k:'Aller à',go:()=>{closeAll();go('stats')}},
+ ];
+ if(!q){ it.push(...ACT.slice(0,3)); it.push(...ACT.slice(3)); }
+ else{
+  ACT.filter(a=>a.t.toLowerCase().includes(q)).forEach(a=>it.push(a));
+  PATIENTS.filter(p=>[p.nom,p.prenom,p.mail,p.tel,String(p.id)].join(' ').toLowerCase().includes(q)).slice(0,6)
+   .forEach(p=>it.push({t:fn(p),s:`${age(p)} ans · ${ACTES.filter(a=>a.patient===p.id).length} actes · dossier ${p.id}`,ic:ini(p),k:'Patient',go:()=>{closeAll();openPatient(p.id)}}));
+  DEVIS.filter(d=>d.id.toLowerCase().includes(q)||fn(pById(d.patient)).toLowerCase().includes(q)).slice(0,4)
+   .forEach(d=>it.push({t:d.id,s:`${fn(pById(d.patient))} · ${EUR(d.montant)} · ${SD[d.statut][0]}`,ic:'◫',k:'Devis',go:()=>{closeAll();go('devis',d.id)}}));
+  STOCK.filter(s=>(s.n+' '+s.ref+' '+(s.lot||'')).toLowerCase().includes(q)).slice(0,4)
+   .forEach(s=>it.push({t:s.n,s:`${s.q} ${s.u} · ${s.lot||'sans lot'}`,ic:'▧',k:'Stock',go:()=>{closeAll();go('stock')}}));
+  [...new Set(ACTES.filter(a=>a.lot&&a.lot.toLowerCase().includes(q)).map(a=>a.lot))].slice(0,3)
+   .forEach(l=>it.push({t:'Lot '+l,s:ACTES.filter(a=>a.lot===l).length+' patients exposés',ic:'⚠',k:'Traçabilité',go:()=>{closeAll();lotSel=l;go('stock')}}));
+  ZONES.filter(z=>z.n.toLowerCase().includes(q)).slice(0,3)
+   .forEach(z=>it.push({t:z.n,s:PLABEL[z.p]+' · '+ACTES.filter(a=>a.zones&&a.zones[z.id]).length+' actes',ic:'◍',k:'Zone',go:()=>{closeAll();aq=z.n.split(' — ')[0];go('actes')}}));
+ }
+ palItems=it; palIdx=0;
+ document.getElementById('palist').innerHTML=it.length?it.map((x,i)=>`
+  <div class="it ${i===0?'k':''}" data-i="${i}" onclick="palItems[${i}].go()">
+   <div class="ic">${esc(x.ic)}</div><div style="min-width:0"><div class="t">${esc(x.t)}</div>${x.s?`<div class="s">${esc(x.s)}</div>`:''}</div>
+   <div class="tag">${x.k}</div></div>`).join(''):'<div class="empty">Aucun résultat.</div>';
+}
+document.getElementById('palq').addEventListener('input',e=>buildPal(e.target.value));
+document.addEventListener('keydown',e=>{
+ const palOn=document.getElementById('pal').classList.contains('on');
+ if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();palOn?closeAll():openPal();return}
+ if(e.key==='Escape'){closeAll();return}
+ if(palOn){
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();
+   palIdx=Math.max(0,Math.min(palItems.length-1,palIdx+(e.key==='ArrowDown'?1:-1)));
+   document.querySelectorAll('.pal .it').forEach((el,i)=>el.classList.toggle('k',i===palIdx));
+   document.querySelector('.pal .it.k')?.scrollIntoView({block:'nearest'});}
+  if(e.key==='Enter'&&palItems[palIdx]) palItems[palIdx].go();
+  return;
+ }
+ if(document.getElementById('over').classList.contains('on')) return;
+ if(e.target.matches('input,textarea,select')) return;
+ const map={a:()=>openActe(),p:()=>go('patients'),d:()=>go('devis'),s:()=>go('stock'),g:()=>go('dash')};
+ if(map[e.key.toLowerCase()]){e.preventDefault();map[e.key.toLowerCase()]()}
+});
+
+/* ---------- actions ---------- */
+function sendRel(id){const d=DEVIS.find(x=>x.id===id); if(!d)return;
+ d.relances++; d.derniere=TODAYS; d.statut=d.relances>=2?'relance2':'relance1';
+ RELS.length=0; fileRelances().forEach(r=>RELS.push(r));
+ RDUE.length=0; RELS.filter(r=>r.du).forEach(r=>RDUE.push(r));
+ paint(); toast('Relance envoyée à '+fn(pById(d.patient)));}
+function allRel(){const n=RDUE.length; if(!n){toast('Aucune relance échue');return}
+ [...RDUE].forEach(r=>{const d=r.d;d.relances++;d.derniere=TODAYS;d.statut=d.relances>=2?'relance2':'relance1'});
+ RELS.length=0; fileRelances().forEach(r=>RELS.push(r));
+ RDUE.length=0; RELS.filter(r=>r.du).forEach(r=>RDUE.push(r));
+ paint(); toast(n+' relance'+(n>1?'s envoyées':' envoyée'));}
+function openPatient(id){pSel=id;pTab='resume';closeAll();go('patients')}
+function ph(l,h,s){const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480">
+ <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="hsl(${h},30%,${86-s}%)"/>
+ <stop offset="1" stop-color="hsl(${h+18},26%,${70-s}%)"/></linearGradient></defs>
+ <rect width="640" height="480" fill="url(#g)"/>
+ <ellipse cx="320" cy="${262+s}" rx="${130-s}" ry="${166-s}" fill="hsl(${h+8},32%,${78-s/2}%)"/>
+ <ellipse cx="320" cy="188" rx="${116-s}" ry="${94-s/2}" fill="hsl(${h+6},34%,${82-s/2}%)"/>
+ <circle cx="272" cy="202" r="9" fill="hsl(${h},20%,42%)" opacity=".5"/><circle cx="368" cy="202" r="9" fill="hsl(${h},20%,42%)" opacity=".5"/>
+ <path d="M280 294 Q320 ${314+s} 360 294" stroke="hsl(${h},22%,45%)" stroke-width="6" fill="none" opacity=".45" stroke-linecap="round"/>
+ <text x="320" y="452" font-family="system-ui" font-size="21" font-weight="700" fill="rgba(255,255,255,.92)" text-anchor="middle">${l}</text>
+ <text x="320" y="44" font-family="system-ui" font-size="12" fill="rgba(255,255,255,.78)" text-anchor="middle">illustration simulée — aucune photo réelle</text></svg>`;
+ return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)}
+function setBA(v){const a=document.getElementById('baA'),h=document.getElementById('baH');
+ if(a){a.style.clipPath=`inset(0 0 0 ${v}%)`;h.style.left=v+'%'}}
+function bindBA(){const b=document.getElementById('ba');if(!b)return;let d=false;
+ const m=e=>{if(!d)return;const r=b.getBoundingClientRect();
+  setBA(Math.max(0,Math.min(100,((e.touches?e.touches[0].clientX:e.clientX)-r.left)/r.width*100)))};
+ b.onmousedown=e=>{d=true;m(e)};b.ontouchstart=e=>{d=true;m(e)};
+ window.addEventListener('mousemove',m);window.addEventListener('touchmove',m,{passive:true});
+ window.onmouseup=()=>d=false;window.ontouchend=()=>d=false}
+function cycleRole(){const k=Object.keys(ROLES);role=k[(k.indexOf(role)+1)%k.length];paint();toast('Vue « '+ROLES[role].l+' »')}
+function toggleTheme(){const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark';paint()}
+function go(v,arg){ if(v==='devis') dSel=arg||null; view=v; document.getElementById('main').scrollTop=0; paint(); }
+function paint(){
+ const al=ROLES[role].v; if(!al.includes(view))view='dash';
+ document.querySelectorAll('#nav a[data-v]').forEach(a=>{a.classList.toggle('on',a.dataset.v===view);
+  a.style.display=al.includes(a.dataset.v)?'':'none'});
+ [['n-devis',ATT.length],['n-rel',RDUE.length],['n-stock',ALERTES.length]].forEach(([i,v])=>{
+  const e=document.getElementById(i); e.textContent=v; e.style.display=v?'':'none'});
+ document.getElementById('avat').textContent=ROLES[role].i;
+ document.getElementById('who').innerHTML=`${ROLES[role].u}<small>${ROLES[role].l}</small>`;
+ document.getElementById('main').innerHTML=(V[view]||V.dash)();
+ bindBA();
+}
+document.querySelectorAll('#nav a[data-v]').forEach(a=>a.onclick=()=>go(a.dataset.v));
+paint();
+</script>
+</body>
+</html>
