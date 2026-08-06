@@ -214,6 +214,33 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .npbar input{height:34px;border:1px solid var(--line);background:var(--panel);border-radius:var(--r-s);padding:0 10px;outline:none;color:var(--ink)}
 .npbar input:focus{border-color:var(--accent)}
 @media(max-width:900px){.npbar{grid-template-columns:1fr 1fr}}
+.perbar{align-items:center}
+.drange{display:flex;align-items:center;gap:6px;padding:3px 4px;border-radius:10px;border:1px solid transparent}
+.drange.on{border-color:var(--accent);background:var(--accent-wash)}
+.drange span{color:var(--ink-3);font-size:12px}
+.drange .inp{height:30px;font-size:12.5px;padding:0 8px}
+/* patients vus récemment, avec leurs actes */
+.hp{border:1px solid var(--line);border-radius:12px;background:var(--panel-2);overflow:hidden}
+.hp+.hp{margin-top:6px}
+.hp-h{display:flex;align-items:center;gap:11px;padding:9px 11px;cursor:pointer;transition:.12s}
+.hp-h:hover{background:var(--accent-wash)}
+.hp-h .r{margin-left:auto;display:flex;gap:6px}
+.hp-a{border-top:1px solid var(--line);background:var(--panel)}
+.hpa{display:flex;align-items:center;gap:10px;padding:7px 11px 7px 14px;cursor:pointer;transition:.12s;border-bottom:1px solid var(--line)}
+.hpa:last-child{border-bottom:none}
+.hpa:hover{background:var(--panel-2)}
+.hpa .minif{width:22px;height:29px;flex:none}
+.hp-more{margin-top:6px;padding:8px 11px;border:1px dashed var(--line-2);border-radius:11px;font-size:12.5px;
+  color:var(--ink-2);text-align:center;cursor:pointer;transition:.12s}
+.hp-more:hover{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-wash)}
+.hpa .dt{font-size:11.5px;color:var(--ink-3);font-variant-numeric:tabular-nums;width:52px;flex:none}
+.hpa .ac{font-size:12.5px;font-weight:600;width:150px;flex:none}
+.hpa .zs{display:flex;gap:4px;flex-wrap:wrap;min-width:0}
+.hpa .pr{margin-left:auto;font-size:11.5px;color:var(--ink-3);white-space:nowrap}
+.hero-per{display:flex;align-items:center;gap:8px;margin:12px 0 7px}
+.hero-per .t{font-size:12px;font-weight:650;color:var(--ink-2)}
+.hero-per .seg{margin-left:auto}
+.hero-per .seg button{padding:3px 9px;font-size:11.5px}
 .subh{display:flex;align-items:center;gap:9px;margin:4px 0 9px;padding-top:12px;border-top:1px solid var(--line)}
 .subh h3{margin:0;font-size:13px;font-weight:660;display:flex;align-items:center;gap:7px}
 .subh h3 span{background:var(--panel-3);color:var(--ink-2);border-radius:6px;padding:1px 7px;font-size:11px;font-weight:700}
@@ -463,6 +490,8 @@ const CATALOGUE=[
  {id:'RF', n:'Radiofréquence',     cat:'Radiofréquence',conso:null,  cons:false,zoned:false,prix:220},
 ];
 const catById=id=>CATALOGUE.find(c=>c.id===id);
+const INJ=['AH','BTX','SKB','MESO'];
+const noZoneTxt=a=>INJ.includes(a.type)?'zones non détaillées':'acte non injectable';
 
 /* ---------- Patients (fictifs) ---------- */
 const PATIENTS=[
@@ -667,6 +696,43 @@ function fileRelances(){
   o.push({d,r,e,du:e<=TODAYS})});
  return o.sort((a,b)=>a.e.localeCompare(b.e));
 }
+/* ---------- Périodes personnalisables ---------- */
+const DATE_MIN=[...FACTURES.map(f=>f.date),...ACTES.map(a=>a.date)].sort()[0];
+const PRESETS=[['7j','7 jours'],['30j','30 jours'],['90j','90 jours'],['mois','Mois en cours'],['annee','Année'],['tout','Tout']];
+function perRange(per){
+ if(per.k==='perso') return [per.from||DATE_MIN, per.to||TODAYS];
+ if(per.k==='tout')  return [DATE_MIN, TODAYS];
+ if(per.k==='mois')  return [TODAYS.slice(0,7)+'-01', TODAYS];
+ if(per.k==='annee') return [TODAYS.slice(0,4)+'-01-01', TODAYS];
+ const n={'7j':7,'30j':30,'90j':90}[per.k]||30;
+ return [new Date(TODAY.getTime()-(n-1)*864e5).toISOString().slice(0,10), TODAYS];
+}
+const inPer=(d,per)=>{const [a,b]=perRange(per);return d>=a&&d<=b};
+const perLabel=per=>{const [a,b]=perRange(per);return `du ${DF(a)} au ${DF(b)}`};
+const addD=(d,n)=>new Date(new Date(d).getTime()+n*864e5).toISOString().slice(0,10);
+function perBuckets(per){
+ const [a,b]=perRange(per), span=days(a,b)+1, out=[];
+ if(span<=14){ for(let i=0;i<span;i++){const d=addD(a,i); out.push({label:DFS(d),from:d,to:d})} }
+ else if(span<=95){ let c=a; while(c<=b){ const e=(addD(c,6)>b?b:addD(c,6)); out.push({label:DFS(c),from:c,to:e}); c=addD(e,1)} }
+ else { let y=+a.slice(0,4), m=+a.slice(5,7);
+   while(true){ const k=`${y}-${String(m).padStart(2,'0')}`; if(k>b.slice(0,7)) break;
+     out.push({label:ml(k),from:k+'-01',to:k+'-31'}); m++; if(m>12){m=1;y++} } }
+ return out;
+}
+/* barre de filtre période réutilisable */
+function periodBar(per,setter,info){
+ return `<div class="fbar perbar">
+  <div class="seg">${PRESETS.map(([k,l])=>`<button class="${per.k===k?'on':''}" onclick="${setter}({k:'${k}',from:'',to:''})">${l}</button>`).join('')}</div>
+  <div class="drange ${per.k==='perso'?'on':''}">
+    <input class="inp" type="date" value="${per.from||''}" max="${TODAYS}"
+      onchange="${setter}({k:'perso',from:this.value,to:document.querySelector('.drange input:last-of-type').value||'${TODAYS}'})">
+    <span>→</span>
+    <input class="inp" type="date" value="${per.to||''}" max="${TODAYS}"
+      onchange="${setter}({k:'perso',from:document.querySelector('.drange input:first-of-type').value||'${DATE_MIN}',to:this.value})">
+  </div>
+  <span class="mu" style="font-size:11.5px;margin-left:auto">${info} · ${perLabel(per)}</span>
+ </div>`;
+}
 const RELS=fileRelances();
 const RDUE=RELS.filter(r=>r.du);
 const CONSENT_KO=ACTES.filter(a=>catById(a.type).cons&&!a.consent);
@@ -782,26 +848,61 @@ V.dash=()=>{
 };
 
 /* ---- recherche du hero : patient existant ou création à la volée ---- */
+let heroPer='7j';
+function setHeroPer(k){heroPer=k;const e=document.getElementById('heroQ');heroSearch(e?e.value:'')}
+function zoneBadges(a,max){
+ if(!a.zones) return `<span class="mu" style="font-size:11.5px">${noZoneTxt(a)}</span>`;
+ const e=zonesOf(a), sh=e.slice(0,max||4);
+ return sh.map(([z,q])=>{const Z=zoneById(z);
+   return `<span class="bdg ${Z.p==='tox'?'b-info':'b-warn'}">${esc(Z.k)} ${fmtQ(q,Z.p)}</span>`}).join('')
+   +(e.length>sh.length?`<span class="bdg b-neu">+${e.length-sh.length}</span>`:'');
+}
 function heroRows(q){
  q=(q||'').trim();
- if(!q){
-  const rec=[...PATIENTS].sort((a,b)=>{
-   const la=ACTES.filter(x=>x.patient===a.id).map(x=>x.date).sort().pop()||'';
-   const lb=ACTES.filter(x=>x.patient===b.id).map(x=>x.date).sort().pop()||'';
-   return lb.localeCompare(la)}).slice(0,3);
-  return `<div class="mu" style="font-size:11.5px;margin:2px 0 4px">Vus récemment</div>`+
-   rec.map(p=>rowP(p)).join('');
- }
+ if(!q) return heroRecent();
  const ql=q.toLowerCase();
  const found=PATIENTS.filter(p=>[p.nom,p.prenom,p.tel,p.mail,String(p.id)].join(' ').toLowerCase().includes(ql)).slice(0,5);
- const parts=q.split(/\s+/);
- const nom=(parts[0]||'').toUpperCase(), prenom=parts.slice(1).join(' ');
+ const parts=q.split(/\s+/), nom=(parts[0]||'').toUpperCase(), prenom=parts.slice(1).join(' ');
  const create=`<div class="hr new" onclick="heroNew('${esc(nom)}','${esc(prenom)}')">
    <div class="pav">+</div>
    <div><div class="nm">Créer « ${esc(nom)}${prenom?' '+esc(prenom):''} » et démarrer l'acte</div>
     <div class="mu" style="font-size:11.5px">nouveau dossier patient</div></div>
    <div class="go">Entrée ↵</div></div>`;
  return (found.length?found.map(p=>rowP(p)).join(''):'')+(q.length>=2?create:'');
+}
+/* patients vus sur la période, avec le détail de leurs actes */
+function heroRecent(){
+ const [a,b]=perRange({k:heroPer});
+ const map={};
+ ACTES.filter(x=>x.date>=a&&x.date<=b).forEach(x=>{(map[x.patient]=map[x.patient]||[]).push(x)});
+ const ids=Object.keys(map).map(Number).sort((x,y)=>
+   map[y].map(o=>o.date).sort().pop().localeCompare(map[x].map(o=>o.date).sort().pop()));
+ const head=`<div class="hero-per">
+   <span class="t">Vus récemment</span>
+   <span class="mu" style="font-size:11.5px">${ids.length} patient${ids.length>1?'s':''} · ${Object.values(map).flat().length} acte${Object.values(map).flat().length>1?'s':''}</span>
+   <div class="seg">${[['7j','7 j'],['30j','30 j'],['90j','90 j']].map(([k,l])=>
+     `<button class="${heroPer===k?'on':''}" onclick="setHeroPer('${k}')">${l}</button>`).join('')}</div></div>`;
+ if(!ids.length) return head+`<div class="mu" style="font-size:12.5px;padding:6px 2px">Aucun patient vu sur cette période. Tapez un nom pour démarrer un acte.</div>`;
+ const SHOW=4;
+ return head+ids.slice(0,SHOW).map(id=>{
+  const p=pById(id), A=map[id].sort((x,y)=>y.date.localeCompare(x.date));
+  return `<div class="hp">
+   <div class="hp-h" onclick="openPatient(${id})">
+     <div class="pav">${esc(ini(p))}</div>
+     <div style="min-width:0"><div class="nm">${esc(p.nom)} ${esc(p.prenom)}</div>
+       <div class="mu" style="font-size:11.5px">${ageTxt(p)} · ${ACTES.filter(x=>x.patient===id).length} acte(s) au total${p.ant.length?' · ⚠ '+esc(p.ant[0]):''}</div></div>
+     <div class="r">
+       <button class="btn xs" onclick="event.stopPropagation();openPatient(${id})">Fiche</button>
+       <button class="btn xs p" onclick="event.stopPropagation();openActe(${id})">✚ Acte</button></div>
+   </div>
+   <div class="hp-a">${A.map(x=>`<div class="hpa" onclick="event.stopPropagation();openActe(${id},${x.id})">
+     ${miniFace(x.zones)}
+     <span class="dt">${DFS(x.date)}</span>
+     <span class="ac">${esc(x.nom)}</span>
+     <span class="zs">${zoneBadges(x,4)}</span>
+     ${ROLES[role].prix?`<span class="pr">${EUR(x.prix)}</span>`:''}</div>`).join('')}</div>
+  </div>`;
+ }).join('')+(ids.length>SHOW?`<div class="hp-more" onclick="go('actes')">+ ${ids.length-SHOW} autre${ids.length-SHOW>1?'s':''} patient${ids.length-SHOW>1?'s':''} vu${ids.length-SHOW>1?'s':''} sur la période — voir tous les actes →</div>`:'');
 }
 function rowP(p){
  const n=ACTES.filter(a=>a.patient===p.id).length;
@@ -870,7 +971,7 @@ function pDetail(p){
      <td>${miniFace(a.zones)}</td><td class="mono">${DF(a.date)}</td>
      <td><b>${esc(a.nom)}</b>${a.effets?`<div class="mu" style="font-size:11px">⚠ ${esc(a.effets)}</div>`:''}</td>
      <td style="max-width:260px">${a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneById(z);
-        return `<span class="bdg ${Z.p==='tox'?'b-info':'b-warn'}" style="margin:0 3px 3px 0">${esc(Z.k)} ${fmtQ(q,Z.p)}</span>`}).join(''):`<span class="mu">${a.cat==='Injections'?'zones non détaillées':'acte non injectable'}</span>`}</td>
+        return `<span class="bdg ${Z.p==='tox'?'b-info':'b-warn'}" style="margin:0 3px 3px 0">${esc(Z.k)} ${fmtQ(q,Z.p)}</span>`}).join(''):`<span class="mu">${noZoneTxt(a)}</span>`}</td>
      <td class="mu" style="white-space:nowrap">${esc(a.praticien)}${a.operateur?`<div style="font-size:11px">op. ${esc(a.operateur)}</div>`:''}</td>
      <td class="mono mu" style="font-size:11.5px">${a.lot||'—'}</td>
      ${ROLES[role].prix?`<td class="num">${EUR(a.prix)}</td>`:''}</tr>`).join('')}
@@ -1006,7 +1107,7 @@ V.actes=()=>{
    <td class="nm">${esc(fn(pById(a.patient)))}</td>
    <td>${esc(a.nom)}<div class="mu" style="font-size:11px">${esc(a.praticien)}${a.operateur?' · '+esc(a.operateur):''}</div></td>
    <td style="max-width:300px">${a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneById(z);
-     return `<span class="bdg ${Z.p==='tox'?'b-info':'b-warn'}" style="margin:0 3px 3px 0">${esc(Z.k)} · ${fmtQ(q,Z.p)}</span>`}).join(''):'<span class="mu">acte non injectable</span>'}</td>
+     return `<span class="bdg ${Z.p==='tox'?'b-info':'b-warn'}" style="margin:0 3px 3px 0">${esc(Z.k)} · ${fmtQ(q,Z.p)}</span>`}).join(''):`<span class="mu">${noZoneTxt(a)}</span>`}</td>
    <td class="mono mu" style="font-size:11.5px">${a.lot||'—'}</td>
    <td class="mu" style="font-size:11.5px;max-width:150px">${a.effets||'—'}</td>
    ${ROLES[role].prix?`<td class="num">${EUR(a.prix)}</td>`:''}</tr>`).join('')}</tbody></table>
@@ -1014,7 +1115,7 @@ V.actes=()=>{
 };
 
 /* ---------------- Devis ---------------- */
-let dF='tous',dSel=null;
+let dF='tous',dSel=null,perD={k:'90j',from:'',to:''},perE={k:'30j',from:'',to:''};
 V.devis=()=>{
  if(dSel){const d=DEVIS.find(x=>x.id===dSel),p=pById(d.patient);
   const h=[]; if(d.envoye)h.push([d.envoye,'Devis envoyé par e-mail','✉']);
@@ -1042,16 +1143,25 @@ V.devis=()=>{
      ${nx?`<div class="tip" style="margin-top:12px"><span class="e">↻</span><div><b>${nx.r.c} programmé le ${DF(nx.e)}</b> — ${esc(nx.r.l)}${nx.du?' <b style="color:var(--crit)">· échu</b>':''}</div></div>`:''}</div></div>
   </div>`;}
 
- const L=DEVIS.filter(d=>dF==='tous'||(dF==='attente'?['envoye','relance1','relance2'].includes(d.statut):d.statut===dF))
-  .sort((a,b)=>b.date.localeCompare(a.date));
- const tx=Math.round(DEVIS.filter(d=>d.statut==='accepte').length/DEVIS.filter(d=>d.statut!=='brouillon').length*100);
- return `<div class="head"><div><h1>Devis &amp; factures</h1><p>${EUR(MATT)} en attente de réponse</p></div>
+ const inP=d=>inPer(d.date,perD);
+ const base=DEVIS.filter(inP);
+ const L=base.filter(d=>dF==='tous'||(dF==='attente'?['envoye','relance1','relance2'].includes(d.statut):d.statut===dF))
+   .sort((a,b)=>b.date.localeCompare(a.date));
+ const att=base.filter(d=>['envoye','relance1','relance2'].includes(d.statut));
+ const matt=att.reduce((s,d)=>s+d.montant,0);
+ const rdue=RELS.filter(r=>r.du&&inP(r.d));
+ const dec=base.filter(d=>d.statut!=='brouillon');
+ const tx=dec.length?Math.round(base.filter(d=>d.statut==='accepte').length/dec.length*100):0;
+ const perdus=base.filter(d=>['refuse','expire'].includes(d.statut)).reduce((s,d)=>s+d.montant,0);
+ return `<div class="head">
+  <div><h1>Devis &amp; factures</h1><p>${base.length} devis sur la période · ${EUR(matt)} en attente de réponse</p></div>
   <div class="r"><button class="btn" onclick="go('relances')">Régler les relances</button><button class="btn p" onclick="toast('Nouveau devis')">+ Devis</button></div></div>
+ ${periodBar(perD,'setPerD',`${base.length} devis`)}
  <div class="grid g4" style="margin-bottom:14px">
-  ${kpi('Taux d’acceptation',tx+' %','objectif 60 %',tx>=60?'up':'dn')}
-  ${kpi('En attente',EUR(MATT),ATT.length+' devis')}
-  ${kpi('Relances échues',RDUE.length,RDUE.length?'à envoyer':'à jour',RDUE.length?'dn':'up')}
-  ${kpi('Perdus',EUR(DEVIS.filter(d=>['refuse','expire'].includes(d.statut)).reduce((s,d)=>s+d.montant,0)))}</div>
+  ${kpi('Taux d’acceptation',dec.length?tx+' %':'—',dec.length?`${base.filter(d=>d.statut==='accepte').length} sur ${dec.length} devis décidés`:'aucun devis décidé',tx>=60?'up':'dn')}
+  ${kpi('En attente',EUR(matt),att.length+' devis')}
+  ${kpi('Relances échues',rdue.length,rdue.length?'à envoyer':'à jour',rdue.length?'dn':'up')}
+  ${kpi('Perdus',EUR(perdus),base.filter(d=>['refuse','expire'].includes(d.statut)).length+' refusés ou expirés')}</div>
  <div class="fbar"><div class="seg">${[['tous','Tous'],['attente','En attente'],['accepte','Acceptés'],['refuse','Refusés'],['expire','Expirés'],['brouillon','Brouillons']]
   .map(([k,l])=>`<button class="${dF===k?'on':''}" onclick="dF='${k}';paint()">${l}</button>`).join('')}</div></div>
  <div class="card"><div class="tw"><table>
@@ -1063,32 +1173,46 @@ V.devis=()=>{
     <td class="mono" ${ag>21?'style="color:var(--crit);font-weight:620"':'class="mono mu"'}>${ag!==null?ag+' j':'—'}</td>
     <td>${nx?(nx.du?bdg('b-crit','⚠ '+nx.r.c+' échu'):bdg('b-info',nx.r.c+' le '+DFS(nx.e))):'<span class="mu">—</span>'}</td>
     <td class="num">${nx&&nx.du?`<button class="btn xs p" onclick="event.stopPropagation();sendRel('${d.id}')">Envoyer</button>`:''}</td></tr>`}).join('')}
-  </tbody></table>${L.length?'':'<div class="empty">Aucun devis.</div>'}</div></div>`;
+  </tbody></table>${L.length?'':'<div class="empty">Aucun devis sur cette période.</div>'}</div></div>`;
 };
 
 /* ---------------- Encaissements ---------------- */
 V.encaiss=()=>{
- const im=FACTURES.filter(f=>rdu(f)>0).sort((a,b)=>a.date.localeCompare(b.date));
- const pm=['CB','Espèces','Chèque','Virement'].map(m=>({label:m,v:FACTURES.filter(f=>f.moyen===m).reduce((s,f)=>s+f.paye,0)})).filter(x=>x.v);
- return `<div class="head"><div><h1>Encaissements</h1><p>Caisse, restes dus et moyens de paiement</p></div>
-  <div class="r"><button class="btn" onclick="toast('Clôture de caisse enregistrée')">Clôture du jour</button>
+ const FP=FACTURES.filter(f=>inPer(f.date,perE));
+ const prev=perPrev(perE);
+ const enc=FP.reduce((s,f)=>s+f.paye,0);
+ const encPrev=FACTURES.filter(f=>inPer(f.date,prev)).reduce((s,f)=>s+f.paye,0);
+ const ev=encPrev?Math.round((enc-encPrev)/encPrev*100):0;
+ const im=FP.filter(f=>rdu(f)>0).sort((a,b)=>a.date.localeCompare(b.date));
+ const reste=im.reduce((s,f)=>s+rdu(f),0);
+ const pm=['CB','Espèces','Chèque','Virement'].map(m=>({label:m,v:FP.filter(f=>f.moyen===m).reduce((s,f)=>s+f.paye,0)})).filter(x=>x.v);
+ const serie=perBuckets(perE).map(b=>({label:b.label,v:FACTURES.filter(f=>f.date>=b.from&&f.date<=b.to).reduce((s,f)=>s+f.paye,0)}));
+ const spanE=days(...perRange(perE))+1;
+ const gran=spanE<=14?'par jour':spanE<=95?'par semaine':'par mois';
+ return `<div class="head">
+  <div><h1>Encaissements</h1><p>${FP.length} facture${FP.length>1?'s':''} sur la période · ${EUR(enc)} encaissés</p></div>
+  <div class="r"><button class="btn" onclick="toast('Export comptable généré')">Exporter</button>
+   <button class="btn" onclick="toast('Clôture de caisse enregistrée')">Clôture du jour</button>
    <button class="btn p" onclick="toast('Encaissement saisi')">+ Encaissement</button></div></div>
+ ${periodBar(perE,'setPerE',`${FP.length} facture${FP.length>1?'s':''}`)}
  <div class="grid g4" style="margin-bottom:14px">
-  ${kpi('Encaissé — 30 j',EUR(CAM),`${CAP?Math.round((CAM-CAP)/CAP*100):0} % vs 30 j précédents`,CAM>=CAP?'up':'dn')}
-  ${kpi('Reste dû',EUR(RESTE),im.length+' factures',RESTE?'dn':'up')}
-  ${kpi('Chèques à encaisser',EUR(FACTURES.filter(f=>f.moyen==='Chèque'&&f.date>'2026-07-01').reduce((s,f)=>s+f.paye,0)))}
-  ${kpi('Espèces en caisse',EUR(FACTURES.filter(f=>f.moyen==='Espèces'&&f.date>'2026-07-25').reduce((s,f)=>s+f.paye,0)))}</div>
+  ${kpi('Encaissé sur la période',EUR(enc),encPrev?`${ev>=0?'▲':'▼'} ${Math.abs(ev)} % vs période précédente`:'pas de comparatif',ev>=0?'up':'dn')}
+  ${kpi('Reste dû',EUR(reste),im.length+' facture'+(im.length>1?'s':''),reste?'dn':'up')}
+  ${kpi('Chèques à encaisser',EUR(FP.filter(f=>f.moyen==='Chèque').reduce((s,f)=>s+f.paye,0)),FP.filter(f=>f.moyen==='Chèque').length+' chèque(s)')}
+  ${kpi('Espèces',EUR(FP.filter(f=>f.moyen==='Espèces').reduce((s,f)=>s+f.paye,0)),'à déposer en banque')}</div>
  <div class="grid g2" style="margin-bottom:13px">
-  <div class="card"><div class="h"><h2>Par moyen de paiement</h2></div><div class="b">${hbars(pm)}</div></div>
-  <div class="card"><div class="h"><h2>Encaissé par mois</h2></div><div class="b">${bars(caMois,{h:170})}</div></div></div>
- <div class="card"><div class="h"><h2>Restes dus</h2><div class="r">${bdg('b-warn',EUR(RESTE)+' à recouvrer')}
-   <button class="btn s" onclick="toast('${im.length} relances de paiement envoyées')">Tout relancer</button></div></div>
+  <div class="card"><div class="h"><h2>Par moyen de paiement</h2><span class="s">sur la période</span></div>
+   <div class="b">${pm.length?hbars(pm):'<div class="empty">Aucun encaissement sur cette période.</div>'}</div></div>
+  <div class="card"><div class="h"><h2>Encaissé</h2><span class="s">${gran}</span></div>
+   <div class="b">${bars(serie,{h:190})}</div></div></div>
+ <div class="card"><div class="h"><h2>Restes dus</h2><div class="r">${bdg('b-warn',EUR(reste)+' à recouvrer')}
+   ${im.length?`<button class="btn s" onclick="toast('${im.length} relances de paiement envoyées')">Tout relancer</button>`:''}</div></div>
   <div class="tw"><table><thead><tr><th>Facture</th><th>Patient</th><th>Date</th><th class="num">Montant</th><th class="num">Payé</th><th class="num">Reste</th><th>Âge</th><th></th></tr></thead>
   <tbody>${im.map(f=>`<tr><td class="mono">${f.id}</td><td class="nm">${esc(fn(pById(f.patient)))}</td>
    <td class="mono">${DF(f.date)}</td><td class="num">${EUR(f.montant)}</td><td class="num">${EUR(f.paye)}</td>
    <td class="num" style="color:var(--crit);font-weight:660">${EUR(rdu(f))}</td><td class="mono">${days(f.date,TODAY)} j</td>
    <td class="num"><button class="btn xs" onclick="toast('Relance envoyée')">Relancer</button></td></tr>`).join('')}</tbody></table>
-   ${im.length?'':'<div class="empty">Aucun impayé 🎉</div>'}</div></div>`;
+   ${im.length?'':'<div class="empty">Aucun impayé sur cette période 🎉</div>'}</div></div>`;
 };
 
 /* ---------------- Relances ---------------- */
@@ -1438,6 +1562,9 @@ function bindBA(){const b=document.getElementById('ba');if(!b)return;let d=false
  window.addEventListener('mousemove',m);window.addEventListener('touchmove',m,{passive:true});
  window.onmouseup=()=>d=false;window.ontouchend=()=>d=false}
 function cycleRole(){const k=Object.keys(ROLES);role=k[(k.indexOf(role)+1)%k.length];paint();toast('Vue « '+ROLES[role].l+' »')}
+function setPerD(p){perD=p;paint()}
+function setPerE(p){perE=p;paint()}
+function perPrev(per){const [a,b]=perRange(per),n=days(a,b)+1;return {k:'perso',from:addD(a,-n),to:addD(a,-1)}}
 function toggleTheme(){const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark';paint()}
 function go(v,arg){ if(v==='devis') dSel=arg||null; view=v; document.getElementById('main').scrollTop=0; paint(); }
 function paint(){
