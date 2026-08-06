@@ -185,6 +185,35 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .chip:hover{border-color:var(--line-2)}
 .chip.on{background:var(--ink);border-color:var(--ink);color:var(--bg);font-weight:640}
 
+/* hero du tableau de bord */
+.hero{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-l);box-shadow:var(--sh-2);
+  padding:17px 19px;margin-bottom:14px;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:linear-gradient(var(--accent),var(--accent-2))}
+.hero-t{font-size:12.5px;font-weight:650;color:var(--ink-2);margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.hero-t span{font-weight:500;color:var(--ink-3)}
+.hero-row{display:flex;gap:9px}
+@media(max-width:760px){.hero-row{flex-direction:column}}
+.hero-s{flex:1;position:relative}
+.hero-s input{width:100%;height:46px;border:1px solid var(--line);border-radius:12px;background:var(--panel-2);
+  padding:0 14px 0 42px;font-size:14.5px;outline:none;transition:.13s;color:var(--ink)}
+.hero-s input:focus{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-wash);background:var(--panel)}
+.hero-s svg{position:absolute;left:15px;top:15px;color:var(--ink-3)}
+.hero .btn.lg{height:46px;padding:0 17px;border-radius:12px;font-size:13.5px}
+.hero-res{margin-top:9px;display:grid;gap:5px}
+.hero-res .hr{display:flex;align-items:center;gap:11px;padding:8px 11px;border-radius:11px;border:1px solid var(--line);
+  background:var(--panel-2);cursor:pointer;transition:.12s}
+.hero-res .hr:hover{border-color:var(--accent);background:var(--accent-wash)}
+.hero-res .hr .go{margin-left:auto;font-size:11.5px;color:var(--ink-3);font-weight:600}
+.hero-res .hr.new .pav{background:linear-gradient(140deg,var(--accent),var(--accent-2))}
+.gdash{grid-template-columns:1.5fr 1fr}
+@media(max-width:1150px){.gdash{grid-template-columns:1fr}}
+/* bandeau nouveau patient dans la saisie d'acte */
+.npbar{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:12px;border:1px solid var(--accent);
+  background:var(--accent-wash);border-radius:var(--r-m);margin-bottom:10px}
+.npbar .full{grid-column:1/-1;display:flex;align-items:center;gap:9px;font-size:12.5px;font-weight:650}
+.npbar input{height:34px;border:1px solid var(--line);background:var(--panel);border-radius:var(--r-s);padding:0 10px;outline:none;color:var(--ink)}
+.npbar input:focus{border-color:var(--accent)}
+@media(max-width:900px){.npbar{grid-template-columns:1fr 1fr}}
 .empty{padding:40px;text-align:center;color:var(--ink-3);font-size:12.5px}
 .tip{background:linear-gradient(120deg,var(--accent-wash),transparent 70%);border:1px solid var(--line);
   border-radius:var(--r-m);padding:11px 14px;font-size:12.5px;color:var(--ink-2);display:flex;gap:10px;align-items:flex-start;margin-bottom:14px}
@@ -450,7 +479,8 @@ const PATIENTS=[
 ].map(r=>({id:r[0],nom:r[1],prenom:r[2],ddn:r[3],tel:r[4],mail:r[5],prat:r[6],depuis:r[7],notes:r[8],ant:r[9]}));
 const pById=id=>PATIENTS.find(p=>p.id===id);
 const fn=p=>`${p.nom} ${p.prenom}`;
-const age=p=>Math.floor(days(p.ddn,TODAY)/365.25);
+const age=p=>p&&p.ddn?Math.floor(days(p.ddn,TODAY)/365.25):null;
+const ageTxt=p=>age(p)!==null?age(p)+' ans':'âge n.c.';
 const ini=p=>p.prenom[0]+p.nom[0];
 
 /* ---------- Actes (avec zones injectées) ---------- */
@@ -691,48 +721,79 @@ V.dash=()=>{
    t:`Consentement manquant — ${fn(pById(a.patient))}`,d:`${a.nom} du ${DF(a.date)}`,
    a:`<button class="btn s" onclick="toast('Lien de signature envoyé par SMS')">Faire signer</button>`}));
 
- const top=CATALOGUE.map(c=>({label:c.n,v:ACTES.filter(a=>a.type===c.id).reduce((s,a)=>s+a.prix,0)}))
-   .filter(x=>x.v>0).sort((a,b)=>b.v-a.v).slice(0,6);
-
  return `<div class="head">
-   <div><h1>Bonjour Dr Baroudi</h1><p>Lundi 3 août 2026 · ${todo.length} chose${todo.length>1?'s':''} à traiter</p></div>
-   <div class="r">
-     <button class="btn" onclick="openActe()">✚ Nouvel acte <kbd style="opacity:.55;font-size:10px">A</kbd></button>
-     <button class="btn p" onclick="openPal()">⌘K Tout faire d'ici</button>
-   </div></div>
+   <div><h1>Bonjour Dr Baroudi</h1><p>Lundi 3 août 2026${todo.length?` · ${todo.length} chose${todo.length>1?'s':''} à traiter`:' · rien à traiter'}</p></div>
+   <div class="r"><button class="btn" onclick="openPal()">⌘K Rechercher ou agir</button></div></div>
 
- <div class="grid g5" style="margin-bottom:13px">
-   ${kpi('CA encaissé — 30 j',EUR(CAM),`${ev>=0?'▲':'▼'} ${Math.abs(ev)} % vs 30 j précédents`,ev>=0?'up':'dn')}
-   ${kpi('Actes — 30 j',ACTM,`${ACTES.length} au total`)}
-   ${kpi('Devis en attente',EUR(MATT),`${ATT.length} devis · ${RDUE.length} à relancer`,RDUE.length?'dn':'')}
-   ${kpi('Reste dû',EUR(RESTE),`${FACTURES.filter(f=>rdu(f)>0).length} factures partielles`,RESTE?'dn':'')}
-   ${kpi('Alertes stock',ALERTES.length,ALERTES.length?'réappro à lancer':'tout est au vert',ALERTES.length?'dn':'up')}
+ <div class="hero">
+   <div class="hero-t">Commencer un acte <span>— tapez un nom, existant ou nouveau</span></div>
+   <div class="hero-row">
+     <div class="hero-s">
+       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+       <input id="heroQ" placeholder="Nom du patient…" autocomplete="off"
+         oninput="heroSearch(this.value)" onkeydown="heroKey(event)">
+     </div>
+     <button class="btn p lg" onclick="openActe(null,null,true)">+ Nouveau patient</button>
+   </div>
+   <div class="hero-res" id="heroRes">${heroRows('')}</div>
  </div>
 
- <div class="grid g2" style="margin-bottom:13px">
-  <div class="card"><div class="h"><h2>À traiter</h2><span class="s">tout se règle sans quitter cet écran</span>
-    <div class="r"><button class="btn s" onclick="allRel()">Tout envoyer</button></div></div>
-   <div class="b" style="max-height:296px;overflow:auto;padding-top:4px">
+ <div class="grid g3" style="margin-bottom:13px">
+   ${kpi('CA encaissé — 30 j',EUR(CAM),`${ev>=0?'▲':'▼'} ${Math.abs(ev)} % vs 30 j précédents`,ev>=0?'up':'dn')}
+   ${kpi('Devis en attente',EUR(MATT),`${ATT.length} devis · ${RDUE.length} à relancer`,RDUE.length?'dn':'')}
+   ${kpi('Reste dû',EUR(RESTE),`${FACTURES.filter(f=>rdu(f)>0).length} factures partielles`,RESTE?'dn':'up')}
+ </div>
+
+ <div class="grid gdash">
+  <div class="card"><div class="h"><h2>À traiter</h2><span class="s">tout se règle depuis cet écran</span>
+    ${RDUE.length?`<div class="r"><button class="btn s" onclick="allRel()">Tout envoyer</button></div>`:''}</div>
+   <div class="b" style="max-height:320px;overflow:auto;padding-top:4px">
     ${todo.length?todo.map(t=>`<div class="tl"><div class="ic" style="background:${t.b};color:${t.c}">${t.i}</div>
       <div><div class="t">${esc(t.t)}</div><div class="d">${esc(t.d)}</div></div><div class="a">${t.a}</div></div>`).join('')
       :'<div class="empty">Rien à traiter. 🎉</div>'}
    </div></div>
-  <div class="card"><div class="h"><h2>Chiffre d'affaires encaissé</h2><span class="s">6 derniers mois</span></div>
-   <div class="b">${bars(caMois)}</div></div>
- </div>
-
- <div class="grid g2">
-  <div class="card"><div class="h"><h2>Derniers actes</h2>
-    <div class="r"><button class="btn s g" onclick="go('actes')">Tout voir →</button></div></div>
-   <div class="tw"><table><thead><tr><th>Schéma</th><th>Patient</th><th>Acte</th><th>Zones</th><th>Date</th></tr></thead><tbody>
-    ${ACTES.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6).map(a=>`
-     <tr class="c" onclick="openPatient(${a.patient})"><td>${miniFace(a.zones)}</td>
-      <td class="nm">${esc(fn(pById(a.patient)))}</td><td>${esc(a.nom)}</td>
-      <td class="mono mu">${zoneSummary(a)}</td><td class="mono mu">${DFS(a.date)}</td></tr>`).join('')}
-   </tbody></table></div></div>
-  <div class="card"><div class="h"><h2>CA par type d'acte</h2></div><div class="b">${hbars(top)}</div></div>
+  <div class="card"><div class="h"><h2>Chiffre d\'affaires</h2><span class="s">6 derniers mois</span></div>
+   <div class="b">${bars(caMois,{h:200})}</div></div>
  </div>`;
 };
+
+/* ---- recherche du hero : patient existant ou création à la volée ---- */
+function heroRows(q){
+ q=(q||'').trim();
+ if(!q){
+  const rec=[...PATIENTS].sort((a,b)=>{
+   const la=ACTES.filter(x=>x.patient===a.id).map(x=>x.date).sort().pop()||'';
+   const lb=ACTES.filter(x=>x.patient===b.id).map(x=>x.date).sort().pop()||'';
+   return lb.localeCompare(la)}).slice(0,3);
+  return `<div class="mu" style="font-size:11.5px;margin:2px 0 4px">Vus récemment</div>`+
+   rec.map(p=>rowP(p)).join('');
+ }
+ const ql=q.toLowerCase();
+ const found=PATIENTS.filter(p=>[p.nom,p.prenom,p.tel,p.mail,String(p.id)].join(' ').toLowerCase().includes(ql)).slice(0,5);
+ const parts=q.split(/\s+/);
+ const nom=(parts[0]||'').toUpperCase(), prenom=parts.slice(1).join(' ');
+ const create=`<div class="hr new" onclick="heroNew('${esc(nom)}','${esc(prenom)}')">
+   <div class="pav">+</div>
+   <div><div class="nm">Créer « ${esc(nom)}${prenom?' '+esc(prenom):''} » et démarrer l'acte</div>
+    <div class="mu" style="font-size:11.5px">nouveau dossier patient</div></div>
+   <div class="go">Entrée ↵</div></div>`;
+ return (found.length?found.map(p=>rowP(p)).join(''):'')+(q.length>=2?create:'');
+}
+function rowP(p){
+ const n=ACTES.filter(a=>a.patient===p.id).length;
+ return `<div class="hr" onclick="openActe(${p.id})"><div class="pav">${esc(ini(p))}</div>
+  <div><div class="nm">${esc(p.nom)} ${esc(p.prenom)}</div>
+   <div class="mu" style="font-size:11.5px">${ageTxt(p)} · ${n} acte${n>1?'s':''}${p.ant.length?' · ⚠ '+esc(p.ant[0]):''}</div></div>
+  <div class="go">Nouvel acte →</div></div>`;
+}
+function heroSearch(v){const e=document.getElementById('heroRes'); if(e) e.innerHTML=heroRows(v)}
+function heroKey(e){
+ if(e.key!=='Enter') return;
+ e.preventDefault();
+ const first=document.querySelector('#heroRes .hr');
+ if(first) first.click();
+}
+function heroNew(nom,prenom){openActe(null,null,{nom,prenom})}
 
 /* ---------------- Patients (maître-détail) ---------------- */
 let pq='',pPrat='',pSel=null,pTab='resume';
@@ -758,7 +819,7 @@ V.patients=()=>{
     ${L.map(p=>`<tr class="c ${pSel===p.id?'sel':''}" onclick="pSel=${p.id};paint()">
       <td><div class="rowline"><div class="pav">${esc(ini(p))}</div>
        <div style="min-width:0"><div class="nm">${esc(p.nom)} ${esc(p.prenom)}</div>
-        <div class="mu" style="font-size:11.5px">${age(p)} ans · ${nA(p)} acte${nA(p)>1?'s':''} · ${last(p)?DFS(last(p)):'jamais'}</div></div>
+        <div class="mu" style="font-size:11.5px">${ageTxt(p)} · ${nA(p)} acte${nA(p)>1?'s':''} · ${last(p)?DFS(last(p)):'jamais'}</div></div>
        ${p.ant.length?`<span class="bdg b-warn" style="margin-left:auto">⚠ ${p.ant.length}</span>`:''}</div></td></tr>`).join('')}
    </tbody></table>${L.length?'':'<div class="empty">Aucun résultat.</div>'}</div>
   </div>
@@ -836,7 +897,7 @@ function pDetail(p){
   <div class="h" style="padding:14px 16px">
    <div class="pav" style="width:38px;height:38px;font-size:13px">${esc(ini(p))}</div>
    <div><h2 style="font-size:16px">${esc(p.nom)} ${esc(p.prenom)}</h2>
-    <div class="mu" style="font-size:11.5px">${age(p)} ans · dossier ${p.id} · ${A.length} actes${ROLES[role].prix?` · ${EUR(ca)}`:''}${rd?` · <span style="color:var(--crit);font-weight:600">reste ${EUR(rd)}</span>`:''}</div></div>
+    <div class="mu" style="font-size:11.5px">${ageTxt(p)} · dossier ${p.id} · ${A.length} actes${ROLES[role].prix?` · ${EUR(ca)}`:''}${rd?` · <span style="color:var(--crit);font-weight:600">reste ${EUR(rd)}</span>`:''}</div></div>
    <div class="r">
     <button class="btn s" onclick="toast('SMS ouvert')">💬</button>
     <button class="btn s" onclick="toast('E-mail ouvert')">✉</button>
@@ -1076,9 +1137,10 @@ V.equipe=()=>{
    SLIDE-OVER : saisie d'acte avec schéma de visage
    ========================================================================== */
 let AS=null;   /* état de saisie */
-function openActe(pid,aid){
+function openActe(pid,aid,np){
  const a=aid?ACTES.find(x=>x.id===aid):null;
- AS={pid:pid||(a?a.patient:PATIENTS[0].id), aid:aid||null, ro:!!a,
+ AS={pid:pid||(a?a.patient:(np?null:PATIENTS[0].id)), aid:aid||null, ro:!!a,
+     np: np?{nom:(np.nom||'').toUpperCase(),prenom:np.prenom||'',ddn:'',tel:'',mail:''}:null,
      type:a?a.type:'AH', date:a?a.date:TODAYS, prat:a?a.praticien:PRATICIENS[0],
      oper:a?a.operateur:'', z:a&&a.zones?{...a.zones}:{}, effets:a?a.effets:'', consent:a?a.consent:false};
  renderOver();
@@ -1086,7 +1148,7 @@ function openActe(pid,aid){
  document.getElementById('scrim').classList.add('on');
 }
 function renderOver(){
- const p=pById(AS.pid);
+ const p=AS.np?null:pById(AS.pid);
  const ent=Object.entries(AS.z).filter(([,q])=>q>0);
  const tox=ent.filter(([z])=>zoneById(z).p==='tox').reduce((s,[,q])=>s+q,0);
  const ah =ent.filter(([z])=>zoneById(z).p==='ah').reduce((s,[,q])=>s+q,0);
@@ -1095,15 +1157,26 @@ function renderOver(){
 
  document.getElementById('overh').innerHTML=`
   <button class="btn g s" onclick="closeAll()">✕</button>
-  <div><h2>${AS.ro?'Acte du '+DF(AS.date):'Nouvel acte'} — ${esc(fn(p))}</h2>
-   <div class="mu" style="font-size:11.5px">${age(p)} ans · dossier ${p.id}${p.ant.length?' · <span style="color:var(--warn);font-weight:600">⚠ '+esc(p.ant[0])+'</span>':''}</div></div>
+  <div><h2>${AS.ro?'Acte du '+DF(AS.date):'Nouvel acte'} — ${p?esc(fn(p)):'nouveau patient'}</h2>
+   <div class="mu" style="font-size:11.5px">${p?`${ageTxt(p)} · dossier ${p.id}${p.ant.length?' · <span style="color:var(--warn);font-weight:600">⚠ '+esc(p.ant[0])+'</span>':''}`:'le dossier sera créé à l’enregistrement'}</div></div>
   <div style="margin-left:auto;display:flex;gap:7px">
    ${AS.ro?'<span class="bdg b-neu">lecture seule</span>':''}
-   <button class="btn s" onclick="openPatient(${p.id})">Fiche complète</button></div>`;
+   ${p?`<button class="btn s" onclick="openPatient(${p.id})">Fiche complète</button>`:''}</div>`;
 
  document.getElementById('overb').innerHTML=`
+  ${AS.ro||!AS.np?'':`<div class="npbar">
+    <div class="full">✚ Nouveau patient
+      <span class="mu" style="font-weight:500">nom et prénom suffisent, le reste peut être complété plus tard</span>
+      <button class="btn xs g" style="margin-left:auto" onclick="AS.np=null;AS.pid=PATIENTS[0].id;renderOver()">choisir un patient existant</button></div>
+    <input placeholder="NOM *" value="${esc(AS.np.nom)}" oninput="AS.np.nom=this.value.toUpperCase();this.value=AS.np.nom">
+    <input placeholder="Prénom *" value="${esc(AS.np.prenom)}" oninput="AS.np.prenom=this.value">
+    <input type="date" title="Date de naissance" value="${AS.np.ddn}" oninput="AS.np.ddn=this.value">
+    <input placeholder="Téléphone" value="${esc(AS.np.tel)}" oninput="AS.np.tel=this.value">
+    <input placeholder="E-mail" value="${esc(AS.np.mail)}" oninput="AS.np.mail=this.value">
+   </div>`}
   ${AS.ro?'':`<div class="fbar" style="margin-bottom:14px">
-    <select class="inp" onchange="AS.pid=+this.value;renderOver()">${PATIENTS.map(x=>`<option value="${x.id}" ${x.id===AS.pid?'selected':''}>${esc(fn(x))}</option>`).join('')}</select>
+    ${AS.np?'':`<select class="inp" onchange="AS.pid=+this.value;renderOver()">${PATIENTS.map(x=>`<option value="${x.id}" ${x.id===AS.pid?'selected':''}>${esc(fn(x))}</option>`).join('')}</select>
+    <button class="btn s" onclick="AS.np={nom:'',prenom:'',ddn:'',tel:'',mail:''};renderOver()">+ Nouveau patient</button>`}
     <input class="inp" type="date" value="${AS.date}" onchange="AS.date=this.value">
     <select class="inp" onchange="AS.prat=this.value">${PRATICIENS.map(x=>`<option ${AS.prat===x?'selected':''}>${x}</option>`).join('')}</select>
     <select class="inp" onchange="AS.oper=this.value"><option value="">Sans opérateur</option>${OPERATEURS.map(x=>`<option ${AS.oper===x?'selected':''}>${x}</option>`).join('')}</select>
@@ -1180,7 +1253,14 @@ function mirrorZ(){
 }
 function saveActe(){
  const ent=Object.entries(AS.z).filter(([,q])=>q>0);
- if(!ent.length){toast('Sélectionnez au moins une zone');return}
+ if(!ent.length){toast('Sélectionnez au moins une zone du visage');return}
+ if(AS.np){
+  if(!AS.np.nom.trim()||!AS.np.prenom.trim()){toast('Nom et prénom du patient sont requis');return}
+  const id=Math.max(...PATIENTS.map(p=>p.id))+1;
+  PATIENTS.push({id,nom:AS.np.nom.trim(),prenom:AS.np.prenom.trim(),ddn:AS.np.ddn||null,
+   tel:AS.np.tel||'—',mail:AS.np.mail||'—',prat:AS.prat,depuis:TODAYS,notes:'',ant:[]});
+  AS.pid=id; AS.np=null;
+ }
  const tox=ent.filter(([z])=>zoneById(z).p==='tox').reduce((s,[,q])=>s+q,0);
  const ah=ent.filter(([z])=>zoneById(z).p==='ah').reduce((s,[,q])=>s+q,0);
  const type=ah>=tox*0.05?'AH':'BTX';
@@ -1219,7 +1299,7 @@ function buildPal(q){
  else{
   ACT.filter(a=>a.t.toLowerCase().includes(q)).forEach(a=>it.push(a));
   PATIENTS.filter(p=>[p.nom,p.prenom,p.mail,p.tel,String(p.id)].join(' ').toLowerCase().includes(q)).slice(0,6)
-   .forEach(p=>it.push({t:fn(p),s:`${age(p)} ans · ${ACTES.filter(a=>a.patient===p.id).length} actes · dossier ${p.id}`,ic:ini(p),k:'Patient',go:()=>{closeAll();openPatient(p.id)}}));
+   .forEach(p=>it.push({t:fn(p),s:`${ageTxt(p)} · ${ACTES.filter(a=>a.patient===p.id).length} actes · dossier ${p.id}`,ic:ini(p),k:'Patient',go:()=>{closeAll();openPatient(p.id)}}));
   DEVIS.filter(d=>d.id.toLowerCase().includes(q)||fn(pById(d.patient)).toLowerCase().includes(q)).slice(0,4)
    .forEach(d=>it.push({t:d.id,s:`${fn(pById(d.patient))} · ${EUR(d.montant)} · ${SD[d.statut][0]}`,ic:'◫',k:'Devis',go:()=>{closeAll();go('devis',d.id)}}));
   STOCK.filter(s=>(s.n+' '+s.ref+' '+(s.lot||'')).toLowerCase().includes(q)).slice(0,4)
