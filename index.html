@@ -214,6 +214,10 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .npbar input{height:34px;border:1px solid var(--line);background:var(--panel);border-radius:var(--r-s);padding:0 10px;outline:none;color:var(--ink)}
 .npbar input:focus{border-color:var(--accent)}
 @media(max-width:900px){.npbar{grid-template-columns:1fr 1fr}}
+.subh{display:flex;align-items:center;gap:9px;margin:4px 0 9px;padding-top:12px;border-top:1px solid var(--line)}
+.subh h3{margin:0;font-size:13px;font-weight:660;display:flex;align-items:center;gap:7px}
+.subh h3 span{background:var(--panel-3);color:var(--ink-2);border-radius:6px;padding:1px 7px;font-size:11px;font-weight:700}
+.subh .r{margin-left:auto;display:flex;gap:6px}
 .empty{padding:40px;text-align:center;color:var(--ink-3);font-size:12.5px}
 .tip{background:linear-gradient(120deg,var(--accent-wash),transparent 70%);border:1px solid var(--line);
   border-radius:var(--r-m);padding:11px 14px;font-size:12.5px;color:var(--ink-2);display:flex;gap:10px;align-items:flex-start;margin-bottom:14px}
@@ -585,6 +589,26 @@ const FACTURES=ACTES.map((a,i)=>{
 });
 const rdu=f=>f.montant-f.paye;
 
+/* ---------- Ordonnances (générées à partir des actes) ---------- */
+const ORDO_TPL={
+ AH:  ['Arnica montana 9 CH — 5 granules 3 fois par jour pendant 5 jours','Paracétamol 1 g si douleur, maximum 3 g par 24 h'],
+ BTX: ['Arnica montana 9 CH — 5 granules 3 fois par jour pendant 3 jours'],
+ SKB: ['Arnica montana 9 CH — 5 granules 3 fois par jour pendant 3 jours','Crème apaisante — 2 applications par jour pendant 5 jours'],
+ PEEL:['Crème réparatrice cicatrisante — 2 applications par jour pendant 7 jours','Photoprotection SPF 50+ quotidienne pendant 1 mois'],
+ MESO:['Arnica montana 9 CH — 5 granules 3 fois par jour pendant 3 jours'],
+ LAS2:['Photoprotection SPF 50+ quotidienne pendant 1 mois'],
+};
+const ORDONNANCES=[];
+(function(){
+ let n=1;
+ ACTES.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(a=>{
+  const t=ORDO_TPL[a.type]; if(!t||a.id%3===0) return;
+  const l=[...t];
+  if(a.zones&&a.zones.levres) l.unshift('Valaciclovir 500 mg — 1 comprimé matin et soir pendant 3 jours (prophylaxie herpétique)');
+  ORDONNANCES.push({id:'ORD-'+(2600+n++), patient:a.patient, acte:a.id, date:a.date, praticien:a.praticien, lignes:l});
+ });
+})();
+
 const STOCK=[
  {ref:'AH-VOLB',n:'Acide hyaluronique — volumateur 1 ml',cat:'Injectable',u:'seringue',q:11,s:8,lot:'L-AH2409',per:'2027-03-31',pu:78,f:'Allergan France'},
  {ref:'AH-LYFT',n:'Acide hyaluronique — comblement profond 1 ml',cat:'Injectable',u:'seringue',q:4,s:6,lot:'L-RL2502',per:'2027-01-31',pu:82,f:'Galderma'},
@@ -796,7 +820,7 @@ function heroKey(e){
 function heroNew(nom,prenom){openActe(null,null,{nom,prenom})}
 
 /* ---------------- Patients (maître-détail) ---------------- */
-let pq='',pPrat='',pSel=null,pTab='resume';
+let pq='',pPrat='',pSel=null,pTab='resume',docF='tous';
 V.patients=()=>{
  let L=PATIENTS.filter(p=>{const q=pq.toLowerCase();
   return (!q||[p.nom,p.prenom,p.mail,p.tel,String(p.id)].join(' ').toLowerCase().includes(q))&&(!pPrat||p.prat===pPrat)});
@@ -830,23 +854,67 @@ V.patients=()=>{
 function pDetail(p){
  const A=ACTES.filter(a=>a.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
  const F=FACTURES.filter(f=>f.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
- const D=DEVIS.filter(d=>d.patient===p.id);
+ const D=DEVIS.filter(d=>d.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
+ const O=ORDONNANCES.filter(o=>o.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
+ const C=A.filter(a=>catById(a.type).cons);
  const ca=F.reduce((s,f)=>s+f.paye,0), rd=F.reduce((s,f)=>s+rdu(f),0);
  const cumul={}; A.forEach(a=>zonesOf(a).forEach(([z,q])=>cumul[z]=(cumul[z]||0)+q));
- const TB=[['resume','Résumé'],['schema','Schéma cumulé'],['actes',`Actes ${A.length}`],['photos','Avant / après'],['facture','Devis & factures']];
+ const nDoc=O.length+D.length+F.length+C.length;
+ const TB=[['resume',`Résumé · ${A.length} acte${A.length>1?'s':''}`],['schema','Schéma cumulé'],
+           ['photos','Avant / après'],['docs',`Documents · ${nDoc}`]];
+
+ /* ---- tableau des actes, réutilisé sur la fiche synthétique ---- */
+ const tableActes = () => `<div class="tw"><table>
+   <thead><tr><th>Schéma</th><th>Date</th><th>Acte</th><th>Zones injectées</th><th>Praticien</th><th>Lot</th>${ROLES[role].prix?'<th class="num">Montant</th>':''}</tr></thead>
+   <tbody>${A.map(a=>`<tr class="c" onclick="openActe(${a.patient},${a.id})">
+     <td>${miniFace(a.zones)}</td><td class="mono">${DF(a.date)}</td>
+     <td><b>${esc(a.nom)}</b>${a.effets?`<div class="mu" style="font-size:11px">⚠ ${esc(a.effets)}</div>`:''}</td>
+     <td style="max-width:260px">${a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneById(z);
+        return `<span class="bdg ${Z.p==='tox'?'b-info':'b-warn'}" style="margin:0 3px 3px 0">${esc(Z.k)} ${fmtQ(q,Z.p)}</span>`}).join(''):`<span class="mu">${a.cat==='Injections'?'zones non détaillées':'acte non injectable'}</span>`}</td>
+     <td class="mu" style="white-space:nowrap">${esc(a.praticien)}${a.operateur?`<div style="font-size:11px">op. ${esc(a.operateur)}</div>`:''}</td>
+     <td class="mono mu" style="font-size:11.5px">${a.lot||'—'}</td>
+     ${ROLES[role].prix?`<td class="num">${EUR(a.prix)}</td>`:''}</tr>`).join('')}
+   </tbody></table>${A.length?'':'<div class="empty">Aucun acte enregistré pour ce patient.</div>'}</div>`;
+
+ /* ---- documents : ordonnances, devis, factures, consentements ---- */
+ const DOCS=[
+  ...O.map(o=>({k:'ordonnance',id:o.id,date:o.date,
+    t:`Ordonnance — ${o.lignes.length} ligne${o.lignes.length>1?'s':''}`,
+    s:o.lignes[0].split(' —')[0]+(o.lignes.length>1?` + ${o.lignes.length-1} autre${o.lignes.length>2?'s':''}`:''),
+    st:bdg('b-neu','Éditée'), a:`<button class="btn xs" onclick="event.stopPropagation();toast('Ordonnance ${o.id} ouverte')">Ouvrir</button>`})),
+  ...D.map(d=>({k:'devis',id:d.id,date:d.date,t:`Devis ${d.id}`,
+    s:`${d.lignes.length} prestation${d.lignes.length>1?'s':''} · ${EUR(d.montant)}`,
+    st:bdg(SD[d.statut][1],SD[d.statut][0]),
+    a:`<button class="btn xs" onclick="event.stopPropagation();go('devis','${d.id}')">Ouvrir</button>`})),
+  ...F.map(f=>({k:'facture',id:f.id,date:f.date,t:`Facture ${f.id}`,
+    s:`${EUR(f.montant)}${f.moyen?' · '+f.moyen:''}`,
+    st:rdu(f)>0?bdg('b-crit','Reste '+EUR(rdu(f))):bdg('b-good','Soldée'),
+    a:`<button class="btn xs" onclick="event.stopPropagation();toast('Facture ${f.id} — PDF Factur-X')">PDF</button>`})),
+  ...C.map(a=>({k:'consentement',id:'CONS-'+a.id,date:a.date,
+    t:`Consentement — ${esc(a.nom)}`, s:`acte du ${DF(a.date)}`,
+    st:a.consent?bdg('b-good','Signé'):bdg('b-crit','⚠ Non signé'),
+    a:a.consent?`<button class="btn xs" onclick="event.stopPropagation();toast('Consentement ouvert')">Ouvrir</button>`
+               :`<button class="btn xs p" onclick="event.stopPropagation();toast('Lien de signature envoyé par SMS')">Faire signer</button>`})),
+ ].sort((a,b)=>b.date.localeCompare(a.date));
+ const KIND={ordonnance:['Ordonnances','℞','Ordonnance'],devis:['Devis','◫','Devis'],
+             facture:['Factures','€','Facture'],consentement:['Consentements','✎','Consentement']};
+ const cnt=k=>DOCS.filter(d=>d.k===k).length;
 
  const body={
-  resume:()=>`<div class="grid g2" style="gap:13px">
-    <div>
-     <div class="fld"><label>Notes</label>${ROLES[role].med?`<textarea class="note">${esc(p.notes||'—')}</textarea>`:'<div class="v mu">🔒 non accessible à ce rôle</div>'}</div>
-    </div>
+  resume:()=>`
+   <div class="grid g2" style="gap:13px;margin-bottom:6px">
+    <div class="fld"><label>Notes</label>${ROLES[role].med?`<textarea class="note">${esc(p.notes||'')}</textarea>`:'<div class="v mu">🔒 non accessible à ce rôle</div>'}</div>
     <div>
      <div class="fld"><label>Antécédents &amp; contre-indications</label>
-      ${p.ant.length?p.ant.map(a=>`<div class="bdg b-warn" style="margin:0 5px 5px 0">⚠ ${esc(a)}</div>`).join(''):'<div class="v mu">Aucun</div>'}</div>
-     <div class="fld"><label>Coordonnées</label><div class="v">${esc(p.tel)}<br>${esc(p.mail)}</div></div>
-     <div class="fld"><label>Suivi</label><div class="v">Patient depuis le ${DF(p.depuis)} · réf. ${esc(p.prat)}</div></div>
+      ${p.ant.length?p.ant.map(a=>`<span class="bdg b-warn" style="margin:0 5px 5px 0">⚠ ${esc(a)}</span>`).join(''):'<div class="v mu">Aucun</div>'}</div>
+     <div class="fld"><label>Coordonnées</label><div class="v">${esc(p.tel)} · ${esc(p.mail)}</div></div>
+     <div class="fld"><label>Suivi</label><div class="v">Patient depuis le ${DF(p.depuis)} · référent ${esc(p.prat)}</div></div>
     </div></div>
-   ${p.ant.some(a=>/Allaitement|Anticoagulant/.test(a))?`<div class="tip" style="margin:4px 0 0;background:var(--warn-w)"><span class="e">⚠</span><div><b>Blocage automatique.</b> Un antécédent bloquant est présent : le logiciel affiche un avertissement avant toute saisie d'acte injectable.</div></div>`:''}`,
+   ${p.ant.some(a=>/Allaitement|Anticoagulant/.test(a))?`<div class="tip" style="margin:0 0 14px;background:var(--warn-w)"><span class="e">⚠</span><div><b>Blocage automatique.</b> Un antécédent bloquant est présent : un avertissement s'affiche avant toute saisie d'acte injectable.</div></div>`:''}
+   <div class="subh"><h3>Actes réalisés<span>${A.length}</span></h3>
+     <div class="r">${A.length?`<button class="btn xs" onclick="pTab='schema';paint()">Voir le schéma cumulé</button>`:''}
+     <button class="btn xs p" onclick="openActe(${p.id})">✚ Nouvel acte</button></div></div>
+   ${tableActes()}`,
 
   schema:()=>`<div class="facewrap">
     <div><div class="facebox">${faceSVG(cumul,{editable:false})}</div>
@@ -858,16 +926,6 @@ function pDetail(p){
        <div class="zn">${esc(Z.k)}<small>${PLABEL[Z.p]}</small></div>
        <b class="mono" style="font-size:12.5px">${fmtQ(q,Z.p)}</b></div>`}).join(''):'<div class="empty">Aucune injection enregistrée.</div>'}
     </div></div>`,
-
-  actes:()=>`<div class="tw"><table><thead><tr><th>Schéma</th><th>Date</th><th>Acte</th><th>Zones injectées</th><th>Lot</th><th>Consent.</th>${ROLES[role].prix?'<th class="num">Montant</th>':''}</tr></thead><tbody>
-   ${A.map(a=>`<tr class="c" onclick="openActe(${a.patient},${a.id})"><td>${miniFace(a.zones)}</td>
-     <td class="mono">${DF(a.date)}</td><td><b>${esc(a.nom)}</b><div class="mu" style="font-size:11px">${esc(a.praticien)}</div></td>
-     <td style="max-width:230px">${a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneById(z);
-        return `<span class="bdg ${Z.p==='tox'?'b-info':'b-warn'}" style="margin:0 3px 3px 0">${esc(Z.k)} ${fmtQ(q,Z.p)}</span>`}).join(''):'<span class="mu">—</span>'}</td>
-     <td class="mono mu" style="font-size:11.5px">${a.lot||'—'}</td>
-     <td>${catById(a.type).cons?(a.consent?bdg('b-good','Signé'):bdg('b-crit','⚠ manquant')):'<span class="mu">n/a</span>'}</td>
-     ${ROLES[role].prix?`<td class="num">${EUR(a.prix)}</td>`:''}</tr>`).join('')}
-   </tbody></table>${A.length?'':'<div class="empty">Aucun acte.</div>'}</div>`,
 
   photos:()=>`<div class="grid g2">
     <div><div class="ba" id="ba">
@@ -881,30 +939,44 @@ function pDetail(p){
         <div style="font-size:11px;color:var(--ink-3);text-align:center;margin-top:3px">${l}</div></div>`).join('')}</div>
      <div class="tip" style="margin:12px 0 0"><span class="e">📷</span><div><b>Import en 1 geste :</b> QR code affiché à l'écran, vous photographiez avec le téléphone, la photo arrive datée et recadrée dans la fiche.</div></div></div></div>`,
 
-  facture:()=>!ROLES[role].prix?'<div class="empty">🔒 Non accessible à ce rôle.</div>':`
-    <div class="grid g4" style="margin-bottom:12px">${kpi('CA cumulé',EUR(ca))}${kpi('Reste dû',EUR(rd),rd?'à recouvrer':'soldé',rd?'dn':'up')}
-     ${kpi('Devis en cours',D.filter(d=>['envoye','relance1','relance2'].includes(d.statut)).length)}${kpi('Factures',F.length)}</div>
-    <div class="tw"><table><thead><tr><th>Pièce</th><th>Date</th><th class="num">Montant</th><th class="num">Payé</th><th>Statut</th></tr></thead><tbody>
-     ${D.map(d=>`<tr class="c" onclick="go('devis','${d.id}')"><td class="mono">${d.id}</td><td class="mono">${DF(d.date)}</td>
-       <td class="num">${EUR(d.montant)}</td><td class="num mu">—</td><td>${bdg(SD[d.statut][1],SD[d.statut][0])}</td></tr>`).join('')}
-     ${F.map(f=>`<tr><td class="mono">${f.id}</td><td class="mono">${DF(f.date)}</td><td class="num">${EUR(f.montant)}</td>
-       <td class="num">${rdu(f)>0?`<span style="color:var(--crit);font-weight:660">${EUR(f.paye)}</span>`:EUR(f.paye)}</td>
-       <td>${rdu(f)>0?bdg('b-crit','reste '+EUR(rdu(f))):bdg('b-good','Soldée · '+f.moyen)}</td></tr>`).join('')}
-    </tbody></table></div>`
+  docs:()=>{
+   const L=DOCS.filter(d=>docF==='tous'||d.k===docF);
+   return `<div class="fbar">
+     <div class="seg">
+       <button class="${docF==='tous'?'on':''}" onclick="docF='tous';paint()">Tous · ${DOCS.length}</button>
+       ${Object.keys(KIND).map(k=>`<button class="${docF===k?'on':''}" onclick="docF='${k}';paint()">${KIND[k][0]} · ${cnt(k)}</button>`).join('')}
+     </div>
+     <div style="margin-left:auto;display:flex;gap:6px">
+       <button class="btn s" onclick="toast('Ordonnance créée')">℞ Ordonnance</button>
+       <button class="btn s" onclick="toast('Devis créé')">◫ Devis</button>
+       <button class="btn s" onclick="toast('Document téléversé')">↑ Téléverser</button>
+     </div></div>
+    ${C.some(a=>!a.consent)?`<div class="tip" style="background:var(--crit-w);border-color:rgba(208,59,59,.25)"><span class="e">⚠</span><div><b>${C.filter(a=>!a.consent).length} consentement${C.filter(a=>!a.consent).length>1?'s non signés':' non signé'}.</b> Un acte injectable sans consentement signé n'est pas défendable en cas de litige — le lien de signature part par SMS en un clic.</div></div>`:''}
+    <div class="tw"><table>
+     <thead><tr><th style="width:130px">Type</th><th>Document</th><th style="width:96px">Date</th><th style="width:130px">Statut</th><th style="width:96px"></th></tr></thead>
+     <tbody>${L.map(d=>`<tr>
+       <td><span class="bdg b-neu">${KIND[d.k][1]} ${KIND[d.k][2]}</span></td>
+       <td><b>${d.t}</b><div class="mu" style="font-size:11.5px">${esc(d.s)}</div></td>
+       <td class="mono" style="white-space:nowrap">${DF(d.date)}</td>
+       <td>${d.st}</td>
+       <td class="num">${d.a}</td></tr>`).join('')}
+     </tbody></table>${L.length?'':'<div class="empty">Aucun document de ce type.</div>'}</div>
+    <div class="mu" style="font-size:11.5px;margin-top:10px">Tout document produit ici est archivé à valeur probante et horodaté. Les factures seront générées au format Factur-X et transmises via votre plateforme agréée.</div>`;
+  }
  };
 
  return `<div class="card">
   <div class="h" style="padding:14px 16px">
    <div class="pav" style="width:38px;height:38px;font-size:13px">${esc(ini(p))}</div>
    <div><h2 style="font-size:16px">${esc(p.nom)} ${esc(p.prenom)}</h2>
-    <div class="mu" style="font-size:11.5px">${ageTxt(p)} · dossier ${p.id} · ${A.length} actes${ROLES[role].prix?` · ${EUR(ca)}`:''}${rd?` · <span style="color:var(--crit);font-weight:600">reste ${EUR(rd)}</span>`:''}</div></div>
+    <div class="mu" style="font-size:11.5px">${ageTxt(p)} · dossier ${p.id} · ${A.length} acte${A.length>1?'s':''}${ROLES[role].prix?` · ${EUR(ca)}`:''}${rd?` · <span style="color:var(--crit);font-weight:600">reste ${EUR(rd)}</span>`:''}</div></div>
    <div class="r">
     <button class="btn s" onclick="toast('SMS ouvert')">💬</button>
     <button class="btn s" onclick="toast('E-mail ouvert')">✉</button>
     <button class="btn s p" onclick="openActe(${p.id})">✚ Acte</button></div>
   </div>
   <div class="b" style="padding-bottom:0"><div class="tabs">${TB.map(([k,l])=>`<button class="${pTab===k?'on':''}" onclick="pTab='${k}';paint()">${l}</button>`).join('')}</div></div>
-  <div class="b">${body[pTab]()}</div></div>`;
+  <div class="b">${(body[pTab]||body.resume)()}</div></div>`;
 }
 
 /* ---------------- Actes ---------------- */
@@ -1270,7 +1342,7 @@ function saveActe(){
   prix:Math.round((tox*PU.tox+ah*PU.ah)/5)*5});
  if(tox){const s=STOCK.find(x=>x.ref==='BTX-100');s.q=Math.max(0,s.q-Math.ceil(tox/100))}
  if(ah){const s=STOCK.find(x=>x.ref==='AH-VOLB');s.q=Math.max(0,s.q-Math.ceil(ah))}
- closeAll(); pSel=AS.pid; pTab='actes'; go('patients');
+ closeAll(); pSel=AS.pid; pTab='resume'; go('patients');
  toast('Acte enregistré · stock mis à jour · consentement '+(AS.consent?'signé':'à faire signer'));
 }
 
