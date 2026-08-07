@@ -258,6 +258,13 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .phi .nm{font-size:12.5px}
 .phi .mu{font-size:11px}
 /* modèles */
+.annul{opacity:.55}
+.annul td{text-decoration:line-through;text-decoration-color:var(--line-2)}
+.annul td:last-child{text-decoration:none}
+.tvag{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}
+.tvag label{font-size:11.5px;color:var(--ink-2);display:flex;align-items:center;justify-content:space-between;gap:8px;
+  border:1px solid var(--line);border-radius:9px;padding:5px 9px;background:var(--panel-2)}
+.tvag .inp{height:28px}
 .msgprev{border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:var(--panel-2);font-size:13px;line-height:1.6}
 .vars{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
 .varchip{font:600 11px var(--sans);border:1px solid var(--line);background:var(--panel-2);border-radius:7px;padding:3px 7px;color:var(--ink-2)}
@@ -426,7 +433,7 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
       <a class="soon"><span class="i">▤</span>Agenda<span class="n">Phase 2</span></a>
       <div class="sgroup">Facturation</div>
       <a data-v="devis"><span class="i">◫</span>Devis &amp; factures<span class="n" id="n-devis">0</span></a>
-      <a data-v="encaiss"><span class="i">€</span>Encaissements</a>
+      <a data-v="encaiss"><span class="i">€</span>Facturation &amp; caisse</a>
       <a data-v="relances"><span class="i">↻</span>Relances auto<span class="n" id="n-rel">0</span></a>
       <div class="sgroup">Logistique</div>
       <a data-v="stock"><span class="i">▧</span>Stock &amp; lots<span class="n" id="n-stock">0</span></a>
@@ -644,12 +651,33 @@ const DEVIS=[
 const SD={brouillon:['Brouillon','b-neu'],envoye:['Envoyé','b-info'],relance1:['Relancé ×1','b-warn'],
  relance2:['Relancé ×2','b-warn'],accepte:['Accepté','b-good'],refuse:['Refusé','b-crit'],expire:['Expiré','b-crit']};
 
+/* --- paramètres de facturation, réglables au back-office --- */
+let FACTU={
+ double:true, modele:'retro',           /* 'retro' = une facture centre + reversement · 'split' = deux factures */
+ centre:{nom:'Centre Gemelia', siret:'812 456 789 00021'},
+ retro:{'Dr O. Baroudi':70, 'Dr A. Merlin':60},   /* part praticien en % */
+ tvaDefaut:20,
+ tvaParActe:{AH:20,BTX:20,SKB:20,MESO:20,PEEL:20,LAS1:20,LAS2:20,RF:20}
+};
+const tauxTVA=t=>FACTU.tvaParActe[t]!==undefined?FACTU.tvaParActe[t]:FACTU.tvaDefaut;
+const tauxRetro=pr=>FACTU.retro[pr]!==undefined?FACTU.retro[pr]:70;
+
+const MOYENS=['CB','Espèces','Chèque','Virement'];
 const FACTURES=ACTES.map((a,i)=>{
  const paye=a.date<'2026-07-20'?a.prix:(i%4===0?0:(i%5===0?Math.round(a.prix*.5):a.prix));
- return {id:'F-'+(2600+i),patient:a.patient,acte:a.id,date:a.date,montant:a.prix,paye,
-         moyen:paye===0?null:['CB','Espèces','Chèque','Virement'][i%4]};
+ const statut=i%37===0?'annulee':'ok';
+ return {id:'F-'+(2600+i),patient:a.patient,acte:a.id,date:a.date,montant:a.prix,
+         paye:statut==='annulee'?0:paye,
+         moyen:(statut==='annulee'||paye===0)?null:MOYENS[i%4],
+         praticien:a.praticien, cat:a.cat, type:a.type, statut,
+         avoir:(i%29===0&&statut==='ok')?Math.round(a.prix*0.2/5)*5:0};
 });
-const rdu=f=>f.montant-f.paye;
+const rdu=f=>f.statut==='annulee'?0:Math.max(0,f.montant-f.avoir-f.paye);
+const fTTC=f=>f.statut==='annulee'?0:f.montant-f.avoir;
+const fHT =f=>Math.round(fTTC(f)/(1+tauxTVA(f.type)/100)*100)/100;
+const fTVA=f=>Math.round((fTTC(f)-fHT(f))*100)/100;
+const partPrat=f=>Math.round(fTTC(f)*tauxRetro(f.praticien)/100);
+const partCentre=f=>fTTC(f)-partPrat(f);
 
 /* ---------- Ordonnances (générées à partir des actes) ---------- */
 const ORDO_TPL={
@@ -1456,43 +1484,165 @@ V.devis=()=>{
 };
 
 /* ---------------- Encaissements ---------------- */
+let encView='detail', fMoyen='tous', fStatut='tous', fPrat='', fCat='', fq='';
+const ENCV=[['detail','Facturations détaillées'],['jours','Totaux journaliers'],['caisse','Encaissement & caisse']];
+
+function factFiltrees(){
+ const q=fq.toLowerCase();
+ return FACTURES.filter(f=>inPer(f.date,perE))
+  .filter(f=>fMoyen==='tous'||(fMoyen==='impaye'?!f.moyen&&f.statut!=='annulee':f.moyen===fMoyen))
+  .filter(f=>fStatut==='tous'?true:fStatut==='annulee'?f.statut==='annulee':fStatut==='avoir'?f.avoir>0:
+             fStatut==='solde'?(f.statut==='ok'&&rdu(f)===0):(f.statut==='ok'&&rdu(f)>0))
+  .filter(f=>!fPrat||f.praticien===fPrat)
+  .filter(f=>!fCat||f.cat===fCat)
+  .filter(f=>{const p=pById(f.patient);return !q||[f.id,fn(p),String(f.patient),(ACTES.find(a=>a.id===f.acte)||{}).nom||''].join(' ').toLowerCase().includes(q)})
+  .sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+}
+function barreFiltres(){
+ return `<div class="fbar">
+  <input class="inp" id="fqi" style="min-width:240px" placeholder="N°, patient, acte…" value="${esc(fq)}"
+    oninput="fq=this.value;paint();const e=document.getElementById('fqi');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
+  <div class="seg"><button class="${fMoyen==='tous'?'on':''}" onclick="fMoyen='tous';paint()">Tous paiements</button>
+   ${MOYENS.map(m=>`<button class="${fMoyen===m?'on':''}" onclick="fMoyen='${m}';paint()">${m}</button>`).join('')}
+   <button class="${fMoyen==='impaye'?'on':''}" onclick="fMoyen='impaye';paint()">Non réglé</button></div>
+  <select class="inp" onchange="fStatut=this.value;paint()">
+   ${[['tous','Tous statuts'],['solde','Soldées'],['reste','Avec reste dû'],['avoir','Avec avoir'],['annulee','Annulées']]
+     .map(([k,l])=>`<option value="${k}" ${fStatut===k?'selected':''}>${l}</option>`).join('')}</select>
+  <select class="inp" onchange="fPrat=this.value;paint()"><option value="">Tous praticiens</option>
+   ${PRATICIENS.map(x=>`<option ${fPrat===x?'selected':''}>${x}</option>`).join('')}</select>
+  <select class="inp" onchange="fCat=this.value;paint()"><option value="">Toutes catégories</option>
+   ${CATS.map(x=>`<option ${fCat===x?'selected':''}>${x}</option>`).join('')}</select>
+  ${(fq||fMoyen!=='tous'||fStatut!=='tous'||fPrat||fCat)?`<button class="chip" onclick="fq='';fMoyen='tous';fStatut='tous';fPrat='';fCat='';paint()">✕ Effacer</button>`:''}
+ </div>`;
+}
+
 V.encaiss=()=>{
- const FP=FACTURES.filter(f=>inPer(f.date,perE));
+ const sub=`<div class="fbar" style="margin-bottom:14px"><div class="seg">${ENCV.map(([k,l])=>
+   `<button class="${encView===k?'on':''}" onclick="encView='${k}';paint()">${l}</button>`).join('')}</div>
+   <div style="margin-left:auto"><button class="btn s g" onclick="go('params');paramTab='facturation';paint()">⚙ Double facturation &amp; rétrocession</button></div></div>`;
+ return sub+({detail:eDetail, jours:eJours, caisse:eCaisse}[encView]||eDetail)();
+};
+
+/* ---------- Facturations détaillées ---------- */
+function eDetail(){
+ const L=factFiltrees(), ok=L.filter(f=>f.statut==='ok');
+ const ttc=ok.reduce((s,f)=>s+fTTC(f),0), ht=ok.reduce((s,f)=>s+fHT(f),0);
+ const tva=Math.round((ttc-ht)*100)/100;
+ const enc=ok.reduce((s,f)=>s+f.paye,0), reste=ok.reduce((s,f)=>s+rdu(f),0);
+ const pc=ok.reduce((s,f)=>s+partCentre(f),0), pp=ok.reduce((s,f)=>s+partPrat(f),0);
+ const dbl=FACTU.double;
+ return `<div class="head" style="margin-bottom:12px">
+   <div><h1>Facturations détaillées</h1><p>${L.length} facturation${L.length>1?'s':''} sur la période${L.length!==ok.length?` · ${L.length-ok.length} annulée(s) exclue(s) des totaux`:''}</p></div>
+   <div class="r"><button class="btn" onclick="toast('Export CSV généré')">Exporter la liste</button>
+    <button class="btn p" onclick="toast('Facturation créée')">+ Facturation</button></div></div>
+ ${periodBar(perE,'setPerE',`${L.length} ligne${L.length>1?'s':''}`)}
+ ${barreFiltres()}
+ <div class="grid ${dbl?'g5':'g4'}" style="margin-bottom:13px">
+  ${kpi('Facturation TTC',EUR(ttc),`${ok.length} facture(s) · moyenne ${EUR(ok.length?ttc/ok.length:0)}`)}
+  ${kpi('Dont HT',EUR(ht),`TVA ${EUR(tva)}`)}
+  ${kpi('Encaissé',EUR(enc),ttc?Math.round(enc/ttc*100)+' % du facturé':'—','up')}
+  ${kpi('Reste dû',EUR(reste),ok.filter(f=>rdu(f)>0).length+' facture(s)',reste?'dn':'up')}
+  ${dbl?kpi('Rétrocession praticien',EUR(pp),`part centre ${EUR(pc)}`):''}</div>
+ <div class="card"><div class="tw"><table>
+  <thead><tr><th style="white-space:nowrap">N°</th><th style="white-space:nowrap">Date</th><th style="white-space:nowrap">Patient</th><th style="white-space:nowrap">Acte</th><th style="white-space:nowrap">Catégorie</th><th style="white-space:nowrap">Praticien</th>
+   ${dbl?'<th>Facturé par</th>':''}
+   <th class="num">HT</th><th class="num">TVA</th><th class="num">TTC</th>
+   ${dbl?'<th class="num">Part centre</th><th class="num">Part praticien</th>':''}
+   <th class="num">Encaissé</th><th>Mode</th><th class="num">Reste</th><th>Statut</th></tr></thead>
+  <tbody>${L.map(f=>{const p=pById(f.patient), a=ACTES.find(x=>x.id===f.acte), an=f.statut==='annulee';
+   return `<tr class="c ${an?'annul':''}" onclick="openPatient(${f.patient})">
+    <td class="mono" style="white-space:nowrap">${f.id}</td><td class="mono" style="white-space:nowrap">${DF(f.date)}</td>
+    <td style="white-space:nowrap"><span class="nm">${esc(fn(p))}</span><div class="mu" style="font-size:11px">n° ${p.id}</div></td>
+    <td style="white-space:nowrap">${a?esc(a.nom):'—'}${f.avoir?`<div class="mu" style="font-size:11px">avoir ${EUR(f.avoir)}</div>`:''}</td>
+    <td class="mu">${esc(f.cat)}</td><td class="mu" style="white-space:nowrap">${esc(f.praticien)}</td>
+    ${dbl?`<td><span class="bdg b-neu">${FACTU.modele==='split'?'Centre + Praticien':esc(FACTU.centre.nom)}</span></td>`:''}
+    <td class="num">${EUR(fHT(f))}</td><td class="num mu">${EUR(fTVA(f))}</td>
+    <td class="num"><b>${EUR(fTTC(f))}</b></td>
+    ${dbl?`<td class="num mu">${EUR(partCentre(f))}</td><td class="num" style="color:var(--accent-ink);font-weight:620">${EUR(partPrat(f))}</td>`:''}
+    <td class="num">${EUR(f.paye)}</td><td class="mu">${f.moyen||'—'}</td>
+    <td class="num">${rdu(f)>0?`<span style="color:var(--crit);font-weight:650">${EUR(rdu(f))}</span>`:'<span class="mu">—</span>'}</td>
+    <td>${an?bdg('b-crit','⊘ Annulée'):f.avoir?bdg('b-warn','Avoir'):rdu(f)>0?bdg('b-warn','Partielle'):bdg('b-good','Soldée')}</td></tr>`}).join('')}
+  </tbody></table>${L.length?'':'<div class="empty">Aucune facturation avec ces filtres.</div>'}</div></div>
+ <div class="mu" style="font-size:11.5px;margin-top:10px">⊘ Les facturations annulées ne sont pas prises en compte dans les totaux. Les avoirs sont déduits des montants HT et TTC.</div>`;
+}
+
+/* ---------- Totaux journaliers ---------- */
+function eJours(){
+ const L=factFiltrees();
+ const j={}; L.forEach(f=>{(j[f.date]=j[f.date]||[]).push(f)});
+ const jours=Object.keys(j).sort((a,b)=>b.localeCompare(a));
+ const tot=L.filter(f=>f.statut==='ok').reduce((s,f)=>s+fTTC(f),0);
+ const dbl=FACTU.double;
+ return `<div class="head" style="margin-bottom:12px">
+   <div><h1>Totaux journaliers</h1><p>${jours.length} jour${jours.length>1?'s':''} de facturation sur la période</p></div>
+   <div class="r"><button class="btn" onclick="toast('Ticket de synthèse envoyé à l’imprimante')">🖨 Ticket de synthèse</button>
+    <button class="btn" onclick="toast('Export CSV généré')">Exporter la liste</button></div></div>
+ ${periodBar(perE,'setPerE',`${jours.length} jour${jours.length>1?'s':''}`)}
+ ${barreFiltres()}
+ <div class="grid g4" style="margin-bottom:13px">
+  ${kpi('Facturation totale TTC',EUR(tot))}
+  ${kpi('Moyenne par jour',EUR(jours.length?tot/jours.length:0),`sur ${jours.length} jour(s) travaillé(s)`)}
+  ${kpi('Encaissé',EUR(L.reduce((s,f)=>s+f.paye,0)))}
+  ${kpi('Reste dû',EUR(L.reduce((s,f)=>s+rdu(f),0)),'',L.reduce((s,f)=>s+rdu(f),0)?'dn':'up')}</div>
+ <div class="card"><div class="tw"><table>
+  <thead><tr><th>Date</th><th class="num">Nb factures</th><th class="num">Nb avoirs</th><th class="num">HT</th><th class="num">TVA</th>
+   <th class="num">TTC</th>${dbl?'<th class="num">Part centre</th><th class="num">Part praticien</th>':''}
+   <th class="num">Encaissé</th><th>Modes de paiement</th><th class="num">Restant dû</th></tr></thead>
+  <tbody>${jours.map(d=>{const F=j[d], ok=F.filter(f=>f.statut==='ok');
+   const modes={}; ok.forEach(f=>{if(f.moyen) modes[f.moyen]=(modes[f.moyen]||0)+f.paye});
+   return `<tr class="c" onclick="encView='detail';setPerE({k:'perso',from:'${d}',to:'${d}'})">
+    <td class="mono"><b>${DF(d)}</b><div class="mu" style="font-size:11px">${new Date(d).toLocaleDateString('fr-FR',{weekday:'long'})}</div></td>
+    <td class="num">${ok.length}${F.length!==ok.length?`<div class="mu" style="font-size:11px">${F.length-ok.length} annulée(s)</div>`:''}</td>
+    <td class="num ${ok.filter(f=>f.avoir>0).length?'':'mu'}">${ok.filter(f=>f.avoir>0).length||'—'}</td>
+    <td class="num">${EUR(ok.reduce((s,f)=>s+fHT(f),0))}</td>
+    <td class="num mu">${EUR(ok.reduce((s,f)=>s+fTVA(f),0))}</td>
+    <td class="num"><b>${EUR(ok.reduce((s,f)=>s+fTTC(f),0))}</b></td>
+    ${dbl?`<td class="num mu">${EUR(ok.reduce((s,f)=>s+partCentre(f),0))}</td>
+      <td class="num" style="color:var(--accent-ink);font-weight:620">${EUR(ok.reduce((s,f)=>s+partPrat(f),0))}</td>`:''}
+    <td class="num">${EUR(ok.reduce((s,f)=>s+f.paye,0))}</td>
+    <td>${Object.keys(modes).length?Object.entries(modes).map(([m,v])=>`<span class="bdg b-neu" style="margin:0 3px 2px 0">${m} ${EUR(v)}</span>`).join(''):'<span class="mu">—</span>'}</td>
+    <td class="num">${ok.reduce((s,f)=>s+rdu(f),0)?`<span style="color:var(--crit);font-weight:650">${EUR(ok.reduce((s,f)=>s+rdu(f),0))}</span>`:'<span class="mu">—</span>'}</td></tr>`}).join('')}
+  </tbody></table>${jours.length?'':'<div class="empty">Aucune facturation sur cette période.</div>'}</div></div>
+ <div class="mu" style="font-size:11.5px;margin-top:10px">Cliquez une ligne pour ouvrir le détail de la journée. Les avoirs sont déduits des montants HT et TTC, les remboursements des montants encaissés.</div>`;
+}
+
+/* ---------- Encaissement & caisse ---------- */
+function eCaisse(){
+ const FP=FACTURES.filter(f=>inPer(f.date,perE)&&f.statut==='ok');
  const prev=perPrev(perE);
  const enc=FP.reduce((s,f)=>s+f.paye,0);
- const encPrev=FACTURES.filter(f=>inPer(f.date,prev)).reduce((s,f)=>s+f.paye,0);
+ const encPrev=FACTURES.filter(f=>inPer(f.date,prev)&&f.statut==='ok').reduce((s,f)=>s+f.paye,0);
  const ev=encPrev?Math.round((enc-encPrev)/encPrev*100):0;
  const im=FP.filter(f=>rdu(f)>0).sort((a,b)=>a.date.localeCompare(b.date));
  const reste=im.reduce((s,f)=>s+rdu(f),0);
- const pm=['CB','Espèces','Chèque','Virement'].map(m=>({label:m,v:FP.filter(f=>f.moyen===m).reduce((s,f)=>s+f.paye,0)})).filter(x=>x.v);
- const serie=perBuckets(perE).map(b=>({label:b.label,v:FACTURES.filter(f=>f.date>=b.from&&f.date<=b.to).reduce((s,f)=>s+f.paye,0)}));
+ const pm=MOYENS.map(m=>({label:m,v:FP.filter(f=>f.moyen===m).reduce((s,f)=>s+f.paye,0)})).filter(x=>x.v);
+ const serie=perBuckets(perE).map(b=>({label:b.label,v:FACTURES.filter(f=>f.statut==='ok'&&f.date>=b.from&&f.date<=b.to).reduce((s,f)=>s+f.paye,0)}));
  const spanE=days(...perRange(perE))+1;
  const gran=spanE<=14?'par jour':spanE<=95?'par semaine':'par mois';
- return `<div class="head">
-  <div><h1>Encaissements</h1><p>${FP.length} facture${FP.length>1?'s':''} sur la période · ${EUR(enc)} encaissés</p></div>
-  <div class="r"><button class="btn" onclick="toast('Export comptable généré')">Exporter</button>
-   <button class="btn" onclick="toast('Clôture de caisse enregistrée')">Clôture du jour</button>
+ return `<div class="head" style="margin-bottom:12px">
+  <div><h1>Encaissement &amp; caisse</h1><p>${FP.length} facture${FP.length>1?'s':''} · ${EUR(enc)} encaissés</p></div>
+  <div class="r"><button class="btn" onclick="toast('Clôture de caisse enregistrée')">Clôture du jour</button>
    <button class="btn p" onclick="toast('Encaissement saisi')">+ Encaissement</button></div></div>
  ${periodBar(perE,'setPerE',`${FP.length} facture${FP.length>1?'s':''}`)}
  <div class="grid g4" style="margin-bottom:14px">
   ${kpi('Encaissé sur la période',EUR(enc),encPrev?`${ev>=0?'▲':'▼'} ${Math.abs(ev)} % vs période précédente`:'pas de comparatif',ev>=0?'up':'dn')}
   ${kpi('Reste dû',EUR(reste),im.length+' facture'+(im.length>1?'s':''),reste?'dn':'up')}
   ${kpi('Chèques à encaisser',EUR(FP.filter(f=>f.moyen==='Chèque').reduce((s,f)=>s+f.paye,0)),FP.filter(f=>f.moyen==='Chèque').length+' chèque(s)')}
-  ${kpi('Espèces',EUR(FP.filter(f=>f.moyen==='Espèces').reduce((s,f)=>s+f.paye,0)),'à déposer en banque')}</div>
+  ${kpi('Espèces en caisse',EUR(FP.filter(f=>f.moyen==='Espèces').reduce((s,f)=>s+f.paye,0)),'à déposer en banque')}</div>
  <div class="grid g2" style="margin-bottom:13px">
   <div class="card"><div class="h"><h2>Par moyen de paiement</h2><span class="s">sur la période</span></div>
-   <div class="b">${pm.length?hbars(pm):'<div class="empty">Aucun encaissement sur cette période.</div>'}</div></div>
+   <div class="b">${pm.length?hbars(pm):'<div class="empty">Aucun encaissement.</div>'}</div></div>
   <div class="card"><div class="h"><h2>Encaissé</h2><span class="s">${gran}</span></div>
    <div class="b">${bars(serie,{h:190})}</div></div></div>
  <div class="card"><div class="h"><h2>Restes dus</h2><div class="r">${bdg('b-warn',EUR(reste)+' à recouvrer')}
    ${im.length?`<button class="btn s" onclick="toast('${im.length} relances de paiement envoyées')">Tout relancer</button>`:''}</div></div>
-  <div class="tw"><table><thead><tr><th>Facture</th><th>Patient</th><th>Date</th><th class="num">Montant</th><th class="num">Payé</th><th class="num">Reste</th><th>Âge</th><th></th></tr></thead>
+  <div class="tw"><table><thead><tr><th>Facture</th><th>Patient</th><th>Date</th><th class="num">TTC</th><th class="num">Payé</th><th class="num">Reste</th><th>Âge</th><th></th></tr></thead>
   <tbody>${im.map(f=>`<tr><td class="mono">${f.id}</td><td class="nm">${esc(fn(pById(f.patient)))}</td>
-   <td class="mono">${DF(f.date)}</td><td class="num">${EUR(f.montant)}</td><td class="num">${EUR(f.paye)}</td>
+   <td class="mono">${DF(f.date)}</td><td class="num">${EUR(fTTC(f))}</td><td class="num">${EUR(f.paye)}</td>
    <td class="num" style="color:var(--crit);font-weight:660">${EUR(rdu(f))}</td><td class="mono">${days(f.date,TODAY)} j</td>
    <td class="num"><button class="btn xs" onclick="toast('Relance envoyée')">Relancer</button></td></tr>`).join('')}</tbody></table>
    ${im.length?'':'<div class="empty">Aucun impayé sur cette période 🎉</div>'}</div></div>`;
-};
+}
 
 /* ---------------- Relances ---------------- */
 V.relances=()=>`<div class="head"><div><h1>Relances automatiques</h1><p>Le devis part, le logiciel relance seul. Vous n'intervenez que si le patient répond.</p></div>
@@ -1589,7 +1739,7 @@ V.stats=()=>{
 /* ---------------- Paramètres (back-office) ---------------- */
 let paramTab='fidelite', modSel='anniv-sms', docSel='d1';
 V.params=()=>{
- const TB=[['fidelite','Critères de fidélité'],['messages',`Modèles de message · ${MODELES.length}`],['documents',`Modèles de document · ${DOCMOD.length}`]];
+ const TB=[['fidelite','Critères de fidélité'],['facturation','Facturation & rétrocession'],['messages',`Modèles de message · ${MODELES.length}`],['documents',`Modèles de document · ${DOCMOD.length}`]];
  const body={
   fidelite:()=>{
    const all=PATIENTS.map(p=>({p,f:fidLevel(p)})).filter(x=>x.f);
@@ -1621,6 +1771,59 @@ V.params=()=>{
           <label>Dernier acte ≤ (mois)<input class="inp" type="number" min="1" value="${n.recence}" onchange="FID.niveaux[${i}].recence=+this.value||1;paint()"></label>
         </div></div>`).join('')}
     </div></div></div>`;
+  },
+  facturation:()=>{
+   const FP=FACTURES.filter(f=>inPer(f.date,perE)&&f.statut==='ok');
+   const ttc=FP.reduce((s,f)=>s+fTTC(f),0);
+   const parPrat=PRATICIENS.map(pr=>{const L=FP.filter(f=>f.praticien===pr);
+     return {pr, ttc:L.reduce((s,f)=>s+fTTC(f),0), pp:L.reduce((s,f)=>s+partPrat(f),0), pc:L.reduce((s,f)=>s+partCentre(f),0), n:L.length}});
+   return `<div class="tip"><span class="e">🧾</span><div>Ces réglages pilotent les colonnes <b>Part centre</b> et <b>Part praticien</b> des facturations détaillées et des totaux journaliers. La simulation ci-dessous porte sur la période sélectionnée dans Facturation &amp; caisse (${perLabel(perE)}).</div></div>
+   <div class="grid g2">
+    <div class="card"><div class="h"><h2>Double facturation</h2>
+      <div class="r"><button class="sw ${FACTU.double?'on':''}" onclick="FACTU.double=!FACTU.double;paint()"></button></div></div>
+     <div class="b">
+      <div class="fld"><label>Modèle de répartition</label>
+       <div class="seg" style="width:100%">
+        ${[['retro','Rétrocession'],['split','Facturation séparée']].map(([k,l])=>
+          `<button class="${FACTU.modele===k?'on':''}" onclick="FACTU.modele='${k}';paint()" style="flex:1">${l}</button>`).join('')}</div>
+       <div class="mu" style="font-size:11.5px;margin-top:6px">${FACTU.modele==='retro'
+         ? "Le centre facture la totalité au patient, puis reverse au praticien sa part selon le taux ci-dessous. Une seule facture patient, un relevé de rétrocession mensuel."
+         : "Deux factures distinctes sont émises pour le même acte : l'une par le centre (part structure), l'autre par le praticien (honoraires). Le patient reçoit les deux."}</div></div>
+      <div class="grid g2" style="gap:10px">
+       <div class="fld"><label>Raison sociale du centre</label><input class="inp" style="width:100%" value="${esc(FACTU.centre.nom)}" onchange="FACTU.centre.nom=this.value;paint()"></div>
+       <div class="fld"><label>SIRET</label><input class="inp" style="width:100%" value="${esc(FACTU.centre.siret)}" onchange="FACTU.centre.siret=this.value;paint()"></div></div>
+      <div style="margin-top:6px;padding-top:12px;border-top:1px solid var(--line)">
+       <div class="fld"><label>Taux de rétrocession — part conservée par le praticien</label>
+        ${PRATICIENS.map(pr=>`<div class="zrow">
+          <div class="zn">${esc(pr)}<small>le centre conserve ${100-tauxRetro(pr)} %</small></div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input class="inp" style="width:74px;text-align:right" type="number" min="0" max="100" value="${tauxRetro(pr)}"
+              onchange="FACTU.retro['${pr}']=Math.max(0,Math.min(100,+this.value||0));paint()">
+            <span class="mu">%</span></div></div>`).join('')}</div></div>
+     </div></div>
+    <div class="card"><div class="h"><h2>Simulation sur la période</h2><span class="s">${FP.length} facture(s) · ${EUR(ttc)} TTC</span></div>
+     <div class="b">
+      ${FACTU.double?`<div class="tw"><table>
+        <thead><tr><th>Praticien</th><th class="num">Factures</th><th class="num">TTC</th><th class="num">Taux</th><th class="num">Part praticien</th><th class="num">Part centre</th></tr></thead>
+        <tbody>${parPrat.map(x=>`<tr><td class="nm">${esc(x.pr)}</td><td class="num">${x.n}</td>
+          <td class="num">${EUR(x.ttc)}</td><td class="num">${tauxRetro(x.pr)} %</td>
+          <td class="num" style="color:var(--accent-ink);font-weight:650">${EUR(x.pp)}</td>
+          <td class="num">${EUR(x.pc)}</td></tr>`).join('')}
+        <tr><td colspan="2"><b>Total</b></td><td class="num"><b>${EUR(ttc)}</b></td><td></td>
+          <td class="num"><b>${EUR(parPrat.reduce((s,x)=>s+x.pp,0))}</b></td>
+          <td class="num"><b>${EUR(parPrat.reduce((s,x)=>s+x.pc,0))}</b></td></tr></tbody></table></div>
+        <button class="btn s" style="margin-top:12px" onclick="toast('Relevé de rétrocession généré')">Générer le relevé de rétrocession</button>`
+        :'<div class="empty">Double facturation désactivée — une seule facture est émise, sans répartition.</div>'}
+      <div style="margin-top:16px;padding-top:13px;border-top:1px solid var(--line)">
+       <div class="fld"><label>Taux de TVA par acte</label>
+        <div class="tvag">${CATALOGUE.map(c=>`<label>${esc(c.n)}
+          <div style="display:flex;gap:5px;align-items:center">
+           <input class="inp" style="width:64px;text-align:right" type="number" min="0" max="20" value="${tauxTVA(c.id)}"
+             onchange="FACTU.tvaParActe['${c.id}']=+this.value||0;paint()"><span class="mu">%</span></div></label>`).join('')}</div>
+        <div class="mu" style="font-size:11.5px;margin-top:6px">Les actes de médecine esthétique sont soumis à TVA à 20 %. Mettez 0 pour un acte à visée thérapeutique exonéré (art. 261-4-1° du CGI) — à valider avec votre expert-comptable.</div></div>
+      </div>
+     </div></div>
+   </div>`;
   },
   messages:()=>{
    const m=modById(modSel)||MODELES[0];
