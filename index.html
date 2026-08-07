@@ -688,6 +688,15 @@ const ORDO_TPL={
  MESO:['Arnica montana 9 CH — 5 granules 3 fois par jour pendant 3 jours'],
  LAS2:['Photoprotection SPF 50+ quotidienne pendant 1 mois'],
 };
+const AUTRES_DOCS=[];
+(function(){ let n=1;
+ PATIENTS.forEach((p,i)=>{
+  AUTRES_DOCS.push({id:'INF-'+(2600+n++),patient:p.id,date:p.depuis,cat:'Information',
+    nom:'Fiche d’information pré-acte',sous:'remise et commentée en consultation'});
+  if(i%3===0) AUTRES_DOCS.push({id:'CRR-'+(2600+n++),patient:p.id,date:p.depuis,cat:'Courrier',
+    nom:'Courrier au médecin traitant',sous:'information de prise en charge esthétique'});
+ });
+})();
 const ORDONNANCES=[];
 (function(){
  let n=1;
@@ -1089,7 +1098,7 @@ function heroKey(e){
 function heroNew(nom,prenom){openActe(null,null,{nom,prenom})}
 
 /* ---------------- Patients (maître-détail) ---------------- */
-let pq='',pPrat='',pSel=null,pTab='resume',docF='tous';
+let pq='',pPrat='',pSel=null,pTab='resume',docF='tous',docQ='';
 let pView='liste', fidF='tous', annivF='mois', perP={k:'90j',from:'',to:''}, photoQ='', photoKind='tous';
 function setPerP(x){perP=x;paint()}
 const PVIEWS=[['liste','Tous les patients'],['fideles','Fidèles'],['anniv','Anniversaires'],['photos','Photothèque']];
@@ -1272,9 +1281,14 @@ function pDetail(p){
  const C=A.filter(a=>catById(a.type).cons);
  const ca=F.reduce((s,f)=>s+f.paye,0), rd=F.reduce((s,f)=>s+rdu(f),0);
  const cumul={}; A.forEach(a=>zonesOf(a).forEach(([z,q])=>cumul[z]=(cumul[z]||0)+q));
- const nDoc=O.length+D.length+F.length+C.length;
+ const AD=AUTRES_DOCS.filter(x=>x.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
+ const nDoc=O.length+C.length+AD.length;
+ const nFac=D.length+F.length+F.filter(f=>f.avoir>0).length;
  const TB=[['resume',`Résumé · ${A.length} acte${A.length>1?'s':''}`],['schema','Schéma cumulé'],
-           ['photos','Avant / après'],['docs',`Documents · ${nDoc}`]];
+           ['photos','Avant / après']]
+   .concat(ROLES[role].prix?[['factu',`Facturation · ${nFac}`]]:[])
+   .concat([['docs',`Documents · ${nDoc}`]]);
+ if(!TB.some(t=>t[0]===pTab)) pTab='resume';
 
  /* ---- tableau des actes, réutilisé sur la fiche synthétique ---- */
  const tableActes = () => `<div class="tw"><table>
@@ -1295,22 +1309,17 @@ function pDetail(p){
     t:`Ordonnance — ${o.lignes.length} ligne${o.lignes.length>1?'s':''}`,
     s:o.lignes[0].split(' —')[0]+(o.lignes.length>1?` + ${o.lignes.length-1} autre${o.lignes.length>2?'s':''}`:''),
     st:bdg('b-neu','Éditée'), a:`<button class="btn xs" onclick="event.stopPropagation();toast('Ordonnance ${o.id} ouverte')">Ouvrir</button>`})),
-  ...D.map(d=>({k:'devis',id:d.id,date:d.date,t:`Devis ${d.id}`,
-    s:`${d.lignes.length} prestation${d.lignes.length>1?'s':''} · ${EUR(d.montant)}`,
-    st:bdg(SD[d.statut][1],SD[d.statut][0]),
-    a:`<button class="btn xs" onclick="event.stopPropagation();go('devis','${d.id}')">Ouvrir</button>`})),
-  ...F.map(f=>({k:'facture',id:f.id,date:f.date,t:`Facture ${f.id}`,
-    s:`${EUR(f.montant)}${f.moyen?' · '+f.moyen:''}`,
-    st:rdu(f)>0?bdg('b-crit','Reste '+EUR(rdu(f))):bdg('b-good','Soldée'),
-    a:`<button class="btn xs" onclick="event.stopPropagation();toast('Facture ${f.id} — PDF Factur-X')">PDF</button>`})),
   ...C.map(a=>({k:'consentement',id:'CONS-'+a.id,date:a.date,
     t:`Consentement — ${esc(a.nom)}`, s:`acte du ${DF(a.date)}`,
     st:a.consent?bdg('b-good','Signé'):bdg('b-crit','⚠ Non signé'),
     a:a.consent?`<button class="btn xs" onclick="event.stopPropagation();toast('Consentement ouvert')">Ouvrir</button>`
                :`<button class="btn xs p" onclick="event.stopPropagation();toast('Lien de signature envoyé par SMS')">Faire signer</button>`})),
+  ...AD.map(x=>({k:x.cat==='Courrier'?'courrier':'information',id:x.id,date:x.date,
+    t:esc(x.nom), s:esc(x.sous), st:bdg('b-neu','Archivé'),
+    a:`<button class="btn xs" onclick="event.stopPropagation();toast('${x.id} ouvert')">Ouvrir</button>`})),
  ].sort((a,b)=>b.date.localeCompare(a.date));
- const KIND={ordonnance:['Ordonnances','℞','Ordonnance'],devis:['Devis','◫','Devis'],
-             facture:['Factures','€','Facture'],consentement:['Consentements','✎','Consentement']};
+ const KIND={ordonnance:['Ordonnances','℞','Ordonnance'],consentement:['Consentements','✎','Consentement'],
+             information:['Informations','ⓘ','Information'],courrier:['Courriers','✉','Courrier']};
  const cnt=k=>DOCS.filter(d=>d.k===k).length;
 
  const body={
@@ -1353,15 +1362,19 @@ function pDetail(p){
      <div class="tip" style="margin:12px 0 0"><span class="e">📷</span><div><b>Import en 1 geste :</b> QR code affiché à l'écran, vous photographiez avec le téléphone, la photo arrive datée et recadrée dans la fiche.</div></div></div></div>`,
 
   docs:()=>{
-   const L=DOCS.filter(d=>docF==='tous'||d.k===docF);
+   const dq=docQ.toLowerCase();
+   const L=DOCS.filter(d=>docF==='tous'||d.k===docF)
+               .filter(d=>!dq||(d.t+' '+d.s+' '+d.id).toLowerCase().includes(dq));
    return `<div class="fbar">
+     <span class="mu" style="font-size:11.5px;font-weight:600;align-self:center">Catégorie</span>
      <div class="seg">
-       <button class="${docF==='tous'?'on':''}" onclick="docF='tous';paint()">Tous · ${DOCS.length}</button>
-       ${Object.keys(KIND).map(k=>`<button class="${docF===k?'on':''}" onclick="docF='${k}';paint()">${KIND[k][0]} · ${cnt(k)}</button>`).join('')}
+       <button class="${docF==='tous'?'on':''}" onclick="docF='tous';paint()">Toutes · ${DOCS.length}</button>
+       ${Object.keys(KIND).filter(k=>cnt(k)>0||docF===k).map(k=>`<button class="${docF===k?'on':''}" onclick="docF='${k}';paint()">${KIND[k][1]} ${KIND[k][0]} · ${cnt(k)}</button>`).join('')}
      </div>
+     <input class="inp" id="dqi" style="min-width:180px" placeholder="Rechercher…" value="${esc(docQ)}"
+       oninput="docQ=this.value;paint();const e=document.getElementById('dqi');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
      <div style="margin-left:auto;display:flex;gap:6px">
        <button class="btn s" onclick="toast('Ordonnance créée')">℞ Ordonnance</button>
-       <button class="btn s" onclick="toast('Devis créé')">◫ Devis</button>
        <button class="btn s" onclick="toast('Document téléversé')">↑ Téléverser</button>
      </div></div>
     ${C.some(a=>!a.consent)?`<div class="tip" style="background:var(--crit-w);border-color:rgba(208,59,59,.25)"><span class="e">⚠</span><div><b>${C.filter(a=>!a.consent).length} consentement${C.filter(a=>!a.consent).length>1?'s non signés':' non signé'}.</b> Un acte injectable sans consentement signé n'est pas défendable en cas de litige — le lien de signature part par SMS en un clic.</div></div>`:''}
@@ -1374,7 +1387,52 @@ function pDetail(p){
        <td>${d.st}</td>
        <td class="num">${d.a}</td></tr>`).join('')}
      </tbody></table>${L.length?'':'<div class="empty">Aucun document de ce type.</div>'}</div>
-    <div class="mu" style="font-size:11.5px;margin-top:10px">Tout document produit ici est archivé à valeur probante et horodaté. Les factures seront générées au format Factur-X et transmises via votre plateforme agréée.</div>`;
+    <div class="mu" style="font-size:11.5px;margin-top:10px">Tout document produit ici est archivé à valeur probante et horodaté. Les devis, factures et avoirs sont regroupés dans l'onglet <a onclick="pTab='factu';paint()">Facturation</a>.</div>`;
+  },
+
+  /* ---------- Onglet Facturation du patient ---------- */
+  factu:()=>{
+   if(!ROLES[role].prix) return '<div class="empty">🔒 Non accessible au rôle « '+ROLES[role].l+' ».</div>';
+   const enAttente=D.filter(d=>['envoye','relance1','relance2'].includes(d.statut));
+   const avoirs=F.filter(f=>f.avoir>0);
+   const modes={}; F.forEach(f=>{if(f.moyen) modes[f.moyen]=(modes[f.moyen]||0)+f.paye});
+   return `<div class="grid g4" style="margin-bottom:14px">
+     ${kpi('CA cumulé',EUR(ca),`${F.filter(x=>x.statut==='ok').length} facture(s)`)}
+     ${kpi('Reste dû',EUR(rd),rd?F.filter(f=>rdu(f)>0).length+' facture(s)':'tout est soldé',rd?'dn':'up')}
+     ${kpi('Devis en attente',EUR(enAttente.reduce((s,d)=>s+d.montant,0)),`${enAttente.length} devis`)}
+     ${kpi('Avoirs',avoirs.length?EUR(avoirs.reduce((s,f)=>s+f.avoir,0)):'—',avoirs.length+' avoir(s)')}</div>
+   <div class="subh" style="border-top:none;padding-top:0"><h3>Devis<span>${D.length}</span></h3>
+     <div class="r"><button class="btn xs p" onclick="toast('Nouveau devis')">+ Devis</button></div></div>
+   <div class="tw"><table><thead><tr><th>N°</th><th>Date</th><th>Prestations</th><th class="num">Montant</th><th>Statut</th><th>Relances</th><th></th></tr></thead>
+    <tbody>${D.map(d=>`<tr class="c" onclick="go('devis','${d.id}')">
+      <td class="mono">${d.id}</td><td class="mono">${DF(d.date)}</td>
+      <td>${d.lignes.map(l=>esc(l[1])).join(' · ')}</td>
+      <td class="num">${EUR(d.montant)}</td><td>${bdg(SD[d.statut][1],SD[d.statut][0])}</td>
+      <td class="mono mu">${d.relances||'—'}</td>
+      <td class="num"><button class="btn xs" onclick="event.stopPropagation();toast('PDF du devis ${d.id}')">PDF</button></td></tr>`).join('')}
+    </tbody></table>${D.length?'':'<div class="empty">Aucun devis.</div>'}</div>
+
+   <div class="subh"><h3>Factures &amp; avoirs<span>${F.length}</span></h3>
+     <div class="r"><button class="btn xs" onclick="toast('Avoir créé')">Créer un avoir</button>
+      <button class="btn xs p" onclick="toast('Nouvelle facture')">+ Facture</button></div></div>
+   <div class="tw"><table><thead><tr><th>N°</th><th>Date</th><th>Acte</th><th class="num">HT</th><th class="num">TVA</th><th class="num">TTC</th><th class="num">Avoir</th><th class="num">Encaissé</th><th>Mode</th><th class="num">Reste</th><th>Statut</th><th></th></tr></thead>
+    <tbody>${F.map(f=>{const act=ACTES.find(x=>x.id===f.acte), an=f.statut==='annulee';
+      return `<tr class="${an?'annul':''}">
+      <td class="mono" style="white-space:nowrap">${f.id}</td><td class="mono" style="white-space:nowrap">${DF(f.date)}</td>
+      <td style="white-space:nowrap">${act?esc(act.nom):'—'}</td>
+      <td class="num">${EUR(fHT(f))}</td><td class="num mu">${EUR(fTVA(f))}</td>
+      <td class="num"><b>${EUR(fTTC(f))}</b></td>
+      <td class="num ${f.avoir?'':'mu'}" ${f.avoir?'style="color:var(--warn)"':''}>${f.avoir?'− '+EUR(f.avoir):'—'}</td>
+      <td class="num">${EUR(f.paye)}</td><td class="mu">${f.moyen||'—'}</td>
+      <td class="num">${rdu(f)>0?`<span style="color:var(--crit);font-weight:650">${EUR(rdu(f))}</span>`:'<span class="mu">—</span>'}</td>
+      <td>${an?bdg('b-crit','⊘ Annulée'):f.avoir?bdg('b-warn','Avoir'):rdu(f)>0?bdg('b-warn','Partielle'):bdg('b-good','Soldée')}</td>
+      <td class="num"><button class="btn xs" onclick="toast('PDF Factur-X de ${f.id}')">PDF</button></td></tr>`}).join('')}
+    </tbody></table>${F.length?'':'<div class="empty">Aucune facture.</div>'}</div>
+
+   ${Object.keys(modes).length?`<div class="subh"><h3>Encaissements par moyen de paiement</h3></div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap">${Object.entries(modes).map(([m,v])=>
+      `<span class="bdg b-neu" style="font-size:12.5px;padding:5px 11px">${m} · ${EUR(v)}</span>`).join('')}</div>`:''}
+   <div class="mu" style="font-size:11.5px;margin-top:12px">Les factures seront générées au format Factur-X et transmises via votre plateforme agréée. Les avoirs sont déduits des montants HT et TTC.</div>`;
   }
  };
 
