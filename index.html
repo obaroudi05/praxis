@@ -281,6 +281,9 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .dvi-t{font-size:12px;font-weight:660;display:flex;align-items:center;gap:6px;margin-bottom:5px}
 .dvi-l{font-size:11.5px;color:var(--ink-2);line-height:1.5;display:flex;gap:7px;padding:1px 0}
 .dvi-l b{color:var(--ink);font-weight:600;flex:none;min-width:62px}
+.kpic{cursor:pointer;border-radius:16px;transition:.14s}
+.kpic:hover{transform:translateY(-1px)}
+.kpic:hover .kpi{border-color:var(--accent);box-shadow:0 4px 16px rgba(42,120,214,.13)}
 .dtog{width:30px;height:26px;border-radius:8px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink-3);font-size:13px;font-weight:750;cursor:pointer;transition:.13s}
 .dtog:hover:not(.lock){border-color:var(--accent);color:var(--accent-ink)}
 .dtog.on{background:var(--good-w);border-color:rgba(12,163,12,.35);color:var(--good)}
@@ -607,7 +610,12 @@ const PATIENTS=[
  [1052,'SANCHEZ','Elena','1995-09-14','07 55 13 06 92','elena.s@example.fr','Dr O. Baroudi','2025-01-08','',[]],
  [1053,'BOUVIER','Hélène','1964-03-29','06 18 47 62 10','h.bouvier@example.fr','Dr O. Baroudi','2019-11-20','Ne souhaite pas de toxine — volumateurs uniquement.',['Anticoagulant (Kardégic)']],
  [1054,'ADAMS','Rachel','1990-09-05','07 41 30 58 76','rachel.adams@example.fr','Dr A. Merlin','2024-11-04','',[]],
+ [1055,'LAMBERT','Céline','1981-04-22','06 27 84 51 09','celine.lambert@example.fr','Dr O. Baroudi','2021-03-11','Suivi régulier interrompu, sans motif exprimé.',[]],
+ [1056,'GIRAUD','Sophie','1986-11-08','07 12 46 88 35','s.giraud@example.fr','Dr A. Merlin','2022-01-25','',[]],
+ [1057,'MERCIER','Anne','1973-07-19','06 84 03 77 21','anne.mercier@example.fr','Dr O. Baroudi','2020-09-03','Trois séances de laser puis plus de nouvelles.',[]],
+ [1058,'ROY','Vanessa','1992-12-02','07 39 55 14 60','v.roy@example.fr','Dr O. Baroudi','2023-04-17','',['Grossesse en 2025']],
 ].map(r=>({id:r[0],nom:r[1],prenom:r[2],ddn:r[3],tel:r[4],mail:r[5],prat:r[6],depuis:r[7],notes:r[8],ant:r[9]}));
+const PERDUS=[1055,1056,1057,1058];   /* jeu de démonstration : patients volontairement perdus de vue */
 const pById=id=>PATIENTS.find(p=>p.id===id);
 const fn=p=>`${p.nom} ${p.prenom}`;
 const age=p=>p&&p.ddn?Math.floor(days(p.ddn,TODAY)/365.25):null;
@@ -618,6 +626,17 @@ const ini=p=>p.prenom[0]+p.nom[0];
 let ACTES=[];
 (function(){
  const R=[
+  /* patients perdus de vue — alimentent la liste « À réactiver » */
+  [1055,'AH','2025-02-11','Dr O. Baroudi','L. Roche','L-AH2331',{levres:1},true,''],
+  [1055,'BTX','2024-09-24','Dr O. Baroudi','L. Roche','L-BX2512',{front:12,glab:18},true,''],
+  [1055,'AH','2024-03-05','Dr O. Baroudi',null,'L-AH2331',{pomm_d:1,pomm_g:1},true,''],
+  [1056,'BTX','2024-11-19','Dr A. Merlin','S. Vidal','L-BX2512',{front:10,glab:16,patte_d:8,patte_g:8},true,''],
+  [1056,'BTX','2024-05-07','Dr A. Merlin','S. Vidal','L-BX2512',{front:10,glab:16},true,''],
+  [1057,'LAS1','2024-06-18','Dr O. Baroudi','L. Roche',null,null,false,''],
+  [1057,'LAS1','2024-04-16','Dr O. Baroudi','L. Roche',null,null,false,''],
+  [1057,'LAS1','2024-02-13','Dr O. Baroudi','L. Roche',null,null,false,''],
+  [1058,'PEEL','2025-03-25','Dr O. Baroudi','S. Vidal','L-PE2604',null,false,''],
+  [1058,'MESO','2025-01-14','Dr O. Baroudi','S. Vidal','L-MK2602',null,false,''],
   [1041,'AH','2026-07-28','Dr O. Baroudi','L. Roche','L-AH2409',{levres:1,amert_d:.3,amert_g:.3},true,''],
   [1041,'BTX','2026-04-14','Dr O. Baroudi','L. Roche','L-BX2601',{front:12,glab:20},true,''],
   [1041,'AH','2025-11-06','Dr O. Baroudi',null,'L-AH2331',{sillon_d:.5,sillon_g:.5},true,''],
@@ -659,6 +678,8 @@ let ACTES=[];
   {cerne_d:.5,cerne_g:.5},{sillon_d:.5,sillon_g:.5},{menton:.5,mand_d:.5,mand_g:.5},
   {levres:1,amert_d:.3,amert_g:.3},{smal_d:.5,smal_g:.5},{front:12,glab:16,patte_d:8,patte_g:8}];
  const LOTS={AH:['L-AH2409','L-AH2331','L-RL2502'],BTX:['L-BX2601','L-BX2512'],SKB:['L-PF2603']};
+ /* les patients perdus de vue sont exclus du tirage : leur dernier acte doit rester ancien */
+ const ACTIFS=PATIENTS.filter(p=>!PERDUS.includes(p.id));
  let nid=6000;
  for(let m=5;m>=0;m--){
   const dt=new Date(2026,7-m,1), n=m===0?4:(9+Math.floor(rnd()*5));
@@ -677,7 +698,7 @@ let ACTES=[];
    let prix=c.prix||0;
    if(zones) prix=Object.entries(zones).reduce((s,[z,q])=>s+q*PU[zoneById(z).p],0);
    if(type==='SKB') prix=320;
-   ACTES.push({id:nid++,patient:PATIENTS[Math.floor(rnd()*PATIENTS.length)].id,type,nom:c.n,cat:c.cat,date,
+   ACTES.push({id:nid++,patient:ACTIFS[Math.floor(rnd()*ACTIFS.length)].id,type,nom:c.n,cat:c.cat,date,
     praticien:PRATICIENS[rnd()<.7?0:1],operateur:rnd()<.6?OPERATEURS[Math.floor(rnd()*2)]:null,
     lot:LOTS[type]?LOTS[type][Math.floor(rnd()*LOTS[type].length)]:null,conso:c.conso,zones,
     consent:!c.cons||rnd()<.94,effets:'',prix:Math.round(prix/5)*5});
@@ -916,6 +937,23 @@ function fidLevel(p){
  return null;
 }
 
+/* --- patients à réactiver : réguliers qui ne sont pas revenus --- */
+let REACT={mois:12, miniActes:2, exclureDevis:true};
+function reactStats(p){
+ const A=ACTES.filter(x=>x.patient===p.id).map(x=>x.date).sort();
+ const last=A[A.length-1];
+ return {n:A.length, last, rec:last?Math.round(days(last,TODAY)/30.44):999,
+         ca:FACTURES.filter(f=>f.patient===p.id).reduce((s,f)=>s+f.paye,0),
+         devisEnCours:DEVIS.some(d=>d.patient===p.id&&['envoye','relance1','relance2'].includes(d.statut))};
+}
+function aReactiver(p){
+ const st=reactStats(p);
+ if(st.n<REACT.miniActes || st.rec<REACT.mois) return null;
+ if(REACT.exclureDevis && st.devisEnCours) return null;
+ return st;
+}
+const reactList=()=>PATIENTS.map(p=>({p,st:aReactiver(p)})).filter(x=>x.st).sort((a,b)=>b.st.rec-a.st.rec);
+
 /* --- anniversaires --- */
 let ANNIV={actif:true, heure:'09:00', canal:'SMS', modele:'anniv-sms',
            remiseType:'%', remise:15, validite:60, joursAvant:0};
@@ -1061,10 +1099,11 @@ let view='dash';
 /* ---------------- Tableau de bord ---------------- */
 V.dash=()=>{
  const ev=CAP?Math.round((CAM-CAP)/CAP*100):0;
+ const NREACT=reactList().length;
  const todo=[];
  RDUE.forEach(r=>todo.push({i:'↻',b:'var(--warn-w)',c:'#8a6100',
    t:`Relance ${r.r.c} — ${fn(pById(r.d.patient))}`,
-   d:`${r.d.id} · ${EUR(r.d.montant)} · envoyé il y a ${days(r.d.envoye,TODAY)} j`,
+   d:`${r.d.id}${CAN('compta')?' · '+EUR(r.d.montant):''} · envoyé il y a ${days(r.d.envoye,TODAY)} j`,
    a:`<button class="btn s p" onclick="sendRel('${r.d.id}')">Envoyer</button>`}));
  ALERTES.forEach(s=>todo.push({i:'▧',b:'var(--crit-w)',c:'#a52a2a',t:`${sst(s).l} — ${s.n}`,
    d:`${s.q} ${s.u} en stock · seuil ${s.s} · ${s.f}`,
@@ -1090,15 +1129,16 @@ V.dash=()=>{
    <div class="hero-res" id="heroRes">${heroRows('')}</div>
  </div>
 
- <div class="grid g3" style="margin-bottom:13px">
-   ${CAN('compta')
-     ? kpi('CA encaissé — 30 j',EUR(CAM),`${ev>=0?'▲':'▼'} ${Math.abs(ev)} % vs 30 j précédents`,ev>=0?'up':'dn')
-     : CAN('prix')
-       ? kpi('Encaissé aujourd’hui',EUR(ENCJ),`${FACTURES.filter(f=>f.date===TODAYS&&f.statut==='ok').length} facture(s) du jour`)
-       : kpi('Actes du jour',NUM(ACTES.filter(a=>a.date===TODAYS).length),`${PATIENTS.filter(p=>ACTES.some(a=>a.patient===p.id&&a.date===TODAYS)).length} patient(s) vu(s)`)}
-   ${kpi('Devis en attente',CAN('prix')?EUR(MATT):NUM(ATT.length),`${ATT.length} devis · ${RDUE.length} à relancer`,RDUE.length?'dn':'')}
-   ${kpi('Reste dû',CAN('prix')?EUR(RESTE):NUM(FACTURES.filter(f=>rdu(f)>0).length),`${FACTURES.filter(f=>rdu(f)>0).length} factures partielles`,RESTE?'dn':'up')}
- </div>
+ ${CAN('compta')
+  ? `<div class="grid g3" style="margin-bottom:13px">
+   ${kpi('CA encaissé — 30 j',EUR(CAM),`${ev>=0?'▲':'▼'} ${Math.abs(ev)} % vs 30 j précédents`,ev>=0?'up':'dn')}
+   ${kpi('Devis en attente',EUR(MATT),`${ATT.length} devis · ${RDUE.length} à relancer`,RDUE.length?'dn':'')}
+   ${kpi('Reste dû',EUR(RESTE),`${FACTURES.filter(f=>rdu(f)>0).length} factures partielles`,RESTE?'dn':'up')}
+   </div>`
+  : `<div class="grid g2" style="margin-bottom:13px">
+   <div class="kpic" onclick="go('devis')">${kpi('Devis en attente',NUM(ATT.length),`${RDUE.length} à relancer aujourd’hui`,RDUE.length?'dn':'')}</div>
+   <div class="kpic" onclick="go('patients');pView='reactiver';paint()">${kpi('Patients à réactiver',NUM(NREACT),`${REACT.miniActes}+ actes, rien depuis ${REACT.mois} mois`,NREACT?'dn':'up')}</div>
+   </div>`}
 
  <div class="grid gdash">
   <div class="card"><div class="h"><h2>À traiter</h2><span class="s">tout se règle depuis cet écran</span>
@@ -1111,23 +1151,23 @@ V.dash=()=>{
   ${CAN('compta')
    ? `<div class="card"><div class="h"><h2>Chiffre d\'affaires</h2><span class="s">6 derniers mois</span></div>
       <div class="b">${bars(caMois,{h:200})}</div></div>`
-   : `<div class="card"><div class="h"><h2>Journée en cours</h2><span class="s">clôture de caisse</span></div>
-      <div class="b">${jourCard()}</div></div>`}
+   : `<div class="card"><div class="h"><h2>Patients à réactiver</h2><span class="s">${REACT.miniActes}+ actes, rien depuis ${REACT.mois} mois</span>
+       ${NREACT?`<div class="r"><button class="btn s" onclick="bulkMsg('fid-dormant',${JSON.stringify(reactList().map(x=>x.p.id)).replace(/"/g,'&quot;')})">Tout relancer</button></div>`:''}</div>
+      <div class="b" style="max-height:320px;overflow:auto;padding-top:4px">${reactCard()}</div></div>`}
  </div>`;
 };
 
-/* carte « journée en cours » — vue caisse pour les rôles sans droit comptable */
-function jourCard(){
- const F=FACTURES.filter(f=>f.date===TODAYS&&f.statut==='ok');
- const pm=MOYENS.map(m=>({label:m,v:F.filter(f=>f.moyen===m).reduce((s,f)=>s+f.paye,0)})).filter(x=>x.v);
- const reste=F.reduce((s,f)=>s+rdu(f),0);
- if(!CAN('prix')) return `<div class="empty">${F.length} facturation${F.length>1?'s':''} enregistrée${F.length>1?'s':''} aujourd’hui.</div>`;
- return `<div class="dvp-tot" style="margin-bottom:11px">
-   <div><span>Encaissé aujourd’hui</span><b>${EUR(F.reduce((s,f)=>s+f.paye,0))}</b></div>
-   <div><span>Reste dû sur la journée</span><b${reste?' style="color:var(--crit)"':''}>${EUR(reste)}</b></div>
-  </div>
-  ${pm.length?hbars(pm):'<div class="empty">Aucun encaissement aujourd’hui.</div>'}
-  <button class="btn s" style="margin-top:10px" onclick="go('encaiss');encView='caisse';paint()">Ouvrir la caisse →</button>`;
+/* carte « patients à réactiver » du tableau de bord — aucun montant, que des rappels */
+function reactCard(){
+ const L=reactList().slice(0,12), tot=reactList().length;
+ if(!tot) return '<div class="empty">Aucun patient à réactiver. 🎉</div>';
+ return L.map(x=>`<div class="tl c" onclick="openPatient(${x.p.id})">
+   <div class="pav">${esc(ini(x.p))}</div>
+   <div><div class="t">${esc(x.p.nom)} ${esc(x.p.prenom)}</div>
+     <div class="d">${x.st.n} acte${x.st.n>1?'s':''} · dernier le ${DF(x.st.last)} — il y a ${x.st.rec} mois</div></div>
+   <div class="a"><button class="btn s" onclick="event.stopPropagation();openMsg('fid-dormant',${x.p.id})">✉ Relancer</button></div>
+  </div>`).join('')
+  +(tot>L.length?`<div class="tl" style="justify-content:center"><a onclick="go('patients');pView='reactiver';paint()">+ ${tot-L.length} autre(s) — voir la liste complète →</a></div>`:'');
 }
 
 /* ---- recherche du hero : patient existant ou création à la volée ---- */
@@ -1183,7 +1223,7 @@ function heroRecent(){
      <span class="dt">${DFS(x.date)}</span>
      <span class="ac">${esc(x.nom)}</span>
      <span class="zs">${zoneBadges(x,4)}</span>
-     ${ROLES[role].prix?`<span class="pr">${EUR(x.prix)}</span>`:''}</div>`).join('')}</div>
+     ${CAN('compta')?`<span class="pr">${EUR(x.prix)}</span>`:''}</div>`).join('')}</div>
   </div>`;
  }).join('')+(ids.length>SHOW?`<div class="hp-more" onclick="go('actes')">+ ${ids.length-SHOW} autre${ids.length-SHOW>1?'s':''} patient${ids.length-SHOW>1?'s':''} vu${ids.length-SHOW>1?'s':''} sur la période — voir tous les actes →</div>`:'');
 }
@@ -1207,16 +1247,16 @@ function heroNew(nom,prenom){openActe(null,null,{nom,prenom})}
 let pq='',pPrat='',pSel=null,pTab='resume',docF='tous',docQ='';
 let pView='liste', fidF='tous', annivF='mois', perP={k:'90j',from:'',to:''}, photoQ='', photoKind='tous';
 function setPerP(x){perP=x;paint()}
-const PVIEWS=[['liste','Tous les patients'],['fideles','Fidèles'],['anniv','Anniversaires'],['photos','Photothèque']];
+const PVIEWS=[['liste','Tous les patients'],['fideles','Fidèles'],['reactiver','À réactiver'],['anniv','Anniversaires'],['photos','Photothèque']];
 
 V.patients=()=>{
  const nFid=PATIENTS.filter(p=>fidLevel(p)).length;
  const nAnn=PATIENTS.filter(p=>annivDate(p,annivF)).length;
  const sub=`<div class="fbar" style="margin-bottom:14px"><div class="seg">${PVIEWS.map(([k,l])=>{
-   const n=k==='fideles'?nFid:k==='anniv'?nAnn:k==='photos'?PHOTOS.length:PATIENTS.length;
+   const n=k==='fideles'?nFid:k==='reactiver'?reactList().length:k==='anniv'?nAnn:k==='photos'?PHOTOS.length:PATIENTS.length;
    return `<button class="${pView===k?'on':''}" onclick="pView='${k}';paint()">${l} · ${n}</button>`}).join('')}</div>
    <div style="margin-left:auto"><button class="btn s g" onclick="go('params')">⚙ Régler les critères et les modèles</button></div></div>`;
- return sub+({liste:pListe, fideles:pFideles, anniv:pAnniv, photos:pPhotos}[pView]||pListe)();
+ return sub+({liste:pListe, fideles:pFideles, reactiver:pReactiver, anniv:pAnniv, photos:pPhotos}[pView]||pListe)();
 };
 
 /* ---------- Tous les patients (maître-détail) ---------- */
@@ -1253,12 +1293,42 @@ function pListe(){
 }
 
 /* ---------- Patients fidèles ---------- */
+/* ---------- Patients à réactiver ---------- */
+function pReactiver(){
+ const L=reactList(), cpt=CAN('compta');
+ const ids=JSON.stringify(L.map(x=>x.p.id)).replace(/"/g,'&quot;');
+ const tr=n=>L.filter(x=>x.st.rec>=n[0]&&x.st.rec<n[1]).length;
+ const T=[[REACT.mois,18,'récent'],[18,24,'1 à 2 ans'],[24,999,'plus de 2 ans']];
+ return `<div class="head" style="margin-bottom:12px">
+   <div><h1>Patients à réactiver</h1><p>${L.length} patient${L.length>1?'s':''} venu${L.length>1?'s':''} au moins ${REACT.miniActes} fois et sans acte depuis plus de ${REACT.mois} mois</p></div>
+   <div class="r"><button class="btn" onclick="toast('Export CSV généré')">Exporter</button>
+    ${L.length?`<button class="btn p" onclick="bulkMsg('fid-dormant',${ids})">✉ Relancer les ${L.length}</button>`:''}</div></div>
+ <div class="tip"><span class="e">↻</span><div>Un patient revenu <b>${REACT.miniActes} fois ou plus</b> puis disparu depuis <b>${REACT.mois} mois</b> n'est pas un prospect : c'est un patient acquis qu'un simple message suffit souvent à ramener.${REACT.exclureDevis?' Ceux qui ont un devis en cours sont exclus — ils sont déjà relancés automatiquement.':''}
+   <a onclick="go('params');paramTab='fidelite';paint()">Régler les critères →</a></div></div>
+ <div class="grid g3" style="margin-bottom:14px">
+  ${T.map(n=>kpi(n[2],NUM(tr(n)),`${n[0]} à ${n[1]===999?'∞':n[1]} mois sans venir`,n[1]===999&&tr(n)?'dn':'')).join('')}</div>
+ <div class="card"><div class="tw"><table>
+  <thead><tr><th>Patient</th><th class="num">Actes</th><th>Dernier acte</th><th class="num">Sans venir depuis</th><th>Dernier soin réalisé</th><th>Contact</th>${cpt?'<th class="num">CA historique</th>':''}<th></th></tr></thead>
+  <tbody>${L.map(x=>{const der=ACTES.filter(a=>a.patient===x.p.id).sort((a,b)=>b.date.localeCompare(a.date))[0];
+   return `<tr class="c" onclick="openPatient(${x.p.id})">
+    <td><div class="rowline"><div class="pav">${esc(ini(x.p))}</div>
+      <div><div class="nm">${esc(x.p.nom)} ${esc(x.p.prenom)}</div><div class="mu" style="font-size:11.5px">${ageTxt(x.p)}</div></div></div></td>
+    <td class="num">${x.st.n}</td>
+    <td class="mono">${DF(x.st.last)}</td>
+    <td class="num"><span class="bdg ${x.st.rec>=24?'b-crit':x.st.rec>=18?'b-warn':'b-neu'}">${x.st.rec} mois</span></td>
+    <td class="mu">${der?esc(der.nom):'—'}</td>
+    <td class="mu" style="font-size:11.5px">${esc(x.p.tel||'—')}<div>${esc(x.p.mail||'')}</div></td>
+    ${cpt?`<td class="num">${EUR(x.st.ca)}</td>`:''}
+    <td class="num"><button class="btn xs" onclick="event.stopPropagation();openMsg('fid-dormant',${x.p.id})">✉ Relancer</button></td></tr>`}).join('')}
+  </tbody></table>${L.length?'':'<div class="empty">Aucun patient à réactiver avec ces critères. 🎉</div>'}</div></div>`;
+}
+
 function pFideles(){
  const all=PATIENTS.map(p=>({p,f:fidLevel(p)})).filter(x=>x.f);
  const L=all.filter(x=>fidF==='tous'||x.f.n===fidF).sort((a,b)=>b.f.idx-a.f.idx||b.f.ca-a.f.ca);
  const caFid=all.reduce((s,x)=>s+x.f.ca,0);
  const caTot=FACTURES.reduce((s,f)=>s+f.paye,0);
- const dormants=PATIENTS.filter(p=>{const st=fidStats(p);return st.actes>=2&&st.rec>12});
+ const dormants=reactList().map(x=>x.p);
  const ids=j=>JSON.stringify(j).replace(/"/g,'&quot;');
  return `<div class="head" style="margin-bottom:12px">
    <div><h1>Patients fidèles</h1><p>${all.length} patients répondent aux critères, sur ${FID.periode} mois glissants</p></div>
@@ -1270,7 +1340,7 @@ function pFideles(){
  <div class="grid g4" style="margin-bottom:14px">
   ${FID.niveaux.map(n=>kpi(n.n+'s',all.filter(x=>x.f.n===n.n).length,`≥ ${n.actes} actes · ≥ ${EUR(n.ca)}`)).join('')}
   ${kpi('CA des fidèles',EUR(caFid),caTot?Math.round(caFid/caTot*100)+' % du CA total':'','up')}
-  ${kpi('À réactiver',dormants.length,'≥ 2 actes, rien depuis 12 mois',dormants.length?'dn':'up')}</div>
+  ${kpi('À réactiver',dormants.length,`≥ ${REACT.miniActes} actes, rien depuis ${REACT.mois} mois`,dormants.length?'dn':'up')}</div>
  <div class="fbar"><div class="seg">
    <button class="${fidF==='tous'?'on':''}" onclick="fidF='tous';paint()">Tous · ${all.length}</button>
    ${FID.niveaux.map(n=>`<button class="${fidF===n.n?'on':''}" onclick="fidF='${n.n}';paint()">${n.n} · ${all.filter(x=>x.f.n===n.n).length}</button>`).join('')}
@@ -1288,7 +1358,8 @@ function pFideles(){
     <td class="num"><button class="btn xs" onclick="event.stopPropagation();openMsg('fid-vip',${x.p.id})">✉</button></td></tr>`).join('')}
   </tbody></table>${L.length?'':'<div class="empty">Aucun patient ne remplit ces critères. Assouplissez-les dans Paramètres.</div>'}</div></div>
  ${dormants.length?`<div class="card" style="margin-top:13px">
-   <div class="h"><h2>À réactiver</h2><span class="s">patients réguliers qui ne sont pas revenus depuis plus d'un an</span>
+   <div class="h"><h2>À réactiver</h2><span class="s">patients réguliers sans acte depuis plus de ${REACT.mois} mois</span>
+    <a style="margin-left:9px;font-size:12px" onclick="pView='reactiver';paint()">liste complète →</a>
     <div class="r"><button class="btn s" onclick="bulkMsg('fid-dormant',${ids(dormants.map(p=>p.id))})">Relancer tout le monde</button></div></div>
    <div class="tw"><table><thead><tr><th>Patient</th><th class="num">Actes</th><th class="num">CA historique</th><th>Dernier acte</th><th></th></tr></thead>
    <tbody>${dormants.map(p=>{const st=fidStats(p);return `<tr class="c" onclick="openPatient(${p.id})">
@@ -1915,7 +1986,7 @@ V.stats=()=>{
 let paramTab='fidelite', modSel='anniv-sms', docSel='d1';
 V.params=()=>{
  const TB=[['cabinet','Cabinet & praticiens'],['actes',`Actes & tarifs · ${CATALOGUE.length}`],
-          ['facturation','Facturation & rétrocession'],['fidelite','Critères de fidélité'],
+          ['facturation','Facturation & rétrocession'],['fidelite','Fidélité & réactivation'],
           ['messages',`Modèles de message · ${MODELES.length}`],['documents',`Modèles de document · ${DOCMOD.length}`]];
  const body={
   cabinet:()=>{
@@ -2015,6 +2086,19 @@ V.params=()=>{
             ${FID.niveaux.map(n=>`<span class="bdg ${n.c}" style="font-size:12.5px;padding:5px 10px">★ ${n.n} : ${all.filter(x=>x.f.n===n.n).length} patient(s)</span>`).join('')}
             <span class="bdg b-neu" style="font-size:12.5px;padding:5px 10px">${PATIENTS.length-all.length} hors critères</span></div></div>
         <button class="btn s" onclick="go('patients');pView='fideles';paint()">Voir la liste →</button></div>
+      <div style="margin-top:16px;padding-top:13px;border-top:1px solid var(--line)">
+        <div class="subh" style="border-top:none;padding-top:0;margin-top:0"><h3>Patients à réactiver<span>${reactList().length}</span></h3></div>
+        <div class="mu" style="font-size:11.5px;margin:-4px 0 10px">Alimente la tuile du tableau de bord et la liste <b>Patients → À réactiver</b>. C'est la seule tuile chiffrée que voient les rôles sans droit comptable.</div>
+        <div class="grid g2" style="gap:10px">
+          <div class="fld"><label>Sans acte depuis (mois)</label>
+            <input class="inp" type="number" min="1" max="60" value="${REACT.mois}" onchange="REACT.mois=+this.value||12;paint()"></div>
+          <div class="fld"><label>Nombre d'actes déjà réalisés ≥</label>
+            <input class="inp" type="number" min="1" max="20" value="${REACT.miniActes}" onchange="REACT.miniActes=+this.value||1;paint()"></div>
+        </div>
+        <div class="zrow"><div class="zn">Exclure les patients ayant un devis en cours<small>ils sont déjà relancés par le scénario automatique</small></div>
+          <button class="sw ${REACT.exclureDevis?'on':''}" onclick="REACT.exclureDevis=!REACT.exclureDevis;paint()"></button></div>
+        <button class="btn s" style="margin-top:10px" onclick="go('patients');pView='reactiver';paint()">Voir les ${reactList().length} patients →</button>
+      </div>
     </div></div>
     <div class="card"><div class="h"><h2>Niveaux</h2><span class="s">un patient obtient le niveau le plus élevé qu'il atteint</span></div><div class="b">
       ${FID.niveaux.map((n,i)=>`<div class="lvl">
@@ -2618,6 +2702,6 @@ function paint(){
 document.querySelectorAll('#nav a[data-v]').forEach(a=>a.onclick=()=>go(a.dataset.v));
 paint();
 </script>
-<!-- build 2026-08-07-C droits-compta -->
+<!-- build 2026-08-07-D dash-reactivation -->
 </body>
 </html>
