@@ -2,10 +2,8 @@
 <html lang="fr" data-theme="light">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<meta name="description" content="Prototype de demonstration - donnees entierement fictives.">
-
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PRAXIS — Gestion de cabinet de médecine esthétique</title>
 <style>
 :root{
@@ -283,6 +281,18 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .dvi-t{font-size:12px;font-weight:660;display:flex;align-items:center;gap:6px;margin-bottom:5px}
 .dvi-l{font-size:11.5px;color:var(--ink-2);line-height:1.5;display:flex;gap:7px;padding:1px 0}
 .dvi-l b{color:var(--ink);font-weight:600;flex:none;min-width:62px}
+.prc{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:9px;background:var(--panel-2)}
+.prc.warn{border-color:rgba(250,178,25,.5);background:var(--warn-w)}
+.prc-h{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.prc-g{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.prc-g label{font-size:10.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em;font-weight:600;display:flex;flex-direction:column;gap:3px}
+.prc-g .inp{height:30px;font-size:12.5px;background:var(--panel)}
+@media(max-width:1150px){.prc-g{grid-template-columns:repeat(2,1fr)}}
+.docsheet{border:1px solid var(--line);border-radius:12px;background:var(--panel-2);overflow:hidden;font-size:12.5px}
+.ds-h{padding:12px 15px;border-bottom:2px solid var(--accent);line-height:1.55;font-weight:560;color:var(--ink)}
+.ds-t{padding:11px 15px 3px;font-weight:700;font-size:13.5px}
+.ds-b{padding:3px 15px 14px;line-height:1.65;color:var(--ink-2);min-height:52px}
+.ds-f{padding:9px 15px;border-top:1px solid var(--line);font-size:10.5px;line-height:1.5;color:var(--ink-3);background:var(--panel-3)}
 .msgprev{border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:var(--panel-2);font-size:13px;line-height:1.6}
 .vars{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
 .varchip{font:600 11px var(--sans);border:1px solid var(--line);background:var(--panel-2);border-radius:7px;padding:3px 7px;color:var(--ink-2)}
@@ -523,7 +533,7 @@ ZDEF.forEach(z=>{
 });
 const zoneById=id=>ZONES.find(z=>z.id===id);
 const UNIT=p=>p==='tox'?'U':'ml';
-const PU={tox:4.5, ah:350};           /* tarif : 4,50 €/U de toxine, 350 €/ml d'AH */
+let PU={tox:4.5, ah:350};             /* tarif : 4,50 €/U de toxine, 350 €/ml d'AH — modifiable au back-office */
 const PLABEL={tox:'Toxine botulique', ah:'Acide hyaluronique'};
 /* durée d'effet par zone — sert à renseigner le patient et à programmer le rappel de soin */
 const ZDUREE={front:'4 à 6 mois',glab:'4 à 6 mois',patte:'4 à 6 mois',sourcil:'4 à 6 mois',cou:'4 à 6 mois',
@@ -917,7 +927,25 @@ function annivDate(p,k){
 const annivAge=(p,d)=>+d.slice(0,4)-+p.ddn.slice(0,4);
 
 /* --- modèles de messages, modifiables au back-office --- */
-const VARS=['prenom','nom','cabinet','praticien','acte','remise','code','validite','date','montant'];
+let CABINET={
+ nom:'Cabinet Dr Baroudi', raison:'SELARL GEMELIA', siret:'812 456 789 00021',
+ tva:'FR32812456789', ape:'8622C', adresse:'12 avenue Victor Hugo, 75116 Paris',
+ tel:'01 45 00 12 34', mail:'contact@cabinet-baroudi.fr', site:'www.cabinet-baroudi.fr',
+ entete:'{{raison}} — {{cabinet}}\n{{adresse}}\nTél. {{tel}} · {{mail}}',
+ pied:'{{raison}} · SIRET {{siret}} · TVA {{tva}} · APE {{ape}}\n{{praticien}} — RPPS {{rpps}} · Assurance RCP {{rcp}}\nActes de médecine esthétique non pris en charge par l’Assurance Maladie, soumis à TVA au taux de 20 %.',
+ enteteOn:true, piedOn:true
+};
+let PRATS=[
+ {nom:'Dr O. Baroudi', specialite:'Médecine esthétique', rpps:'10101234567', adeli:'751234567',
+  ordre:'75/12345', siret:'812 456 789 00021', tva:'FR32812456789',
+  rcpCie:'MACSF', rcpPolice:'RCP-4587921', rcpFin:'2027-03-31'},
+ {nom:'Dr A. Merlin', specialite:'Médecine esthétique', rpps:'10109876543', adeli:'759876543',
+  ordre:'75/67890', siret:'904 112 003 00017', tva:'FR58904112003',
+  rcpCie:'AXA', rcpPolice:'RCP-2298104', rcpFin:'2026-10-31'},
+];
+const pratInfo=n=>PRATS.find(x=>x.nom===n)||PRATS[0];
+const rcpAlerte=x=>days(TODAY,x.rcpFin)<90;
+const VARS=['prenom','nom','cabinet','raison','praticien','rpps','siret','tva','ape','adresse','tel','mail','site','rcp','acte','remise','code','validite','date','montant'];
 let MODELES=[
  {id:'anniv-sms', cat:'Anniversaire', canal:'SMS', nom:'Anniversaire — SMS', actif:true,
   texte:"Bonjour {{prenom}}, toute l'équipe du {{cabinet}} vous souhaite un très bel anniversaire ! Pour l'occasion, {{remise}} sur le soin de votre choix jusqu'au {{validite}}. Code : {{code}}. À très vite !"},
@@ -940,8 +968,11 @@ const modById=id=>MODELES.find(m=>m.id===id);
 const fillTpl=(t,ctx)=>String(t).replace(/\{\{(\w+)\}\}/g,(_,k)=>ctx[k]!==undefined?ctx[k]:'{{'+k+'}}');
 function tplCtx(p,extra){
  const v=addD(TODAYS,ANNIV.validite);
+ const pr=pratInfo(p?p.prat:'Dr O. Baroudi');
  return Object.assign({
-  prenom:p?p.prenom:'Claire', nom:p?p.nom:'MARTIN', cabinet:'Cabinet Dr Baroudi',
+  prenom:p?p.prenom:'Claire', nom:p?p.nom:'MARTIN', cabinet:CABINET.nom, raison:CABINET.raison,
+  siret:CABINET.siret, tva:CABINET.tva, ape:CABINET.ape, adresse:CABINET.adresse,
+  tel:CABINET.tel, mail:CABINET.mail, site:CABINET.site, rpps:pr.rpps, rcp:`${pr.rcpCie} n° ${pr.rcpPolice}`,
   praticien:p?p.prat:'Dr O. Baroudi', acte:'acide hyaluronique',
   remise:ANNIV.remiseType==='%'?ANNIV.remise+' %':EUR(ANNIV.remise),
   code:'ANNIV'+(p?p.id:1041), validite:DF(v), date:DF(TODAYS), montant:EUR(350)
@@ -1326,7 +1357,7 @@ function pDetail(p){
  const ca=F.reduce((s,f)=>s+f.paye,0), rd=F.reduce((s,f)=>s+rdu(f),0);
  const cumul={}; A.forEach(a=>zonesOf(a).forEach(([z,q])=>cumul[z]=(cumul[z]||0)+q));
  const AD=AUTRES_DOCS.filter(x=>x.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
- const nDoc=O.length+C.length+AD.length;
+ const nDoc=O.length+C.length+AD.length+D.length;
  const nFac=D.length+F.length+F.filter(f=>f.avoir>0).length;
  const TB=[['resume',`Résumé · ${A.length} acte${A.length>1?'s':''}`],['schema','Schéma cumulé'],
            ['photos','Avant / après']]
@@ -1353,6 +1384,10 @@ function pDetail(p){
     t:`Ordonnance — ${o.lignes.length} ligne${o.lignes.length>1?'s':''}`,
     s:o.lignes[0].split(' —')[0]+(o.lignes.length>1?` + ${o.lignes.length-1} autre${o.lignes.length>2?'s':''}`:''),
     st:bdg('b-neu','Éditée'), a:`<button class="btn xs" onclick="event.stopPropagation();toast('Ordonnance ${o.id} ouverte')">Ouvrir</button>`})),
+  ...D.map(d=>({k:'devis',id:d.id,date:d.date,t:`Devis ${d.id}`,
+    s:`${d.lignes.length} prestation${d.lignes.length>1?'s':''} · ${EUR(d.montant)}${d.infos?' · fiche d’information jointe':''}`,
+    st:bdg(SD[d.statut][1],SD[d.statut][0]),
+    a:`<button class="btn xs" onclick="event.stopPropagation();go('devis','${d.id}')">Ouvrir</button>`})),
   ...C.map(a=>({k:'consentement',id:'CONS-'+a.id,date:a.date,
     t:`Consentement — ${esc(a.nom)}`, s:`acte du ${DF(a.date)}`,
     st:a.consent?bdg('b-good','Signé'):bdg('b-crit','⚠ Non signé'),
@@ -1362,7 +1397,7 @@ function pDetail(p){
     t:esc(x.nom), s:esc(x.sous), st:bdg('b-neu','Archivé'),
     a:`<button class="btn xs" onclick="event.stopPropagation();toast('${x.id} ouvert')">Ouvrir</button>`})),
  ].sort((a,b)=>b.date.localeCompare(a.date));
- const KIND={ordonnance:['Ordonnances','℞','Ordonnance'],consentement:['Consentements','✎','Consentement'],
+ const KIND={devis:['Devis','◫','Devis'],ordonnance:['Ordonnances','℞','Ordonnance'],consentement:['Consentements','✎','Consentement'],
              information:['Informations','ⓘ','Information'],courrier:['Courriers','✉','Courrier']};
  const cnt=k=>DOCS.filter(d=>d.k===k).length;
 
@@ -1431,7 +1466,7 @@ function pDetail(p){
        <td>${d.st}</td>
        <td class="num">${d.a}</td></tr>`).join('')}
      </tbody></table>${L.length?'':'<div class="empty">Aucun document de ce type.</div>'}</div>
-    <div class="mu" style="font-size:11.5px;margin-top:10px">Tout document produit ici est archivé à valeur probante et horodaté. Les devis, factures et avoirs sont regroupés dans l'onglet <a onclick="pTab='factu';paint()">Facturation</a>.</div>`;
+    <div class="mu" style="font-size:11.5px;margin-top:10px">Tout document produit ici est archivé à valeur probante et horodaté. Les factures et avoirs, qui relèvent du suivi financier, sont dans l'onglet <a onclick="pTab='factu';paint()">Facturation</a>.</div>`;
   },
 
   /* ---------- Onglet Facturation du patient ---------- */
@@ -1846,8 +1881,89 @@ V.stats=()=>{
 /* ---------------- Paramètres (back-office) ---------------- */
 let paramTab='fidelite', modSel='anniv-sms', docSel='d1';
 V.params=()=>{
- const TB=[['fidelite','Critères de fidélité'],['facturation','Facturation & rétrocession'],['messages',`Modèles de message · ${MODELES.length}`],['documents',`Modèles de document · ${DOCMOD.length}`]];
+ const TB=[['cabinet','Cabinet & praticiens'],['actes',`Actes & tarifs · ${CATALOGUE.length}`],
+          ['facturation','Facturation & rétrocession'],['fidelite','Critères de fidélité'],
+          ['messages',`Modèles de message · ${MODELES.length}`],['documents',`Modèles de document · ${DOCMOD.length}`]];
  const body={
+  cabinet:()=>{
+   const F=(k,l,w)=>`<div class="fld"><label>${l}</label><input class="inp" style="width:100%" value="${esc(CABINET[k]||'')}" onchange="CABINET['${k}']=this.value;paint()"></div>`;
+   return `<div class="tip"><span class="e">🏛️</span><div>Ces informations alimentent l'en-tête et le pied de page de tous les documents générés — devis, factures, ordonnances, consentements — ainsi que les variables des modèles.</div></div>
+   <div class="grid g2">
+    <div class="card"><div class="h"><h2>Identité du cabinet</h2></div><div class="b">
+      <div class="grid g2" style="gap:10px">
+        ${F('nom','Nom d’usage')}${F('raison','Raison sociale')}
+        ${F('siret','SIRET')}${F('tva','N° de TVA intracommunautaire')}
+        ${F('ape','Code APE')}${F('tel','Téléphone')}
+      </div>
+      ${F('adresse','Adresse')}
+      <div class="grid g2" style="gap:10px">${F('mail','E-mail')}${F('site','Site web')}</div>
+      <div class="fld" style="margin-top:4px"><label>Effet sur les documents générés</label>
+        <div id="docprev">${docPrev()}</div>
+        <div class="mu" style="font-size:11.5px;margin-top:6px">Modifiable en détail dans l’onglet <b>Modèles de document</b>.</div></div>
+    </div></div>
+    <div class="card"><div class="h"><h2>Praticiens</h2><span class="s">identifiants et assurance</span>
+      <div class="r"><button class="btn xs p" onclick="PRATS.push({nom:'Nouveau praticien',specialite:'Médecine esthétique',rpps:'',adeli:'',ordre:'',siret:'',tva:'',rcpCie:'',rcpPolice:'',rcpFin:''});paint()">+</button></div></div>
+     <div class="b">
+      ${PRATS.map((x,i)=>`<div class="prc ${rcpAlerte(x)?'warn':''}">
+        <div class="prc-h"><input class="inp" style="flex:1;font-weight:650" value="${esc(x.nom)}" onchange="PRATS[${i}].nom=this.value;paint()">
+          ${rcpAlerte(x)?`<span class="bdg b-warn">⚠ RCP expire le ${DF(x.rcpFin)}</span>`:`<span class="bdg b-good">RCP à jour</span>`}</div>
+        <div class="prc-g">
+          <label>Spécialité<input class="inp" value="${esc(x.specialite)}" onchange="PRATS[${i}].specialite=this.value"></label>
+          <label>N° RPPS<input class="inp" value="${esc(x.rpps)}" onchange="PRATS[${i}].rpps=this.value;paint()"></label>
+          <label>N° ADELI<input class="inp" value="${esc(x.adeli)}" onchange="PRATS[${i}].adeli=this.value"></label>
+          <label>N° à l’Ordre<input class="inp" value="${esc(x.ordre)}" onchange="PRATS[${i}].ordre=this.value"></label>
+          <label>SIRET<input class="inp" value="${esc(x.siret)}" onchange="PRATS[${i}].siret=this.value"></label>
+          <label>N° de TVA<input class="inp" value="${esc(x.tva)}" onchange="PRATS[${i}].tva=this.value"></label>
+          <label>Assureur RCP<input class="inp" value="${esc(x.rcpCie)}" onchange="PRATS[${i}].rcpCie=this.value;paint()"></label>
+          <label>N° de police<input class="inp" value="${esc(x.rcpPolice)}" onchange="PRATS[${i}].rcpPolice=this.value;paint()"></label>
+          <label>Échéance RCP<input class="inp" type="date" value="${x.rcpFin}" onchange="PRATS[${i}].rcpFin=this.value;paint()"></label>
+        </div></div>`).join('')}
+     </div></div>
+   </div>`;
+  },
+
+  actes:()=>{
+   const vol=id=>ACTES.filter(a=>a.type===id).length;
+   const ca=id=>FACTURES.filter(f=>f.type===id&&f.statut==='ok').reduce((s,f)=>s+fTTC(f),0);
+   return `<div class="tip"><span class="e">💶</span><div>Le tarif des injections est calculé à l'unité — par unité de toxine et par millilitre d'acide hyaluronique — ce qui fait que le montant d'un acte suit automatiquement les quantités posées sur le schéma. Les autres actes sont au forfait.</div></div>
+   <div class="grid g2" style="grid-template-columns:340px 1fr;align-items:start">
+    <div class="card"><div class="h"><h2>Tarifs des injectables</h2><span class="s">à l’unité</span></div><div class="b">
+      <div class="zrow"><span class="zd" style="background:var(--toxine)"></span>
+        <div class="zn">Toxine botulique<small>prix par unité (U)</small></div>
+        <div style="display:flex;align-items:center;gap:5px">
+          <input class="inp" style="width:78px;text-align:right" type="number" step="0.5" min="0" value="${PU.tox}" onchange="PU.tox=+this.value||0;paint()">
+          <span class="mu">€/U</span></div></div>
+      <div class="zrow"><span class="zd" style="background:var(--ah)"></span>
+        <div class="zn">Acide hyaluronique<small>prix par millilitre</small></div>
+        <div style="display:flex;align-items:center;gap:5px">
+          <input class="inp" style="width:78px;text-align:right" type="number" step="10" min="0" value="${PU.ah}" onchange="PU.ah=+this.value||0;paint()">
+          <span class="mu">€/ml</span></div></div>
+      <div class="dvp-tot" style="margin-top:10px">
+        <div><span>Exemple : haut du visage (52 U)</span><b>${EUR(Math.round(52*PU.tox/5)*5)}</b></div>
+        <div><span>Exemple : lèvres (1 ml)</span><b>${EUR(Math.round(PU.ah/5)*5)}</b></div>
+        <div><span>Exemple : pommettes (2 ml)</span><b>${EUR(Math.round(2*PU.ah/5)*5)}</b></div>
+      </div>
+    </div></div>
+    <div class="card"><div class="h"><h2>Catalogue des actes</h2><span class="s">${CATALOGUE.length} actes</span>
+      <div class="r"><button class="btn xs p" onclick="CATALOGUE.push({id:'X'+Date.now(),n:'Nouvel acte',cat:'Injections',conso:null,cons:false,zoned:false,prix:0});paint()">+ Acte</button></div></div>
+     <div class="tw"><table>
+      <thead><tr><th>Acte</th><th>Catégorie</th><th class="num">Tarif</th><th class="num">TVA</th><th>Consommable</th><th>Consent.</th><th class="num">Réalisés</th><th class="num">CA</th></tr></thead>
+      <tbody>${CATALOGUE.map((c,i)=>`<tr>
+        <td><input class="inp" style="width:100%;min-width:170px" value="${esc(c.n)}" onchange="CATALOGUE[${i}].n=this.value;paint()"></td>
+        <td><select class="inp" onchange="CATALOGUE[${i}].cat=this.value;paint()">${CATS.map(x=>`<option ${c.cat===x?'selected':''}>${x}</option>`).join('')}</select></td>
+        <td class="num">${c.zoned&&!c.prix?'<span class="mu" style="font-size:11.5px">à l’unité</span>'
+          :`<div style="display:flex;gap:4px;align-items:center;justify-content:flex-end">
+             <input class="inp" style="width:76px;text-align:right" type="number" min="0" step="10" value="${c.prix||0}" onchange="CATALOGUE[${i}].prix=+this.value||0;paint()"><span class="mu">€</span></div>`}</td>
+        <td class="num"><div style="display:flex;gap:3px;align-items:center;justify-content:flex-end">
+          <input class="inp" style="width:56px;text-align:right" type="number" min="0" max="20" value="${tauxTVA(c.id)}" onchange="FACTU.tvaParActe['${c.id}']=+this.value||0;paint()"><span class="mu">%</span></div></td>
+        <td><select class="inp" onchange="CATALOGUE[${i}].conso=this.value||null;paint()">
+          <option value="">aucun</option>${STOCK.map(st=>`<option value="${st.ref}" ${c.conso===st.ref?'selected':''}>${st.ref}</option>`).join('')}</select></td>
+        <td style="text-align:center"><input type="checkbox" ${c.cons?'checked':''} onchange="CATALOGUE[${i}].cons=this.checked;paint()"></td>
+        <td class="num mu">${vol(c.id)}</td><td class="num">${EUR(ca(c.id))}</td></tr>`).join('')}
+      </tbody></table></div></div>
+   </div>`;
+  },
+
   fidelite:()=>{
    const all=PATIENTS.map(p=>({p,f:fidLevel(p)})).filter(x=>x.f);
    return `<div class="tip"><span class="e">⭐</span><div>Ces critères pilotent la liste <b>Patients → Fidèles</b>. Chaque modification est répercutée immédiatement : le compteur ci-dessous se met à jour à chaque changement.</div></div>
@@ -1965,7 +2081,17 @@ V.params=()=>{
   documents:()=>{
    const d=DOCMOD.find(x=>x.id===docSel)||DOCMOD[0];
    const cats=[...new Set(DOCMOD.map(x=>x.cat))];
-   return `<div class="grid g2" style="grid-template-columns:280px 1fr">
+   return `<div class="grid g2" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
+    <div class="card"><div class="h"><h2>En-tête automatique</h2>
+      <div class="r"><button class="sw ${CABINET.enteteOn?'on':''}" onclick="CABINET.enteteOn=!CABINET.enteteOn;paint()"></button></div></div>
+     <div class="b"><div class="vars">${VARS.slice(2,14).map(v=>`<button class="varchip" onclick="insHF('hdr','${v}')">{{${v}}}</button>`).join('')}</div>
+      <textarea class="note" id="hdr" style="min-height:74px" oninput="CABINET.entete=this.value;document.getElementById('docprev').innerHTML=docPrev()">${esc(CABINET.entete)}</textarea></div></div>
+    <div class="card"><div class="h"><h2>Pied de page automatique</h2>
+      <div class="r"><button class="sw ${CABINET.piedOn?'on':''}" onclick="CABINET.piedOn=!CABINET.piedOn;paint()"></button></div></div>
+     <div class="b"><div class="vars">${VARS.slice(2,14).map(v=>`<button class="varchip" onclick="insHF('ftr','${v}')">{{${v}}}</button>`).join('')}</div>
+      <textarea class="note" id="ftr" style="min-height:74px" oninput="CABINET.pied=this.value;document.getElementById('docprev').innerHTML=docPrev()">${esc(CABINET.pied)}</textarea></div></div>
+   </div>
+   <div class="grid g2" style="grid-template-columns:280px 1fr">
     <div class="card"><div class="h"><h2>Modèles</h2><div class="r"><button class="btn xs p" onclick="newDoc()">+</button></div></div>
      <div class="b" style="padding:8px">
       ${cats.map(c=>`<div class="mcat">${c}</div>`+DOCMOD.filter(x=>x.cat===c).map(x=>
@@ -1979,8 +2105,9 @@ V.params=()=>{
          ${['Ordonnance','Consentement','Devis','Information'].map(c=>`<option ${d.cat===c?'selected':''}>${c}</option>`).join('')}</select></div></div>
       <div class="fld"><label>Corps du document — mêmes variables que les messages</label>
        <div class="vars">${VARS.map(v=>`<button class="varchip" onclick="insVar('dtxt','${v}',null,'${d.id}')">{{${v}}}</button>`).join('')}</div>
-       <textarea class="note" id="dtxt" style="min-height:200px" oninput="DOCMOD.find(x=>x.id==='${d.id}').corps=this.value;document.getElementById('dprev').innerHTML=prevHTML(this.value)">${esc(d.corps)}</textarea></div>
-      <div class="fld"><label>Aperçu</label><div class="msgprev" id="dprev">${prevHTML(d.corps)}</div></div>
+       <textarea class="note" id="dtxt" style="min-height:200px" oninput="DOCMOD.find(x=>x.id==='${d.id}').corps=this.value;document.getElementById('docprev').innerHTML=docPrev()">${esc(d.corps)}</textarea></div>
+      <div class="fld"><label>Aperçu du document généré — en-tête, corps, pied de page</label>
+        <div id="docprev">${docPrev()}</div></div>
       <button class="btn s" onclick="toast('Modèle enregistré')">Enregistrer</button>
      </div></div></div>`;
   }
@@ -1990,13 +2117,30 @@ V.params=()=>{
  ${(body[paramTab]||body.fidelite)()}`;
 };
 const prevHTML=t=>esc(fillTpl(t,tplCtx(PATIENTS[0]))).replace(/\n/g,'<br>');
+function docPrev(){
+ const d=DOCMOD.find(x=>x.id===docSel)||DOCMOD[0];
+ return `<div class="docsheet">
+  ${CABINET.enteteOn?`<div class="ds-h">${prevHTML(CABINET.entete)}</div>`:''}
+  <div class="ds-t">${esc(d.nom)}</div>
+  <div class="ds-b">${prevHTML(d.corps)||'<span class="mu">corps du document vide</span>'}</div>
+  ${CABINET.piedOn?`<div class="ds-f">${prevHTML(CABINET.pied)}</div>`:''}
+ </div>`;
+}
+function insHF(id,v){
+ const e=document.getElementById(id), a=(e.selectionStart==null?e.value.length:e.selectionStart);
+ e.value=e.value.slice(0,a)+'{{'+v+'}}'+e.value.slice(e.selectionEnd==null?a:e.selectionEnd);
+ if(id==='hdr') CABINET.entete=e.value; else CABINET.pied=e.value;
+ e.focus(); e.selectionStart=e.selectionEnd=a+v.length+4;
+ document.getElementById('docprev').innerHTML=docPrev();
+}
 function insVar(id,v,mid,did){
  const e=document.getElementById(id); if(!e) return;
- const a=e.selectionStart||e.value.length;
- e.value=e.value.slice(0,a)+'{{'+v+'}}'+e.value.slice(e.selectionEnd||a);
+ const a=(e.selectionStart==null?e.value.length:e.selectionStart);
+ e.value=e.value.slice(0,a)+'{{'+v+'}}'+e.value.slice(e.selectionEnd==null?a:e.selectionEnd);
  if(mid) modById(mid).texte=e.value; if(did) DOCMOD.find(x=>x.id===did).corps=e.value;
  e.focus(); e.selectionStart=e.selectionEnd=a+v.length+4;
- const pv=document.getElementById(id==='mtxt'?'mprev':'dprev'); if(pv) pv.innerHTML=prevHTML(e.value);
+ if(id==='dtxt'){const pv=document.getElementById('docprev'); if(pv) pv.innerHTML=docPrev();}
+ else {const pv=document.getElementById('mprev'); if(pv) pv.innerHTML=prevHTML(e.value);}
 }
 function newModele(){const id='m'+Date.now();MODELES.push({id,cat:'Fidélité',canal:'SMS',nom:'Nouveau modèle',actif:false,texte:'Bonjour {{prenom}}, '});modSel=id;paint()}
 function newDoc(){const id='x'+Date.now();DOCMOD.push({id,cat:'Ordonnance',nom:'Nouveau modèle',corps:''});docSel=id;paint()}
@@ -2047,8 +2191,8 @@ function renderMsg(){
    <button class="btn p" onclick="sendMsg()">Envoyer à ${n} destinataire${n>1?'s':''}</button></div>`;
 }
 function insMsVar(v){
- const e=document.getElementById('mstxt'), a=e.selectionStart||e.value.length;
- e.value=e.value.slice(0,a)+'{{'+v+'}}'+e.value.slice(e.selectionEnd||a);
+ const e=document.getElementById('mstxt'), a=(e.selectionStart==null?e.value.length:e.selectionStart);
+ e.value=e.value.slice(0,a)+'{{'+v+'}}'+e.value.slice(e.selectionEnd==null?a:e.selectionEnd);
  MS.texte=e.value; e.focus(); e.selectionStart=e.selectionEnd=a+v.length+4;
  document.getElementById('msprev').innerHTML=esc(fillTpl(e.value,tplCtx(pById(MS.ids[0])))).replace(/\n/g,'<br>');
 }
@@ -2249,7 +2393,7 @@ function saveDevis(){
    envoye:null,relances:0,derniere:null,lignes,
    zones:{...AS.z},seances:st,remise:rem,validite:AS.validite,
    infos:AS.infosOn?infosPatient(AS.z):null,note:AS.notePat||''});
- closeAll(); pSel=AS.pid; pTab='factu'; go('patients');
+ closeAll(); pSel=AS.pid; pTab='docs'; docF='devis'; docQ=''; pView='liste'; go('patients');
  toast('Devis '+num+' créé · '+EUR(net)+(AS.infosOn?' · fiche d\'information jointe':''));
 }
 function zClick(ev,id,dir){
@@ -2406,5 +2550,6 @@ function paint(){
 document.querySelectorAll('#nav a[data-v]').forEach(a=>a.onclick=()=>go(a.dataset.v));
 paint();
 </script>
+<!-- build 2026-08-07-B params-cabinet-actes-hf -->
 </body>
 </html>
