@@ -265,6 +265,24 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .tvag label{font-size:11.5px;color:var(--ink-2);display:flex;align-items:center;justify-content:space-between;gap:8px;
   border:1px solid var(--line);border-radius:9px;padding:5px 9px;background:var(--panel-2)}
 .tvag .inp{height:28px}
+.dvp{border:1px solid var(--accent);border-radius:var(--r-m);background:var(--accent-wash);padding:11px}
+.dvp-h{display:flex;align-items:center;gap:7px;font-size:12.5px;margin-bottom:9px}
+.dvp-h b{font-weight:660}
+.dvp-h .mu{font-size:11px}
+.dvp-g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.dvp-g>label{font-size:10.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;font-weight:600;display:flex;flex-direction:column;gap:4px}
+.dvp-g .inp{height:30px;background:var(--panel)}
+.dvp-g .step{background:var(--panel)}
+.dvp-g .step span{min-width:34px}
+.dvp-tot{background:var(--panel);border-radius:10px;padding:9px 11px}
+.dvp-tot>div{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;padding:2px 0}
+.dvp-tot .big{border-top:1px solid var(--line);margin-top:5px;padding-top:6px;font-size:14px}
+.dvp-tot .big b{font-size:18px;letter-spacing:-.03em}
+.dvp-inf{}
+.dvi{background:var(--panel);border-radius:10px;padding:9px 11px;margin-bottom:6px}
+.dvi-t{font-size:12px;font-weight:660;display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.dvi-l{font-size:11.5px;color:var(--ink-2);line-height:1.5;display:flex;gap:7px;padding:1px 0}
+.dvi-l b{color:var(--ink);font-weight:600;flex:none;min-width:62px}
 .msgprev{border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:var(--panel-2);font-size:13px;line-height:1.6}
 .vars{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
 .varchip{font:600 11px var(--sans);border:1px solid var(--line);background:var(--panel-2);border-radius:7px;padding:3px 7px;color:var(--ink-2)}
@@ -307,7 +325,7 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .pal .sec{font-size:10px;font-weight:650;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);padding:9px 12px 4px}
 
 /* ============ SLIDE-OVER ============ */
-.over{position:fixed;top:0;right:0;bottom:0;width:min(1080px,96vw);background:var(--panel);z-index:96;
+.over{position:fixed;top:0;right:0;bottom:0;width:min(1240px,97vw);background:var(--panel);z-index:96;
   box-shadow:var(--sh-3);transform:translateX(100%);transition:transform .24s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
 .over.on{transform:none}
 .over .oh{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line)}
@@ -316,8 +334,10 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .over .of{padding:13px 20px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px;background:var(--panel-2)}
 
 /* ============ FACE MAP ============ */
-.facewrap{display:grid;grid-template-columns:1fr 320px;gap:16px}
-@media(max-width:900px){.facewrap{grid-template-columns:1fr}}
+.facewrap{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px}
+.facewrap.d3{grid-template-columns:minmax(0,1fr) 280px 330px}
+@media(max-width:1250px){.facewrap.d3{grid-template-columns:minmax(0,1fr) 320px}.facewrap.d3>:last-child{grid-column:1/-1}}
+@media(max-width:900px){.facewrap,.facewrap.d3{grid-template-columns:1fr}}
 .facebox{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r-m);padding:8px;position:relative}
 .face{width:100%;height:auto;max-height:min(600px,calc(100vh - 290px));display:block;touch-action:manipulation}
 .zone{fill:var(--ink);fill-opacity:.03;stroke:var(--ink);stroke-opacity:.16;stroke-width:1;stroke-dasharray:3 4;cursor:pointer;transition:fill-opacity .12s,stroke-opacity .12s}
@@ -505,6 +525,30 @@ const zoneById=id=>ZONES.find(z=>z.id===id);
 const UNIT=p=>p==='tox'?'U':'ml';
 const PU={tox:4.5, ah:350};           /* tarif : 4,50 €/U de toxine, 350 €/ml d'AH */
 const PLABEL={tox:'Toxine botulique', ah:'Acide hyaluronique'};
+/* durée d'effet par zone — sert à renseigner le patient et à programmer le rappel de soin */
+const ZDUREE={front:'4 à 6 mois',glab:'4 à 6 mois',patte:'4 à 6 mois',sourcil:'4 à 6 mois',cou:'4 à 6 mois',
+ levres:'6 à 9 mois',perib:'6 à 9 mois',cerne:'9 à 12 mois',sillon:'9 à 12 mois',amert:'9 à 12 mois',
+ tempe:'12 à 18 mois',pomm:'12 à 18 mois',mand:'12 à 18 mois',menton:'12 à 18 mois',nez:'12 à 18 mois',smal:'12 à 18 mois'};
+const zDuree=id=>ZDUREE[String(id).replace(/_[dg]$/,'')]||'variable';
+const INFOS={
+ tox:{produit:'Toxine botulique de type A',
+   effet:'Effet visible à partir du 3ᵉ jour, résultat complet à 15 jours.',
+   suites:'Pas d’éviction sociale. Rougeurs et petites papules pendant 20 à 30 minutes.',
+   avant:'Pas d’aspirine ni d’anti-inflammatoire 5 jours avant si possible.',
+   apres:'Ne pas s’allonger ni faire de sport pendant 4 h. Pas de massage de la zone pendant 48 h.',
+   seances:'1 séance, retouche possible à 15 jours si nécessaire.'},
+ ah:{produit:'Acide hyaluronique réticulé',
+   effet:'Résultat immédiat, définitif à 15 jours après résorption de l’œdème.',
+   suites:'Œdème et ecchymoses possibles 3 à 7 jours. Prévoir une éviction sociale de 48 h.',
+   avant:'Pas d’aspirine ni d’anti-inflammatoire 5 jours avant. Pas d’alcool la veille.',
+   apres:'Pas de sport, sauna ni exposition solaire pendant 48 h. Massage uniquement sur indication.',
+   seances:'1 séance, retouche éventuelle à 1 mois.'}
+};
+function infosPatient(z){
+ const fams=[...new Set(Object.keys(z).filter(k=>z[k]>0).map(k=>zoneById(k).p))];
+ const dur={}; Object.keys(z).filter(k=>z[k]>0).forEach(k=>{const d=zDuree(k);(dur[d]=dur[d]||[]).push(zoneById(k).k)});
+ return {fams, dur};
+}
 const fmtQ=(q,p)=>p==='tox'?`${q} U`:`${q.toFixed(2).replace(/0$/,'').replace(/\.$/,'')} ml`;
 
 /* protocoles = 1 clic pour une ordonnance complète de zones */
@@ -2040,6 +2084,7 @@ function openActe(pid,aid,np){
  const a=aid?ACTES.find(x=>x.id===aid):null;
  AS={pid:pid||(a?a.patient:(np?null:PATIENTS[0].id)), aid:aid||null, ro:!!a,
      np: np?{nom:(np.nom||'').toUpperCase(),prenom:np.prenom||'',ddn:'',tel:'',mail:''}:null,
+     seances:1, remise:0, remiseType:'%', validite:30, notePat:'', infosOn:true,
      type:a?a.type:'AH', date:a?a.date:TODAYS, prat:a?a.praticien:PRATICIENS[0],
      oper:a?a.operateur:'', z:a&&a.zones?{...a.zones}:{}, effets:a?a.effets:'', consent:a?a.consent:false};
  renderOver();
@@ -2080,7 +2125,7 @@ function renderOver(){
     <select class="inp" onchange="AS.prat=this.value">${PRATICIENS.map(x=>`<option ${AS.prat===x?'selected':''}>${x}</option>`).join('')}</select>
     <select class="inp" onchange="AS.oper=this.value"><option value="">Sans opérateur</option>${OPERATEURS.map(x=>`<option ${AS.oper===x?'selected':''}>${x}</option>`).join('')}</select>
    </div>`}
-  <div class="facewrap">
+  <div class="facewrap ${AS.ro||!ent.length?'':'d3'}">
    <div>
     ${AS.ro?'':`<div class="preset">
       <span class="mu" style="font-size:11.5px;align-self:center;margin-right:2px">Protocole en 1 clic :</span>
@@ -2118,6 +2163,7 @@ function renderOver(){
     <div class="fld" style="margin-top:10px"><label>Effets secondaires observés</label>
      <input class="inp" style="width:100%" value="${esc(AS.effets||'')}" ${AS.ro?'disabled':''} oninput="AS.effets=this.value" placeholder="aucun"></div>
    </div>
+   ${AS.ro||!ent.length?'':devisPane(ent,tox,ah,prix)}
   </div>`;
 
  document.getElementById('overf').innerHTML=AS.ro?
@@ -2125,10 +2171,86 @@ function renderOver(){
    <div style="margin-left:auto"><button class="btn" onclick="closeAll()">Fermer</button></div>`
   :`<label style="display:flex;gap:7px;align-items:center;font-size:12.5px;cursor:pointer">
      <input type="checkbox" ${AS.consent?'checked':''} onchange="AS.consent=this.checked"> Consentement éclairé signé</label>
-   <span class="mu" style="font-size:11.5px">le stock se décrémente et le devis lié est soldé automatiquement</span>
+   <span class="mu" style="font-size:11.5px">acte : le stock se décrémente · devis : rien n'est consommé</span>
    <div style="margin-left:auto;display:flex;gap:8px">
     <button class="btn" onclick="closeAll()">Annuler</button>
-    <button class="btn p" onclick="saveActe()">Enregistrer l'acte${ROLES[role].prix?' · '+EUR(prix):''}</button></div>`;
+    <button class="btn" onclick="saveDevis()">📄 Générer un devis${ROLES[role].prix&&Object.values(AS.z).some(q=>q>0)?' · '+EUR(Math.max(0,prix*(AS.seances||1)-(AS.remiseType==='%'?Math.round(prix*(AS.seances||1)*(AS.remise||0)/100):(AS.remise||0)))):''}</button>
+    <button class="btn p" onclick="saveActe()">✚ Enregistrer l'acte${ROLES[role].prix?' · '+EUR(prix):''}</button></div>`;
+}
+function devisPane(ent,tox,ah,prix){
+ const st=AS.seances||1;
+ const brut=prix*st;
+ const rem=AS.remiseType==='%'?Math.round(brut*(AS.remise||0)/100):(AS.remise||0);
+ const net=Math.max(0,brut-rem);
+ const inf=infosPatient(AS.z);
+ return `<div class="dvp">
+  <div class="dvp-h"><span>📄</span><b>Devis</b><span class="mu">à remettre au patient</span></div>
+  <div class="dvp-g">
+   <label>Séances<div class="step">
+     <button onclick="AS.seances=Math.max(1,(AS.seances||1)-1);renderOver()">−</button>
+     <span>${st}</span>
+     <button onclick="AS.seances=(AS.seances||1)+1;renderOver()">+</button></div></label>
+   <label>Remise<div style="display:flex;gap:4px">
+     <input class="inp" style="width:58px;text-align:right" type="number" min="0" value="${AS.remise||0}" onchange="AS.remise=+this.value||0;renderOver()">
+     <select class="inp" style="width:52px" onchange="AS.remiseType=this.value;renderOver()">
+       ${['%','€'].map(t=>`<option ${AS.remiseType===t?'selected':''}>${t}</option>`).join('')}</select></div></label>
+   <label>Validité<div style="display:flex;gap:4px;align-items:center">
+     <input class="inp" style="width:58px;text-align:right" type="number" min="1" value="${AS.validite}" onchange="AS.validite=+this.value||30;renderOver()">
+     <span class="mu" style="font-size:11px">jours</span></div></label>
+  </div>
+  ${ROLES[role].prix?`<div class="dvp-tot">
+    <div><span>Sous-total ${st>1?`(${st} séances)`:''}</span><b>${EUR(brut)}</b></div>
+    ${rem?`<div><span>Remise</span><b style="color:var(--good)">− ${EUR(rem)}</b></div>`:''}
+    <div class="big"><span>Total TTC</span><b>${EUR(net)}</b></div>
+    <div class="mu" style="font-size:11px">dont TVA ${EUR(net-Math.round(net/1.2))} · valable jusqu'au ${DF(addD(TODAYS,AS.validite))}</div>
+   </div>`:''}
+  <div class="dvp-h" style="margin-top:12px"><span>ℹ️</span><b>Informations remises au patient</b>
+    <button class="sw ${AS.infosOn?'on':''}" style="margin-left:auto" onclick="AS.infosOn=!AS.infosOn;renderOver()"></button></div>
+  ${AS.infosOn?`<div class="dvp-inf">
+    ${inf.fams.map(f=>`<div class="dvi">
+      <div class="dvi-t"><span class="zd" style="background:var(--${f==='tox'?'toxine':'ah'})"></span>${INFOS[f].produit}</div>
+      <div class="dvi-l"><b>Résultat</b>${INFOS[f].effet}</div>
+      <div class="dvi-l"><b>Suites</b>${INFOS[f].suites}</div>
+      <div class="dvi-l"><b>Avant</b>${INFOS[f].avant}</div>
+      <div class="dvi-l"><b>Après</b>${INFOS[f].apres}</div>
+      <div class="dvi-l"><b>Séances</b>${INFOS[f].seances}</div></div>`).join('')}
+    <div class="dvi"><div class="dvi-t">⏱ Durée d'effet estimée</div>
+      ${Object.entries(inf.dur).map(([d,zs])=>`<div class="dvi-l"><b>${d}</b>${zs.join(', ')}</div>`).join('')}
+      <div class="dvi-l"><b>Rappel</b>un message de renouvellement sera programmé automatiquement.</div></div>
+    <div class="dvi"><div class="dvi-t">⚖️ Mentions légales</div>
+      <div class="dvi-l"><b>Réflexion</b>délai légal de 15 jours avant toute réalisation.</div>
+      <div class="dvi-l"><b>Prise en charge</b>acte non remboursé, soumis à TVA 20 %.</div></div>
+    <div class="fld" style="margin-top:8px"><label>Note personnalisée pour ce patient</label>
+      <textarea class="note" style="min-height:56px" placeholder="ex. reprendre les photos avant la séance" oninput="AS.notePat=this.value">${esc(AS.notePat||'')}</textarea></div>
+   </div>`:'<div class="mu" style="font-size:11.5px">La fiche d\'information ne sera pas jointe au devis.</div>'}
+ </div>`;
+}
+function saveDevis(){
+ const ent=Object.entries(AS.z).filter(([,q])=>q>0);
+ if(!ent.length){toast('Sélectionnez au moins une zone du visage');return}
+ if(AS.np){
+  if(!AS.np.nom.trim()||!AS.np.prenom.trim()){toast('Nom et prénom du patient sont requis');return}
+  const id=Math.max(...PATIENTS.map(p=>p.id))+1;
+  PATIENTS.push({id,nom:AS.np.nom.trim(),prenom:AS.np.prenom.trim(),ddn:AS.np.ddn||null,
+   tel:AS.np.tel||'—',mail:AS.np.mail||'—',prat:AS.prat,depuis:TODAYS,notes:'',ant:[]});
+  AS.pid=id; AS.np=null;
+ }
+ const st=AS.seances||1;
+ const tox=ent.filter(([z])=>zoneById(z).p==='tox').reduce((s,[,q])=>s+q,0);
+ const ah=ent.filter(([z])=>zoneById(z).p==='ah').reduce((s,[,q])=>s+q,0);
+ const lignes=[];
+ if(tox) lignes.push(['BTX',`Toxine botulique — ${ent.filter(([z])=>zoneById(z).p==='tox').map(([z])=>zoneById(z).k).join(', ')} (${tox} U)`,st,Math.round(tox*PU.tox/5)*5]);
+ if(ah)  lignes.push(['AH',`Acide hyaluronique — ${ent.filter(([z])=>zoneById(z).p==='ah').map(([z])=>zoneById(z).k).join(', ')} (${ah} ml)`,st,Math.round(ah*PU.ah/5)*5]);
+ const brut=lignes.reduce((s,l)=>s+l[2]*l[3],0);
+ const rem=AS.remiseType==='%'?Math.round(brut*(AS.remise||0)/100):(AS.remise||0);
+ const net=Math.max(0,brut-rem);
+ const num='D-'+String(TODAYS.slice(2,4))+String(TODAYS.slice(5,7))+'-'+String(DEVIS.length+22).padStart(3,'0');
+ DEVIS.unshift({id:num,patient:AS.pid,date:TODAYS,montant:net,statut:'brouillon',
+   envoye:null,relances:0,derniere:null,lignes,
+   zones:{...AS.z},seances:st,remise:rem,validite:AS.validite,
+   infos:AS.infosOn?infosPatient(AS.z):null,note:AS.notePat||''});
+ closeAll(); pSel=AS.pid; pTab='factu'; go('patients');
+ toast('Devis '+num+' créé · '+EUR(net)+(AS.infosOn?' · fiche d\'information jointe':''));
 }
 function zClick(ev,id,dir){
  if(AS?.ro) return;
