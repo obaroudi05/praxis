@@ -281,6 +281,10 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .dvi-t{font-size:12px;font-weight:660;display:flex;align-items:center;gap:6px;margin-bottom:5px}
 .dvi-l{font-size:11.5px;color:var(--ink-2);line-height:1.5;display:flex;gap:7px;padding:1px 0}
 .dvi-l b{color:var(--ink);font-weight:600;flex:none;min-width:62px}
+.dtog{width:30px;height:26px;border-radius:8px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink-3);font-size:13px;font-weight:750;cursor:pointer;transition:.13s}
+.dtog:hover:not(.lock){border-color:var(--accent);color:var(--accent-ink)}
+.dtog.on{background:var(--good-w);border-color:rgba(12,163,12,.35);color:var(--good)}
+.dtog.lock{cursor:default;opacity:.72}
 .prc{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:9px;background:var(--panel-2)}
 .prc.warn{border-color:rgba(250,178,25,.5);background:var(--warn-w)}
 .prc-h{display:flex;align-items:center;gap:9px;margin-bottom:9px}
@@ -788,10 +792,15 @@ let RULES=[
  {id:4,j:30,c:'Tâche', l:'Devis marqué expiré → tâche pour le secrétariat',on:true},
 ];
 const ROLES={
- praticien:{l:'Praticien',u:'Dr O. Baroudi',i:'OB',v:['dash','stats','patients','actes','devis','encaiss','relances','stock','equipe','params'],med:true,prix:true},
- assistante:{l:'Assistante',u:'L. Roche',i:'LR',v:['dash','patients','actes','stock','relances'],med:true,prix:false},
- secretariat:{l:'Secrétariat',u:'N. Faure',i:'NF',v:['dash','patients','devis','encaiss','relances','stock'],med:false,prix:true},
+ praticien:{l:'Praticien',u:'Dr O. Baroudi',i:'OB',v:['dash','stats','patients','actes','devis','encaiss','relances','stock','equipe','params'],med:true,prix:true,compta:true},
+ assistante:{l:'Assistante',u:'L. Roche',i:'LR',v:['dash','patients','actes','devis','encaiss','stock','relances'],med:true,prix:true,compta:false},
+ secretariat:{l:'Secrétariat',u:'N. Faure',i:'NF',v:['dash','patients','devis','encaiss','relances','stock'],med:false,prix:true,compta:false},
 };
+/* prix   = voir les montants d'un acte, d'un devis, d'une facture (métier : facturer, encaisser)
+   compta = suivi comptable : CA global, ventilation HT/TVA, rétrocession centre/praticien,
+            statistiques et périodes au-delà de la journée. Réservé au praticien par défaut. */
+const CAN=k=>!!ROLES[role][k];
+const HORIZON_SANS_COMPTA=31;   /* jours consultables sans droit comptable */
 let role='praticien';
 
 /* ---------- Agrégats ---------- */
@@ -805,6 +814,7 @@ const acMois=serie(6,k=>ACTES.filter(a=>mk(a.date)===k).length);
 const in30=d=>d<=TODAYS&&days(d,TODAY)<=30;
 const inP30=d=>days(d,TODAY)>30&&days(d,TODAY)<=60;
 const CAM=FACTURES.filter(f=>in30(f.date)).reduce((s,f)=>s+f.paye,0);
+const ENCJ=FACTURES.filter(f=>f.date===TODAYS&&f.statut==='ok').reduce((s,f)=>s+f.paye,0);
 const CAP=FACTURES.filter(f=>inP30(f.date)).reduce((s,f)=>s+f.paye,0);
 const ACTM=ACTES.filter(a=>in30(a.date)).length;
 const RESTE=FACTURES.reduce((s,f)=>s+rdu(f),0);
@@ -1064,7 +1074,7 @@ V.dash=()=>{
    a:`<button class="btn s" onclick="toast('Lien de signature envoyé par SMS')">Faire signer</button>`}));
 
  return `<div class="head">
-   <div><h1>Bonjour Dr Baroudi</h1><p>Lundi 3 août 2026${todo.length?` · ${todo.length} chose${todo.length>1?'s':''} à traiter`:' · rien à traiter'}</p></div>
+   <div><h1>Bonjour ${esc(ROLES[role].u.replace(/^Dr /,'Dr '))}</h1><p>Lundi 3 août 2026${todo.length?` · ${todo.length} chose${todo.length>1?'s':''} à traiter`:' · rien à traiter'}</p></div>
    <div class="r"><button class="btn" onclick="openPal()">⌘K Rechercher ou agir</button></div></div>
 
  <div class="hero">
@@ -1081,9 +1091,13 @@ V.dash=()=>{
  </div>
 
  <div class="grid g3" style="margin-bottom:13px">
-   ${kpi('CA encaissé — 30 j',EUR(CAM),`${ev>=0?'▲':'▼'} ${Math.abs(ev)} % vs 30 j précédents`,ev>=0?'up':'dn')}
-   ${kpi('Devis en attente',EUR(MATT),`${ATT.length} devis · ${RDUE.length} à relancer`,RDUE.length?'dn':'')}
-   ${kpi('Reste dû',EUR(RESTE),`${FACTURES.filter(f=>rdu(f)>0).length} factures partielles`,RESTE?'dn':'up')}
+   ${CAN('compta')
+     ? kpi('CA encaissé — 30 j',EUR(CAM),`${ev>=0?'▲':'▼'} ${Math.abs(ev)} % vs 30 j précédents`,ev>=0?'up':'dn')
+     : CAN('prix')
+       ? kpi('Encaissé aujourd’hui',EUR(ENCJ),`${FACTURES.filter(f=>f.date===TODAYS&&f.statut==='ok').length} facture(s) du jour`)
+       : kpi('Actes du jour',NUM(ACTES.filter(a=>a.date===TODAYS).length),`${PATIENTS.filter(p=>ACTES.some(a=>a.patient===p.id&&a.date===TODAYS)).length} patient(s) vu(s)`)}
+   ${kpi('Devis en attente',CAN('prix')?EUR(MATT):NUM(ATT.length),`${ATT.length} devis · ${RDUE.length} à relancer`,RDUE.length?'dn':'')}
+   ${kpi('Reste dû',CAN('prix')?EUR(RESTE):NUM(FACTURES.filter(f=>rdu(f)>0).length),`${FACTURES.filter(f=>rdu(f)>0).length} factures partielles`,RESTE?'dn':'up')}
  </div>
 
  <div class="grid gdash">
@@ -1094,10 +1108,27 @@ V.dash=()=>{
       <div><div class="t">${esc(t.t)}</div><div class="d">${esc(t.d)}</div></div><div class="a">${t.a}</div></div>`).join('')
       :'<div class="empty">Rien à traiter. 🎉</div>'}
    </div></div>
-  <div class="card"><div class="h"><h2>Chiffre d\'affaires</h2><span class="s">6 derniers mois</span></div>
-   <div class="b">${bars(caMois,{h:200})}</div></div>
+  ${CAN('compta')
+   ? `<div class="card"><div class="h"><h2>Chiffre d\'affaires</h2><span class="s">6 derniers mois</span></div>
+      <div class="b">${bars(caMois,{h:200})}</div></div>`
+   : `<div class="card"><div class="h"><h2>Journée en cours</h2><span class="s">clôture de caisse</span></div>
+      <div class="b">${jourCard()}</div></div>`}
  </div>`;
 };
+
+/* carte « journée en cours » — vue caisse pour les rôles sans droit comptable */
+function jourCard(){
+ const F=FACTURES.filter(f=>f.date===TODAYS&&f.statut==='ok');
+ const pm=MOYENS.map(m=>({label:m,v:F.filter(f=>f.moyen===m).reduce((s,f)=>s+f.paye,0)})).filter(x=>x.v);
+ const reste=F.reduce((s,f)=>s+rdu(f),0);
+ if(!CAN('prix')) return `<div class="empty">${F.length} facturation${F.length>1?'s':''} enregistrée${F.length>1?'s':''} aujourd’hui.</div>`;
+ return `<div class="dvp-tot" style="margin-bottom:11px">
+   <div><span>Encaissé aujourd’hui</span><b>${EUR(F.reduce((s,f)=>s+f.paye,0))}</b></div>
+   <div><span>Reste dû sur la journée</span><b${reste?' style="color:var(--crit)"':''}>${EUR(reste)}</b></div>
+  </div>
+  ${pm.length?hbars(pm):'<div class="empty">Aucun encaissement aujourd’hui.</div>'}
+  <button class="btn s" style="margin-top:10px" onclick="go('encaiss');encView='caisse';paint()">Ouvrir la caisse →</button>`;
+}
 
 /* ---- recherche du hero : patient existant ou création à la volée ---- */
 let heroPer='7j';
@@ -1475,8 +1506,9 @@ function pDetail(p){
    const enAttente=D.filter(d=>['envoye','relance1','relance2'].includes(d.statut));
    const avoirs=F.filter(f=>f.avoir>0);
    const modes={}; F.forEach(f=>{if(f.moyen) modes[f.moyen]=(modes[f.moyen]||0)+f.paye});
+   const cpt=CAN('compta');
    return `<div class="grid g4" style="margin-bottom:14px">
-     ${kpi('CA cumulé',EUR(ca),`${F.filter(x=>x.statut==='ok').length} facture(s)`)}
+     ${kpi('Total facturé',EUR(ca),`${F.filter(x=>x.statut==='ok').length} facture(s)`)}
      ${kpi('Reste dû',EUR(rd),rd?F.filter(f=>rdu(f)>0).length+' facture(s)':'tout est soldé',rd?'dn':'up')}
      ${kpi('Devis en attente',EUR(enAttente.reduce((s,d)=>s+d.montant,0)),`${enAttente.length} devis`)}
      ${kpi('Avoirs',avoirs.length?EUR(avoirs.reduce((s,f)=>s+f.avoir,0)):'—',avoirs.length+' avoir(s)')}</div>
@@ -1494,12 +1526,12 @@ function pDetail(p){
    <div class="subh"><h3>Factures &amp; avoirs<span>${F.length}</span></h3>
      <div class="r"><button class="btn xs" onclick="toast('Avoir créé')">Créer un avoir</button>
       <button class="btn xs p" onclick="toast('Nouvelle facture')">+ Facture</button></div></div>
-   <div class="tw"><table><thead><tr><th>N°</th><th>Date</th><th>Acte</th><th class="num">HT</th><th class="num">TVA</th><th class="num">TTC</th><th class="num">Avoir</th><th class="num">Encaissé</th><th>Mode</th><th class="num">Reste</th><th>Statut</th><th></th></tr></thead>
+   <div class="tw"><table><thead><tr><th>N°</th><th>Date</th><th>Acte</th>${cpt?'<th class="num">HT</th><th class="num">TVA</th>':''}<th class="num">TTC</th><th class="num">Avoir</th><th class="num">Encaissé</th><th>Mode</th><th class="num">Reste</th><th>Statut</th><th></th></tr></thead>
     <tbody>${F.map(f=>{const act=ACTES.find(x=>x.id===f.acte), an=f.statut==='annulee';
       return `<tr class="${an?'annul':''}">
       <td class="mono" style="white-space:nowrap">${f.id}</td><td class="mono" style="white-space:nowrap">${DF(f.date)}</td>
       <td style="white-space:nowrap">${act?esc(act.nom):'—'}</td>
-      <td class="num">${EUR(fHT(f))}</td><td class="num mu">${EUR(fTVA(f))}</td>
+      ${cpt?`<td class="num">${EUR(fHT(f))}</td><td class="num mu">${EUR(fTVA(f))}</td>`:''}
       <td class="num"><b>${EUR(fTTC(f))}</b></td>
       <td class="num ${f.avoir?'':'mu'}" ${f.avoir?'style="color:var(--warn)"':''}>${f.avoir?'− '+EUR(f.avoir):'—'}</td>
       <td class="num">${EUR(f.paye)}</td><td class="mu">${f.moyen||'—'}</td>
@@ -1661,8 +1693,8 @@ function barreFiltres(){
 V.encaiss=()=>{
  const sub=`<div class="fbar" style="margin-bottom:14px"><div class="seg">${ENCV.map(([k,l])=>
    `<button class="${encView===k?'on':''}" onclick="encView='${k}';paint()">${l}</button>`).join('')}</div>
-   <div style="margin-left:auto"><button class="btn s g" onclick="go('params');paramTab='facturation';paint()">⚙ Double facturation &amp; rétrocession</button></div></div>`;
- return sub+({detail:eDetail, jours:eJours, caisse:eCaisse}[encView]||eDetail)();
+   ${CAN('compta')?`<div style="margin-left:auto"><button class="btn s g" onclick="go('params');paramTab='facturation';paint()">⚙ Double facturation &amp; rétrocession</button></div>`:''}</div>`;
+ return sub+(CAN('compta')?'':bandeauCompta())+({detail:eDetail, jours:eJours, caisse:eCaisse}[encView]||eDetail)();
 };
 
 /* ---------- Facturations détaillées ---------- */
@@ -1672,23 +1704,23 @@ function eDetail(){
  const tva=Math.round((ttc-ht)*100)/100;
  const enc=ok.reduce((s,f)=>s+f.paye,0), reste=ok.reduce((s,f)=>s+rdu(f),0);
  const pc=ok.reduce((s,f)=>s+partCentre(f),0), pp=ok.reduce((s,f)=>s+partPrat(f),0);
- const dbl=FACTU.double;
+ const cpt=CAN('compta'), dbl=FACTU.double&&cpt;
  return `<div class="head" style="margin-bottom:12px">
    <div><h1>Facturations détaillées</h1><p>${L.length} facturation${L.length>1?'s':''} sur la période${L.length!==ok.length?` · ${L.length-ok.length} annulée(s) exclue(s) des totaux`:''}</p></div>
    <div class="r"><button class="btn" onclick="toast('Export CSV généré')">Exporter la liste</button>
     <button class="btn p" onclick="toast('Facturation créée')">+ Facturation</button></div></div>
- ${periodBar(perE,'setPerE',`${L.length} ligne${L.length>1?'s':''}`,PRESETS_FACTU)}
+ ${periodBar(perE,'setPerE',`${L.length} ligne${L.length>1?'s':''}`,presetsFactu())}
  ${barreFiltres()}
- <div class="grid ${dbl?'g5':'g4'}" style="margin-bottom:13px">
+ <div class="grid ${dbl?'g5':cpt?'g4':'g3'}" style="margin-bottom:13px">
   ${kpi('Facturation TTC',EUR(ttc),`${ok.length} facture(s) · moyenne ${EUR(ok.length?ttc/ok.length:0)}`)}
-  ${kpi('Dont HT',EUR(ht),`TVA ${EUR(tva)}`)}
+  ${cpt?kpi('Dont HT',EUR(ht),`TVA ${EUR(tva)}`):''}
   ${kpi('Encaissé',EUR(enc),ttc?Math.round(enc/ttc*100)+' % du facturé':'—','up')}
   ${kpi('Reste dû',EUR(reste),ok.filter(f=>rdu(f)>0).length+' facture(s)',reste?'dn':'up')}
   ${dbl?kpi('Rétrocession praticien',EUR(pp),`part centre ${EUR(pc)}`):''}</div>
  <div class="card"><div class="tw"><table>
   <thead><tr><th style="white-space:nowrap">N°</th><th style="white-space:nowrap">Date</th><th style="white-space:nowrap">Patient</th><th style="white-space:nowrap">Acte</th><th style="white-space:nowrap">Catégorie</th><th style="white-space:nowrap">Praticien</th>
    ${dbl?'<th>Facturé par</th>':''}
-   <th class="num">HT</th><th class="num">TVA</th><th class="num">TTC</th>
+   ${cpt?'<th class="num">HT</th><th class="num">TVA</th>':''}<th class="num">TTC</th>
    ${dbl?'<th class="num">Part centre</th><th class="num">Part praticien</th>':''}
    <th class="num">Encaissé</th><th>Mode</th><th class="num">Reste</th><th>Statut</th></tr></thead>
   <tbody>${L.map(f=>{const p=pById(f.patient), a=ACTES.find(x=>x.id===f.acte), an=f.statut==='annulee';
@@ -1698,7 +1730,7 @@ function eDetail(){
     <td style="white-space:nowrap">${a?esc(a.nom):'—'}${f.avoir?`<div class="mu" style="font-size:11px">avoir ${EUR(f.avoir)}</div>`:''}</td>
     <td class="mu">${esc(f.cat)}</td><td class="mu" style="white-space:nowrap">${esc(f.praticien)}</td>
     ${dbl?`<td><span class="bdg b-neu">${FACTU.modele==='split'?'Centre + Praticien':esc(FACTU.centre.nom)}</span></td>`:''}
-    <td class="num">${EUR(fHT(f))}</td><td class="num mu">${EUR(fTVA(f))}</td>
+    ${cpt?`<td class="num">${EUR(fHT(f))}</td><td class="num mu">${EUR(fTVA(f))}</td>`:''}
     <td class="num"><b>${EUR(fTTC(f))}</b></td>
     ${dbl?`<td class="num mu">${EUR(partCentre(f))}</td><td class="num" style="color:var(--accent-ink);font-weight:620">${EUR(partPrat(f))}</td>`:''}
     <td class="num">${EUR(f.paye)}</td><td class="mu">${f.moyen||'—'}</td>
@@ -1714,12 +1746,12 @@ function eJours(){
  const j={}; L.forEach(f=>{(j[f.date]=j[f.date]||[]).push(f)});
  const jours=Object.keys(j).sort((a,b)=>b.localeCompare(a));
  const tot=L.filter(f=>f.statut==='ok').reduce((s,f)=>s+fTTC(f),0);
- const dbl=FACTU.double;
+ const cpt=CAN('compta'), dbl=FACTU.double&&cpt;
  return `<div class="head" style="margin-bottom:12px">
    <div><h1>Totaux journaliers</h1><p>${jours.length} jour${jours.length>1?'s':''} de facturation sur la période</p></div>
    <div class="r"><button class="btn" onclick="toast('Ticket de synthèse envoyé à l’imprimante')">🖨 Ticket de synthèse</button>
     <button class="btn" onclick="toast('Export CSV généré')">Exporter la liste</button></div></div>
- ${periodBar(perE,'setPerE',`${jours.length} jour${jours.length>1?'s':''}`,PRESETS_FACTU)}
+ ${periodBar(perE,'setPerE',`${jours.length} jour${jours.length>1?'s':''}`,presetsFactu())}
  ${barreFiltres()}
  <div class="grid g4" style="margin-bottom:13px">
   ${kpi('Facturation totale TTC',EUR(tot))}
@@ -1727,7 +1759,7 @@ function eJours(){
   ${kpi('Encaissé',EUR(L.reduce((s,f)=>s+f.paye,0)))}
   ${kpi('Reste dû',EUR(L.reduce((s,f)=>s+rdu(f),0)),'',L.reduce((s,f)=>s+rdu(f),0)?'dn':'up')}</div>
  <div class="card"><div class="tw"><table>
-  <thead><tr><th>Date</th><th class="num">Nb factures</th><th class="num">Nb avoirs</th><th class="num">HT</th><th class="num">TVA</th>
+  <thead><tr><th>Date</th><th class="num">Nb factures</th><th class="num">Nb avoirs</th>${cpt?'<th class="num">HT</th><th class="num">TVA</th>':''}
    <th class="num">TTC</th>${dbl?'<th class="num">Part centre</th><th class="num">Part praticien</th>':''}
    <th class="num">Encaissé</th><th>Modes de paiement</th><th class="num">Restant dû</th></tr></thead>
   <tbody>${jours.map(d=>{const F=j[d], ok=F.filter(f=>f.statut==='ok');
@@ -1736,8 +1768,8 @@ function eJours(){
     <td class="mono"><b>${DF(d)}</b><div class="mu" style="font-size:11px">${new Date(d).toLocaleDateString('fr-FR',{weekday:'long'})}</div></td>
     <td class="num">${ok.length}${F.length!==ok.length?`<div class="mu" style="font-size:11px">${F.length-ok.length} annulée(s)</div>`:''}</td>
     <td class="num ${ok.filter(f=>f.avoir>0).length?'':'mu'}">${ok.filter(f=>f.avoir>0).length||'—'}</td>
-    <td class="num">${EUR(ok.reduce((s,f)=>s+fHT(f),0))}</td>
-    <td class="num mu">${EUR(ok.reduce((s,f)=>s+fTVA(f),0))}</td>
+    ${cpt?`<td class="num">${EUR(ok.reduce((s,f)=>s+fHT(f),0))}</td>
+    <td class="num mu">${EUR(ok.reduce((s,f)=>s+fTVA(f),0))}</td>`:''}
     <td class="num"><b>${EUR(ok.reduce((s,f)=>s+fTTC(f),0))}</b></td>
     ${dbl?`<td class="num mu">${EUR(ok.reduce((s,f)=>s+partCentre(f),0))}</td>
       <td class="num" style="color:var(--accent-ink);font-weight:620">${EUR(ok.reduce((s,f)=>s+partPrat(f),0))}</td>`:''}
@@ -1765,7 +1797,7 @@ function eCaisse(){
   <div><h1>Encaissement &amp; caisse</h1><p>${FP.length} facture${FP.length>1?'s':''} · ${EUR(enc)} encaissés</p></div>
   <div class="r"><button class="btn" onclick="toast('Clôture de caisse enregistrée')">Clôture du jour</button>
    <button class="btn p" onclick="toast('Encaissement saisi')">+ Encaissement</button></div></div>
- ${periodBar(perE,'setPerE',`${FP.length} facture${FP.length>1?'s':''}`,PRESETS_FACTU)}
+ ${periodBar(perE,'setPerE',`${FP.length} facture${FP.length>1?'s':''}`,presetsFactu())}
  <div class="grid g4" style="margin-bottom:14px">
   ${kpi('Encaissé sur la période',EUR(enc),encPrev?`${ev>=0?'▲':'▼'} ${Math.abs(ev)} % vs période précédente`:'pas de comparatif',ev>=0?'up':'dn')}
   ${kpi('Reste dû',EUR(reste),im.length+' facture'+(im.length>1?'s':''),reste?'dn':'up')}
@@ -1857,6 +1889,7 @@ V.stock=()=>{
 
 /* ---------------- Statistiques ---------------- */
 V.stats=()=>{
+ if(!CAN('compta')) return `<div class="head"><div><h1>Statistiques</h1></div></div><div class="empty">🔒 Le suivi comptable est réservé au praticien. Le rôle « ${ROLES[role].l} » a accès à la facturation et aux encaissements.</div>`;
  const pc=CATS.map(c=>({label:c,v:ACTES.filter(a=>a.cat===c).reduce((s,a)=>s+a.prix,0)})).filter(x=>x.v).sort((a,b)=>b.v-a.v);
  const pp=PRATICIENS.map(p=>({label:p,v:ACTES.filter(a=>a.praticien===p).reduce((s,a)=>s+a.prix,0)}));
  const zc={}; ACTES.forEach(a=>zonesOf(a).forEach(([z])=>{const n=ZDEF.find(x=>z.startsWith(x.id)).k;zc[n]=(zc[n]||0)+1}));
@@ -1996,6 +2029,7 @@ V.params=()=>{
     </div></div></div>`;
   },
   facturation:()=>{
+   if(!CAN('compta')) return '<div class="empty">🔒 Réservé au praticien.</div>';
    const FP=FACTURES.filter(f=>inPer(f.date,perE)&&f.statut==='ok');
    const ttc=FP.reduce((s,f)=>s+fTTC(f),0);
    const parPrat=PRATICIENS.map(pr=>{const L=FP.filter(f=>f.praticien===pr);
@@ -2199,10 +2233,29 @@ function insMsVar(v){
 function sendMsg(){const n=MS.ids.length;closeAll();toast(n+' message'+(n>1?'s envoyés':' envoyé')+' · '+MS.canal)}
 
 /* ---------------- Équipe ---------------- */
+/* Matrice des droits — pilotée par ROLES, modifiable en un clic.
+   f = drapeau du rôle ('med' | 'prix' | 'compta'), vu = vue à autoriser, fixe = non modifiable. */
+const DROITS=[
+ {l:'Voir les patients',            vu:'patients', fixe:1},
+ {l:'Saisir un acte &amp; le schéma',   vu:'actes'},
+ {l:'Lire les notes médicales',     f:'med'},
+ {l:'Voir les montants',            f:'prix',   h:'tarifs des actes, montants des devis et factures'},
+ {l:'Créer devis / facture',        vu:'devis'},
+ {l:'Encaisser',                    vu:'encaiss'},
+ {l:'<b>Suivi comptable</b>',       f:'compta', h:'CA cumulé, ventilation HT / TVA, rétrocession centre-praticien, statistiques, périodes au-delà de '+HORIZON_SANS_COMPTA+' jours'},
+ {l:'Gérer le stock',               vu:'stock'},
+ {l:'Paramétrer le logiciel',       vu:'params'},
+ {l:'Gérer les utilisateurs',       vu:'equipe'},
+];
+const RK=['praticien','assistante','secretariat'];
+function droitOn(r,d){ return d.f?!!ROLES[r][d.f]:ROLES[r].v.includes(d.vu) }
+function toggleDroit(r,i){
+ const d=DROITS[i]; if(d.fixe||r==='praticien') return;
+ if(d.f) ROLES[r][d.f]=!ROLES[r][d.f];
+ else { const v=ROLES[r].v, k=v.indexOf(d.vu); k<0?v.push(d.vu):v.splice(k,1) }
+ paint(); toast(`${ROLES[r].l} : ${d.l.replace(/<[^>]+>/g,'')} ${droitOn(r,d)?'autorisé':'retiré'}`);
+}
 V.equipe=()=>{
- const M=[['Voir les patients',1,1,1],['Créer / modifier un patient',1,1,1],['Lire les notes médicales',1,1,0],
-  ['Saisir un acte &amp; le schéma',1,1,0],['Voir tarifs et CA',1,0,1],['Créer devis / facture',1,0,1],
-  ['Encaisser',1,0,1],['Gérer le stock',1,1,0],['Exporter les données',1,0,0],['Gérer les utilisateurs',1,0,0]];
  const U=[['Dr O. Baroudi','Praticien — admin','OB','2026-08-03',1],['Dr A. Merlin','Praticien','AM','2026-08-01',1],
   ['L. Roche','Assistante','LR','2026-08-03',1],['S. Vidal','Assistante','SV','2026-07-31',0],['N. Faure','Secrétariat','NF','2026-08-03',0]];
  return `<div class="head"><div><h1>Équipe &amp; droits</h1><p>5 utilisateurs · 3 rôles</p></div>
@@ -2213,10 +2266,14 @@ V.equipe=()=>{
    <thead><tr><th>Nom</th><th>Rôle</th><th>Dernière connexion</th><th>2FA</th></tr></thead>
    <tbody>${U.map(u=>`<tr><td><div class="rowline"><div class="pav" style="width:26px;height:26px;font-size:10px">${u[2]}</div><b>${u[0]}</b></div></td>
     <td class="mu">${u[1]}</td><td class="mono mu">${DF(u[3])}</td><td>${u[4]?bdg('b-good','Activée'):bdg('b-warn','⚠ à activer')}</td></tr>`).join('')}</tbody></table></div></div>
-  <div class="card"><div class="h"><h2>Matrice des droits</h2></div><div class="tw"><table>
-   <thead><tr><th>Action</th><th style="text-align:center">Praticien</th><th style="text-align:center">Assistante</th><th style="text-align:center">Secrétariat</th></tr></thead>
-   <tbody>${M.map(m=>`<tr><td>${m[0]}</td>${[1,2,3].map(i=>`<td style="text-align:center">${m[i]?'<span style="color:var(--good);font-weight:750">✓</span>':'<span class="mu">—</span>'}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
-   <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">Chaque accès à une donnée de santé est journalisé (utilisateur, patient, horodatage). Obligation de l'agrément HDS et de l'article 9 du RGPD.</div></div></div>
+  <div class="card"><div class="h"><h2>Matrice des droits</h2><span class="s">cliquez pour autoriser ou retirer</span></div><div class="tw"><table>
+   <thead><tr><th>Action</th>${RK.map(r=>`<th style="text-align:center">${ROLES[r].l}</th>`).join('')}</tr></thead>
+   <tbody>${DROITS.map((d,i)=>`<tr><td>${d.l}${d.h?`<div class="mu" style="font-size:11px;font-weight:400">${d.h}</div>`:''}</td>
+    ${RK.map(r=>{const on=droitOn(r,d), lock=d.fixe||r==='praticien';
+     return `<td style="text-align:center"><button class="dtog ${on?'on':''} ${lock?'lock':''}"
+       ${lock?`title="non modifiable"`:`onclick="toggleDroit('${r}',${i})"`}>${on?'✓':'—'}</button></td>`}).join('')}
+    </tr>`).join('')}</tbody></table></div>
+   <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">Le <b>suivi comptable</b> est la ligne qui sépare « facturer » de « piloter » : sans ce droit, un utilisateur émet les factures, encaisse et relance les impayés, mais ne voit ni le chiffre d'affaires cumulé, ni la TVA, ni la rétrocession.<br>Chaque accès à une donnée de santé est journalisé (utilisateur, patient, horodatage). Obligation de l'agrément HDS et de l'article 9 du RGPD.</div></div></div>
  </div>`;
 };
 
@@ -2532,7 +2589,18 @@ function bindBA(){const b=document.getElementById('ba');if(!b)return;let d=false
  window.onmouseup=()=>d=false;window.ontouchend=()=>d=false}
 function cycleRole(){const k=Object.keys(ROLES);role=k[(k.indexOf(role)+1)%k.length];paint();toast('Vue « '+ROLES[role].l+' »')}
 function setPerD(p){perD=p;paint()}
-function setPerE(p){perE=p;paint()}
+function presetsFactu(){ return CAN('compta')?PRESETS_FACTU:['jour','perso'] }
+function bandeauCompta(){ return `<div class="tip" style="margin-bottom:13px"><span class="e">🔒</span><div>Vue <b>facturation</b> : vous voyez les facturations, les encaissements et les restes dus. Le <b>suivi comptable</b> — chiffre d'affaires cumulé, ventilation HT/TVA et rétrocession centre/praticien — est réservé au praticien. Période consultable limitée à ${HORIZON_SANS_COMPTA} jours.</div></div>` }
+function setPerE(p){
+ if(!CAN('compta')){
+  const [a,b]=perRange(p);
+  if(days(a,b)+1>HORIZON_SANS_COMPTA){
+   p={k:'perso',from:addD(b,-(HORIZON_SANS_COMPTA-1)),to:b};
+   toast(`Période ramenée à ${HORIZON_SANS_COMPTA} jours — le suivi comptable est réservé au praticien`);
+  }
+ }
+ perE=p;paint()
+}
 function perPrev(per){const [a,b]=perRange(per),n=days(a,b)+1;return {k:'perso',from:addD(a,-n),to:addD(a,-1)}}
 function toggleTheme(){const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark';paint()}
 function go(v,arg){ if(v==='devis') dSel=arg||null; view=v; document.getElementById('main').scrollTop=0; paint(); }
@@ -2550,6 +2618,6 @@ function paint(){
 document.querySelectorAll('#nav a[data-v]').forEach(a=>a.onclick=()=>go(a.dataset.v));
 paint();
 </script>
-<!-- build 2026-08-07-B params-cabinet-actes-hf -->
+<!-- build 2026-08-07-C droits-compta -->
 </body>
 </html>
