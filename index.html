@@ -759,9 +759,12 @@ function fileRelances(){
 }
 /* ---------- Périodes personnalisables ---------- */
 const DATE_MIN=[...FACTURES.map(f=>f.date),...ACTES.map(a=>a.date)].sort()[0];
+const PRESET_L={jour:'Journée','7j':'7 jours','30j':'30 jours','90j':'90 jours',mois:'Mois en cours',annee:'Année',tout:'Tout',perso:'Personnalisée'};
 const PRESETS=[['7j','7 jours'],['30j','30 jours'],['90j','90 jours'],['mois','Mois en cours'],['annee','Année'],['tout','Tout']];
+const PRESETS_FACTU=['jour','annee','perso'];
 function perRange(per){
  if(per.k==='perso') return [per.from||DATE_MIN, per.to||TODAYS];
+ if(per.k==='jour')  return [TODAYS, TODAYS];
  if(per.k==='tout')  return [DATE_MIN, TODAYS];
  if(per.k==='mois')  return [TODAYS.slice(0,7)+'-01', TODAYS];
  if(per.k==='annee') return [TODAYS.slice(0,4)+'-01-01', TODAYS];
@@ -781,14 +784,16 @@ function perBuckets(per){
  return out;
 }
 /* barre de filtre période réutilisable */
-function periodBar(per,setter,info){
+function periodBar(per,setter,info,presets){
+ const keys=presets||PRESETS.map(x=>x[0]);
+ const [ra,rb]=perRange(per);
  return `<div class="fbar perbar">
-  <div class="seg">${PRESETS.map(([k,l])=>`<button class="${per.k===k?'on':''}" onclick="${setter}({k:'${k}',from:'',to:''})">${l}</button>`).join('')}</div>
+  <div class="seg">${keys.map(k=>`<button class="${per.k===k?'on':''}" onclick="${setter}({k:'${k}',from:'${ra}',to:'${rb}'})">${PRESET_L[k]}</button>`).join('')}</div>
   <div class="drange ${per.k==='perso'?'on':''}">
-    <input class="inp" type="date" value="${per.from||''}" max="${TODAYS}"
+    <input class="inp" type="date" value="${ra}" max="${TODAYS}"
       onchange="${setter}({k:'perso',from:this.value,to:document.querySelector('.drange input:last-of-type').value||'${TODAYS}'})">
     <span>→</span>
-    <input class="inp" type="date" value="${per.to||''}" max="${TODAYS}"
+    <input class="inp" type="date" value="${rb}" max="${TODAYS}"
       onchange="${setter}({k:'perso',from:document.querySelector('.drange input:first-of-type').value||'${DATE_MIN}',to:this.value})">
   </div>
   <span class="mu" style="font-size:11.5px;margin-left:auto">${info} · ${perLabel(per)}</span>
@@ -1422,7 +1427,7 @@ V.actes=()=>{
 };
 
 /* ---------------- Devis ---------------- */
-let dF='tous',dSel=null,perD={k:'90j',from:'',to:''},perE={k:'30j',from:'',to:''};
+let dF='tous',dSel=null,perD={k:'90j',from:'',to:''},perE={k:'jour',from:'',to:''};
 V.devis=()=>{
  if(dSel){const d=DEVIS.find(x=>x.id===dSel),p=pById(d.patient);
   const h=[]; if(d.envoye)h.push([d.envoye,'Devis envoyé par e-mail','✉']);
@@ -1535,7 +1540,7 @@ function eDetail(){
    <div><h1>Facturations détaillées</h1><p>${L.length} facturation${L.length>1?'s':''} sur la période${L.length!==ok.length?` · ${L.length-ok.length} annulée(s) exclue(s) des totaux`:''}</p></div>
    <div class="r"><button class="btn" onclick="toast('Export CSV généré')">Exporter la liste</button>
     <button class="btn p" onclick="toast('Facturation créée')">+ Facturation</button></div></div>
- ${periodBar(perE,'setPerE',`${L.length} ligne${L.length>1?'s':''}`)}
+ ${periodBar(perE,'setPerE',`${L.length} ligne${L.length>1?'s':''}`,PRESETS_FACTU)}
  ${barreFiltres()}
  <div class="grid ${dbl?'g5':'g4'}" style="margin-bottom:13px">
   ${kpi('Facturation TTC',EUR(ttc),`${ok.length} facture(s) · moyenne ${EUR(ok.length?ttc/ok.length:0)}`)}
@@ -1577,7 +1582,7 @@ function eJours(){
    <div><h1>Totaux journaliers</h1><p>${jours.length} jour${jours.length>1?'s':''} de facturation sur la période</p></div>
    <div class="r"><button class="btn" onclick="toast('Ticket de synthèse envoyé à l’imprimante')">🖨 Ticket de synthèse</button>
     <button class="btn" onclick="toast('Export CSV généré')">Exporter la liste</button></div></div>
- ${periodBar(perE,'setPerE',`${jours.length} jour${jours.length>1?'s':''}`)}
+ ${periodBar(perE,'setPerE',`${jours.length} jour${jours.length>1?'s':''}`,PRESETS_FACTU)}
  ${barreFiltres()}
  <div class="grid g4" style="margin-bottom:13px">
   ${kpi('Facturation totale TTC',EUR(tot))}
@@ -1623,7 +1628,7 @@ function eCaisse(){
   <div><h1>Encaissement &amp; caisse</h1><p>${FP.length} facture${FP.length>1?'s':''} · ${EUR(enc)} encaissés</p></div>
   <div class="r"><button class="btn" onclick="toast('Clôture de caisse enregistrée')">Clôture du jour</button>
    <button class="btn p" onclick="toast('Encaissement saisi')">+ Encaissement</button></div></div>
- ${periodBar(perE,'setPerE',`${FP.length} facture${FP.length>1?'s':''}`)}
+ ${periodBar(perE,'setPerE',`${FP.length} facture${FP.length>1?'s':''}`,PRESETS_FACTU)}
  <div class="grid g4" style="margin-bottom:14px">
   ${kpi('Encaissé sur la période',EUR(enc),encPrev?`${ev>=0?'▲':'▼'} ${Math.abs(ev)} % vs période précédente`:'pas de comparatif',ev>=0?'up':'dn')}
   ${kpi('Reste dû',EUR(reste),im.length+' facture'+(im.length>1?'s':''),reste?'dn':'up')}
