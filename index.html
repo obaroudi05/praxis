@@ -241,6 +241,38 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .hero-per .t{font-size:12px;font-weight:650;color:var(--ink-2)}
 .hero-per .seg{margin-left:auto}
 .hero-per .seg button{padding:3px 9px;font-size:11.5px}
+/* photothèque */
+.phday{margin-bottom:16px}
+.phday-h{display:flex;align-items:baseline;gap:10px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.phday-h b{font-size:13.5px}
+.phday-h .mu{font-size:11.5px}
+.phgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px}
+.phc{position:relative;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel);cursor:pointer;
+  box-shadow:var(--sh-1);transition:.13s}
+.phc:hover{transform:translateY(-2px);box-shadow:var(--sh-2);border-color:var(--accent)}
+.phc img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}
+.phk{position:absolute;top:7px;left:7px;font-size:9.5px;font-weight:750;letter-spacing:.08em;padding:2px 7px;border-radius:6px;
+  background:rgba(0,0,0,.62);color:#fff}
+.phk.apres{background:rgba(42,120,214,.85)}
+.phi{padding:7px 9px}
+.phi .nm{font-size:12.5px}
+.phi .mu{font-size:11px}
+/* modèles */
+.msgprev{border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:var(--panel-2);font-size:13px;line-height:1.6}
+.vars{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
+.varchip{font:600 11px var(--sans);border:1px solid var(--line);background:var(--panel-2);border-radius:7px;padding:3px 7px;color:var(--ink-2)}
+.varchip:hover{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-wash)}
+.mcat{font-size:10px;font-weight:650;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);padding:10px 8px 4px}
+.mrow{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:9px;cursor:pointer;transition:.12s}
+.mrow:hover{background:var(--panel-2)}
+.mrow.on{background:var(--accent-wash)}
+.mrow .nm{font-size:12.5px;font-weight:560;min-width:0}
+.dotk{width:7px;height:7px;border-radius:50%;background:var(--good);margin-left:auto;flex:none}
+.lvl{border:1px solid var(--line);border-radius:12px;padding:11px;margin-bottom:9px;background:var(--panel-2)}
+.lvl-h{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.lvl-g{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lvl-g label{font-size:11px;color:var(--ink-3);display:flex;flex-direction:column;gap:3px}
+.lvl-g .inp{height:31px}
 .subh{display:flex;align-items:center;gap:9px;margin:4px 0 9px;padding-top:12px;border-top:1px solid var(--line)}
 .subh h3{margin:0;font-size:13px;font-weight:660;display:flex;align-items:center;gap:7px}
 .subh h3 span{background:var(--panel-3);color:var(--ink-2);border-radius:6px;padding:1px 7px;font-size:11px;font-weight:700}
@@ -400,6 +432,7 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
       <a data-v="stock"><span class="i">▧</span>Stock &amp; lots<span class="n" id="n-stock">0</span></a>
       <div class="sgroup">Admin</div>
       <a data-v="equipe"><span class="i">◎</span>Équipe &amp; droits</a>
+      <a data-v="params"><span class="i">⚙</span>Paramètres</a>
     </nav>
     <div class="side-foot">
       <div class="av" id="avat">OB</div>
@@ -495,20 +528,20 @@ const noZoneTxt=a=>INJ.includes(a.type)?'zones non détaillées':'acte non injec
 
 /* ---------- Patients (fictifs) ---------- */
 const PATIENTS=[
- [1041,'MARTIN','Claire','1984-03-12','06 12 34 56 78','claire.martin@example.fr','Dr O. Baroudi','2022-09-14','Souhaite un résultat naturel, redoute les lèvres trop volumineuses.',[]],
- [1042,'DUBOIS','Sophie','1991-07-25','06 22 88 41 09','s.dubois@example.fr','Dr O. Baroudi','2023-02-03','Peau réactive : test 48 h avant tout peeling.',['Eczéma de contact','Allergie nickel']],
- [1043,'NGUYEN','Linh','1997-11-04','07 61 02 55 30','linh.nguyen@example.fr','Dr A. Merlin','2024-05-21','Première consultation orientée cernes.',[]],
+ [1041,'MARTIN','Claire','1984-08-03','06 12 34 56 78','claire.martin@example.fr','Dr O. Baroudi','2022-09-14','Souhaite un résultat naturel, redoute les lèvres trop volumineuses.',[]],
+ [1042,'DUBOIS','Sophie','1991-08-06','06 22 88 41 09','s.dubois@example.fr','Dr O. Baroudi','2023-02-03','Peau réactive : test 48 h avant tout peeling.',['Eczéma de contact','Allergie nickel']],
+ [1043,'NGUYEN','Linh','1997-08-09','07 61 02 55 30','linh.nguyen@example.fr','Dr A. Merlin','2024-05-21','Première consultation orientée cernes.',[]],
  [1044,'BENALI','Yasmine','1978-01-30','06 45 71 12 84','y.benali@example.fr','Dr O. Baroudi','2021-06-08','Suivi toxine 2×/an, très régulière.',['Migraines chroniques']],
  [1045,'ROUSSEAU','Émilie','1975-09-17','06 09 33 27 51','emilie.r@example.fr','Dr A. Merlin','2023-10-12','Projet global visage sur 12 mois.',['Hypertension traitée']],
- [1046,'GARCIA','Laura','1988-04-02','07 82 19 64 03','laura.garcia@example.fr','Dr O. Baroudi','2024-01-19','',[]],
- [1047,'LEFEVRE','Camille','1999-12-08','06 74 55 90 22','camille.lf@example.fr','Dr O. Baroudi','2025-03-06','Budget serré — proposer un étalement.',[]],
+ [1046,'GARCIA','Laura','1988-08-21','07 82 19 64 03','laura.garcia@example.fr','Dr O. Baroudi','2024-01-19','',[]],
+ [1047,'LEFEVRE','Camille','1999-08-28','06 74 55 90 22','camille.lf@example.fr','Dr O. Baroudi','2025-03-06','Budget serré — proposer un étalement.',[]],
  [1048,'MOREAU','Julien','1982-06-21','06 51 40 73 18','j.moreau@example.fr','Dr A. Merlin','2022-11-29','',['Tabagisme actif']],
  [1049,'PETIT','Nadia','1993-02-14','07 08 62 31 47','nadia.petit@example.fr','Dr O. Baroudi','2024-08-30','Allaitement — injections reportées.',['Allaitement jusqu’à 12/2026']],
  [1050,'FONTAINE','Alice','1970-05-06','06 33 92 18 05','alice.fontaine@example.fr','Dr O. Baroudi','2020-04-15','Patiente fidèle, 3 parrainages.',['Thyroïdite d’Hashimoto']],
  [1051,'CHEVALIER','Marc','1979-08-11','06 60 27 84 39','m.chevalier@example.fr','Dr A. Merlin','2023-06-02','',[]],
- [1052,'SANCHEZ','Elena','1995-10-23','07 55 13 06 92','elena.s@example.fr','Dr O. Baroudi','2025-01-08','',[]],
+ [1052,'SANCHEZ','Elena','1995-09-14','07 55 13 06 92','elena.s@example.fr','Dr O. Baroudi','2025-01-08','',[]],
  [1053,'BOUVIER','Hélène','1964-03-29','06 18 47 62 10','h.bouvier@example.fr','Dr O. Baroudi','2019-11-20','Ne souhaite pas de toxine — volumateurs uniquement.',['Anticoagulant (Kardégic)']],
- [1054,'ADAMS','Rachel','1990-09-15','07 41 30 58 76','rachel.adams@example.fr','Dr A. Merlin','2024-11-04','',[]],
+ [1054,'ADAMS','Rachel','1990-09-05','07 41 30 58 76','rachel.adams@example.fr','Dr A. Merlin','2024-11-04','',[]],
 ].map(r=>({id:r[0],nom:r[1],prenom:r[2],ddn:r[3],tel:r[4],mail:r[5],prat:r[6],depuis:r[7],notes:r[8],ant:r[9]}));
 const pById=id=>PATIENTS.find(p=>p.id===id);
 const fn=p=>`${p.nom} ${p.prenom}`;
@@ -664,7 +697,7 @@ let RULES=[
  {id:4,j:30,c:'Tâche', l:'Devis marqué expiré → tâche pour le secrétariat',on:true},
 ];
 const ROLES={
- praticien:{l:'Praticien',u:'Dr O. Baroudi',i:'OB',v:['dash','stats','patients','actes','devis','encaiss','relances','stock','equipe'],med:true,prix:true},
+ praticien:{l:'Praticien',u:'Dr O. Baroudi',i:'OB',v:['dash','stats','patients','actes','devis','encaiss','relances','stock','equipe','params'],med:true,prix:true},
  assistante:{l:'Assistante',u:'L. Roche',i:'LR',v:['dash','patients','actes','stock','relances'],med:true,prix:false},
  secretariat:{l:'Secrétariat',u:'N. Faure',i:'NF',v:['dash','patients','devis','encaiss','relances','stock'],med:false,prix:true},
 };
@@ -736,6 +769,108 @@ function periodBar(per,setter,info){
 const RELS=fileRelances();
 const RDUE=RELS.filter(r=>r.du);
 const CONSENT_KO=ACTES.filter(a=>catById(a.type).cons&&!a.consent);
+
+/* ==========================================================================
+   Photothèque, fidélité, anniversaires, modèles — paramétrables au back-office
+   ========================================================================== */
+const PHOTOS=[];
+(function(){ let n=1;
+ ACTES.filter(a=>a.zones).sort((a,b)=>a.date.localeCompare(b.date)).forEach(a=>{
+  if(a.id%2) return;
+  const h=(a.patient*13)%40+8;
+  PHOTOS.push({id:'PH-'+n++,patient:a.patient,acte:a.id,date:a.date,kind:'avant',h,zone:Object.keys(a.zones)[0]});
+  const ap=addD(a.date,30);
+  if(ap<=TODAYS) PHOTOS.push({id:'PH-'+n++,patient:a.patient,acte:a.id,date:ap,kind:'apres',h:h+4,zone:Object.keys(a.zones)[0]});
+ });
+})();
+
+/* --- critères de fidélité, modifiables dans Paramètres --- */
+let FID={
+ periode:24, mode:'et',
+ niveaux:[
+  {n:'Fidèle', actes:4, ca:1500, anciennete:12, recence:18, c:'b-info'},
+  {n:'VIP',    actes:7, ca:2500, anciennete:24, recence:12, c:'b-good'},
+ ]
+};
+function fidStats(p){
+ const from=addD(TODAYS,-Math.round(FID.periode*30.44));
+ const A=ACTES.filter(x=>x.patient===p.id&&x.date>=from);
+ const ca=FACTURES.filter(f=>f.patient===p.id&&f.date>=from).reduce((s,f)=>s+f.paye,0);
+ const anc=Math.round(days(p.depuis,TODAY)/30.44);
+ const last=ACTES.filter(x=>x.patient===p.id).map(x=>x.date).sort().pop();
+ return {actes:A.length, ca, anc, rec:last?Math.round(days(last,TODAY)/30.44):999, last};
+}
+function fidLevel(p){
+ const s=fidStats(p);
+ for(let i=FID.niveaux.length-1;i>=0;i--){
+  const n=FID.niveaux[i];
+  const c=[s.actes>=n.actes, s.ca>=n.ca, s.anc>=n.anciennete, s.rec<=n.recence];
+  if(FID.mode==='et'?c.every(Boolean):c.filter(Boolean).length>=3) return {...n,...s,idx:i,crit:c};
+ }
+ return null;
+}
+
+/* --- anniversaires --- */
+let ANNIV={actif:true, heure:'09:00', canal:'SMS', modele:'anniv-sms',
+           remiseType:'%', remise:15, validite:60, joursAvant:0};
+function annivRange(k){
+ const y=+TODAYS.slice(0,4), m=+TODAYS.slice(5,7);
+ if(k==='jour') return [TODAYS,TODAYS];
+ if(k==='semaine') return [TODAYS,addD(TODAYS,7)];
+ if(k==='mois') return [`${y}-${String(m).padStart(2,'0')}-01`, `${y}-${String(m).padStart(2,'0')}-31`];
+ if(k==='suivant'){const mm=m===12?1:m+1, yy=m===12?y+1:y;
+   return [`${yy}-${String(mm).padStart(2,'0')}-01`,`${yy}-${String(mm).padStart(2,'0')}-31`]}
+ return [`${y}-01-01`,`${y}-12-31`];
+}
+function annivDate(p,k){
+ if(!p.ddn) return null;
+ const [a,b]=annivRange(k), md=p.ddn.slice(5);
+ for(let y=+a.slice(0,4); y<=+b.slice(0,4); y++){const d=`${y}-${md}`; if(d>=a&&d<=b) return d}
+ return null;
+}
+const annivAge=(p,d)=>+d.slice(0,4)-+p.ddn.slice(0,4);
+
+/* --- modèles de messages, modifiables au back-office --- */
+const VARS=['prenom','nom','cabinet','praticien','acte','remise','code','validite','date','montant'];
+let MODELES=[
+ {id:'anniv-sms', cat:'Anniversaire', canal:'SMS', nom:'Anniversaire — SMS', actif:true,
+  texte:"Bonjour {{prenom}}, toute l'équipe du {{cabinet}} vous souhaite un très bel anniversaire ! Pour l'occasion, {{remise}} sur le soin de votre choix jusqu'au {{validite}}. Code : {{code}}. À très vite !"},
+ {id:'anniv-mail', cat:'Anniversaire', canal:'E-mail', nom:'Anniversaire — e-mail', actif:false,
+  texte:"Bonjour {{prenom}},\n\nToute l'équipe du {{cabinet}} vous souhaite un très bel anniversaire.\n\nPour marquer l'occasion, nous vous offrons {{remise}} sur le soin de votre choix, valable jusqu'au {{validite}} (code {{code}}).\n\nAu plaisir de vous revoir,\n{{praticien}}"},
+ {id:'fid-vip', cat:'Fidélité', canal:'SMS', nom:'Patient VIP — invitation', actif:true,
+  texte:"Bonjour {{prenom}}, en remerciement de votre fidélité, {{remise}} sur votre prochain soin au {{cabinet}}. Valable jusqu'au {{validite}}, code {{code}}."},
+ {id:'fid-dormant', cat:'Fidélité', canal:'SMS', nom:'Patient à réactiver', actif:true,
+  texte:"Bonjour {{prenom}}, cela fait un moment que nous ne vous avons pas vue au {{cabinet}}. Nous serions ravis de refaire le point sur votre suivi. {{remise}} sur votre prochaine consultation."},
+ {id:'relance1', cat:'Relance devis', canal:'E-mail', nom:'Relance devis — J+3', actif:true,
+  texte:"Bonjour {{prenom}},\n\nVous trouverez ci-joint le devis établi le {{date}} pour un montant de {{montant}}.\n\nJe reste à votre disposition pour en reparler.\n\n{{praticien}}"},
+ {id:'relance2', cat:'Relance devis', canal:'SMS', nom:'Relance devis — J+10', actif:true,
+  texte:"Bonjour {{prenom}}, votre devis du {{date}} ({{montant}}) est toujours valable. Souhaitez-vous que nous en reparlions ? {{cabinet}}"},
+ {id:'postacte', cat:'Suivi post-acte', canal:'SMS', nom:'Nouvelles à J+2', actif:true,
+  texte:"Bonjour {{prenom}}, comment se passent les suites de votre {{acte}} ? N'hésitez pas à nous répondre si quelque chose vous inquiète. {{cabinet}}"},
+ {id:'rappel-soin', cat:'Rappel de soin', canal:'SMS', nom:'Renouvellement conseillé', actif:true,
+  texte:"Bonjour {{prenom}}, votre {{acte}} du {{date}} arrive au terme de sa durée d'action. Souhaitez-vous programmer une séance d'entretien ? {{cabinet}}"},
+];
+const modById=id=>MODELES.find(m=>m.id===id);
+const fillTpl=(t,ctx)=>String(t).replace(/\{\{(\w+)\}\}/g,(_,k)=>ctx[k]!==undefined?ctx[k]:'{{'+k+'}}');
+function tplCtx(p,extra){
+ const v=addD(TODAYS,ANNIV.validite);
+ return Object.assign({
+  prenom:p?p.prenom:'Claire', nom:p?p.nom:'MARTIN', cabinet:'Cabinet Dr Baroudi',
+  praticien:p?p.prat:'Dr O. Baroudi', acte:'acide hyaluronique',
+  remise:ANNIV.remiseType==='%'?ANNIV.remise+' %':EUR(ANNIV.remise),
+  code:'ANNIV'+(p?p.id:1041), validite:DF(v), date:DF(TODAYS), montant:EUR(350)
+ }, extra||{});
+}
+
+/* --- modèles de documents --- */
+let DOCMOD=[
+ {id:'d1', cat:'Ordonnance', nom:'Suites d’injection', corps:"Arnica montana 9 CH — 5 granules 3 fois par jour pendant 5 jours\nParacétamol 1 g si douleur, maximum 3 g par 24 h"},
+ {id:'d2', cat:'Ordonnance', nom:'Prophylaxie herpétique (lèvres)', corps:"Valaciclovir 500 mg — 1 comprimé matin et soir pendant 3 jours, à débuter la veille de l’injection"},
+ {id:'d3', cat:'Ordonnance', nom:'Suites de peeling', corps:"Crème réparatrice cicatrisante — 2 applications par jour pendant 7 jours\nPhotoprotection SPF 50+ quotidienne pendant 1 mois"},
+ {id:'d4', cat:'Consentement', nom:'Consentement — acide hyaluronique', corps:"Je soussigné(e) {{prenom}} {{nom}} reconnais avoir reçu une information claire et complète sur l’acte d’injection d’acide hyaluronique, ses bénéfices attendus, ses effets secondaires possibles (ecchymoses, œdème, asymétrie transitoire) et ses alternatives. Un délai de réflexion m’a été laissé."},
+ {id:'d5', cat:'Consentement', nom:'Consentement — toxine botulique', corps:"Je soussigné(e) {{prenom}} {{nom}} reconnais avoir été informé(e) des modalités de l’injection de toxine botulique, de son caractère temporaire (4 à 6 mois), des effets indésirables possibles et des contre-indications."},
+ {id:'d6', cat:'Devis', nom:'Mentions légales du devis', corps:"Devis valable 30 jours à compter du {{date}}. Délai de réflexion légal de 15 jours applicable. Les actes de médecine esthétique ne sont pas pris en charge par l’Assurance Maladie et sont soumis à TVA au taux de 20 %."},
+];
 
 /* ==========================================================================
    Composants
@@ -922,16 +1057,30 @@ function heroNew(nom,prenom){openActe(null,null,{nom,prenom})}
 
 /* ---------------- Patients (maître-détail) ---------------- */
 let pq='',pPrat='',pSel=null,pTab='resume',docF='tous';
+let pView='liste', fidF='tous', annivF='mois', perP={k:'90j',from:'',to:''}, photoQ='', photoKind='tous';
+function setPerP(x){perP=x;paint()}
+const PVIEWS=[['liste','Tous les patients'],['fideles','Fidèles'],['anniv','Anniversaires'],['photos','Photothèque']];
+
 V.patients=()=>{
+ const nFid=PATIENTS.filter(p=>fidLevel(p)).length;
+ const nAnn=PATIENTS.filter(p=>annivDate(p,annivF)).length;
+ const sub=`<div class="fbar" style="margin-bottom:14px"><div class="seg">${PVIEWS.map(([k,l])=>{
+   const n=k==='fideles'?nFid:k==='anniv'?nAnn:k==='photos'?PHOTOS.length:PATIENTS.length;
+   return `<button class="${pView===k?'on':''}" onclick="pView='${k}';paint()">${l} · ${n}</button>`}).join('')}</div>
+   <div style="margin-left:auto"><button class="btn s g" onclick="go('params')">⚙ Régler les critères et les modèles</button></div></div>`;
+ return sub+({liste:pListe, fideles:pFideles, anniv:pAnniv, photos:pPhotos}[pView]||pListe)();
+};
+
+/* ---------- Tous les patients (maître-détail) ---------- */
+function pListe(){
  let L=PATIENTS.filter(p=>{const q=pq.toLowerCase();
   return (!q||[p.nom,p.prenom,p.mail,p.tel,String(p.id)].join(' ').toLowerCase().includes(q))&&(!pPrat||p.prat===pPrat)});
- const nA=p=>ACTES.filter(a=>a.patient===p.id).length;
  const last=p=>ACTES.filter(a=>a.patient===p.id).map(a=>a.date).sort().pop();
  L.sort((a,b)=>(last(b)||'').localeCompare(last(a)||''));
  if(!pSel&&L.length) pSel=L[0].id;
- return `<div class="head"><div><h1>Patients</h1><p>${L.length} sur ${PATIENTS.length} · la fiche s'ouvre à droite, sans changer de page</p></div>
+ return `<div class="head" style="margin-bottom:12px"><div><h1>Patients</h1><p>${L.length} sur ${PATIENTS.length} · la fiche s'ouvre à droite, sans changer de page</p></div>
   <div class="r"><button class="btn" onclick="toast('Recherche de doublons : 0 doublon détecté')">Doublons</button>
-   <button class="btn p" onclick="toast('Prototype : formulaire de création')">+ Patient</button></div></div>
+   <button class="btn p" onclick="openActe(null,null,true)">+ Patient</button></div></div>
  <div class="md">
   <div class="card" style="position:sticky;top:0">
    <div class="h" style="gap:7px">
@@ -940,17 +1089,147 @@ V.patients=()=>{
      <select class="inp" style="box-shadow:none;width:130px" onchange="pPrat=this.value;paint()">
        <option value="">Tous</option>${PRATICIENS.map(x=>`<option ${pPrat===x?'selected':''}>${x}</option>`).join('')}</select>
    </div>
-   <div class="tw" style="max-height:calc(100vh - 190px);overflow:auto"><table><tbody>
-    ${L.map(p=>`<tr class="c ${pSel===p.id?'sel':''}" onclick="pSel=${p.id};paint()">
+   <div class="tw" style="max-height:calc(100vh - 240px);overflow:auto"><table><tbody>
+    ${L.map(p=>{const f=fidLevel(p);
+     return `<tr class="c ${pSel===p.id?'sel':''}" onclick="pSel=${p.id};paint()">
       <td><div class="rowline"><div class="pav">${esc(ini(p))}</div>
        <div style="min-width:0"><div class="nm">${esc(p.nom)} ${esc(p.prenom)}</div>
-        <div class="mu" style="font-size:11.5px">${ageTxt(p)} · ${nA(p)} acte${nA(p)>1?'s':''} · ${last(p)?DFS(last(p)):'jamais'}</div></div>
-       ${p.ant.length?`<span class="bdg b-warn" style="margin-left:auto">⚠ ${p.ant.length}</span>`:''}</div></td></tr>`).join('')}
+        <div class="mu" style="font-size:11.5px">${ageTxt(p)} · ${ACTES.filter(a=>a.patient===p.id).length} actes · ${last(p)?DFS(last(p)):'jamais'}</div></div>
+       <div style="margin-left:auto;display:flex;gap:4px">
+        ${f?`<span class="bdg ${f.c}">${f.n}</span>`:''}
+        ${p.ant.length?`<span class="bdg b-warn">⚠ ${p.ant.length}</span>`:''}</div></div></td></tr>`}).join('')}
    </tbody></table>${L.length?'':'<div class="empty">Aucun résultat.</div>'}</div>
   </div>
   ${pSel?pDetail(pById(pSel)):'<div class="card"><div class="empty">Sélectionnez un patient.</div></div>'}
  </div>`;
-};
+}
+
+/* ---------- Patients fidèles ---------- */
+function pFideles(){
+ const all=PATIENTS.map(p=>({p,f:fidLevel(p)})).filter(x=>x.f);
+ const L=all.filter(x=>fidF==='tous'||x.f.n===fidF).sort((a,b)=>b.f.idx-a.f.idx||b.f.ca-a.f.ca);
+ const caFid=all.reduce((s,x)=>s+x.f.ca,0);
+ const caTot=FACTURES.reduce((s,f)=>s+f.paye,0);
+ const dormants=PATIENTS.filter(p=>{const st=fidStats(p);return st.actes>=2&&st.rec>12});
+ const ids=j=>JSON.stringify(j).replace(/"/g,'&quot;');
+ return `<div class="head" style="margin-bottom:12px">
+   <div><h1>Patients fidèles</h1><p>${all.length} patients répondent aux critères, sur ${FID.periode} mois glissants</p></div>
+   <div class="r"><button class="btn" onclick="toast('Export CSV généré')">Exporter</button>
+    <button class="btn p" onclick="bulkMsg('fid-vip',${ids(L.map(x=>x.p.id))})">✉ Message groupé</button></div></div>
+ <div class="tip"><span class="e">⭐</span><div><b>Critères actuels — ${FID.mode==='et'?'les 4 requis':'au moins 3 sur 4'} :</b>
+   ${FID.niveaux.map(n=>`<b>${n.n}</b> = ≥ ${n.actes} actes, ≥ ${EUR(n.ca)}, ancienneté ≥ ${n.anciennete} mois, dernier acte ≤ ${n.recence} mois`).join(' &nbsp;·&nbsp; ')}.
+   <a onclick="go('params')">Modifier dans Paramètres →</a></div></div>
+ <div class="grid g4" style="margin-bottom:14px">
+  ${FID.niveaux.map(n=>kpi(n.n+'s',all.filter(x=>x.f.n===n.n).length,`≥ ${n.actes} actes · ≥ ${EUR(n.ca)}`)).join('')}
+  ${kpi('CA des fidèles',EUR(caFid),caTot?Math.round(caFid/caTot*100)+' % du CA total':'','up')}
+  ${kpi('À réactiver',dormants.length,'≥ 2 actes, rien depuis 12 mois',dormants.length?'dn':'up')}</div>
+ <div class="fbar"><div class="seg">
+   <button class="${fidF==='tous'?'on':''}" onclick="fidF='tous';paint()">Tous · ${all.length}</button>
+   ${FID.niveaux.map(n=>`<button class="${fidF===n.n?'on':''}" onclick="fidF='${n.n}';paint()">${n.n} · ${all.filter(x=>x.f.n===n.n).length}</button>`).join('')}
+ </div></div>
+ <div class="card"><div class="tw"><table>
+  <thead><tr><th>Patient</th><th>Niveau</th><th class="num">Actes</th><th class="num">CA</th><th class="num">Ancienneté</th><th>Dernier acte</th><th>Critères remplis</th><th></th></tr></thead>
+  <tbody>${L.map(x=>`<tr class="c" onclick="openPatient(${x.p.id})">
+    <td><div class="rowline"><div class="pav">${esc(ini(x.p))}</div>
+      <div><div class="nm">${esc(x.p.nom)} ${esc(x.p.prenom)}</div><div class="mu" style="font-size:11.5px">${ageTxt(x.p)} · ${esc(x.p.tel)}</div></div></div></td>
+    <td><span class="bdg ${x.f.c}">★ ${x.f.n}</span></td>
+    <td class="num">${x.f.actes}</td><td class="num">${EUR(x.f.ca)}</td>
+    <td class="num">${x.f.anc} mois</td>
+    <td class="mono">${x.f.last?DF(x.f.last):'—'}<div class="mu" style="font-size:11px">il y a ${x.f.rec} mois</div></td>
+    <td>${['actes','CA','ancienneté','récence'].map((l,i)=>`<span class="bdg ${x.f.crit[i]?'b-good':'b-neu'}" style="margin:0 2px 2px 0">${x.f.crit[i]?'✓':'·'} ${l}</span>`).join('')}</td>
+    <td class="num"><button class="btn xs" onclick="event.stopPropagation();openMsg('fid-vip',${x.p.id})">✉</button></td></tr>`).join('')}
+  </tbody></table>${L.length?'':'<div class="empty">Aucun patient ne remplit ces critères. Assouplissez-les dans Paramètres.</div>'}</div></div>
+ ${dormants.length?`<div class="card" style="margin-top:13px">
+   <div class="h"><h2>À réactiver</h2><span class="s">patients réguliers qui ne sont pas revenus depuis plus d'un an</span>
+    <div class="r"><button class="btn s" onclick="bulkMsg('fid-dormant',${ids(dormants.map(p=>p.id))})">Relancer tout le monde</button></div></div>
+   <div class="tw"><table><thead><tr><th>Patient</th><th class="num">Actes</th><th class="num">CA historique</th><th>Dernier acte</th><th></th></tr></thead>
+   <tbody>${dormants.map(p=>{const st=fidStats(p);return `<tr class="c" onclick="openPatient(${p.id})">
+     <td class="nm">${esc(p.nom)} ${esc(p.prenom)}</td><td class="num">${ACTES.filter(a=>a.patient===p.id).length}</td>
+     <td class="num">${EUR(FACTURES.filter(f=>f.patient===p.id).reduce((s,f)=>s+f.paye,0))}</td>
+     <td class="mono">${st.last?DF(st.last):'—'} <span class="mu">(${st.rec} mois)</span></td>
+     <td class="num"><button class="btn xs" onclick="event.stopPropagation();openMsg('fid-dormant',${p.id})">✉ Relancer</button></td></tr>`}).join('')}
+   </tbody></table></div></div>`:''}`;
+}
+
+/* ---------- Anniversaires ---------- */
+function pAnniv(){
+ const L=PATIENTS.map(p=>({p,d:annivDate(p,annivF)})).filter(x=>x.d).sort((a,b)=>a.d.localeCompare(b.d));
+ const m=modById(ANNIV.modele)||MODELES[0];
+ const sansDate=PATIENTS.filter(p=>!p.ddn).length;
+ const ids=j=>JSON.stringify(j).replace(/"/g,'&quot;');
+ return `<div class="head" style="margin-bottom:12px">
+   <div><h1>Anniversaires</h1><p>${L.length} patient${L.length>1?'s':''} sur la période sélectionnée</p></div>
+   <div class="r"><button class="btn p" onclick="bulkMsg('${ANNIV.modele}',${ids(L.map(x=>x.p.id))})">✉ Envoyer à tous</button></div></div>
+ <div class="grid g2" style="grid-template-columns:1fr 1.2fr">
+  <div class="card"><div class="h"><h2>Envoi automatique</h2><span class="s">${ANNIV.actif?'actif':'désactivé'}</span>
+    <div class="r"><button class="sw ${ANNIV.actif?'on':''}" onclick="ANNIV.actif=!ANNIV.actif;paint()"></button></div></div>
+   <div class="b">
+    <div class="grid g2" style="gap:10px">
+     <div class="fld"><label>Canal</label><select class="inp" style="width:100%" onchange="ANNIV.canal=this.value;paint()">
+       ${['SMS','E-mail'].map(c=>`<option ${ANNIV.canal===c?'selected':''}>${c}</option>`).join('')}</select></div>
+     <div class="fld"><label>Heure d'envoi</label><input class="inp" style="width:100%" type="time" value="${ANNIV.heure}" onchange="ANNIV.heure=this.value"></div>
+     <div class="fld"><label>Remise offerte</label><div style="display:flex;gap:6px">
+       <input class="inp" style="width:72px" type="number" min="0" value="${ANNIV.remise}" onchange="ANNIV.remise=+this.value||0;paint()">
+       <select class="inp" onchange="ANNIV.remiseType=this.value;paint()">${['%','€'].map(t=>`<option ${ANNIV.remiseType===t?'selected':''}>${t}</option>`).join('')}</select></div></div>
+     <div class="fld"><label>Validité (jours)</label><input class="inp" style="width:100%" type="number" min="1" value="${ANNIV.validite}" onchange="ANNIV.validite=+this.value||1;paint()"></div>
+    </div>
+    <div class="fld"><label>Modèle utilisé</label>
+      <select class="inp" style="width:100%" onchange="ANNIV.modele=this.value;paint()">
+        ${MODELES.filter(x=>x.cat==='Anniversaire').map(x=>`<option value="${x.id}" ${ANNIV.modele===x.id?'selected':''}>${esc(x.nom)}</option>`).join('')}</select></div>
+    <div class="fld"><label>Aperçu réel</label>
+      <div class="msgprev">${esc(fillTpl(m.texte,tplCtx(L[0]?L[0].p:PATIENTS[0]))).replace(/\n/g,'<br>')}</div></div>
+    <button class="btn s" onclick="go('params')">⚙ Modifier ce modèle</button>
+   </div></div>
+  <div class="card"><div class="h"><h2>Qui fête son anniversaire</h2>
+    <div class="r"><div class="seg">${[['jour','Auj.'],['semaine','7 j'],['mois','Ce mois'],['suivant','Mois prochain']].map(([k,l])=>
+      `<button class="${annivF===k?'on':''}" onclick="annivF='${k}';paint()">${l}</button>`).join('')}</div></div></div>
+   <div class="tw" style="max-height:440px;overflow:auto"><table>
+    <thead><tr><th>Date</th><th>Patient</th><th class="num">Âge</th><th>Contact</th><th>Statut</th><th></th></tr></thead>
+    <tbody>${L.map(x=>{const f=fidLevel(x.p), passe=x.d<TODAYS;
+      return `<tr class="c" onclick="openPatient(${x.p.id})">
+      <td class="mono" ${x.d===TODAYS?'style="color:var(--accent-ink);font-weight:700"':'class="mono mu"'}>${DFS(x.d)}</td>
+      <td><div class="nm">${esc(x.p.nom)} ${esc(x.p.prenom)}</div>${f?`<span class="bdg ${f.c}" style="font-size:10px">★ ${f.n}</span>`:''}</td>
+      <td class="num">${annivAge(x.p,x.d)} ans</td>
+      <td class="mu" style="font-size:11.5px">${esc(x.p.tel)}</td>
+      <td>${passe?bdg('b-good','Envoyé'):x.d===TODAYS?bdg('b-warn','Aujourd’hui '+ANNIV.heure):bdg('b-neu','Programmé')}</td>
+      <td class="num"><button class="btn xs" onclick="event.stopPropagation();openMsg('${ANNIV.modele}',${x.p.id})">Aperçu</button></td></tr>`}).join('')}
+    </tbody></table>${L.length?'':'<div class="empty">Aucun anniversaire sur cette période.</div>'}</div>
+   ${sansDate?`<div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">⚠ ${sansDate} patient(s) sans date de naissance ne recevront rien.</div></div>`:''}
+  </div>
+ </div>`;
+}
+
+/* ---------- Photothèque ---------- */
+function pPhotos(){
+ const q=photoQ.toLowerCase();
+ const L=PHOTOS.filter(x=>inPer(x.date,perP))
+  .filter(x=>photoKind==='tous'||x.kind===photoKind)
+  .filter(x=>{const p=pById(x.patient); return !q||fn(p).toLowerCase().includes(q)})
+  .sort((a,b)=>b.date.localeCompare(a.date));
+ const parJour={}; L.forEach(x=>{(parJour[x.date]=parJour[x.date]||[]).push(x)});
+ const jours=Object.keys(parJour).sort((a,b)=>b.localeCompare(a));
+ return `<div class="head" style="margin-bottom:12px">
+   <div><h1>Photothèque</h1><p>${L.length} photo${L.length>1?'s':''} sur ${PHOTOS.length} · ${jours.length} date${jours.length>1?'s':''} de prise de vue</p></div>
+   <div class="r"><button class="btn" onclick="toast('QR code affiché : photographiez avec le téléphone')">📱 Importer par QR code</button></div></div>
+ ${periodBar(perP,'setPerP',`${L.length} photo${L.length>1?'s':''}`)}
+ <div class="fbar">
+  <input class="inp" id="phq" style="min-width:240px" placeholder="Nom du patient…" value="${esc(photoQ)}"
+    oninput="photoQ=this.value;paint();const e=document.getElementById('phq');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
+  <div class="seg">${[['tous','Toutes'],['avant','Avant'],['apres','Après']].map(([k,l])=>
+    `<button class="${photoKind===k?'on':''}" onclick="photoKind='${k}';paint()">${l}</button>`).join('')}</div>
+ </div>
+ ${jours.length?jours.map(j=>`<div class="phday">
+   <div class="phday-h"><b>${DF(j)}</b><span class="mu">${parJour[j].length} photo${parJour[j].length>1?'s':''} · ${[...new Set(parJour[j].map(x=>x.patient))].length} patient(s)</span></div>
+   <div class="phgrid">${parJour[j].map(x=>{const p=pById(x.patient), a=ACTES.find(y=>y.id===x.acte);
+     return `<div class="phc" onclick="openPatientPhotos(${x.patient})">
+      <img src="${ph2(x)}" alt="photo simulée">
+      <span class="phk ${x.kind}">${x.kind==='avant'?'AVANT':'APRÈS'}</span>
+      <div class="phi"><div class="nm">${esc(p.nom)} ${esc(p.prenom)}</div>
+       <div class="mu">${a?esc(a.nom):''}${x.zone&&zoneById(x.zone)?' · '+esc(zoneById(x.zone).k):''}</div></div></div>`}).join('')}</div>
+  </div>`).join(''):'<div class="card"><div class="empty">Aucune photo sur cette période.</div></div>'}`;
+}
+function ph2(x){return ph((x.kind==='avant'?'AVANT — ':'APRÈS — ')+DF(x.date), x.h, x.kind==='avant'?0:8)}
+function openPatientPhotos(id){pSel=id;pTab='photos';pView='liste';go('patients')}
 
 function pDetail(p){
  const A=ACTES.filter(a=>a.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
@@ -1306,6 +1585,164 @@ V.stats=()=>{
   <div class="card"><div class="h"><h2>CA par praticien</h2></div><div class="b">${hbars(pp)}</div></div>
   <div class="card"><div class="h"><h2>Zones les plus traitées</h2><span class="s">inédit vs Gemelia</span></div><div class="b">${hbars(pz,{fmt:NUM})}</div></div></div>`;
 };
+
+/* ---------------- Paramètres (back-office) ---------------- */
+let paramTab='fidelite', modSel='anniv-sms', docSel='d1';
+V.params=()=>{
+ const TB=[['fidelite','Critères de fidélité'],['messages',`Modèles de message · ${MODELES.length}`],['documents',`Modèles de document · ${DOCMOD.length}`]];
+ const body={
+  fidelite:()=>{
+   const all=PATIENTS.map(p=>({p,f:fidLevel(p)})).filter(x=>x.f);
+   return `<div class="tip"><span class="e">⭐</span><div>Ces critères pilotent la liste <b>Patients → Fidèles</b>. Chaque modification est répercutée immédiatement : le compteur ci-dessous se met à jour à chaque changement.</div></div>
+   <div class="grid g2">
+    <div class="card"><div class="h"><h2>Réglages généraux</h2></div><div class="b">
+      <div class="fld"><label>Période d'observation</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="inp" style="width:80px" type="number" min="1" max="120" value="${FID.periode}" onchange="FID.periode=+this.value||12;paint()">
+          <span class="mu" style="font-size:12.5px">mois glissants — actes et CA comptés sur cette fenêtre</span></div></div>
+      <div class="fld"><label>Combinaison des critères</label>
+        <div class="seg">${[['et','Les 4 critères requis'],['ou','Au moins 3 sur 4']].map(([k,l])=>
+          `<button class="${FID.mode===k?'on':''}" onclick="FID.mode='${k}';paint()">${l}</button>`).join('')}</div></div>
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+        <div class="fld"><label>Résultat avec ces réglages</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            ${FID.niveaux.map(n=>`<span class="bdg ${n.c}" style="font-size:12.5px;padding:5px 10px">★ ${n.n} : ${all.filter(x=>x.f.n===n.n).length} patient(s)</span>`).join('')}
+            <span class="bdg b-neu" style="font-size:12.5px;padding:5px 10px">${PATIENTS.length-all.length} hors critères</span></div></div>
+        <button class="btn s" onclick="go('patients');pView='fideles';paint()">Voir la liste →</button></div>
+    </div></div>
+    <div class="card"><div class="h"><h2>Niveaux</h2><span class="s">un patient obtient le niveau le plus élevé qu'il atteint</span></div><div class="b">
+      ${FID.niveaux.map((n,i)=>`<div class="lvl">
+        <div class="lvl-h"><input class="inp" style="width:140px;font-weight:650" value="${esc(n.n)}" onchange="FID.niveaux[${i}].n=this.value;paint()">
+          <span class="bdg ${n.c}">${all.filter(x=>x.f.n===n.n).length} patient(s)</span></div>
+        <div class="lvl-g">
+          <label>Actes minimum<input class="inp" type="number" min="0" value="${n.actes}" onchange="FID.niveaux[${i}].actes=+this.value||0;paint()"></label>
+          <label>CA minimum (€)<input class="inp" type="number" min="0" step="100" value="${n.ca}" onchange="FID.niveaux[${i}].ca=+this.value||0;paint()"></label>
+          <label>Ancienneté ≥ (mois)<input class="inp" type="number" min="0" value="${n.anciennete}" onchange="FID.niveaux[${i}].anciennete=+this.value||0;paint()"></label>
+          <label>Dernier acte ≤ (mois)<input class="inp" type="number" min="1" value="${n.recence}" onchange="FID.niveaux[${i}].recence=+this.value||1;paint()"></label>
+        </div></div>`).join('')}
+    </div></div></div>`;
+  },
+  messages:()=>{
+   const m=modById(modSel)||MODELES[0];
+   const cats=[...new Set(MODELES.map(x=>x.cat))];
+   return `<div class="grid g2" style="grid-template-columns:280px 1fr">
+    <div class="card"><div class="h"><h2>Modèles</h2><div class="r"><button class="btn xs p" onclick="newModele()">+</button></div></div>
+     <div class="b" style="padding:8px">
+      ${cats.map(c=>`<div class="mcat">${c}</div>`+MODELES.filter(x=>x.cat===c).map(x=>
+        `<div class="mrow ${modSel===x.id?'on':''}" onclick="modSel='${x.id}';paint()">
+          <span class="bdg b-neu">${x.canal}</span><div class="nm">${esc(x.nom)}</div>
+          ${x.actif?'<span class="dotk"></span>':''}</div>`).join('')).join('')}
+     </div></div>
+    <div class="card"><div class="h"><h2>${esc(m.nom)}</h2>
+      <div class="r"><button class="sw ${m.actif?'on':''}" onclick="modById('${m.id}').actif=!modById('${m.id}').actif;paint()"></button></div></div>
+     <div class="b">
+      <div class="grid g3" style="gap:10px">
+       <div class="fld"><label>Nom</label><input class="inp" style="width:100%" value="${esc(m.nom)}" onchange="modById('${m.id}').nom=this.value;paint()"></div>
+       <div class="fld"><label>Catégorie</label><select class="inp" style="width:100%" onchange="modById('${m.id}').cat=this.value;paint()">
+         ${['Anniversaire','Fidélité','Relance devis','Suivi post-acte','Rappel de soin'].map(c=>`<option ${m.cat===c?'selected':''}>${c}</option>`).join('')}</select></div>
+       <div class="fld"><label>Canal</label><select class="inp" style="width:100%" onchange="modById('${m.id}').canal=this.value;paint()">
+         ${['SMS','E-mail'].map(c=>`<option ${m.canal===c?'selected':''}>${c}</option>`).join('')}</select></div>
+      </div>
+      <div class="fld"><label>Contenu — cliquez une variable pour l'insérer</label>
+       <div class="vars">${VARS.map(v=>`<button class="varchip" onclick="insVar('mtxt','${v}','${m.id}')">{{${v}}}</button>`).join('')}</div>
+       <textarea class="note" id="mtxt" style="min-height:150px" oninput="modById('${m.id}').texte=this.value;document.getElementById('mprev').innerHTML=prevHTML(this.value)">${esc(m.texte)}</textarea>
+       ${m.canal==='SMS'?`<div class="mu" style="font-size:11.5px;margin-top:4px">${m.texte.length} caractères — ${Math.ceil(m.texte.length/160)} SMS par destinataire</div>`:''}</div>
+      <div class="fld"><label>Aperçu avec un patient réel</label><div class="msgprev" id="mprev">${prevHTML(m.texte)}</div></div>
+      <div style="display:flex;gap:8px"><button class="btn s" onclick="toast('Modèle enregistré')">Enregistrer</button>
+       <button class="btn s" onclick="openMsg('${m.id}',${PATIENTS[0].id})">Tester l'envoi</button></div>
+     </div></div></div>`;
+  },
+  documents:()=>{
+   const d=DOCMOD.find(x=>x.id===docSel)||DOCMOD[0];
+   const cats=[...new Set(DOCMOD.map(x=>x.cat))];
+   return `<div class="grid g2" style="grid-template-columns:280px 1fr">
+    <div class="card"><div class="h"><h2>Modèles</h2><div class="r"><button class="btn xs p" onclick="newDoc()">+</button></div></div>
+     <div class="b" style="padding:8px">
+      ${cats.map(c=>`<div class="mcat">${c}</div>`+DOCMOD.filter(x=>x.cat===c).map(x=>
+        `<div class="mrow ${docSel===x.id?'on':''}" onclick="docSel='${x.id}';paint()"><div class="nm">${esc(x.nom)}</div></div>`).join('')).join('')}
+     </div></div>
+    <div class="card"><div class="h"><h2>${esc(d.nom)}</h2><span class="s">${d.cat}</span></div>
+     <div class="b">
+      <div class="grid g2" style="gap:10px">
+       <div class="fld"><label>Nom</label><input class="inp" style="width:100%" value="${esc(d.nom)}" onchange="DOCMOD.find(x=>x.id==='${d.id}').nom=this.value;paint()"></div>
+       <div class="fld"><label>Type</label><select class="inp" style="width:100%" onchange="DOCMOD.find(x=>x.id==='${d.id}').cat=this.value;paint()">
+         ${['Ordonnance','Consentement','Devis','Information'].map(c=>`<option ${d.cat===c?'selected':''}>${c}</option>`).join('')}</select></div></div>
+      <div class="fld"><label>Corps du document — mêmes variables que les messages</label>
+       <div class="vars">${VARS.map(v=>`<button class="varchip" onclick="insVar('dtxt','${v}',null,'${d.id}')">{{${v}}}</button>`).join('')}</div>
+       <textarea class="note" id="dtxt" style="min-height:200px" oninput="DOCMOD.find(x=>x.id==='${d.id}').corps=this.value;document.getElementById('dprev').innerHTML=prevHTML(this.value)">${esc(d.corps)}</textarea></div>
+      <div class="fld"><label>Aperçu</label><div class="msgprev" id="dprev">${prevHTML(d.corps)}</div></div>
+      <button class="btn s" onclick="toast('Modèle enregistré')">Enregistrer</button>
+     </div></div></div>`;
+  }
+ };
+ return `<div class="head"><div><h1>Paramètres</h1><p>Critères, messages et documents — tout ce qui pilote les automatismes</p></div></div>
+ <div class="fbar"><div class="seg">${TB.map(([k,l])=>`<button class="${paramTab===k?'on':''}" onclick="paramTab='${k}';paint()">${l}</button>`).join('')}</div></div>
+ ${(body[paramTab]||body.fidelite)()}`;
+};
+const prevHTML=t=>esc(fillTpl(t,tplCtx(PATIENTS[0]))).replace(/\n/g,'<br>');
+function insVar(id,v,mid,did){
+ const e=document.getElementById(id); if(!e) return;
+ const a=e.selectionStart||e.value.length;
+ e.value=e.value.slice(0,a)+'{{'+v+'}}'+e.value.slice(e.selectionEnd||a);
+ if(mid) modById(mid).texte=e.value; if(did) DOCMOD.find(x=>x.id===did).corps=e.value;
+ e.focus(); e.selectionStart=e.selectionEnd=a+v.length+4;
+ const pv=document.getElementById(id==='mtxt'?'mprev':'dprev'); if(pv) pv.innerHTML=prevHTML(e.value);
+}
+function newModele(){const id='m'+Date.now();MODELES.push({id,cat:'Fidélité',canal:'SMS',nom:'Nouveau modèle',actif:false,texte:'Bonjour {{prenom}}, '});modSel=id;paint()}
+function newDoc(){const id='x'+Date.now();DOCMOD.push({id,cat:'Ordonnance',nom:'Nouveau modèle',corps:''});docSel=id;paint()}
+
+/* ---------------- Composeur de message ---------------- */
+let MS=null;
+function openMsg(modId,pid,list){
+ const m=modById(modId)||MODELES[0];
+ MS={mod:m.id, ids:list&&list.length?list:[pid], texte:m.texte, canal:m.canal};
+ renderMsg();
+ document.getElementById('over').classList.add('on');
+ document.getElementById('scrim').classList.add('on');
+}
+function bulkMsg(modId,ids){ if(!ids||!ids.length){toast('Aucun destinataire sur cette liste');return} openMsg(modId,null,ids) }
+function renderMsg(){
+ const n=MS.ids.length, p0=pById(MS.ids[0]);
+ document.getElementById('overh').innerHTML=`
+  <button class="btn g s" onclick="closeAll()">✕</button>
+  <div><h2>${MS.canal} — ${n} destinataire${n>1?'s':''}</h2>
+   <div class="mu" style="font-size:11.5px">${esc(modById(MS.mod).nom)}${MS.canal==='SMS'?` · ${MS.texte.length} caractères · ${Math.ceil(MS.texte.length/160)} SMS chacun`:''}</div></div>
+  <div style="margin-left:auto"><button class="btn s" onclick="closeAll();go('params');paramTab='messages';modSel='${MS.mod}';paint()">⚙ Modifier le modèle</button></div>`;
+ document.getElementById('overb').innerHTML=`
+  <div class="grid g2" style="grid-template-columns:1fr 320px;gap:14px">
+   <div>
+    <div class="fbar">
+     <select class="inp" onchange="MS.mod=this.value;MS.texte=modById(this.value).texte;MS.canal=modById(this.value).canal;renderMsg()">
+       ${MODELES.map(x=>`<option value="${x.id}" ${MS.mod===x.id?'selected':''}>${esc(x.cat)} — ${esc(x.nom)}</option>`).join('')}</select>
+     <select class="inp" onchange="MS.canal=this.value;renderMsg()">${['SMS','E-mail'].map(c=>`<option ${MS.canal===c?'selected':''}>${c}</option>`).join('')}</select>
+    </div>
+    <div class="fld"><label>Message — les variables sont remplacées pour chaque destinataire</label>
+     <div class="vars">${VARS.map(v=>`<button class="varchip" onclick="insMsVar('${v}')">{{${v}}}</button>`).join('')}</div>
+     <textarea class="note" id="mstxt" style="min-height:170px" oninput="MS.texte=this.value;document.getElementById('msprev').innerHTML=esc(fillTpl(this.value,tplCtx(pById(MS.ids[0])))).replace(/\\n/g,'<br>')">${esc(MS.texte)}</textarea></div>
+    <div class="fld"><label>Aperçu pour ${esc(fn(p0))}</label>
+     <div class="msgprev" id="msprev">${esc(fillTpl(MS.texte,tplCtx(p0))).replace(/\n/g,'<br>')}</div></div>
+   </div>
+   <div><div class="fld"><label>Destinataires (${n})</label>
+     <div style="max-height:380px;overflow:auto">
+      ${MS.ids.map(id=>{const p=pById(id);return `<div class="zrow"><div class="pav" style="width:26px;height:26px;font-size:10px">${esc(ini(p))}</div>
+        <div class="zn">${esc(p.nom)} ${esc(p.prenom)}<small>${MS.canal==='SMS'?esc(p.tel):esc(p.mail)}</small></div>
+        <button class="rm" onclick="MS.ids=MS.ids.filter(x=>x!==${id});MS.ids.length?renderMsg():closeAll()">✕</button></div>`}).join('')}
+     </div></div>
+    <div class="tip" style="margin-top:10px"><span class="e">🔒</span><div>Les patients désinscrits des messages sont exclus automatiquement — obligation RGPD.</div></div>
+   </div></div>`;
+ document.getElementById('overf').innerHTML=`
+  <span class="mu" style="font-size:11.5px">Envoi immédiat · trace conservée dans la fiche de chaque patient</span>
+  <div style="margin-left:auto;display:flex;gap:8px">
+   <button class="btn" onclick="closeAll()">Annuler</button>
+   <button class="btn p" onclick="sendMsg()">Envoyer à ${n} destinataire${n>1?'s':''}</button></div>`;
+}
+function insMsVar(v){
+ const e=document.getElementById('mstxt'), a=e.selectionStart||e.value.length;
+ e.value=e.value.slice(0,a)+'{{'+v+'}}'+e.value.slice(e.selectionEnd||a);
+ MS.texte=e.value; e.focus(); e.selectionStart=e.selectionEnd=a+v.length+4;
+ document.getElementById('msprev').innerHTML=esc(fillTpl(e.value,tplCtx(pById(MS.ids[0])))).replace(/\n/g,'<br>');
+}
+function sendMsg(){const n=MS.ids.length;closeAll();toast(n+' message'+(n>1?'s envoyés':' envoyé')+' · '+MS.canal)}
 
 /* ---------------- Équipe ---------------- */
 V.equipe=()=>{
