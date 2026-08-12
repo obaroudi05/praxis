@@ -528,6 +528,15 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .sw.on::after{transform:translateX(16px)}
 .bar{height:5px;border-radius:3px;background:var(--grid);overflow:hidden;min-width:64px}
 .bar i{display:block;height:100%;border-radius:3px}
+.ver{font-size:10px;color:var(--ink-3);text-align:center;padding:4px 0 2px;letter-spacing:.02em;font-variant-numeric:tabular-nums;opacity:.7}
+.majbar{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(24px);z-index:400;
+  display:flex;align-items:center;gap:12px;padding:11px 12px 11px 17px;border-radius:14px;
+  background:var(--ink);color:var(--bg);box-shadow:var(--sh-3);font-size:12.5px;font-weight:540;
+  opacity:0;pointer-events:none;transition:.22s;max-width:min(640px,92vw)}
+.majbar.on{opacity:1;transform:translateX(-50%);pointer-events:auto}
+.majbar .btn{flex:none}
+.majx{width:24px;height:24px;border-radius:7px;border:none;background:transparent;color:var(--bg);opacity:.5;cursor:pointer;flex:none;font-size:12px}
+.majx:hover{opacity:1;background:rgba(255,255,255,.13)}
 .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);
   padding:10px 16px;border-radius:11px;font-size:12.5px;font-weight:560;box-shadow:var(--sh-3);opacity:0;pointer-events:none;transition:.2s;z-index:120}
 .toast.on{opacity:1;transform:translateX(-50%)}
@@ -562,6 +571,7 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
       <a data-v="equipe"><span class="i">◎</span>Équipe &amp; droits</a>
       <a data-v="params"><span class="i">⚙</span>Paramètres</a>
     </nav>
+    <div class="ver" id="ver" title="Version chargée dans ce navigateur"></div>
     <div class="side-foot">
       <div class="av" id="avat">OB</div>
       <div class="who" id="who">Dr O. Baroudi<small>Praticien</small></div>
@@ -570,6 +580,11 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
     </div>
   </aside>
   <main class="main" id="main"></main>
+</div>
+<div class="majbar" id="majbar">
+  <span>Une nouvelle version de PRAXIS est en ligne. Votre navigateur affiche encore l'ancienne.</span>
+  <button class="btn s p" onclick="rechargerDur()">Recharger maintenant</button>
+  <button class="majx" onclick="document.getElementById('majbar').classList.remove('on')" title="Plus tard">✕</button>
 </div>
 
 <div class="scrim" id="scrim" onclick="closeAll()"></div>
@@ -2950,6 +2965,26 @@ function docPane(a){
 }
 
 /* ==========================================================================
+   Version et détection de mise à jour
+   ========================================================================== */
+const BUILD='2026-08-07-J';
+function rechargerDur(){
+ const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
+}
+async function checkMaj(){
+ try{
+  const r=await fetch('index.html?nc='+Date.now(),{cache:'no-store'});
+  if(!r.ok) return;
+  const m=(await r.text()).match(/const BUILD='([^']+)'/);
+  if(m && m[1]!==BUILD) document.getElementById('majbar').classList.add('on');
+ }catch(e){ /* fichier local ou hors ligne : rien à signaler */ }
+}
+function initVersion(){
+ const e=document.getElementById('ver'); if(e) e.textContent='version '+BUILD;
+ if(location.protocol.indexOf('http')===0){ checkMaj(); setInterval(checkMaj,180000) }
+}
+
+/* ==========================================================================
    Command palette / navigation
    ========================================================================== */
 let palIdx=0, palItems=[];
@@ -3070,7 +3105,8 @@ function paint(){
 }
 document.querySelectorAll('#nav a[data-v]').forEach(a=>a.onclick=()=>go(a.dataset.v));
 paint();
+initVersion();
 </script>
-<!-- build 2026-08-07-I protocoles-saisie -->
+<!-- build 2026-08-07-J -->
 </body>
 </html>
