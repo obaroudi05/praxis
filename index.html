@@ -291,6 +291,30 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .dvi-l{font-size:11.5px;color:var(--ink-2);line-height:1.5;display:flex;gap:7px;padding:1px 0}
 .dvi-l b{color:var(--ink);font-weight:600;flex:none;min-width:62px}
 /* journal documentaire d'un acte */
+.addl{border:1px dashed var(--line-2);border-radius:11px;padding:8px 9px;background:var(--panel-2)}
+.addl-t{font-size:10.5px;text-transform:uppercase;letter-spacing:.045em;color:var(--ink-3);font-weight:650;margin-bottom:6px}
+.addl .addz{margin-top:0}
+.addl-p{margin-top:8px;padding-top:7px;border-top:1px solid var(--line);font-size:11px;color:var(--ink-3);
+  display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.chip.xs{font-size:11px;padding:2px 8px}
+.qin{width:52px;height:22px;border:none;background:transparent;text-align:center;font-size:12.3px;font-weight:640;
+  color:var(--ink);outline:none;font-variant-numeric:tabular-nums;-moz-appearance:textfield}
+.qin::-webkit-outer-spin-button,.qin::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.qin:focus{background:var(--panel);border-radius:6px}
+.prot{border:1px solid var(--line);border-radius:11px;background:var(--panel-2);margin-bottom:6px;overflow:hidden;transition:.13s}
+.prot.on{border-color:var(--accent);box-shadow:0 3px 14px rgba(42,120,214,.10)}
+.prot-h{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer}
+.prot-h:hover{background:var(--accent-wash)}
+.prot-h .chev{font-size:15px;color:var(--ink-3);transition:transform .16s}
+.prot.on .prot-h .chev{transform:rotate(90deg);color:var(--accent-ink)}
+.prot .pn{font-size:12.5px;font-weight:640}
+.prot-b{border-top:1px solid var(--line);background:var(--panel);padding:9px 10px 10px}
+.prot-b .zrow{margin-bottom:5px;padding:5px 8px}
+.addz{display:flex;gap:6px;align-items:center;margin-top:8px}
+.addz .inp{height:31px;font-size:12px;min-width:0}
+.addl select.inp{height:31px;font-size:12px;min-width:0}
+.rm{width:22px;height:22px;border-radius:7px;flex:none;color:var(--ink-3);font-size:12px;cursor:pointer;background:transparent;border:none;transition:.12s}
+.rm:hover{background:var(--crit-w);color:var(--crit)}
 .zchr{display:flex;flex-wrap:wrap;gap:4px;margin:7px 0 1px 16px}
 .zc{font-size:10.5px;padding:2px 7px;border-radius:7px;border:1px solid var(--line);background:var(--panel);
   color:var(--ink-3);cursor:pointer;font-variant-numeric:tabular-nums;transition:.12s}
@@ -629,7 +653,7 @@ function infosPatient(z){
 const fmtQ=(q,p)=>p==='tox'?`${q} U`:`${q.toFixed(2).replace(/0$/,'').replace(/\.$/,'')} ml`;
 
 /* protocoles = 1 clic pour une ordonnance complète de zones */
-const PROTOS=[
+let PROTOS=[
  {n:'Haut du visage', z:{front:12, glab:20, patte_d:10, patte_g:10}},
  {n:'Lèvres + menton', z:{levres:1, menton:.5, amert_d:.3, amert_g:.3}},
  {n:'Restructuration', z:{pomm_d:1, pomm_g:1, mand_d:1, mand_g:1, menton:.5}},
@@ -2099,6 +2123,31 @@ V.stats=()=>{
   <div class="card"><div class="h"><h2>Zones les plus traitées</h2><span class="s">inédit vs Gemelia</span></div><div class="b">${hbars(pz,{fmt:NUM})}</div></div></div>`;
 };
 
+/* ---------- protocoles paramétrables ---------- */
+let protoSel=null;
+const protoResume=x=>{
+ const E=Object.entries(x.z).filter(([,q])=>q>0);
+ if(!E.length) return 'aucune zone';
+ const tox=E.filter(([z])=>zoneById(z)?.p==='tox').reduce((s,[,q])=>s+q,0);
+ const ah =E.filter(([z])=>zoneById(z)?.p==='ah').reduce((s,[,q])=>s+q,0);
+ return `${E.length} zone${E.length>1?'s':''} · `+[tox?`${tox} U`:'',ah?`${+ah.toFixed(2)} ml`:''].filter(Boolean).join(' + ');
+};
+function zoneOptions(exclues){
+ const dispo=ZONES.filter(z=>!exclues.includes(z.id));
+ if(!dispo.length) return '<option value="">toutes les zones sont déjà dans ce protocole</option>';
+ return ['tox','ah'].map(p=>{const L=dispo.filter(z=>z.p===p); if(!L.length) return '';
+  return `<optgroup label="${PLABEL[p]}">${L.map(z=>`<option value="${z.id}">${esc(z.k)} · ${fmtQ(z.d,p)}</option>`).join('')}</optgroup>`}).join('');
+}
+function setProtoZone(i,z,q){ if(q>0) PROTOS[i].z[z]=q; else delete PROTOS[i].z[z]; paint() }
+function addProtoZone(i){
+ const e=document.getElementById('pz'+i); if(!e||!e.value){toast('Aucune zone disponible');return}
+ const z=zoneById(e.value); PROTOS[i].z[e.value]=z.d; paint(); toast(z.k+' ajoutée au protocole');
+}
+function rmProto(i){
+ if(PROTOS.length<2){toast('Gardez au moins un protocole');return}
+ const n=PROTOS[i].n; PROTOS.splice(i,1); protoSel=null; paint(); toast(`Protocole « ${n} » supprimé`);
+}
+
 /* ---------------- Paramètres (back-office) ---------------- */
 let paramTab='fidelite', modSel='anniv-sms', docSel='d1';
 V.params=()=>{
@@ -2147,7 +2196,8 @@ V.params=()=>{
    const vol=id=>ACTES.filter(a=>a.type===id).length;
    const ca=id=>FACTURES.filter(f=>f.type===id&&f.statut==='ok').reduce((s,f)=>s+fTTC(f),0);
    return `<div class="tip"><span class="e">💶</span><div>Le tarif des injections est calculé à l'unité — par unité de toxine et par millilitre d'acide hyaluronique — ce qui fait que le montant d'un acte suit automatiquement les quantités posées sur le schéma. Les autres actes sont au forfait.</div></div>
-   <div class="grid g2" style="grid-template-columns:340px 1fr;align-items:start">
+   <div class="grid g2" style="grid-template-columns:360px 1fr;align-items:start">
+    <div>
     <div class="card"><div class="h"><h2>Tarifs des injectables</h2><span class="s">à l’unité</span></div><div class="b">
       <div class="zrow"><span class="zd" style="background:var(--toxine)"></span>
         <div class="zn">Toxine botulique<small>prix par unité (U)</small></div>
@@ -2165,6 +2215,36 @@ V.params=()=>{
         <div><span>Exemple : pommettes (2 ml)</span><b>${EUR(Math.round(2*PU.ah/5)*5)}</b></div>
       </div>
     </div></div>
+
+    <div class="card" style="margin-top:13px"><div class="h"><h2>Protocoles en 1 clic</h2><span class="s">${PROTOS.length}</span>
+      <div class="r"><button class="btn xs p" onclick="PROTOS.push({n:'Nouveau protocole',z:{}});protoSel=PROTOS.length-1;paint()">+ Protocole</button></div></div>
+     <div class="b" style="padding:9px">
+      <div class="mu" style="font-size:11.5px;margin-bottom:9px">Un protocole pose d'un seul clic un ensemble de zones et de doses sur le schéma d'acte. Les doses restent modifiables acte par acte.</div>
+      ${PROTOS.map((x,i)=>`<div class="prot ${protoSel===i?'on':''}">
+        <div class="prot-h" onclick="protoSel=protoSel===${i}?null:${i};paint()">
+          <span class="chev">›</span>
+          <div style="flex:1;min-width:0"><div class="pn">${esc(x.n)}</div>
+            <div class="mu" style="font-size:11px">${protoResume(x)}</div></div>
+          <button class="rm" onclick="event.stopPropagation();rmProto(${i})">✕</button>
+        </div>
+        ${protoSel===i?`<div class="prot-b">
+          <div class="fld"><label>Nom du protocole</label>
+            <input class="inp" style="width:100%" value="${esc(x.n)}" onchange="PROTOS[${i}].n=this.value;paint()"></div>
+          ${Object.entries(x.z).length?Object.entries(x.z).map(([z,q])=>{const Z=zoneById(z); if(!Z) return '';
+            return `<div class="zrow"><span class="zd" style="background:var(--${Z.p==='tox'?'toxine':'ah'})"></span>
+             <div class="zn">${esc(Z.k)}<small>${PLABEL[Z.p]}</small></div>
+             <input class="inp" style="width:72px;text-align:right" type="number" min="0" step="${Z.p==='tox'?1:0.1}" value="${q}"
+               onchange="setProtoZone(${i},'${z}',+this.value)">
+             <span class="mu" style="font-size:11px;width:16px">${Z.p==='tox'?'U':'ml'}</span>
+             <button class="rm" onclick="setProtoZone(${i},'${z}',0)">✕</button></div>`}).join('')
+            :'<div class="empty" style="padding:14px">Aucune zone dans ce protocole.</div>'}
+          <div class="addz">
+            <select class="inp" id="pz${i}" style="flex:1">${zoneOptions(Object.keys(x.z))}</select>
+            <button class="btn xs p" onclick="addProtoZone(${i})">+ Ajouter</button>
+          </div></div>`:''}
+       </div>`).join('')}
+     </div></div>
+    </div>
     <div class="card"><div class="h"><h2>Catalogue des actes</h2><span class="s">${CATALOGUE.length} actes</span>
       <div class="r"><button class="btn xs p" onclick="CATALOGUE.push({id:'X'+Date.now(),n:'Nouvel acte',cat:'Injections',conso:null,cons:false,zoned:false,prix:0});paint()">+ Acte</button></div></div>
      <div class="tw"><table>
@@ -2548,15 +2628,30 @@ function renderOver(){
     ${ROLES[role].prix?`<div class="zrow" style="background:var(--accent-wash);border-color:transparent">
       <div class="zn" style="font-weight:640">Montant calculé<small>4,50 €/U · 350 €/ml</small></div>
       <b style="font-size:17px;letter-spacing:-.03em">${EUR(prix)}</b></div>`:''}
-    <div style="max-height:340px;overflow:auto;margin:8px 0">
+    <div style="max-height:300px;overflow:auto;margin:8px 0">
      ${ent.length?ent.map(([z,q])=>{const Z=zoneById(z);
        return `<div class="zrow"><span class="zd" style="background:var(--${Z.p==='tox'?'toxine':'ah'})"></span>
         <div class="zn">${esc(Z.k)}<small>${PLABEL[Z.p]}</small></div>
         ${AS.ro?`<b class="mono">${fmtQ(q,Z.p)}</b>`:`<div class="step">
-          <button onclick="bump('${z}',-1)">−</button><span>${fmtQ(q,Z.p)}</span><button onclick="bump('${z}',1)">+</button></div>
+          <button onclick="bump('${z}',-1)">−</button>
+          <input class="qin" type="number" min="0" step="${Z.p==='tox'?1:0.1}" value="${q}"
+            onchange="setZ('${z}',+this.value)" onclick="event.stopPropagation()">
+          <button onclick="bump('${z}',1)">+</button></div>
+         <span class="mu" style="font-size:11px;width:15px">${Z.p==='tox'?'U':'ml'}</span>
          <button class="rm" onclick="delZ('${z}')">✕</button>`}</div>`}).join('')
-      :'<div class="empty" style="padding:28px">Cliquez sur une zone du visage.</div>'}
+      :'<div class="empty" style="padding:22px">Aucune zone. Cliquez sur le visage <b>ou</b> ajoutez une ligne ci-dessous.</div>'}
     </div>
+    ${AS.ro?'':`<div class="addl">
+      <div class="addl-t">Ajouter une ligne sans passer par le schéma</div>
+      <select class="inp" id="mzone" style="width:100%;margin-bottom:6px" onchange="syncDose()">${zoneOptions(Object.keys(AS.z).filter(k=>AS.z[k]>0))}</select>
+      <div class="addz">
+        <input class="inp" id="mqte" type="number" min="0" step="0.1" style="width:82px;text-align:right" value="${doseDef()}">
+        <span class="mu" style="font-size:11.5px;flex:1" id="munit">${uniteDef()}</span>
+        <button class="btn xs p" onclick="addLigne()">+ Ajouter la ligne</button>
+      </div>
+      ${PROTOS.length?`<div class="addl-p">Protocole :
+        ${PROTOS.map((x,i)=>`<button class="chip xs" onclick="applyProto(${i})" title="${esc(protoResume(x))}">${esc(x.n)}</button>`).join('')}</div>`:''}
+     </div>`}
     <div class="fld" style="margin-top:10px"><label>Effets secondaires observés</label>
      <input class="inp" style="width:100%" value="${esc(AS.effets||'')}" ${AS.ro?'disabled':''} oninput="AS.effets=this.value" placeholder="aucun"></div>
    </div>
@@ -2665,6 +2760,24 @@ function zClick(ev,id,dir){
 function bump(id,d){const z=zoneById(id);const nv=+((AS.z[id]||0)+d*z.s).toFixed(2);
  if(nv<=0)delete AS.z[id];else AS.z[id]=nv;renderOver()}
 function delZ(id){delete AS.z[id];renderOver()}
+/* --- saisie manuelle d'une ligne de traitement, sans cliquer sur le visage --- */
+const zonesLibres=()=>ZONES.filter(z=>!(AS.z[z.id]>0));
+function doseDef(){const L=zonesLibres();return L.length?L[0].d:0}
+function uniteDef(){const L=zonesLibres();return L.length?(L[0].p==='tox'?'U':'ml'):''}
+function syncDose(){
+ const e=document.getElementById('mzone'), z=zoneById(e.value); if(!z) return;
+ document.getElementById('mqte').value=z.d;
+ document.getElementById('mqte').step=z.p==='tox'?1:0.1;
+ document.getElementById('munit').textContent=z.p==='tox'?'U':'ml';
+}
+function addLigne(){
+ const e=document.getElementById('mzone'); if(!e||!e.value){toast('Toutes les zones sont déjà saisies');return}
+ const q=+document.getElementById('mqte').value;
+ if(!(q>0)){toast('Indiquez une quantité supérieure à zéro');return}
+ const z=zoneById(e.value); AS.z[e.value]=q; renderOver();
+ toast(`${z.k} — ${fmtQ(q,z.p)} ajouté`);
+}
+function setZ(id,q){ if(q>0) AS.z[id]=Math.round(q*100)/100; else delete AS.z[id]; renderOver() }
 function applyProto(i){Object.entries(PROTOS[i].z).forEach(([k,v])=>AS.z[k]=v);renderOver();toast('Protocole « '+PROTOS[i].n+' » appliqué')}
 function mirrorZ(){
  Object.keys({...AS.z}).forEach(k=>{
@@ -2958,6 +3071,6 @@ function paint(){
 document.querySelectorAll('#nav a[data-v]').forEach(a=>a.onclick=()=>go(a.dataset.v));
 paint();
 </script>
-<!-- build 2026-08-07-H schema-cumul-dates -->
+<!-- build 2026-08-07-I protocoles-saisie -->
 </body>
 </html>
