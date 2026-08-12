@@ -290,6 +290,39 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .dvi-t{font-size:12px;font-weight:660;display:flex;align-items:center;gap:6px;margin-bottom:5px}
 .dvi-l{font-size:11.5px;color:var(--ink-2);line-height:1.5;display:flex;gap:7px;padding:1px 0}
 .dvi-l b{color:var(--ink);font-weight:600;flex:none;min-width:62px}
+/* journal documentaire d'un acte */
+.dpane{display:flex;flex-direction:column;gap:7px}
+.dpane-h{display:flex;align-items:flex-start;gap:8px;padding-bottom:2px}
+.dpane-h h3{font-size:13px;font-weight:700;letter-spacing:-.01em;line-height:1.3}
+.dpane-h .r{margin-left:auto;display:flex;gap:6px;flex:none}
+.drow{border:1px solid var(--line);border-radius:12px;background:var(--panel-2);overflow:hidden;transition:.13s}
+.drow.on{border-color:var(--accent);box-shadow:0 3px 14px rgba(42,120,214,.11)}
+.drow-h{display:flex;align-items:center;gap:9px;padding:8px 10px;cursor:pointer}
+.drow-h:hover{background:var(--accent-wash)}
+.dic{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:13px;flex:none;
+  background:var(--panel-3);color:var(--ink-2)}
+.dic.k-consentement{background:var(--accent-wash);color:var(--accent-ink)}
+.dic.k-devis{background:#eef3fd;color:#1c5cab}
+.dic.k-facture{background:var(--good-w);color:var(--good)}
+.dic.k-ordonnance{background:#f4eefb;color:#5b3a9e}
+.drow .dn{font-size:12.5px;font-weight:620;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drow .dm{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.drow .dch{color:var(--ink-3);font-size:13px;flex:none}
+.drow-a{display:flex;gap:6px;padding:0 10px 9px 45px}
+.dhist{border-top:1px solid var(--line);background:var(--panel);padding:7px 10px 8px 45px}
+.dh{font-size:11.5px;padding:3px 0 5px;position:relative}
+.dh+.dh{border-top:1px solid var(--line)}
+.dh::before{content:'';position:absolute;left:-13px;top:9px;width:6px;height:6px;border-radius:50%;background:var(--line-2)}
+.dh:last-child::before{background:var(--accent)}
+.dh .dt{color:var(--ink-3);font-variant-numeric:tabular-nums;font-size:10.5px}
+.dh .dp{color:var(--ink-3)}
+.dh .de{color:var(--ink-2);line-height:1.45}
+.dmod{border:1px dashed var(--accent);border-radius:12px;background:var(--accent-wash);padding:8px 9px;margin-bottom:2px}
+.dmod-c{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);font-weight:700;margin:6px 0 3px}
+.dmod-c:first-child{margin-top:0}
+.dmod-b{display:block;width:100%;text-align:left;font-size:12px;padding:5px 8px;border-radius:8px;
+  background:var(--panel);border:1px solid var(--line);margin-bottom:3px;cursor:pointer;color:var(--ink);transition:.12s}
+.dmod-b:hover{border-color:var(--accent);color:var(--accent-ink)}
 .kpic{cursor:pointer;border-radius:16px;transition:.14s}
 .kpic:hover{transform:translateY(-1px)}
 .kpic:hover .kpi{border-color:var(--accent);box-shadow:0 4px 16px rgba(42,120,214,.13)}
@@ -362,6 +395,7 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 /* ============ FACE MAP ============ */
 .facewrap{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px}
 .facewrap.d3{grid-template-columns:minmax(0,1fr) 280px 330px}
+.facewrap.d3.ro{grid-template-columns:minmax(0,1fr) 250px 386px}
 @media(max-width:1250px){.facewrap.d3{grid-template-columns:minmax(0,1fr) 320px}.facewrap.d3>:last-child{grid-column:1/-1}}
 @media(max-width:900px){.facewrap,.facewrap.d3{grid-template-columns:1fr}}
 .facebox{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r-m);padding:8px;position:relative}
@@ -736,6 +770,13 @@ const DEVIS=[
  {id:'D-2607-021',patient:1042,date:'2026-07-30',montant:340, statut:'brouillon',envoye:null,relances:0,derniere:null,lignes:[['MESO','Mésothérapie',1,180],['PEEL','Peeling',1,160]]},
  {id:'D-2604-007',patient:1048,date:'2026-04-15',montant:390, statut:'refuse',  envoye:'2026-04-15',relances:2,derniere:'2026-05-06',lignes:[['BTX','Haut du visage',1,390]]},
 ];
+/* rattachement d'un devis à l'acte de la consultation où il a été établi
+   (l'acte le plus proche en date chez le même patient, à 10 jours près) */
+DEVIS.forEach(d=>{
+ const A=ACTES.filter(x=>x.patient===d.patient)
+   .map(x=>({x,dd:Math.abs(days(x.date,d.date))})).filter(o=>o.dd<=10).sort((p,q)=>p.dd-q.dd);
+ if(A.length) d.acte=A[0].x.id;
+});
 const SD={brouillon:['Brouillon','b-neu'],envoye:['Envoyé','b-info'],relance1:['Relancé ×1','b-warn'],
  relance2:['Relancé ×2','b-warn'],accepte:['Accepté','b-good'],refuse:['Refusé','b-crit'],expire:['Expiré','b-crit']};
 
@@ -2428,7 +2469,7 @@ function renderOver(){
     <select class="inp" onchange="AS.prat=this.value">${PRATICIENS.map(x=>`<option ${AS.prat===x?'selected':''}>${x}</option>`).join('')}</select>
     <select class="inp" onchange="AS.oper=this.value"><option value="">Sans opérateur</option>${OPERATEURS.map(x=>`<option ${AS.oper===x?'selected':''}>${x}</option>`).join('')}</select>
    </div>`}
-  <div class="facewrap ${AS.ro||!ent.length?'':'d3'}">
+  <div class="facewrap ${AS.ro?'d3 ro':(ent.length?'d3':'')}">
    <div>
     ${AS.ro?'':`<div class="preset">
       <span class="mu" style="font-size:11.5px;align-self:center;margin-right:2px">Protocole en 1 clic :</span>
@@ -2466,12 +2507,15 @@ function renderOver(){
     <div class="fld" style="margin-top:10px"><label>Effets secondaires observés</label>
      <input class="inp" style="width:100%" value="${esc(AS.effets||'')}" ${AS.ro?'disabled':''} oninput="AS.effets=this.value" placeholder="aucun"></div>
    </div>
-   ${AS.ro||!ent.length?'':devisPane(ent,tox,ah,prix)}
+   ${AS.ro?docPane(ACTES.find(x=>x.id===AS.aid)):(ent.length?devisPane(ent,tox,ah,prix):'')}
   </div>`;
 
  document.getElementById('overf').innerHTML=AS.ro?
-  `<div class="mu" style="font-size:12px">Acte clôturé et signé · toute modification serait tracée</div>
-   <div style="margin-left:auto"><button class="btn" onclick="closeAll()">Fermer</button></div>`
+  `<div class="mu" style="font-size:12px">Acte clôturé · chaque envoi est horodaté et tracé</div>
+   <div style="margin-left:auto;display:flex;gap:8px">
+    ${(()=>{const ac=ACTES.find(x=>x.id===AS.aid);const n=ac?docsActe(ac).filter(d=>d.env).length:0;
+      return n?`<button class="btn p" onclick="sendAllDocs(${AS.aid})">✉ Envoyer les ${n} document${n>1?'s':''} en attente</button>`:''})()}
+    <button class="btn" onclick="closeAll()">Fermer</button></div>`
   :`<label style="display:flex;gap:7px;align-items:center;font-size:12.5px;cursor:pointer">
      <input type="checkbox" ${AS.consent?'checked':''} onchange="AS.consent=this.checked"> Consentement éclairé signé</label>
    <span class="mu" style="font-size:11.5px">acte : le stock se décrémente · devis : rien n'est consommé</span>
@@ -2548,7 +2592,8 @@ function saveDevis(){
  const rem=AS.remiseType==='%'?Math.round(brut*(AS.remise||0)/100):(AS.remise||0);
  const net=Math.max(0,brut-rem);
  const num='D-'+String(TODAYS.slice(2,4))+String(TODAYS.slice(5,7))+'-'+String(DEVIS.length+22).padStart(3,'0');
- DEVIS.unshift({id:num,patient:AS.pid,date:TODAYS,montant:net,statut:'brouillon',
+ const acteJour=ACTES.find(x=>x.patient===AS.pid&&x.date===TODAYS);
+ DEVIS.unshift({id:num,patient:AS.pid,date:TODAYS,montant:net,statut:'brouillon',acte:acteJour?acteJour.id:null,
    envoye:null,relances:0,derniere:null,lignes,
    zones:{...AS.z},seances:st,remise:rem,validite:AS.validite,
    infos:AS.infosOn?infosPatient(AS.z):null,note:AS.notePat||''});
@@ -2592,10 +2637,150 @@ function saveActe(){
   date:AS.date,praticien:AS.prat,operateur:AS.oper||null,lot:type==='AH'?'L-AH2409':'L-BX2601',
   conso:type==='AH'?'AH-VOLB':'BTX-100',zones:{...AS.z},consent:AS.consent,effets:AS.effets||'',
   prix:Math.round((tox*PU.tox+ah*PU.ah)/5)*5});
+ DEVIS.filter(d=>!d.acte&&d.patient===AS.pid&&d.date===AS.date).forEach(d=>{d.acte=ACTES[0].id});
  if(tox){const s=STOCK.find(x=>x.ref==='BTX-100');s.q=Math.max(0,s.q-Math.ceil(tox/100))}
  if(ah){const s=STOCK.find(x=>x.ref==='AH-VOLB');s.q=Math.max(0,s.q-Math.ceil(ah))}
  closeAll(); pSel=AS.pid; pTab='resume'; go('patients');
  toast('Acte enregistré · stock mis à jour · consentement '+(AS.consent?'signé':'à faire signer'));
+}
+
+/* ==========================================================================
+   Journal documentaire d'un acte — statuts et horodatage
+   ========================================================================== */
+/* Un document n'a pas d'existence propre : il est dérivé de l'objet métier qui
+   le porte (l'acte pour un consentement, le devis, l'ordonnance, la facture).
+   On ne duplique donc aucun statut — on ne stocke ici que l'historique. */
+let DOCH={};                     /* id document → [{t, ev, par}] */
+const DOCADD=[];                 /* documents produits depuis un modèle */
+const hsh=x=>{let h=0;for(const c of String(x))h=(h*31+c.charCodeAt(0))>>>0;return h};
+const hStamp=(d,id,off)=>{const k=hsh(id)+(off||0)*37;return `${d}T${String(9+k%9).padStart(2,'0')}:${String(k%60).padStart(2,'0')}`};
+function nowStamp(){const n=new Date();return `${TODAYS}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`}
+const DTS=t=>t?`${DF(t.slice(0,10))} à ${t.slice(11,16)}`:'—';
+function logDoc(id,ev,par){(DOCH[id]=DOCH[id]||[]).push({t:nowStamp(),ev,par:par||ROLES[role].u})}
+function histo(id,seed){return (DOCH[id]||[]).length?DOCH[id]:seed}
+
+/* --- documents rattachés à un acte, avec leur statut réel --- */
+const DST={
+ attente:['⏳ À faire signer','b-warn'], lien:['✉ Lien envoyé','b-info'], signe:['✓ Signé','b-good'],
+ editee:['Éditée','b-neu'],  envoye:['✉ Envoyé','b-info'], lu:['👁 Lu','b-info'],
+ brouillon:['Brouillon','b-neu'], accepte:['✓ Accepté','b-good'], refuse:['✕ Refusé','b-crit'],
+ expire:['Expiré','b-crit'], relance1:['Relancé ×1','b-warn'], relance2:['Relancé ×2','b-warn'],
+ emise:['Émise','b-neu'], soldee:['✓ Soldée','b-good'], partielle:['Partielle','b-warn'], annulee:['⊘ Annulée','b-crit'],
+};
+function docsActe(a){
+ const out=[], p=pById(a.patient), c=catById(a.type);
+ if(c&&c.cons){
+  const id='CONS-'+a.id;
+  const st=a.consent?'signe':(DOCH[id]||[]).some(h=>/Lien/.test(h.ev))?'lien':'attente';
+  out.push({id, k:'consentement', ic:'✎', nom:'Consentement — '+a.nom, st, ts:hStamp(a.date,id),
+    seed:[{t:hStamp(a.date,id),ev:'Généré depuis le modèle',par:a.praticien}].concat(
+      a.consent?[{t:hStamp(a.date,id,1),ev:'Signé électroniquement par le patient',par:fn(p)}]:[]),
+    env:!a.consent, sign:!a.consent});
+ }
+ ORDONNANCES.filter(o=>o.acte===a.id).forEach(o=>{
+  const st=(DOCH[o.id]||[]).some(h=>/Envoy/.test(h.ev))?'envoye':'editee';
+  out.push({id:o.id, k:'ordonnance', ic:'℞', nom:`Ordonnance — ${o.lignes.length} ligne${o.lignes.length>1?'s':''}`,
+    sous:o.lignes[0].split(' —')[0], st, ts:hStamp(o.date,o.id),
+    seed:[{t:hStamp(o.date,o.id),ev:'Éditée et remise en consultation',par:o.praticien}], env:st!=='envoye'});
+ });
+ DEVIS.filter(d=>d.acte===a.id).forEach(d=>{
+  out.push({id:d.id, k:'devis', ic:'◫', nom:'Devis '+d.id, sous:`${d.lignes.length} prestation${d.lignes.length>1?'s':''}${CAN('prix')?' · '+EUR(d.montant):''}`,
+    st:d.statut, ts:hStamp(d.date,d.id),
+    seed:[{t:hStamp(d.date,d.id),ev:'Établi depuis le schéma d’acte',par:a.praticien}].concat(
+      d.envoye?[{t:hStamp(d.envoye,d.id,1),ev:'Envoyé au patient',par:a.praticien}]:[]).concat(
+      d.derniere?[{t:hStamp(d.derniere,d.id,2),ev:`Relance ${d.relances} envoyée`,par:'Automatique'}]:[]),
+    env:d.statut==='brouillon', go:()=>0});
+ });
+ FACTURES.filter(f=>f.acte===a.id).forEach(f=>{
+  const st=f.statut==='annulee'?'annulee':rdu(f)>0?(f.paye?'partielle':'emise'):'soldee';
+  out.push({id:f.id, k:'facture', ic:'€', nom:'Facture '+f.id, sous:CAN('prix')?`${EUR(fTTC(f))}${f.paye?' · encaissé '+EUR(f.paye):''}`:'',
+    st, ts:hStamp(f.date,f.id),
+    seed:[{t:hStamp(f.date,f.id),ev:'Émise',par:f.praticien}].concat(
+      f.paye?[{t:hStamp(f.date,f.id,1),ev:`Encaissée${f.moyen?' — '+f.moyen:''}`,par:'Secrétariat'}]:[]),
+    env:(DOCH[f.id]||[]).every(h=>!/Envoy/.test(h.ev))});
+ });
+ DOCADD.filter(d=>d.acte===a.id).forEach(d=>{
+  const st=d.signe?'signe':d.envoye?'envoye':'brouillon';
+  out.push({id:d.id, k:d.cat.toLowerCase(), ic:d.cat==='Ordonnance'?'℞':d.cat==='Consentement'?'✎':'ⓘ',
+    nom:d.nom, sous:d.cat, st, ts:d.ts, seed:[{t:d.ts,ev:'Généré depuis le modèle',par:d.par}],
+    env:!d.envoye, sign:d.cat==='Consentement'&&!d.signe});
+ });
+ return out.sort((x,y)=>x.ts.localeCompare(y.ts));
+}
+const canalPat=p=>p&&p.mail&&p.mail!=='—'?'e-mail':'SMS';
+
+/* --- actions : un clic --- */
+function sendDoc(aid,id){
+ const a=ACTES.find(x=>x.id===aid), p=pById(a.patient), ca=canalPat(p);
+ const d=docsActe(a).find(x=>x.id===id); if(!d) return;
+ if(d.k==='consentement'){ logDoc(id,`Lien de signature envoyé par ${ca}`); toast(`Lien de signature envoyé par ${ca} à ${fn(p)}`) }
+ else if(d.k==='devis'){ const dv=DEVIS.find(x=>x.id===id); if(dv&&dv.statut==='brouillon'){dv.statut='envoye';dv.envoye=TODAYS}
+   logDoc(id,`Devis envoyé par ${ca}`); toast(`Devis ${id} envoyé par ${ca}`) }
+ else { const ad=DOCADD.find(x=>x.id===id); if(ad) ad.envoye=nowStamp();
+   logDoc(id,`Envoyé par ${ca}`); toast(`${d.nom} envoyé par ${ca}`) }
+ renderOver();
+}
+function signDoc(aid,id){
+ const a=ACTES.find(x=>x.id===aid), p=pById(a.patient);
+ if(id==='CONS-'+aid){ a.consent=true; if(AS&&AS.aid===aid) AS.consent=true }
+ const ad=DOCADD.find(x=>x.id===id); if(ad) ad.signe=nowStamp();
+ logDoc(id,'Signé électroniquement par le patient',fn(p));
+ toast('Consentement signé et horodaté'); renderOver(); 
+}
+function sendAllDocs(aid){
+ const a=ACTES.find(x=>x.id===aid), L=docsActe(a).filter(d=>d.env);
+ if(!L.length){toast('Tous les documents ont déjà été envoyés');return}
+ L.forEach(d=>sendDoc(aid,d.id));
+ toast(`${L.length} document${L.length>1?'s':''} envoyé${L.length>1?'s':''} à ${fn(pById(a.patient))}`);
+}
+function addDocActe(aid,mid){
+ const a=ACTES.find(x=>x.id===aid), m=DOCMOD.find(x=>x.id===mid); if(!m) return;
+ const id=m.cat.slice(0,3).toUpperCase()+'-'+(9000+DOCADD.length+1);
+ DOCADD.push({id, acte:aid, patient:a.patient, cat:m.cat, nom:m.nom, corps:fillTpl(m.corps,tplCtx(pById(a.patient))),
+   ts:nowStamp(), par:ROLES[role].u, envoye:null, signe:null});
+ logDoc(id,'Généré depuis le modèle « '+m.nom+' »');
+ docAdd=false; toast(m.cat+' « '+m.nom+' » générée'); renderOver();
+}
+let docAdd=false, docOpen=null;
+function toggleDocAdd(){docAdd=!docAdd;renderOver()}
+function toggleDocHist(id){docOpen=docOpen===id?null:id;renderOver()}
+
+function docPane(a){
+ const L=docsActe(a), p=pById(a.patient), ca=canalPat(p);
+ const nEnv=L.filter(d=>d.env).length;
+ return `<div class="dpane">
+  <div class="dpane-h">
+   <div style="min-width:0"><h3>Documents</h3>
+     <div class="mu" style="font-size:11px">${L.length} pièce${L.length>1?'s':''} · envoi par ${ca}</div></div>
+   <div class="r">
+    <button class="btn xs" onclick="toggleDocAdd()">${docAdd?'✕':'+ Doc.'}</button>
+    ${nEnv?`<button class="btn xs p" onclick="sendAllDocs(${a.id})">✉ Tout envoyer · ${nEnv}</button>`:''}</div></div>
+  ${docAdd?`<div class="dmod">${['Ordonnance','Consentement','Information','Devis'].map(c=>{
+     const M=DOCMOD.filter(x=>x.cat===c); if(!M.length) return '';
+     return `<div class="dmod-c">${c}</div>`+M.map(m=>`<button class="dmod-b" onclick="addDocActe(${a.id},'${m.id}')">${esc(m.nom)}</button>`).join('')}).join('')}
+    <div class="mu" style="font-size:11px;padding:6px 2px 2px">Modèles réglés dans <a onclick="closeAll();go('params');paramTab='documents';paint()">Paramètres → Modèles de document</a>.</div></div>`:''}
+  ${L.length?L.map(d=>{const H=histo(d.id,d.seed||[]);
+   return `<div class="drow ${docOpen===d.id?'on':''}">
+    <div class="drow-h" onclick="toggleDocHist('${d.id}')">
+      <span class="dic k-${d.k}">${d.ic}</span>
+      <div style="min-width:0;flex:1">
+        <div class="dn">${esc(d.nom)}</div>
+        <div class="dm">${d.sous?esc(d.sous)+' · ':''}${DTS(H[H.length-1]?.t||d.ts)}</div></div>
+      <span class="bdg ${(DST[d.st]||['—','b-neu'])[1]}">${(DST[d.st]||[d.st])[0]}</span>
+      <span class="dch">${docOpen===d.id?'▾':'›'}</span>
+    </div>
+    <div class="drow-a">
+      ${d.env?`<button class="btn xs p" onclick="sendDoc(${a.id},'${d.id}')" title="Envoi par ${ca} à ${esc(p.mail!=='—'?p.mail:p.tel)}">✉ Envoyer</button>`:''}
+      ${d.sign?`<button class="btn xs" onclick="signDoc(${a.id},'${d.id}')">✓ Marquer signé</button>`:''}
+      <button class="btn xs" onclick="toast('PDF de ${d.id} ouvert')">PDF</button>
+      ${d.k==='devis'?`<button class="btn xs" onclick="closeAll();go('devis','${d.id}')">Ouvrir</button>`:''}
+    </div>
+    ${docOpen===d.id?`<div class="dhist">${H.map(h=>`<div class="dh">
+      <div class="dt">${DTS(h.t)} <span class="dp">· ${esc(h.par)}</span></div>
+      <div class="de">${esc(h.ev)}</div></div>`).join('')}</div>`:''}
+   </div>`}).join('')
+  :`<div class="empty" style="padding:22px">Aucun document pour cet acte.<br><span class="mu" style="font-size:11.5px">Utilisez « + Document » pour en générer un depuis vos modèles.</span></div>`}
+ </div>`;
 }
 
 /* ==========================================================================
@@ -2720,6 +2905,6 @@ function paint(){
 document.querySelectorAll('#nav a[data-v]').forEach(a=>a.onclick=()=>go(a.dataset.v));
 paint();
 </script>
-<!-- build 2026-08-07-E hero-repliable -->
+<!-- build 2026-08-07-F docs-acte -->
 </body>
 </html>
