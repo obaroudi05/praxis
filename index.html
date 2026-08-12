@@ -291,6 +291,11 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .dvi-l{font-size:11.5px;color:var(--ink-2);line-height:1.5;display:flex;gap:7px;padding:1px 0}
 .dvi-l b{color:var(--ink);font-weight:600;flex:none;min-width:62px}
 /* journal documentaire d'un acte */
+.zchr{display:flex;flex-wrap:wrap;gap:4px;margin:7px 0 1px 16px}
+.zc{font-size:10.5px;padding:2px 7px;border-radius:7px;border:1px solid var(--line);background:var(--panel);
+  color:var(--ink-3);cursor:pointer;font-variant-numeric:tabular-nums;transition:.12s}
+.zc b{color:var(--ink-2);font-weight:650}
+.zc:hover{border-color:var(--accent);color:var(--accent-ink)}
 .dpane{display:flex;flex-direction:column;gap:7px}
 .dpane-h{display:flex;align-items:flex-start;gap:8px;padding-bottom:2px}
 .dpane-h h3{font-size:13px;font-weight:700;letter-spacing:-.01em;line-height:1.3}
@@ -413,8 +418,20 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .neck{fill:var(--ink);fill-opacity:.028;stroke:var(--ink);stroke-opacity:.20;stroke-width:1.6;pointer-events:none}
 .zlabel{font:700 11px var(--sans);fill:#fff;text-anchor:middle;pointer-events:none;paint-order:stroke;
   stroke:rgba(0,0,0,.28);stroke-width:2.4px}
+/* injections antérieures : contour discret + date en tout petit */
+.zone.ant{stroke-dasharray:none;stroke-width:1.2}
+.zone.ant-tox{fill:var(--toxine);fill-opacity:.09;stroke:var(--toxine);stroke-opacity:.42}
+.zone.ant-ah{fill:var(--ah);fill-opacity:.09;stroke:var(--ah);stroke-opacity:.42}
+.zone.ro.ant{fill-opacity:.09}
+.zdate{font:600 7.2px var(--sans);text-anchor:middle;pointer-events:none;paint-order:stroke;
+  stroke:var(--panel-2);stroke-width:2px;letter-spacing:.01em}
+.zdate.t{fill:var(--toxine)} .zdate.a{fill:var(--ah)}
+.zlead{stroke-width:1;stroke-opacity:.5;stroke-dasharray:2 2;pointer-events:none}
+.zlead.t{stroke:var(--toxine)} .zlead.a{stroke:var(--ah)}
+.zdate:not(.seul){fill:#fff;stroke:rgba(0,0,0,.3)}
 .face-legend{display:flex;gap:14px;align-items:center;justify-content:center;padding:8px 0 2px;font-size:12px;color:var(--ink-2)}
 .face-legend i{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:-1px}
+.face-legend i.ant{background:linear-gradient(135deg,var(--toxine),var(--ah));opacity:.32;border:1px solid var(--line-2)}
 .zrow{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:10px;background:var(--panel-2);
   border:1px solid var(--line);margin-bottom:6px}
 .zrow .zd{width:8px;height:8px;border-radius:3px;flex:none}
@@ -749,6 +766,15 @@ let ACTES=[];
  }
 })();
 const zonesOf=a=>a.zones?Object.entries(a.zones):[];
+/* historique d'injection par zone anatomique, du plus récent au plus ancien */
+function zoneHist(pid,exclure){
+ const h={};
+ ACTES.filter(a=>a.patient===pid&&a.id!==exclure).forEach(a=>
+   zonesOf(a).filter(([,q])=>q>0).forEach(([z,q])=>{(h[z]=h[z]||[]).push({d:a.date,q,aid:a.id})}));
+ Object.values(h).forEach(L=>L.sort((x,y)=>y.d.localeCompare(x.d)));
+ return h;
+}
+const DFT=d=>new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'2-digit'});
 const zoneSummary=a=>{
   if(!a.zones) return '—';
   const e=zonesOf(a);
@@ -1116,7 +1142,7 @@ function miniFace(zones){
 }
 
 /* ---- Schéma de visage interactif ---- */
-function faceSVG(state,{editable=true}={}){
+function faceSVG(state,{editable=true,hist=null}={}){
  const g=`
  <path class="neck" d="M160 404 C160 444 152 460 128 470 C110 478 96 492 88 520 L312 520 C304 492 290 478 272 470 C248 460 240 444 240 404 Z"/>
  <path class="guide" d="M200 68 C284 68 328 126 328 204 C328 244 322 278 312 310 C298 354 270 398 242 420 C228 431 212 438 200 438 C188 438 172 431 158 420 C130 398 102 354 88 310 C78 278 72 244 72 204 C72 126 116 68 200 68 Z"/>
@@ -1130,13 +1156,39 @@ function faceSVG(state,{editable=true}={}){
  <path class="guide" d="M200 216 L196 262 C190 271 184 272 180 267 M200 216 L204 262 C210 271 216 272 220 267"/>
  <path class="guide" d="M164 328 C180 316 190 320 200 325 C210 320 220 316 236 328 C220 341 210 344 200 339 C190 344 180 341 164 328 Z"/>
  <path class="guide" d="M164 328 L236 328" stroke-opacity=".12"/>`;
+ const H=hist||{};
  const zs=ZONES.map(z=>{
-  const q=state[z.id]||0, cls=(q>0?(z.p==='tox'?'zone act-tox':'zone act-ah'):'zone')+(editable?'':' ro');
+  const q=state[z.id]||0, ant=H[z.id];
+  const cls=(q>0?(z.p==='tox'?'zone act-tox':'zone act-ah')
+            :ant?(z.p==='tox'?'zone ant ant-tox':'zone ant ant-ah'):'zone')+(editable?'':' ro');
   const ev=editable?`onclick="zClick(event,'${z.id}')" oncontextmenu="zClick(event,'${z.id}',-1);return false"`:'';
-  return `<ellipse class="${cls}" cx="${z.cx}" cy="${z.cy}" rx="${z.rx}" ry="${z.ry}" ${ev}><title>${esc(z.n)} — ${PLABEL[z.p]}</title></ellipse>`;
+  const tt=esc(z.n)+' — '+PLABEL[z.p]+(ant?'\n'+ant.map(x=>`${DFT(x.d)} · ${fmtQ(x.q,z.p)}`).join('\n'):'');
+  return `<ellipse class="${cls}" cx="${z.cx}" cy="${z.cy}" rx="${z.rx}" ry="${z.ry}" ${ev}><title>${tt}</title></ellipse>`;
  }).join('');
- const lbl=ZONES.filter(z=>state[z.id]>0).map(z=>
-  `<text class="zlabel" x="${z.cx}" y="${z.cy+4}">${fmtQ(state[z.id],z.p)}</text>`).join('');
+ /* Les zones du visage se chevauchent : on réserve une boîte par étiquette et on
+    décale verticalement celles qui se recouvriraient, de haut en bas puis de gauche à droite. */
+ const pris=[];
+ const place=(x,y,w,h)=>{
+  const heurte=(yy)=>pris.some(p=>Math.abs(p.x-x)<(p.w+w)/2+2 && Math.abs(p.y-yy)<(p.h+h)/2+1);
+  const essais=[0,10,-10,20,-20,30,-30];
+  for(const d of essais){ if(!heurte(y+d)){ pris.push({x,y:y+d,w,h}); return y+d } }
+  pris.push({x,y,w,h}); return y;
+ };
+ const lbl=ZONES.filter(z=>state[z.id]>0||H[z.id])
+  .sort((a,b)=>a.cy-b.cy||a.cx-b.cx)
+  .map(z=>{
+   const q=state[z.id]||0, ant=H[z.id];
+   const qt=q?fmtQ(q,z.p):'';
+   const dt=ant?DFT(ant[0].d)+(ant.length>1?` ×${ant.length}`:''):'';
+   const w=Math.max(qt.length*6.2, dt.length*4.1);
+   const h=(qt?11:0)+(dt?8:0);
+   const y=place(z.cx, z.cy, w, h);
+   /* étiquette déportée : un filet la relie à sa zone pour lever toute ambiguïté */
+   const fil=Math.abs(y-z.cy)>7?`<line class="zlead ${z.p==='tox'?'t':'a'}" x1="${z.cx}" y1="${z.cy}" x2="${z.cx}" y2="${y+(y>z.cy?-7:5)}"/>`:'';
+   return fil
+        + (qt?`<text class="zlabel" x="${z.cx}" y="${y+(dt?0:4)}">${qt}</text>`:'')
+        + (dt?`<text class="zdate ${qt?'':'seul'} ${z.p==='tox'?'t':'a'}" x="${z.cx}" y="${y+(qt?11:4)}">${dt}</text>`:'');
+  }).join('');
  return `<svg class="face" viewBox="0 0 400 530">${g}${zs}${lbl}</svg>`;
 }
 
@@ -1578,16 +1630,22 @@ function pDetail(p){
      <button class="btn xs p" onclick="openActe(${p.id})">✚ Nouvel acte</button></div></div>
    ${tableActes()}`,
 
-  schema:()=>`<div class="facewrap">
-    <div><div class="facebox">${faceSVG(cumul,{editable:false})}</div>
-     <div class="face-legend"><span><i style="background:var(--toxine)"></i>Toxine</span><span><i style="background:var(--ah)"></i>Acide hyaluronique</span></div></div>
+  schema:()=>{const ZH=zoneHist(p.id);
+   return `<div class="facewrap">
+    <div><div class="facebox">${faceSVG(cumul,{editable:false,hist:ZH})}</div>
+     <div class="face-legend"><span><i style="background:var(--toxine)"></i>Toxine</span><span><i style="background:var(--ah)"></i>Acide hyaluronique</span>
+      <span class="mu">quantité cumulée · date de la dernière injection</span></div></div>
     <div>
-     <div class="tip" style="margin-bottom:10px"><span class="e">🗺️</span><div><b>Cumul historique.</b> Toutes les injections de ce patient, toutes séances confondues, sur un seul schéma.</div></div>
-     ${Object.keys(cumul).length?Object.entries(cumul).sort((a,b)=>b[1]-a[1]).map(([z,q])=>{const Z=zoneById(z);
-       return `<div class="zrow"><span class="zd" style="background:var(--${Z.p==='tox'?'toxine':'ah'})"></span>
-       <div class="zn">${esc(Z.k)}<small>${PLABEL[Z.p]}</small></div>
-       <b class="mono" style="font-size:12.5px">${fmtQ(q,Z.p)}</b></div>`}).join(''):'<div class="empty">Aucune injection enregistrée.</div>'}
-    </div></div>`,
+     <div class="tip" style="margin-bottom:10px"><span class="e">🗺️</span><div><b>Cumul historique.</b> Toutes les injections de ce patient sur un seul schéma. Sous chaque quantité, la date de la dernière séance sur cette zone — et le nombre de fois qu'elle a été traitée.</div></div>
+     ${Object.keys(cumul).length?Object.entries(cumul).sort((a,b)=>b[1]-a[1]).map(([z,q])=>{const Z=zoneById(z), L=ZH[z]||[];
+       return `<div class="zrow" style="display:block">
+        <div style="display:flex;align-items:center;gap:8px">
+         <span class="zd" style="background:var(--${Z.p==='tox'?'toxine':'ah'})"></span>
+         <div class="zn">${esc(Z.k)}<small>${PLABEL[Z.p]} · ${L.length} séance${L.length>1?'s':''}</small></div>
+         <b class="mono" style="font-size:12.5px">${fmtQ(q,Z.p)}</b></div>
+        ${L.length?`<div class="zchr">${L.map(x=>`<button class="zc" onclick="openActe(${p.id},${x.aid})" title="Ouvrir l’acte du ${DF(x.d)}">${DFT(x.d)} <b>${fmtQ(x.q,Z.p)}</b></button>`).join('')}</div>`:''}
+       </div>`}).join(''):'<div class="empty">Aucune injection enregistrée.</div>'}
+    </div></div>`},
 
   photos:()=>`<div class="grid g2">
     <div><div class="ba" id="ba">
@@ -2441,7 +2499,6 @@ function renderOver(){
  const tox=ent.filter(([z])=>zoneById(z).p==='tox').reduce((s,[,q])=>s+q,0);
  const ah =ent.filter(([z])=>zoneById(z).p==='ah').reduce((s,[,q])=>s+q,0);
  const prix=Math.round((tox*PU.tox+ah*PU.ah)/5)*5;
- const lotTox=STOCK.find(s=>s.ref==='BTX-100'), lotAH=STOCK.find(s=>s.ref==='AH-VOLB');
 
  document.getElementById('overh').innerHTML=`
   <button class="btn g s" onclick="closeAll()">✕</button>
@@ -2476,10 +2533,11 @@ function renderOver(){
       ${PROTOS.map((x,i)=>`<button class="chip" onclick="applyProto(${i})">${x.n}</button>`).join('')}
       <button class="chip" onclick="mirrorZ()">⇄ Symétriser</button>
       ${ent.length?`<button class="chip" onclick="AS.z={};renderOver()">Effacer</button>`:''}</div>`}
-    <div class="facebox">${faceSVG(AS.z,{editable:!AS.ro})}</div>
+    <div class="facebox">${faceSVG(AS.z,{editable:!AS.ro,hist:zoneHist(AS.pid,AS.aid)})}</div>
     <div class="face-legend">
-      <span><i style="background:var(--toxine)"></i>Toxine botulique (U)</span>
+      <span><i style="background:var(--toxine)"></i>Toxine (U)</span>
       <span><i style="background:var(--ah)"></i>Acide hyaluronique (ml)</span>
+      ${Object.keys(zoneHist(AS.pid,AS.aid)).length?'<span><i class="ant"></i>Injections antérieures — date en petit</span>':''}
       ${AS.ro?'':'<span class="mu">clic = ajouter · clic droit = retirer</span>'}</div>
    </div>
    <div>
@@ -2499,11 +2557,6 @@ function renderOver(){
          <button class="rm" onclick="delZ('${z}')">✕</button>`}</div>`}).join('')
       :'<div class="empty" style="padding:28px">Cliquez sur une zone du visage.</div>'}
     </div>
-    ${ent.length?`<div class="zrow" style="display:block">
-      <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);font-weight:600;margin-bottom:5px">Lots consommés (auto)</div>
-      ${tox?`<div style="font-size:12px;display:flex;gap:6px;align-items:center;margin-bottom:3px"><span class="zd" style="background:var(--toxine)"></span>${lotTox.lot} · ${lotTox.n} <span class="bdg ${lotTox.q<lotTox.s?'b-crit':'b-good'}" style="margin-left:auto">reste ${lotTox.q}</span></div>`:''}
-      ${ah?`<div style="font-size:12px;display:flex;gap:6px;align-items:center"><span class="zd" style="background:var(--ah)"></span>${lotAH.lot} · ${lotAH.n} <span class="bdg ${lotAH.q<lotAH.s?'b-crit':'b-good'}" style="margin-left:auto">reste ${lotAH.q}</span></div>`:''}
-     </div>`:''}
     <div class="fld" style="margin-top:10px"><label>Effets secondaires observés</label>
      <input class="inp" style="width:100%" value="${esc(AS.effets||'')}" ${AS.ro?'disabled':''} oninput="AS.effets=this.value" placeholder="aucun"></div>
    </div>
@@ -2905,6 +2958,6 @@ function paint(){
 document.querySelectorAll('#nav a[data-v]').forEach(a=>a.onclick=()=>go(a.dataset.v));
 paint();
 </script>
-<!-- build 2026-08-07-G docs-acte2 -->
+<!-- build 2026-08-07-H schema-cumul-dates -->
 </body>
 </html>
