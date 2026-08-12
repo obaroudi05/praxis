@@ -2514,7 +2514,7 @@ function renderOver(){
   `<div class="mu" style="font-size:12px">Acte clôturé · chaque envoi est horodaté et tracé</div>
    <div style="margin-left:auto;display:flex;gap:8px">
     ${(()=>{const ac=ACTES.find(x=>x.id===AS.aid);const n=ac?docsActe(ac).filter(d=>d.env).length:0;
-      return n?`<button class="btn p" onclick="sendAllDocs(${AS.aid})">✉ Envoyer les ${n} document${n>1?'s':''} en attente</button>`:''})()}
+      return n?`<button class="btn p" onclick="sendAllDocs(${AS.aid})">✉ Envoyer ${n>1?`les ${n} documents`:'le document'} en attente</button>`:''})()}
     <button class="btn" onclick="closeAll()">Fermer</button></div>`
   :`<label style="display:flex;gap:7px;align-items:center;font-size:12.5px;cursor:pointer">
      <input type="checkbox" ${AS.consent?'checked':''} onchange="AS.consent=this.checked"> Consentement éclairé signé</label>
@@ -2905,6 +2905,6 @@ function paint(){
 document.querySelectorAll('#nav a[data-v]').forEach(a=>a.onclick=()=>go(a.dataset.v));
 paint();
 </script>
-<!-- build 2026-08-07-F docs-acte -->
+<!-- build 2026-08-07-G docs-acte2 -->
 </body>
 </html>
