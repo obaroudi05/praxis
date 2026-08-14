@@ -387,6 +387,9 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
  .a4:last-child{page-break-after:auto}
  @page{size:A4;margin:13mm 0 11mm}
 }
+.fld2{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);
+  margin:16px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--line)}
+.fld2:first-child{margin-top:0}
 .trow{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--line)}
 .trow:last-child{border-bottom:none}
 .trow b{font-size:12.5px;font-weight:620;display:block}
@@ -394,8 +397,8 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .trow .sw{margin-left:auto;flex:none}
 /* aperçu réduit de la feuille dans les paramètres */
 .trprev{overflow:hidden;border-radius:10px;border:1px solid var(--line);background:#fff}
-.trprev .a4{width:210mm;min-height:0;transform:scale(.62);transform-origin:top left;
-  box-shadow:none;margin:0 0 -38% -0;padding:12mm 14mm}
+.trprev .a4{width:210mm;min-height:0;transform:scale(.5);transform-origin:top left;
+  box-shadow:none;margin:0 0 -50% 0;padding:12mm 14mm}
 .dvl{border-bottom:1px solid var(--line);cursor:pointer;transition:.12s}
 .dvl:hover{background:var(--panel)}
 .dvl.on{background:var(--accent-wash)}
@@ -1430,7 +1433,6 @@ let DOCMOD=[
  {id:'d3', cat:'Ordonnance', nom:'Suites de peeling', corps:"Crème réparatrice cicatrisante — 2 applications par jour pendant 7 jours\nPhotoprotection SPF 50+ quotidienne pendant 1 mois"},
  {id:'d4', cat:'Consentement', nom:'Consentement — acide hyaluronique', corps:"Je soussigné(e) {{prenom}} {{nom}} reconnais avoir reçu une information claire et complète sur l’acte d’injection d’acide hyaluronique, ses bénéfices attendus, ses effets secondaires possibles (ecchymoses, œdème, asymétrie transitoire) et ses alternatives. Un délai de réflexion m’a été laissé."},
  {id:'d5', cat:'Consentement', nom:'Consentement — toxine botulique', corps:"Je soussigné(e) {{prenom}} {{nom}} reconnais avoir été informé(e) des modalités de l’injection de toxine botulique, de son caractère temporaire (4 à 6 mois), des effets indésirables possibles et des contre-indications."},
- {id:'d6', cat:'Devis', nom:'Mentions légales du devis', corps:"Devis valable 30 jours à compter du {{date}}. Délai de réflexion légal de 15 jours applicable. Les actes de médecine esthétique ne sont pas pris en charge par l’Assurance Maladie et sont soumis à TVA au taux de 20 %."},
 ];
 
 /* ==========================================================================
@@ -2490,7 +2492,7 @@ function rmProto(i){
 }
 
 /* ---------------- Paramètres (back-office) ---------------- */
-let paramTab='fidelite', modSel='anniv-sms', docSel='d1', trSel='esth';
+let paramTab='fidelite', modSel='anniv-sms', docSel='d1', trSel='esth', docMode='modele';
 const TRAMES0=JSON.parse(JSON.stringify(TRAMES));
 function trReset(){ TRAMES[trSel]=JSON.parse(JSON.stringify(TRAMES0[trSel])); paint();
   toast('Trame « '+TRAMES[trSel].titre+' » réinitialisée') }
@@ -2507,8 +2509,8 @@ function devisExemple(f){
 V.params=()=>{
  const TB=[['cabinet','Cabinet & praticiens'],['actes',`Actes & tarifs · ${CATALOGUE.length}`],
           ['facturation','Facturation & rétrocession'],['fidelite','Fidélité & réactivation'],
-          ['messages',`Modèles de message · ${MODELES.length}`],['documents',`Modèles de document · ${DOCMOD.length}`],
-          ['trames',`Trames de devis · ${Object.keys(TRAMES).length}`]];
+          ['messages',`Modèles de message · ${MODELES.length}`],
+          ['documents',`Modèles de document · ${DOCMOD.length+Object.keys(TRAMES).length}`]];
  const body={
   cabinet:()=>{
    const F=(k,l,w)=>`<div class="fld"><label>${l}</label><input class="inp" style="width:100%" value="${esc(CABINET[k]||'')}" onchange="CABINET['${k}']=this.value;paint()"></div>`;
@@ -2764,10 +2766,13 @@ V.params=()=>{
    <div class="grid g2" style="grid-template-columns:280px 1fr">
     <div class="card"><div class="h"><h2>Modèles</h2><div class="r"><button class="btn xs p" onclick="newDoc()">+</button></div></div>
      <div class="b" style="padding:8px">
+      <div class="mcat">Trames de devis</div>
+      ${FAMILLES.map(f=>`<div class="mrow ${docMode==='trame'&&trSel===f.id?'on':''}" onclick="docMode='trame';trSel='${f.id}';paint()">
+        <div class="nm">${f.i} ${esc(TRAMES[f.id].titre)}</div><div class="mu" style="font-size:11px">mise en page complète</div></div>`).join('')}
       ${cats.map(c=>`<div class="mcat">${c}</div>`+DOCMOD.filter(x=>x.cat===c).map(x=>
-        `<div class="mrow ${docSel===x.id?'on':''}" onclick="docSel='${x.id}';paint()"><div class="nm">${esc(x.nom)}</div></div>`).join('')).join('')}
+        `<div class="mrow ${docMode==='modele'&&docSel===x.id?'on':''}" onclick="docMode='modele';docSel='${x.id}';paint()"><div class="nm">${esc(x.nom)}</div></div>`).join('')).join('')}
      </div></div>
-    <div class="card"><div class="h"><h2>${esc(d.nom)}</h2><span class="s">${d.cat}</span></div>
+    ${docMode==='trame'?trameEditeur():`<div class="card"><div class="h"><h2>${esc(d.nom)}</h2><span class="s">${d.cat}</span></div>
      <div class="b">
       <div class="grid g2" style="gap:10px">
        <div class="fld"><label>Nom</label><input class="inp" style="width:100%" value="${esc(d.nom)}" onchange="DOCMOD.find(x=>x.id==='${d.id}').nom=this.value;paint()"></div>
@@ -2779,73 +2784,70 @@ V.params=()=>{
       <div class="fld"><label>Aperçu du document généré — en-tête, corps, pied de page</label>
         <div id="docprev">${docPrev()}</div></div>
       <button class="btn s" onclick="toast('Modèle enregistré')">Enregistrer</button>
-     </div></div></div>`;
-  },
-
-  /* ---------- trame des devis, une par catégorie ---------- */
-  trames:()=>{
-   const T=TRAMES[trSel]||TRAMES.esth, F=famById(trSel);
-   const set=(k,v)=>`TRAMES['${trSel}'].${k}=${v};trPrev()`;
-   const champ=(k,l,ph)=>`<div class="fld"><label>${l}</label>
-     <input class="inp" style="width:100%" value="${esc(T[k]||'')}" placeholder="${esc(ph||'')}"
-       oninput="${set(k,'this.value')}"></div>`;
-   const zone=(k,l,h)=>`<div class="fld"><label>${l}</label>
-     <textarea class="note" style="min-height:${h||64}px" oninput="${set(k,'this.value')}">${esc(T[k]||'')}</textarea></div>`;
-   const inter=(k,l,s2)=>`<div class="trow"><div><b>${l}</b>${s2?`<small>${s2}</small>`:''}</div>
-     <button class="sw ${T[k]?'on':''}" onclick="TRAMES['${trSel}'].${k}=!TRAMES['${trSel}'].${k};paint()"></button></div>`;
-   return `<div class="tip"><span class="e">◫</span><div>Chaque catégorie de devis a sa propre trame : titre, blocs affichés, colonnes et textes. Ce que vous réglez ici s'applique à tous les devis de cette catégorie, anciens comme nouveaux.</div></div>
-   <div class="fbar" style="margin-bottom:12px"><div class="seg">${FAMILLES.map(f=>
-     `<button class="${trSel===f.id?'on':''}" onclick="trSel='${f.id}';paint()">${f.i} ${esc(TRAMES[f.id].titre)}</button>`).join('')}</div>
-     <div style="margin-left:auto"><span class="mu" style="font-size:11.5px">catégorie ${esc(F.n)}</span></div></div>
-   <div class="grid g2" style="grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);align-items:start">
-    <div>
-     <div class="card" style="margin-bottom:13px"><div class="h"><h2>Intitulés</h2></div><div class="b">
-      ${champ('titre','Titre du document','Devis médecine esthétique')}
-      ${champ('court','Libellé court — listes et messages','médecine esthétique')}
-      ${champ('colTitre','Intitulé de la colonne de désignation','Nature précise de l’acte')}
-      ${zone('intro','Texte d’introduction (facultatif) — variables acceptées',54)}
-      <div class="fld"><label>Validité par défaut</label>
-       <div class="r" style="gap:8px"><input class="inp" type="number" min="1" style="width:100px"
-         value="${T.validiteJours}" oninput="TRAMES['${trSel}'].validiteJours=+this.value||30;trPrev()">
-        <span class="mu" style="font-size:11.5px;align-self:center">jours à compter de l’établissement</span></div></div>
-     </div></div>
-
-     <div class="card" style="margin-bottom:13px"><div class="h"><h2>Blocs et colonnes</h2>
-       <span class="s">ce qui figure sur la feuille</span></div><div class="b" style="padding:6px 14px 12px">
-      ${inter('praticien','Encadré praticien','nom, spécialité, n° d’ordre, RPPS')}
-      ${inter('patient','Encadré patient','nom, date de naissance, adresse, dossier')}
-      ${inter('lieu','Lieu d’exécution de la prestation')}
-      ${inter('seances','Colonne « Séances »')}
-      ${inter('pu','Colonne « P.U. »')}
-      ${inter('tva','Ligne TVA sous le total')}
-      ${inter('anesth','Nature de l’anesthésie','exigée par l’arrêté du 17 octobre 1996')}
-      ${inter('suites','Bloc suites et soins')}
-      ${inter('validite','Bloc validité de l’offre')}
-      ${inter('reglementOn','Bloc conditions de règlement')}
-      ${inter('mentions','Encadré des mentions légales')}
-      ${inter('signatures','Cases de signature')}
-     </div></div>
-
-     <div class="card"><div class="h"><h2>Textes</h2></div><div class="b">
-      ${champ('suitesTitre','Titre du bloc suites','Suites et soins')}
-      ${zone('reglement','Conditions de règlement',60)}
-      ${zone('mentions','Mentions légales',92)}
-      ${champ('manuscrite','Mention manuscrite à recopier — vide pour la retirer')}
-      <div class="grid g2" style="gap:10px">${champ('sigPrat','Case de gauche')}${champ('sigPat','Case de droite')}</div>
-      <button class="btn s" onclick="toast('Trame « ${esc(T.titre)} » enregistrée')">Enregistrer</button>
-      <button class="btn s g" onclick="trReset()">Réinitialiser cette trame</button>
-     </div></div>
-    </div>
-    <div class="card" style="position:sticky;top:0"><div class="h"><h2>Aperçu</h2>
-      <div class="r"><button class="btn xs" onclick="apercuDevis(devisExemple('${trSel}'))">Plein écran</button></div></div>
-     <div class="b"><div class="trprev" id="trprev">${devisDoc(devisExemple(trSel))}</div></div></div>
-   </div>`;
+     </div></div>`}</div>`;
   }
  };
  return `<div class="head"><div><h1>Paramètres</h1><p>Critères, messages et documents — tout ce qui pilote les automatismes</p></div></div>
  <div class="fbar"><div class="seg">${TB.map(([k,l])=>`<button class="${paramTab===k?'on':''}" onclick="paramTab='${k}';paint()">${l}</button>`).join('')}</div></div>
  ${(body[paramTab]||body.fidelite)()}`;
 };
+/* ---------- éditeur de trame, dans Modèles de document ---------- */
+function trameEditeur(){
+ const T=TRAMES[trSel]||TRAMES.esth;
+ const set=(k,v)=>`TRAMES['${trSel}'].${k}=${v};trPrev()`;
+ const champ=(k,l,ph)=>`<div class="fld"><label>${l}</label>
+   <input class="inp" style="width:100%" value="${esc(T[k]||'')}" placeholder="${esc(ph||'')}"
+     oninput="${set(k,'this.value')}"></div>`;
+ const zone=(k,l,h)=>`<div class="fld"><label>${l}</label>
+   <textarea class="note" style="min-height:${h||64}px" oninput="${set(k,'this.value')}">${esc(T[k]||'')}</textarea></div>`;
+ const inter=(k,l,s2)=>`<div class="trow"><div><b>${l}</b>${s2?`<small>${s2}</small>`:''}</div>
+   <button class="sw ${T[k]?'on':''}" onclick="TRAMES['${trSel}'].${k}=!TRAMES['${trSel}'].${k};paint()"></button></div>`;
+ return `<div class="card"><div class="h"><h2>${esc(T.titre)}</h2><span class="s">Trame de devis</span>
+   <div class="r"><button class="btn xs" onclick="apercuDevis(devisExemple('${trSel}'))">Aperçu plein écran</button>
+    <button class="btn xs g" onclick="trReset()">Réinitialiser</button></div></div>
+  <div class="b">
+   <div class="tip" style="margin-bottom:12px"><span class="e">◫</span><div>Contrairement aux autres modèles, un devis n'est pas un texte libre : sa trame décide du titre, des blocs affichés, des colonnes et des textes. Ce que vous réglez ici s'applique à tous les devis de cette catégorie.</div></div>
+   <div class="grid g2" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;gap:14px">
+    <div>
+     <div class="fld2">Intitulés</div>
+     ${champ('titre','Titre du document','Devis médecine esthétique')}
+     ${champ('court','Libellé court — listes et messages','médecine esthétique')}
+     ${champ('colTitre','Intitulé de la colonne de désignation','Nature précise de l’acte')}
+     ${zone('intro','Texte d’introduction (facultatif) — variables acceptées',52)}
+     <div class="fld"><label>Validité par défaut</label>
+      <div class="r" style="gap:8px"><input class="inp" type="number" min="1" style="width:92px"
+        value="${T.validiteJours}" oninput="TRAMES['${trSel}'].validiteJours=+this.value||30;trPrev()">
+       <span class="mu" style="font-size:11.5px;align-self:center">jours</span></div></div>
+
+     <div class="fld2">Blocs et colonnes</div>
+     ${inter('praticien','Encadré praticien','nom, spécialité, n° d’ordre, RPPS')}
+     ${inter('patient','Encadré patient','nom, date de naissance, adresse')}
+     ${inter('lieu','Lieu d’exécution de la prestation')}
+     ${inter('seances','Colonne « Séances »')}
+     ${inter('pu','Colonne « P.U. »')}
+     ${inter('tva','Ligne TVA sous le total')}
+     ${inter('anesth','Nature de l’anesthésie','exigée par l’arrêté du 17 octobre 1996')}
+     ${inter('suites','Bloc suites et soins')}
+     ${inter('validite','Bloc validité de l’offre')}
+     ${inter('reglementOn','Bloc conditions de règlement')}
+     ${inter('mentions','Encadré des mentions légales')}
+     ${inter('signatures','Cases de signature')}
+
+     <div class="fld2">Textes</div>
+     ${champ('suitesTitre','Titre du bloc suites','Suites et soins')}
+     ${zone('reglement','Conditions de règlement',58)}
+     ${zone('mentions','Mentions légales',88)}
+     ${champ('manuscrite','Mention manuscrite à recopier — vide pour la retirer')}
+     ${champ('sigPrat','Case de signature de gauche')}
+     ${champ('sigPat','Case de signature de droite')}
+     <button class="btn s" onclick="toast('Trame « ${esc(T.titre)} » enregistrée')">Enregistrer</button>
+    </div>
+    <div style="position:sticky;top:0">
+     <div class="fld2" style="margin-top:0">Aperçu — en-tête, corps, pied de page</div>
+     <div class="trprev" id="trprev">${devisDoc(devisExemple(trSel))}</div>
+    </div>
+   </div></div></div>`;
+}
 const prevHTML=t=>esc(fillTpl(t,tplCtx(PATIENTS[0]))).replace(/\n/g,'<br>');
 function docPrev(){
  const d=DOCMOD.find(x=>x.id===docSel)||DOCMOD[0];
@@ -3468,7 +3470,7 @@ function docPane(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='P';
+const BUILD='Q';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
