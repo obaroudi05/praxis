@@ -361,17 +361,19 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .dv-tot .l span:last-child{font-variant-numeric:tabular-nums}
 .dv-tot .net{border-top:1.5px solid #16161a;margin-top:1mm;padding-top:2mm;font-size:13px;font-weight:720}
 .dv-tot .tva{color:#71717a;font-size:9.5px;padding-top:0}
-.dv-p{font-size:10.5px;color:#3f3f46;margin-bottom:3.5mm}
+.dv-p{font-size:10.5px;color:#3f3f46;margin-bottom:2.8mm}
 .dv-p b{color:#16161a}
-.dv-men{border:1px solid #16161a;border-radius:2mm;padding:3mm 4mm;font-size:10px;line-height:1.5;margin:1mm 0 3.5mm}
+.dv-men{border:1px solid #16161a;border-radius:2mm;padding:2.6mm 4mm;font-size:10px;line-height:1.5;margin:1mm 0 3mm}
 .dv-sg{display:grid;grid-template-columns:1fr 1fr;gap:6mm;margin-top:2mm}
-.dv-sg .c{border:1px solid #d4d4d8;border-radius:2mm;padding:3mm 4mm;min-height:21mm}
+.dv-sg .c{border:1px solid #d4d4d8;border-radius:2mm;padding:3mm 4mm;min-height:19mm}
 .dv-sg .lb{font-size:8.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#71717a}
 .dv-sg .hint{font-size:9px;color:#a1a1aa;margin-top:1.4mm;line-height:1.5}
 .dv-ft{margin-top:4mm;padding-top:2.5mm;border-top:1px solid #d4d4d8;font-size:9px;line-height:1.5;color:#71717a;text-align:center}
 /* rien ne se coupe au mauvais endroit, sur écran comme au tirage */
 .dv-tb thead{display:table-header-group}
-.dv-tb tr,.dv-tot,.dv-men,.dv-sg,.dv-bx,.dv-2{break-inside:avoid;page-break-inside:avoid}
+.dv-tb tr,.dv-tot,.dv-men,.dv-sg,.dv-bx,.dv-2,.dv-ft{break-inside:avoid;page-break-inside:avoid}
+.dv-sg{break-after:avoid;page-break-after:avoid}          /* le pied ne part jamais seul */
+.dv-ft{break-before:avoid;page-break-before:avoid}
 .dv-s{break-after:avoid;page-break-after:avoid}
 @media print{
  html,body{background:#fff!important}
@@ -385,6 +387,15 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
  .a4:last-child{page-break-after:auto}
  @page{size:A4;margin:13mm 0 11mm}
 }
+.trow{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--line)}
+.trow:last-child{border-bottom:none}
+.trow b{font-size:12.5px;font-weight:620;display:block}
+.trow small{display:block;font-size:11px;color:var(--ink-3);margin-top:1px}
+.trow .sw{margin-left:auto;flex:none}
+/* aperçu réduit de la feuille dans les paramètres */
+.trprev{overflow:hidden;border-radius:10px;border:1px solid var(--line);background:#fff}
+.trprev .a4{width:210mm;min-height:0;transform:scale(.62);transform-origin:top left;
+  box-shadow:none;margin:0 0 -38% -0;padding:12mm 14mm}
 .dvl{border-bottom:1px solid var(--line);cursor:pointer;transition:.12s}
 .dvl:hover{background:var(--panel)}
 .dvl.on{background:var(--accent-wash)}
@@ -763,9 +774,44 @@ const toast=m=>{const t=document.getElementById('toast');t.textContent=m;t.class
              Dose : combien (facultatif)
    ========================================================================== */
 const FAMILLES=[
- {id:'esth',n:'Médecine esthétique',dn:'médecine esthétique',i:'✦'},
- {id:'epil',n:'Épilation',dn:'épilation laser',i:'⌇'}];
-const nomDevis=d=>'Devis '+famById(d&&d.fam||'esth').dn;
+ {id:'esth',n:'Médecine esthétique',i:'✦'},
+ {id:'epil',n:'Épilation',i:'⌇'}];
+
+/* ==========================================================================
+   Trames de devis — une par catégorie, entièrement réglable au back-office.
+   La trame décide du titre, des blocs affichés, des colonnes et des textes.
+   ========================================================================== */
+let TRAMES={
+ esth:{
+  titre:'Devis médecine esthétique', court:'médecine esthétique',
+  intro:'',
+  colTitre:'Nature précise de l’acte',
+  seances:true, pu:true, tva:true,
+  praticien:true, patient:true, lieu:true, anesth:false, suites:true,
+  validite:true, mentions:true, reglementOn:false, signatures:true,
+  validiteJours:30,
+  suitesTitre:'Suites et soins',
+  reglement:'Règlement à l’acte, par carte bancaire, espèces ou virement. Aucun acompte n’est demandé.',
+  mentions:'Devis établi en deux exemplaires, dont un remis au patient.\nLes actes de médecine esthétique ne sont pas pris en charge par l’Assurance Maladie.\nAucune somme ne peut être exigée avant l’exécution de la prestation.',
+  manuscrite:'Devis reçu avant l’exécution de la prestation de service',
+  sigPrat:'Le praticien', sigPat:'Le patient'},
+ epil:{
+  titre:'Devis épilation', court:'épilation',
+  intro:'',
+  colTitre:'Zones traitées',
+  seances:true, pu:true, tva:true,
+  praticien:true, patient:true, lieu:true, anesth:false, suites:true,
+  validite:true, mentions:true, reglementOn:true, signatures:true,
+  validiteJours:60,
+  suitesTitre:'Précautions avant et après séance',
+  reglement:'Forfait réglable en une fois ou séance par séance. Toute séance non décommandée 48 h à l’avance est due.',
+  mentions:'Devis établi en deux exemplaires, dont un remis au patient.\nLes séances d’épilation ne sont pas prises en charge par l’Assurance Maladie.\nAucune somme ne peut être exigée avant l’exécution de la prestation.',
+  manuscrite:'Devis reçu avant l’exécution de la prestation de service',
+  sigPrat:'Le praticien', sigPat:'Le/la patient(e)'},
+};
+const trame=f=>TRAMES[f&&TRAMES[f]?f:'esth'];
+const nomDevis=d=>trame(d&&d.fam||'esth').titre;
+const courtDevis=f=>trame(f).court;
 const REGIONS =[{id:'visage',n:'Visage',i:'☺'},{id:'corps',n:'Corps',i:'🧍'}];
 const famById=id=>FAMILLES.find(f=>f.id===id)||FAMILLES[0];
 
@@ -2139,7 +2185,7 @@ V.devis=()=>{
  return `<div class="head">
   <div><h1>Devis &amp; factures</h1><p>${base.length} devis sur la période · ${EUR(matt)} en attente de réponse</p></div>
   <div class="r"><button class="btn" onclick="go('relances')">Régler les relances</button>
-   <button class="btn p" onclick="openDevis(null,devFam)">+ Devis ${famById(devFam).n.toLowerCase()}</button></div></div>
+   <button class="btn p" onclick="openDevis(null,devFam)">+ ${esc(trame(devFam).titre)}</button></div></div>
  <div class="fbar" style="margin-bottom:12px"><div class="seg">${FAMILLES.map(f=>{
    const n=DEVIS.filter(d=>(d.fam||'esth')===f.id).length;
    return `<button class="${devFam===f.id?'on':''}" onclick="devFam='${f.id}';paint()">${f.i} ${f.n} · ${n}</button>`}).join('')}</div></div>
@@ -2444,11 +2490,25 @@ function rmProto(i){
 }
 
 /* ---------------- Paramètres (back-office) ---------------- */
-let paramTab='fidelite', modSel='anniv-sms', docSel='d1';
+let paramTab='fidelite', modSel='anniv-sms', docSel='d1', trSel='esth';
+const TRAMES0=JSON.parse(JSON.stringify(TRAMES));
+function trReset(){ TRAMES[trSel]=JSON.parse(JSON.stringify(TRAMES0[trSel])); paint();
+  toast('Trame « '+TRAMES[trSel].titre+' » réinitialisée') }
+function trPrev(){ const e=document.getElementById('trprev'); if(e) e.innerHTML=devisDoc(devisExemple(trSel)) }
+/* un devis représentatif de la catégorie, pour l'aperçu de la trame */
+function devisExemple(f){
+ const d=DEVIS.find(x=>(x.fam||'esth')===f);
+ if(d) return d;
+ const c=actesDe(f)[0], p=PATIENTS[0], px=c.prix||300;
+ return {id:'D-0000-000', patient:p.id, date:TODAYS, fam:f, praticien:p.prat, statut:'brouillon',
+   montant:px*2, remise:0, validite:trame(f).validiteJours, note:'',
+   lignes:[[c.id, c.n, 2, px]]};
+}
 V.params=()=>{
  const TB=[['cabinet','Cabinet & praticiens'],['actes',`Actes & tarifs · ${CATALOGUE.length}`],
           ['facturation','Facturation & rétrocession'],['fidelite','Fidélité & réactivation'],
-          ['messages',`Modèles de message · ${MODELES.length}`],['documents',`Modèles de document · ${DOCMOD.length}`]];
+          ['messages',`Modèles de message · ${MODELES.length}`],['documents',`Modèles de document · ${DOCMOD.length}`],
+          ['trames',`Trames de devis · ${Object.keys(TRAMES).length}`]];
  const body={
   cabinet:()=>{
    const F=(k,l,w)=>`<div class="fld"><label>${l}</label><input class="inp" style="width:100%" value="${esc(CABINET[k]||'')}" onchange="CABINET['${k}']=this.value;paint()"></div>`;
@@ -2720,6 +2780,66 @@ V.params=()=>{
         <div id="docprev">${docPrev()}</div></div>
       <button class="btn s" onclick="toast('Modèle enregistré')">Enregistrer</button>
      </div></div></div>`;
+  },
+
+  /* ---------- trame des devis, une par catégorie ---------- */
+  trames:()=>{
+   const T=TRAMES[trSel]||TRAMES.esth, F=famById(trSel);
+   const set=(k,v)=>`TRAMES['${trSel}'].${k}=${v};trPrev()`;
+   const champ=(k,l,ph)=>`<div class="fld"><label>${l}</label>
+     <input class="inp" style="width:100%" value="${esc(T[k]||'')}" placeholder="${esc(ph||'')}"
+       oninput="${set(k,'this.value')}"></div>`;
+   const zone=(k,l,h)=>`<div class="fld"><label>${l}</label>
+     <textarea class="note" style="min-height:${h||64}px" oninput="${set(k,'this.value')}">${esc(T[k]||'')}</textarea></div>`;
+   const inter=(k,l,s2)=>`<div class="trow"><div><b>${l}</b>${s2?`<small>${s2}</small>`:''}</div>
+     <button class="sw ${T[k]?'on':''}" onclick="TRAMES['${trSel}'].${k}=!TRAMES['${trSel}'].${k};paint()"></button></div>`;
+   return `<div class="tip"><span class="e">◫</span><div>Chaque catégorie de devis a sa propre trame : titre, blocs affichés, colonnes et textes. Ce que vous réglez ici s'applique à tous les devis de cette catégorie, anciens comme nouveaux.</div></div>
+   <div class="fbar" style="margin-bottom:12px"><div class="seg">${FAMILLES.map(f=>
+     `<button class="${trSel===f.id?'on':''}" onclick="trSel='${f.id}';paint()">${f.i} ${esc(TRAMES[f.id].titre)}</button>`).join('')}</div>
+     <div style="margin-left:auto"><span class="mu" style="font-size:11.5px">catégorie ${esc(F.n)}</span></div></div>
+   <div class="grid g2" style="grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);align-items:start">
+    <div>
+     <div class="card" style="margin-bottom:13px"><div class="h"><h2>Intitulés</h2></div><div class="b">
+      ${champ('titre','Titre du document','Devis médecine esthétique')}
+      ${champ('court','Libellé court — listes et messages','médecine esthétique')}
+      ${champ('colTitre','Intitulé de la colonne de désignation','Nature précise de l’acte')}
+      ${zone('intro','Texte d’introduction (facultatif) — variables acceptées',54)}
+      <div class="fld"><label>Validité par défaut</label>
+       <div class="r" style="gap:8px"><input class="inp" type="number" min="1" style="width:100px"
+         value="${T.validiteJours}" oninput="TRAMES['${trSel}'].validiteJours=+this.value||30;trPrev()">
+        <span class="mu" style="font-size:11.5px;align-self:center">jours à compter de l’établissement</span></div></div>
+     </div></div>
+
+     <div class="card" style="margin-bottom:13px"><div class="h"><h2>Blocs et colonnes</h2>
+       <span class="s">ce qui figure sur la feuille</span></div><div class="b" style="padding:6px 14px 12px">
+      ${inter('praticien','Encadré praticien','nom, spécialité, n° d’ordre, RPPS')}
+      ${inter('patient','Encadré patient','nom, date de naissance, adresse, dossier')}
+      ${inter('lieu','Lieu d’exécution de la prestation')}
+      ${inter('seances','Colonne « Séances »')}
+      ${inter('pu','Colonne « P.U. »')}
+      ${inter('tva','Ligne TVA sous le total')}
+      ${inter('anesth','Nature de l’anesthésie','exigée par l’arrêté du 17 octobre 1996')}
+      ${inter('suites','Bloc suites et soins')}
+      ${inter('validite','Bloc validité de l’offre')}
+      ${inter('reglementOn','Bloc conditions de règlement')}
+      ${inter('mentions','Encadré des mentions légales')}
+      ${inter('signatures','Cases de signature')}
+     </div></div>
+
+     <div class="card"><div class="h"><h2>Textes</h2></div><div class="b">
+      ${champ('suitesTitre','Titre du bloc suites','Suites et soins')}
+      ${zone('reglement','Conditions de règlement',60)}
+      ${zone('mentions','Mentions légales',92)}
+      ${champ('manuscrite','Mention manuscrite à recopier — vide pour la retirer')}
+      <div class="grid g2" style="gap:10px">${champ('sigPrat','Case de gauche')}${champ('sigPat','Case de droite')}</div>
+      <button class="btn s" onclick="toast('Trame « ${esc(T.titre)} » enregistrée')">Enregistrer</button>
+      <button class="btn s g" onclick="trReset()">Réinitialiser cette trame</button>
+     </div></div>
+    </div>
+    <div class="card" style="position:sticky;top:0"><div class="h"><h2>Aperçu</h2>
+      <div class="r"><button class="btn xs" onclick="apercuDevis(devisExemple('${trSel}'))">Plein écran</button></div></div>
+     <div class="b"><div class="trprev" id="trprev">${devisDoc(devisExemple(trSel))}</div></div></div>
+   </div>`;
   }
  };
  return `<div class="head"><div><h1>Paramètres</h1><p>Critères, messages et documents — tout ce qui pilote les automatismes</p></div></div>
@@ -3348,7 +3468,7 @@ function docPane(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='O';
+const BUILD='P';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -3396,68 +3516,76 @@ const hfDevis=(t,p,prn)=>{const pr=pratInfo(prn);
  return esc(fillTpl(t,tplCtx(p,{praticien:prn,rpps:pr.rpps,rcp:`${pr.rcpCie} n° ${pr.rcpPolice}`}))).replace(/\n/g,'<br>')};
 
 function devisDoc(d){
- const p=pById(d.patient), prn=d.praticien||p.prat, pr=pratInfo(prn);
+ const p=pById(d.patient), prn=d.praticien||p.prat, pr=pratInfo(prn), T=trame(d.fam||'esth');
  const {L,brut,rem,net,tva,ht}=totauxDoc(d);
- const val=d.validite||30, lim=addD(d.date,val);
+ const val=d.validite||T.validiteJours||30, lim=addD(d.date,val);
  const su=[...new Set(L.map(x=>medleg(x.type).su))];
  const ar=Math.max(0,...L.map(x=>medleg(x.type).ar));
  const taux=[...new Set(L.map(x=>tauxTVA(x.type)))];
+ const txt=t=>esc(fillTpl(t||'',tplCtx(p,{praticien:prn,rpps:pr.rpps,
+   rcp:`${pr.rcpCie} n° ${pr.rcpPolice}`,montant:E2(net),validite:DF(lim)}))).replace(/\n/g,'<br>');
+ const nc=1+(T.seances?1:0)+(T.pu?1:0);            /* colonnes du tableau */
  return `<div class="a4">
   ${CABINET.enteteOn?`<div class="dv-hd">${hfDevis(CABINET.entete,p,prn)}</div>`:''}
   <div class="gr">
   <div class="dv-ti">
-   <h1>Devis — ${esc(famById(d.fam||'esth').dn)}</h1>
+   <h1>${esc(T.titre)}</h1>
    <div class="n"><b>${esc(d.id||'projet')}</b><br>Établi le ${DF(d.date)}</div></div>
 
-  <div class="dv-2">
-   <div class="dv-bx"><div class="lb">Praticien</div>
+  ${(T.praticien||T.patient)?`<div class="dv-2">
+   ${T.praticien?`<div class="dv-bx"><div class="lb">Praticien</div>
     <b>${esc(prn)}</b>
     <div>${esc(pr.specialite)}<br>${esc(CABINET.adresse)}<br>
-     Inscription au tableau de l’Ordre n° ${esc(pr.ordre)}<br>RPPS ${esc(pr.rpps)}</div></div>
-   <div class="dv-bx"><div class="lb">Patient</div>
+     Inscription au tableau de l’Ordre n° ${esc(pr.ordre)}<br>RPPS ${esc(pr.rpps)}</div></div>`:''}
+   ${T.patient?`<div class="dv-bx"><div class="lb">Patient</div>
     <b>${esc(fn(p))}</b>
     <div>Né(e) le ${DF(p.ddn)}<br>${esc(p.adr||'—')}<br>
-     ${esc(p.tel)}<br>Dossier n° ${p.id}</div></div></div>
+     ${esc(p.tel)}<br>Dossier n° ${p.id}</div></div>`:''}</div>`:''}
 
-  <div class="dv-lieu"><b>Lieu d’exécution de la prestation :</b> ${esc(CABINET.nom)}, ${esc(CABINET.adresse)}.</div>
+  ${T.lieu?`<div class="dv-lieu"><b>Lieu d’exécution de la prestation :</b> ${esc(CABINET.nom)}, ${esc(CABINET.adresse)}.</div>`:''}
+  ${T.intro?`<div class="dv-p">${txt(T.intro)}</div>`:''}
 
   <div class="dv-s">Détail des prestations</div>
   <table class="dv-tb"><thead><tr>
-    <th style="width:56%">Nature précise de l’acte et de l’anesthésie</th>
-    <th class="n" style="width:12%">Séances</th><th class="n" style="width:16%">P.U. TTC</th><th class="n" style="width:16%">Total TTC</th>
+    <th style="width:${T.seances&&T.pu?56:T.seances||T.pu?68:84}%">${esc(T.colTitre||'Nature précise de l’acte')}</th>
+    ${T.seances?'<th class="n" style="width:12%">Séances</th>':''}
+    ${T.pu?'<th class="n" style="width:16%">P.U. TTC</th>':''}
+    <th class="n" style="width:16%">Total TTC</th>
    </tr></thead><tbody>
    ${L.map(x=>`<tr>
      <td><b>${esc(acteDef(x.type).n)}</b>
        ${(()=>{const z=detLigne(x); return z?`<div class="dz">${esc(z)}</div>`:''})()}
-       <div class="an">Anesthésie : ${esc(medleg(x.type).an)}</div></td>
-     <td class="n">${x.q}</td><td class="n">${E2(x.tot/x.q)}</td><td class="n">${E2(x.tot)}</td></tr>`).join('')}
+       ${T.anesth?`<div class="an">Anesthésie : ${esc(medleg(x.type).an)}</div>`:''}</td>
+     ${T.seances?`<td class="n">${x.q}</td>`:''}
+     ${T.pu?`<td class="n">${E2(x.tot/x.q)}</td>`:''}
+     <td class="n">${E2(x.tot)}</td></tr>`).join('')}
   </tbody></table>
 
   <div class="dv-tot">
    <div class="l"><span>Total des prestations</span><span>${E2(brut)}</span></div>
    ${rem?`<div class="l"><span>Remise commerciale</span><span>− ${E2(rem)}</span></div>`:''}
    <div class="l net"><span>Net à payer TTC</span><span>${E2(net)}</span></div>
-   <div class="l tva"><span>dont TVA ${taux.join(' et ')} %</span><span>${E2(tva)} · base HT ${E2(ht)}</span></div></div>
+   ${T.tva?`<div class="l tva"><span>dont TVA ${taux.join(' et ')} %</span><span>${E2(tva)} · base HT ${E2(ht)}</span></div>`:''}</div>
 
-  <div class="dv-s" style="margin-top:2mm">Suites, soins et arrêt de travail</div>
+  ${T.suites?`<div class="dv-s" style="margin-top:2mm">${esc(T.suitesTitre||'Suites et soins')}</div>
   <div class="dv-p">${su.map(x=>esc(x)).join('<br>')}<br>
-   <b>Arrêt de travail prévisible :</b> ${ar?`${ar} jour${ar>1?'s':''}`:'aucun'}.</div>
+   <b>Arrêt de travail prévisible :</b> ${ar?`${ar} jour${ar>1?'s':''}`:'aucun'}.</div>`:''}
 
-  <div class="dv-s">Validité de l’offre</div>
+  ${T.validite?`<div class="dv-s">Validité de l’offre</div>
   <div class="dv-p">Le présent devis est valable <b>${val} jours</b>, soit jusqu’au <b>${DF(lim)}</b>.
-   Au-delà, les tarifs sont susceptibles d’être révisés.${d.note?`<br>${esc(d.note)}`:''}</div>
+   Au-delà, les tarifs sont susceptibles d’être révisés.${d.note?`<br>${esc(d.note)}`:''}</div>`:''}
 
-  <div class="dv-men">
-   Devis établi en deux exemplaires, dont un remis au patient.
-   Les actes de médecine esthétique ne sont pas pris en charge par l’Assurance Maladie.
-   Aucune somme ne peut être exigée avant l’exécution de la prestation.<br>
-   <b>Mention à recopier de la main du patient :</b> « Devis reçu avant l’exécution de la prestation de service ».</div>
+  ${T.reglementOn&&T.reglement?`<div class="dv-s">Conditions de règlement</div>
+  <div class="dv-p">${txt(T.reglement)}</div>`:''}
 
-  <div class="dv-sg">
-   <div class="c"><div class="lb">Le praticien</div>
+  ${T.mentions?`<div class="dv-men">
+   ${txt(T.mentions)}${T.manuscrite?`<br><b>Mention à recopier de la main du patient :</b> « ${esc(T.manuscrite)} ».`:''}</div>`:''}
+
+  ${T.signatures?`<div class="dv-sg">
+   <div class="c"><div class="lb">${esc(T.sigPrat||'Le praticien')}</div>
     <div class="hint">${esc(prn)} — signature</div></div>
-   <div class="c"><div class="lb">Le patient</div>
-    <div class="hint">Date, mention manuscrite ci-dessus, puis signature</div></div></div>
+   <div class="c"><div class="lb">${esc(T.sigPat||'Le patient')}</div>
+    <div class="hint">Date${T.manuscrite?', mention manuscrite ci-dessus':''}, puis signature</div></div></div>`:''}
   </div>
   ${CABINET.piedOn?`<div class="dv-ft">${hfDevis(CABINET.pied,p,prn)}</div>`:''}
  </div>`;
@@ -3505,7 +3633,7 @@ function dvChoix(pid){
  d.id='famchoix'; d.className='famchoix';
  d.innerHTML=`<div class="fc-t">Quel devis établir pour ce patient ?</div>
   ${FAMILLES.map(f=>`<button class="fc-b" onclick="document.getElementById('famchoix').remove();openDevis(${pid},'${f.id}')">
-    <span class="fc-i">${f.i}</span><div><b>Devis ${f.dn}</b><small>${f.id==='epil'?'aisselles, maillot, jambes… sur le schéma corporel':'injections, peeling, laser, radiofréquence'}</small></div></button>`).join('')}
+    <span class="fc-i">${f.i}</span><div><b>${esc(trame(f.id).titre)}</b><small>${f.id==='epil'?'aisselles, maillot, jambes… sur le schéma corporel':'injections, peeling, laser, radiofréquence'}</small></div></button>`).join('')}
   <button class="fc-x" onclick="document.getElementById('famchoix').remove()">Annuler</button>`;
  d.onclick=e=>{if(e.target===d) d.remove()};      /* un clic à côté referme */
  document.body.appendChild(d);
@@ -3517,7 +3645,7 @@ function openDevis(pid,fam,did){
  const a0=actesDe(f)[0];
  DV={ id:d?d.id:null, pid:pid||(d?d.patient:PATIENTS[0].id), fam:f,
       date:d?d.date:TODAYS, prat:d?(d.praticien||PRATICIENS[0]):PRATICIENS[0],
-      remise:d?(d.remise||0):0, remiseType:'€', validite:d?(d.validite||30):30,
+      remise:d?(d.remise||0):0, remiseType:'€', validite:d?(d.validite||trame(f).validiteJours):trame(f).validiteJours,
       note:d?(d.note||''):'', infosOn:true, mode:'schema',
       lignes:(d&&d.prest&&d.prest.length)?d.prest.map(x=>({...x,z:{...x.z}}))
             :[{type:a0.id, reg:regionDef(a0.id), z:{}, seances:1, prix:null}] };
@@ -3542,7 +3670,7 @@ function dvSetActe(t){
 }
 function dvSetFam(f){
  if(DV.fam===f) return;
- DV.fam=f; const L=actesDe(f);
+ DV.fam=f; DV.validite=trame(f).validiteJours; const L=actesDe(f);
  DV.lignes.forEach(l=>{ if(!L.some(c=>c.id===l.type)){ l.type=L[0].id; l.z={}; l.prix=null; l.reg=regionDef(l.type) } });
  renderDevis();
 }
@@ -3614,7 +3742,7 @@ function renderDevis(){
   <div class="actepick">
    <div class="ap-t">1 · Type de devis</div>
    <div class="seg" style="margin-bottom:8px">${FAMILLES.map(f=>
-     `<button class="${DV.fam===f.id?'on':''}" onclick="dvSetFam('${f.id}')">${f.i} Devis ${f.n.toLowerCase()}</button>`).join('')}</div>
+     `<button class="${DV.fam===f.id?'on':''}" onclick="dvSetFam('${f.id}')">${f.i} ${esc(trame(f.id).titre)}</button>`).join('')}</div>
    <div class="ap-t">2 · Prestation ${dvLigne+1} sur ${DV.lignes.length}</div>
    <div class="ap-l">${actesDe(DV.fam).map(c=>`<button class="apc ${L.type===c.id?'on':''}" onclick="dvSetActe('${c.id}')">
      <span class="dot" style="background:var(--${c.col||'accent'})"></span>${esc(c.n)}
