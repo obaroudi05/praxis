@@ -387,6 +387,18 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
  .a4:last-child{page-break-after:auto}
  @page{size:A4;margin:13mm 0 11mm}
 }
+.dv-hist{margin-top:4mm;padding-top:2mm;border-top:1px dotted #d4d4d8;font-size:8.5px;color:#8a8a92;
+  display:flex;flex-wrap:wrap;gap:2mm 5mm}
+.dv-hist i{font-style:normal;opacity:.75}
+/* colonne Documents du tableau des actes */
+.dcol{display:flex;flex-direction:column;gap:3px;min-width:0}
+.dcell{display:flex;align-items:center;gap:6px;cursor:pointer;border-radius:7px;padding:2px 5px;margin:0 -5px;transition:.12s}
+.dcell:hover{background:var(--wash)}
+.dcell .di{width:17px;height:17px;border-radius:5px;display:grid;place-items:center;font-size:9.5px;flex:none;
+  background:var(--wash);color:var(--ink-2)}
+.dcell .dl{font-size:11.5px;font-weight:560;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+.dcell .dt{font-size:10px;color:var(--ink-3);white-space:nowrap;font-variant-numeric:tabular-nums}
+.dcell .bdg{flex:none}
 .fld2{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);
   margin:16px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--line)}
 .fld2:first-child{margin-top:0}
@@ -1170,9 +1182,11 @@ const AUTRES_DOCS=[];
 (function(){ let n=1;
  PATIENTS.forEach((p,i)=>{
   AUTRES_DOCS.push({id:'INF-'+(2600+n++),patient:p.id,date:p.depuis,cat:'Information',
-    nom:'Fiche d’information pré-acte',sous:'remise et commentée en consultation'});
+    nom:'Fiche d’information pré-acte',sous:'remise et commentée en consultation',
+    corps:"Les actes de médecine esthétique proposés au cabinet sont des actes médicaux. Ils requièrent un examen préalable, une information complète et votre consentement écrit.\n\nAvant la séance : pas d’aspirine ni d’anti-inflammatoire pendant les 5 jours précédents, sauf traitement prescrit. Signalez tout traitement anticoagulant, toute infection en cours, une grossesse ou un allaitement.\n\nAprès la séance : pas de sport intense, de sauna ni d’exposition solaire pendant 48 heures. Ecchymoses et œdème sont fréquents et régressifs.\n\nEn cas de douleur inhabituelle, de blanchiment cutané ou de trouble visuel, contactez le cabinet sans délai."});
   if(i%3===0) AUTRES_DOCS.push({id:'CRR-'+(2600+n++),patient:p.id,date:p.depuis,cat:'Courrier',
-    nom:'Courrier au médecin traitant',sous:'information de prise en charge esthétique'});
+    nom:'Courrier au médecin traitant',sous:'information de prise en charge esthétique',
+    corps:"Cher Confrère, chère Consœur,\n\nJe reçois en consultation votre patient(e) dans le cadre d’une prise en charge de médecine esthétique. Les actes envisagés sont réalisés au cabinet, sous anesthésie locale de contact lorsqu’elle est nécessaire, et ne relèvent pas d’une prise en charge par l’Assurance Maladie.\n\nJe reste à votre disposition pour tout élément utile au suivi, et vous remercie de me signaler tout traitement ou antécédent susceptible de modifier la conduite à tenir.\n\nConfraternellement."});
  });
 })();
 const ORDONNANCES=[];
@@ -1720,37 +1734,67 @@ V.patients=()=>{
 };
 
 /* ---------- Tous les patients (maître-détail) ---------- */
-function pListe(){
+function patientsTries(){
  let L=PATIENTS.filter(p=>{const q=pq.toLowerCase();
   return (!q||[p.nom,p.prenom,p.mail,p.tel,String(p.id)].join(' ').toLowerCase().includes(q))&&(!pPrat||p.prat===pPrat)});
  const last=p=>ACTES.filter(a=>a.patient===p.id).map(a=>a.date).sort().pop();
- L.sort((a,b)=>(last(b)||'').localeCompare(last(a)||''));
- if(!pSel&&L.length) pSel=L[0].id;
- return `<div class="head" style="margin-bottom:12px"><div><h1>Patients</h1><p>${L.length} sur ${PATIENTS.length} · la fiche s'ouvre à droite, sans changer de page</p></div>
+ return L.sort((a,b)=>(last(b)||'').localeCompare(last(a)||''));
+}
+/* la fiche prend toute la fenêtre ; on revient à la liste d'un clic */
+function pFiche(){
+ const p=pById(pSel), L=patientsTries(), i=L.findIndex(x=>x.id===pSel);
+ const nav=(d,l)=>{const n=L[i+d]; return n?`<button class="btn s" onclick="pSel=${n.id};paint()" title="${esc(fn(n))}">${l}</button>`:''};
+ const nA=ACTES.filter(a=>a.patient===p.id).length;
+ const F=FACTURES.filter(f=>f.patient===p.id);
+ const ca=F.reduce((s,f)=>s+f.paye,0), rd=F.reduce((s,f)=>s+rdu(f),0);
+ return `<div class="head" style="margin-bottom:12px">
+   <div class="r" style="gap:11px">
+     <button class="btn" onclick="pSel=null;paint()">← Tous les patients</button>
+     <div class="pav" style="width:38px;height:38px;font-size:13px">${esc(ini(p))}</div>
+     <div><h1 style="font-size:19px">${esc(fn(p))}</h1>
+      <p>${ageTxt(p)} · dossier ${p.id} · ${nA} acte${nA>1?'s':''} · patient depuis le ${DF(p.depuis)}${CAN('prix')?` · ${EUR(ca)}`:''}${rd&&CAN('prix')?` · <span style="color:var(--crit);font-weight:600">reste ${EUR(rd)}</span>`:''}</p></div></div>
+   <div class="r">${i>=0?`<span class="mu" style="font-size:11.5px;align-self:center">${i+1} / ${L.length}</span>`:''}
+     ${nav(-1,'‹')}${nav(1,'›')}
+     <button class="btn s" onclick="toast('SMS ouvert')" title="Envoyer un SMS">💬</button>
+     <button class="btn s" onclick="toast('E-mail ouvert')" title="Envoyer un e-mail">✉</button>
+     <button class="btn" onclick="dvChoix(${p.id})">📄 Devis</button>
+     <button class="btn p" onclick="openActe(${p.id})">✚ Nouvel acte</button></div></div>
+  ${pDetail(p)}`;
+}
+function pListe(){
+ if(pSel) return pFiche();
+ const L=patientsTries();
+ return `<div class="head" style="margin-bottom:12px"><div><h1>Patients</h1><p>${L.length} sur ${PATIENTS.length} · un clic sur un nom ouvre le dossier en pleine page</p></div>
   <div class="r"><button class="btn" onclick="toast('Recherche de doublons : 0 doublon détecté')">Doublons</button>
    <button class="btn p" onclick="openActe(null,null,true)">+ Patient</button></div></div>
- <div class="md">
-  <div class="card" style="position:sticky;top:0">
+ <div class="md" style="grid-template-columns:1fr">
+  <div class="card">
    <div class="h" style="gap:7px">
      <input class="inp" style="flex:1;box-shadow:none" placeholder="Nom, e-mail, téléphone…" value="${esc(pq)}"
        oninput="pq=this.value;paint();const e=document.querySelector('.md .inp');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
      <select class="inp" style="box-shadow:none;width:130px" onchange="pPrat=this.value;paint()">
        <option value="">Tous</option>${PRATICIENS.map(x=>`<option ${pPrat===x?'selected':''}>${x}</option>`).join('')}</select>
    </div>
-   <div class="tw" style="max-height:calc(100vh - 240px);overflow:auto"><table><tbody>
-    ${L.map(p=>{const f=fidLevel(p);
-     return `<tr class="c ${pSel===p.id?'sel':''}" onclick="pSel=${p.id};paint()">
+   <div class="tw"><table>
+    <thead><tr><th>Patient</th><th class="num">Actes</th><th>Dernier acte</th><th>Praticien référent</th><th>Contact</th><th></th></tr></thead>
+    <tbody>${L.map(p=>{const f=fidLevel(p), na=ACTES.filter(a=>a.patient===p.id).length, d=lastActe(p);
+     return `<tr class="c" onclick="openPatient(${p.id})">
       <td><div class="rowline"><div class="pav">${esc(ini(p))}</div>
        <div style="min-width:0"><div class="nm">${esc(p.nom)} ${esc(p.prenom)}</div>
-        <div class="mu" style="font-size:11.5px">${ageTxt(p)} · ${ACTES.filter(a=>a.patient===p.id).length} actes · ${last(p)?DFS(last(p)):'jamais'}</div></div>
-       <div style="margin-left:auto;display:flex;gap:4px">
+        <div class="mu" style="font-size:11.5px">${ageTxt(p)} · dossier ${p.id}</div></div>
+       <div style="display:flex;gap:4px;margin-left:8px">
         ${f?`<span class="bdg ${f.c}">${f.n}</span>`:''}
-        ${p.ant.length?`<span class="bdg b-warn">⚠ ${p.ant.length}</span>`:''}</div></div></td></tr>`}).join('')}
+        ${p.ant.length?`<span class="bdg b-warn">⚠ ${p.ant.length}</span>`:''}</div></div></td>
+      <td class="num">${na}</td>
+      <td class="mono mu" style="white-space:nowrap">${d?DF(d):'jamais'}</td>
+      <td class="mu" style="white-space:nowrap">${esc(p.prat)}</td>
+      <td class="mu" style="font-size:11.5px">${esc(p.tel)}<div>${esc(p.mail)}</div></td>
+      <td class="num"><button class="btn xs" onclick="event.stopPropagation();openPatient(${p.id})">Ouvrir</button></td></tr>`}).join('')}
    </tbody></table>${L.length?'':'<div class="empty">Aucun résultat.</div>'}</div>
   </div>
-  ${pSel?pDetail(pById(pSel)):'<div class="card"><div class="empty">Sélectionnez un patient.</div></div>'}
  </div>`;
 }
+const lastActe=p=>ACTES.filter(a=>a.patient===p.id).map(a=>a.date).sort().pop();
 
 /* ---------- Patients fidèles ---------- */
 /* ---------- Patients à réactiver ---------- */
@@ -1919,7 +1963,8 @@ function pDetail(p){
  const ca=F.reduce((s,f)=>s+f.paye,0), rd=F.reduce((s,f)=>s+rdu(f),0);
  const cumul={}; A.forEach(a=>zonesOf(a).forEach(([z,q])=>cumul[z]=(cumul[z]||0)+q));
  const AD=AUTRES_DOCS.filter(x=>x.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
- const nDoc=O.length+C.length+AD.length+D.length;
+ const AG=DOCADD.filter(x=>x.patient===p.id).sort((a,b)=>b.ts.localeCompare(a.ts));   /* produits depuis un modèle */
+ const nDoc=O.length+C.length+AD.length+D.length+AG.length;
  const nFac=D.length+F.length+F.filter(f=>f.avoir>0).length;
  const TB=[['resume',`Résumé · ${A.length} acte${A.length>1?'s':''}`],['schema','Schéma cumulé'],
            ['photos','Avant / après']]
@@ -1928,37 +1973,54 @@ function pDetail(p){
  if(!TB.some(t=>t[0]===pTab)) pTab='resume';
 
  /* ---- tableau des actes, réutilisé sur la fiche synthétique ---- */
+ /* colonne Documents : chaque pièce, son statut et son horodatage, cliquable */
+ const colDocs = a => {const L=docsActe(a);
+   if(!L.length) return '<span class="mu" style="font-size:11.5px">—</span>';
+   return `<div class="dcol">${L.map(d=>{const H=histo(d.id,d.seed||[]), last=H[H.length-1];
+     const st=DST[d.st]||[d.st,'b-neu'];
+     return `<div class="dcell" title="${esc(d.nom)} — ${esc(last?last.ev:'')} le ${DTS(last?last.t:d.ts)}"
+        onclick="event.stopPropagation();apercuDoc(${a.id},'${d.id}')">
+       <span class="di k-${d.k}">${d.ic}</span>
+       <span class="dl">${esc(LBLDOC[d.k]||d.k)}</span>
+       <span class="bdg ${st[1]}">${st[0]}</span>
+       <span class="dt">${DTS(last?last.t:d.ts)}</span></div>`}).join('')}</div>`};
+
  const tableActes = () => `<div class="tw"><table>
-   <thead><tr><th>Schéma</th><th>Date</th><th>Acte</th><th>Zones injectées</th><th>Praticien</th><th>Lot</th>${ROLES[role].prix?'<th class="num">Montant</th>':''}</tr></thead>
+   <thead><tr><th>Schéma</th><th>Date</th><th>Acte</th><th>Zones injectées</th><th style="min-width:250px">Documents</th><th>Praticien</th><th>Lot</th>${ROLES[role].prix?'<th class="num">Montant</th>':''}</tr></thead>
    <tbody>${A.map(a=>`<tr class="c" onclick="openActe(${a.patient},${a.id})">
      <td>${miniFace(a.zones)}</td><td class="mono">${DF(a.date)}</td>
      <td><b>${esc(a.nom)}</b>${a.effets?`<div class="mu" style="font-size:11px">⚠ ${esc(a.effets)}</div>`:''}</td>
-     <td style="max-width:260px">${a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneById(z);
+     <td style="max-width:230px">${a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneById(z);
         return `<span class="bdg ${Z.p==='tox'?'b-info':'b-warn'}" style="margin:0 3px 3px 0">${esc(Z.k)} ${fmtQ(q,Z.p)}</span>`}).join(''):`<span class="mu">${noZoneTxt(a)}</span>`}</td>
+     <td>${colDocs(a)}</td>
      <td class="mu" style="white-space:nowrap">${esc(a.praticien)}${a.operateur?`<div style="font-size:11px">op. ${esc(a.operateur)}</div>`:''}</td>
      <td class="mono mu" style="font-size:11.5px">${a.lot||'—'}</td>
      ${ROLES[role].prix?`<td class="num">${EUR(a.prix)}</td>`:''}</tr>`).join('')}
    </tbody></table>${A.length?'':'<div class="empty">Aucun acte enregistré pour ce patient.</div>'}</div>`;
 
  /* ---- documents : ordonnances, devis, factures, consentements ---- */
+ const pdfBtn=(aid,id)=>`<button class="btn xs" onclick="event.stopPropagation();apercuDoc(${aid},'${id}')">◫ PDF</button>`;
  const DOCS=[
   ...O.map(o=>({k:'ordonnance',id:o.id,date:o.date,
     t:`Ordonnance — ${o.lignes.length} ligne${o.lignes.length>1?'s':''}`,
     s:o.lignes[0].split(' —')[0]+(o.lignes.length>1?` + ${o.lignes.length-1} autre${o.lignes.length>2?'s':''}`:''),
-    st:bdg('b-neu','Éditée'), a:`<button class="btn xs" onclick="event.stopPropagation();toast('Ordonnance ${o.id} ouverte')">Ouvrir</button>`})),
+    st:bdg('b-neu','Éditée'), a:pdfBtn(o.acte,o.id)})),
   ...D.map(d=>({k:'devis',id:d.id,date:d.date,t:nomDevis(d),
     s:`${d.id} · ${d.lignes.length} prestation${d.lignes.length>1?'s':''}${CAN('prix')?' · '+EUR(d.montant):''}${d.infos?' · fiche d’information jointe':''}`,
     st:bdg(SD[d.statut][1],SD[d.statut][0]),
-    a:`<button class="btn xs" onclick="event.stopPropagation();apercuDevis('${d.id}')">PDF</button>
+    a:`<button class="btn xs" onclick="event.stopPropagation();apercuDevis('${d.id}')">◫ PDF</button>
         <button class="btn xs" onclick="event.stopPropagation();go('devis','${d.id}')">Ouvrir</button>`})),
   ...C.map(a=>({k:'consentement',id:'CONS-'+a.id,date:a.date,
     t:`Consentement — ${esc(a.nom)}`, s:`acte du ${DF(a.date)}`,
     st:a.consent?bdg('b-good','Signé'):bdg('b-crit','⚠ Non signé'),
-    a:a.consent?`<button class="btn xs" onclick="event.stopPropagation();toast('Consentement ouvert')">Ouvrir</button>`
-               :`<button class="btn xs p" onclick="event.stopPropagation();toast('Lien de signature envoyé par SMS')">Faire signer</button>`})),
+    a:pdfBtn(a.id,'CONS-'+a.id)+(a.consent?'':`<button class="btn xs p" onclick="event.stopPropagation();sendDoc(${a.id},'CONS-${a.id}')">Faire signer</button>`)})),
+  ...AG.map(x=>({k:x.cat==='Courrier'?'courrier':x.cat.toLowerCase(),id:x.id,date:x.ts.slice(0,10),
+    t:esc(x.nom), s:`${esc(x.cat)} · généré le ${DTS(x.ts)}`,
+    st:x.signe?bdg('b-good','Signé'):x.envoye?bdg('b-info','Envoyé'):bdg('b-neu','Généré'),
+    a:pdfBtn(x.acte,x.id)})),
   ...AD.map(x=>({k:x.cat==='Courrier'?'courrier':'information',id:x.id,date:x.date,
     t:esc(x.nom), s:esc(x.sous), st:bdg('b-neu','Archivé'),
-    a:`<button class="btn xs" onclick="event.stopPropagation();toast('${x.id} ouvert')">Ouvrir</button>`})),
+    a:`<button class="btn xs" onclick="event.stopPropagation();apercuAutre('${x.id}')">◫ PDF</button>`})),
  ].sort((a,b)=>b.date.localeCompare(a.date));
  const KIND={devis:['Devis','◫','Devis'],ordonnance:['Ordonnances','℞','Ordonnance'],consentement:['Consentements','✎','Consentement'],
              information:['Informations','ⓘ','Information'],courrier:['Courriers','✉','Courrier']};
@@ -2096,15 +2158,6 @@ function pDetail(p){
  };
 
  return `<div class="card fiche">
-  <div class="h" style="padding:14px 16px">
-   <div class="pav" style="width:38px;height:38px;font-size:13px">${esc(ini(p))}</div>
-   <div><h2 style="font-size:16px">${esc(p.nom)} ${esc(p.prenom)}</h2>
-    <div class="mu" style="font-size:11.5px">${ageTxt(p)} · dossier ${p.id} · ${A.length} acte${A.length>1?'s':''}${ROLES[role].prix?` · ${EUR(ca)}`:''}${rd?` · <span style="color:var(--crit);font-weight:600">reste ${EUR(rd)}</span>`:''}</div></div>
-   <div class="r">
-    <button class="btn s" onclick="toast('SMS ouvert')">💬</button>
-    <button class="btn s" onclick="toast('E-mail ouvert')">✉</button>
-    <button class="btn s p" onclick="openActe(${p.id})">✚ Acte</button></div>
-  </div>
   <div class="b" style="padding-bottom:0"><div class="tabs">${TB.map(([k,l])=>`<button class="${pTab===k?'on':''}" onclick="pTab='${k}';paint()">${l}</button>`).join('')}</div></div>
   <div class="b">${(body[pTab]||body.resume)()}</div></div>`;
 }
@@ -3344,6 +3397,8 @@ function logDoc(id,ev,par){(DOCH[id]=DOCH[id]||[]).push({t:nowStamp(),ev,par:par
 function histo(id,seed){return (DOCH[id]||[]).length?DOCH[id]:seed}
 
 /* --- documents rattachés à un acte, avec leur statut réel --- */
+const LBLDOC={devis:'Devis',ordonnance:'Ordonnance',consentement:'Consentement',
+ information:'Information',courrier:'Courrier',facture:'Facture'};
 const DST={
  attente:['⏳ À faire signer','b-warn'], lien:['✉ Lien envoyé','b-info'], signe:['✓ Signé','b-good'],
  editee:['Éditée','b-neu'],  envoye:['✉ Envoyé','b-info'], lu:['👁 Lu','b-info'],
@@ -3456,7 +3511,7 @@ function docPane(a){
     <div class="drow-a">
       ${d.env?`<button class="btn xs p" onclick="sendDoc(${a.id},'${d.id}')" title="Envoi par ${ca} à ${esc(p.mail!=='—'?p.mail:p.tel)}">✉ Envoyer</button>`:''}
       ${d.sign?`<button class="btn xs" onclick="signDoc(${a.id},'${d.id}')">✓ Marquer signé</button>`:''}
-      <button class="btn xs" onclick="${d.k==='devis'?`apercuDevis('${d.id}')`:`toast('PDF de ${d.id} ouvert')`}">PDF</button>
+      <button class="btn xs" onclick="apercuDoc(${a.id},'${d.id}')">◫ Aperçu PDF</button>
       ${d.k==='devis'?`<button class="btn xs" onclick="closeAll();go('devis','${d.id}')">Ouvrir</button>`:''}
     </div>
     ${docOpen===d.id?`<div class="dhist">${H.map(h=>`<div class="dh">
@@ -3470,7 +3525,7 @@ function docPane(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='Q';
+const BUILD='R';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -3593,21 +3648,156 @@ function devisDoc(d){
  </div>`;
 }
 
-/* ---------- visionneuse ---------- */
+/* ==========================================================================
+   Tout document imprimable — consentement, ordonnance, facture, information…
+   Même feuille A4, même en-tête et même pied que le devis.
+   ========================================================================== */
+const CONSENT_TXT={
+ AH:{prod:'acide hyaluronique réticulé', risq:'Œdème, ecchymoses, rougeur et sensibilité au point d’injection, régressifs en quelques jours. Plus rarement : nodule, asymétrie, infection, réaction inflammatoire retardée. Exceptionnellement : occlusion vasculaire pouvant conduire à une nécrose cutanée ou, très exceptionnellement, à un trouble visuel.'},
+ BTX:{prod:'toxine botulique de type A', risq:'Rougeur au point de ponction, céphalées transitoires. Plus rarement : asymétrie, ptôsis palpébral régressif en quelques semaines, sécheresse oculaire.'},
+ SKB:{prod:'acide hyaluronique non réticulé (skinbooster)', risq:'Papules transitoires, ecchymoses, œdème régressifs en 24 à 48 heures.'},
+ MESO:{prod:'solution de mésothérapie', risq:'Rougeurs, micro-ecchymoses, sensibilité pendant 24 à 72 heures.'},
+ PEEL:{prod:'agent de peeling chimique', risq:'Érythème, desquamation, sensation de chaleur. Plus rarement : hyperpigmentation post-inflammatoire, en particulier en cas d’exposition solaire.'},
+ LAS2:{prod:'lumière pulsée / laser', risq:'Érythème transitoire, œdème. Plus rarement : brûlure superficielle, trouble pigmentaire.'},
+ LAS1:{prod:'laser épilatoire', risq:'Érythème péri-folliculaire, œdème transitoire. Plus rarement : brûlure superficielle, trouble pigmentaire, repousse paradoxale.'},
+ RF:{prod:'radiofréquence', risq:'Chaleur, rougeur transitoire. Plus rarement : brûlure superficielle.'},
+};
+const consentTxt=t=>CONSENT_TXT[t]||{prod:acteDef(t).n.toLowerCase(), risq:'Effets indésirables transitoires au point de traitement.'};
+
+/* corps de chaque type de document, en HTML de feuille */
+function corpsDoc(a,d){
+ const p=pById(a.patient), prn=a.praticien, pr=pratInfo(prn), C=acteDef(a.type);
+ const H=histo(d.id,d.seed||[]);
+ const bloc=(t,c)=>`<div class="dv-s">${esc(t)}</div><div class="dv-p">${c}</div>`;
+ const sign=(g,dr,hg,hd)=>`<div class="dv-sg"><div class="c"><div class="lb">${esc(g)}</div><div class="hint">${esc(hg)}</div></div>
+   <div class="c"><div class="lb">${esc(dr)}</div><div class="hint">${esc(hd)}</div></div></div>`;
+
+ if(d.k==='consentement'){
+  const ct=consentTxt(a.type);
+  return `${bloc('Acte proposé',
+    `<b>${esc(a.nom)}</b>${a.zones?` — ${zonesOf(a).map(([z])=>esc(zoneById(z)?.k||z)).join(', ')}`:''}<br>
+     Produit utilisé : ${esc(ct.prod)}${a.lot?` · lot ${esc(a.lot)}`:''}<br>
+     Praticien : ${esc(prn)} · séance du ${DF(a.date)}`)}
+  ${bloc('Information délivrée',
+    `Le praticien m’a exposé la nature de l’acte, ses objectifs, son déroulement et son caractère strictement esthétique,
+     non pris en charge par l’Assurance Maladie. J’ai pu poser toutes les questions utiles et disposer du temps nécessaire à ma réflexion.`)}
+  ${bloc('Risques et effets indésirables', esc(ct.risq))}
+  ${bloc('Alternatives',
+    `L’abstention thérapeutique m’a été présentée comme une option, ainsi que les alternatives disponibles au cabinet.`)}
+  ${bloc('Suites et conduite à tenir', esc(medleg(a.type).su)+'<br>Je m’engage à signaler sans délai tout événement inhabituel.')}
+  <div class="dv-men">Je soussigné(e) <b>${esc(fn(p))}</b>, né(e) le ${DF(p.ddn)}, déclare avoir reçu une information claire,
+   loyale et appropriée, l’avoir comprise, et donner mon consentement libre et éclairé à l’acte décrit ci-dessus.<br>
+   <b>Mention à recopier de la main du patient :</b> « Lu et approuvé, bon pour accord ».</div>
+  ${sign('Le praticien','Le patient',`${prn} — signature`,'Date, mention manuscrite, puis signature')}`;
+ }
+
+ if(d.k==='ordonnance'){
+  const o=ORDONNANCES.find(x=>x.id===d.id);
+  const L=o?o.lignes:(DOCADD.find(x=>x.id===d.id)?.corps||'').split('\n').filter(Boolean);
+  return `${bloc('Patient',`<b>${esc(fn(p))}</b> — né(e) le ${DF(p.ddn)}`)}
+  <div class="dv-s">Prescription</div>
+  <div class="dv-p">${L.map(l=>`<div style="padding:1.4mm 0 1.4mm 4mm;border-left:2px solid #d4d4d8;margin-bottom:1.6mm">${esc(l)}</div>`).join('')}</div>
+  ${bloc('Durée',`Ordonnance établie le ${DF(o?o.date:a.date)}. À renouveler uniquement sur avis médical.`)}
+  ${sign('Le praticien','','Signature et cachet','')}`;
+ }
+
+ if(d.k==='facture'){
+  const f=FACTURES.find(x=>x.id===d.id); if(!f) return '';
+  const t=tauxTVA(f.type), ht=fHT(f), tva=fTVA(f), ttc=fTTC(f);
+  return `${bloc('Patient',`<b>${esc(fn(p))}</b> — dossier n° ${p.id}<br>${esc(p.adr||'')}`)}
+  <div class="dv-s">Prestation</div>
+  <table class="dv-tb"><thead><tr><th style="width:64%">Désignation</th><th class="n">Date</th><th class="n">Total TTC</th></tr></thead>
+   <tbody><tr><td><b>${esc(a.nom)}</b>${a.zones?`<div class="dz">${zonesOf(a).map(([z])=>esc(zoneById(z)?.k||z)).join(', ')}</div>`:''}</td>
+    <td class="n">${DF(a.date)}</td><td class="n">${E2(ttc)}</td></tr></tbody></table>
+  <div class="dv-tot">
+   <div class="l"><span>Total HT</span><span>${E2(ht)}</span></div>
+   <div class="l"><span>TVA ${t} %</span><span>${E2(tva)}</span></div>
+   <div class="l net"><span>Total TTC</span><span>${E2(ttc)}</span></div>
+   ${f.paye?`<div class="l"><span>Encaissé${f.moyen?' — '+esc(f.moyen):''}</span><span>${E2(f.paye)}</span></div>`:''}
+   ${rdu(f)?`<div class="l"><span>Reste dû</span><span>${E2(rdu(f))}</span></div>`:''}</div>
+  <div class="dv-men">Facture acquittée le ${DF(f.date)}${f.moyen?` par ${esc(f.moyen)}`:''}.
+   Actes à visée esthétique non pris en charge par l’Assurance Maladie, soumis à TVA au taux de ${t} %.</div>`;
+ }
+
+ /* information, courrier, tout document produit depuis un modèle */
+ const ad=DOCADD.find(x=>x.id===d.id);
+ const corps=ad?ad.corps:(d.sous||'');
+ return `${bloc('Patient',`<b>${esc(fn(p))}</b> — né(e) le ${DF(p.ddn)} · dossier n° ${p.id}`)}
+  <div class="dv-p" style="white-space:pre-wrap">${esc(corps)}</div>
+  ${bloc('Établi le',`${DTS(H[0]?.t||d.ts)} par ${esc(H[0]?.par||prn)}`)}
+  ${sign('Le praticien','','Signature','')}`;
+}
+
+/* la feuille A4 complète, tous documents confondus */
+function docDoc(a,d){
+ const p=pById(a.patient), prn=a.praticien;
+ const H=histo(d.id,d.seed||[]);
+ return `<div class="a4">
+  ${CABINET.enteteOn?`<div class="dv-hd">${hfDevis(CABINET.entete,p,prn)}</div>`:''}
+  <div class="gr">
+   <div class="dv-ti"><h1>${esc(d.nom)}</h1>
+    <div class="n"><b>${esc(d.id)}</b><br>Établi le ${DF((H[0]?.t||d.ts).slice(0,10))}</div></div>
+   ${corpsDoc(a,d)}
+   <div class="dv-hist">${H.map(h=>`<span>${DTS(h.t)} — ${esc(h.ev)} <i>(${esc(h.par)})</i></span>`).join('')}</div>
+  </div>
+  ${CABINET.piedOn?`<div class="dv-ft">${hfDevis(CABINET.pied,p,prn)}</div>`:''}
+ </div>`;
+}
+
+/* document rattaché au patient, sans acte (information, courrier) */
+function docAutre(x){
+ const p=pById(x.patient), prn=p.prat;
+ return `<div class="a4">
+  ${CABINET.enteteOn?`<div class="dv-hd">${hfDevis(CABINET.entete,p,prn)}</div>`:''}
+  <div class="gr">
+   <div class="dv-ti"><h1>${esc(x.nom)}</h1>
+    <div class="n"><b>${esc(x.id)}</b><br>Établi le ${DF(x.date)}</div></div>
+   <div class="dv-s">Patient</div>
+   <div class="dv-p"><b>${esc(fn(p))}</b> — né(e) le ${DF(p.ddn)} · dossier n° ${p.id}<br>${esc(p.adr||'')}</div>
+   <div class="dv-s">${esc(x.cat)}</div>
+   <div class="dv-p" style="white-space:pre-wrap">${esc(x.corps||x.sous||'')}</div>
+   <div class="dv-sg"><div class="c"><div class="lb">Le praticien</div>
+     <div class="hint">${esc(prn)} — signature</div></div>
+    <div class="c"><div class="lb">${x.cat==='Information'?'Le patient':'Destinataire'}</div>
+     <div class="hint">${x.cat==='Information'?'Reçu le, puis signature':'Médecin traitant'}</div></div></div>
+  </div>
+  ${CABINET.piedOn?`<div class="dv-ft">${hfDevis(CABINET.pied,p,prn)}</div>`:''}
+ </div>`;
+}
+
+/* ---------- visionneuse commune à tous les documents ---------- */
 let PV=null;
-function apercuDevis(id){
- const d=(typeof id==='object')?id:DEVIS.find(x=>x.id===id); if(!d) return;
- PV=d.id||'projet';
- const p=pById(d.patient), {net}=totauxDoc(d);
+function pdfView(titre,sous,html,actions){
+ PV=titre;
  document.getElementById('pvbar').innerHTML=`
-  <span class="tt">${esc(nomDevis(d))}</span>
-  <span class="ss">${esc(d.id||'projet non enregistré')} · ${esc(fn(p))} · ${DF(d.date)}${CAN('prix')?' · '+E2(net):''}</span>
+  <span class="tt">${esc(titre)}</span><span class="ss">${esc(sous)}</span>
   <div class="r">
    <button class="pv-b" onclick="window.print()">⎙ Imprimer / Enregistrer en PDF</button>
-   ${d.id&&d.statut==='brouillon'?`<button class="pv-b" onclick="fermerPdf();sendRel('${d.id}')">✉ Envoyer au patient</button>`:''}
+   ${actions||''}
    <button class="pv-b p" onclick="fermerPdf()">✕ Fermer</button></div>`;
- document.getElementById('pvsc').innerHTML=devisDoc(d);
+ document.getElementById('pvsc').innerHTML=html;
  document.getElementById('pdfv').classList.add('on');
+}
+function apercuDevis(id){
+ const d=(typeof id==='object')?id:DEVIS.find(x=>x.id===id); if(!d) return;
+ const p=pById(d.patient), {net}=totauxDoc(d);
+ pdfView(nomDevis(d), `${d.id||'projet non enregistré'} · ${fn(p)} · ${DF(d.date)}${CAN('prix')?' · '+E2(net):''}`,
+   devisDoc(d),
+   d.id&&d.statut==='brouillon'?`<button class="pv-b" onclick="fermerPdf();sendRel('${d.id}')">✉ Envoyer au patient</button>`:'');
+}
+function apercuAutre(id){
+ const x=AUTRES_DOCS.find(y=>y.id===id); if(!x) return;
+ pdfView(x.nom, `${x.id} · ${fn(pById(x.patient))} · ${DF(x.date)}`, docAutre(x), '');
+}
+/* n'importe quelle pièce rattachée à un acte */
+function apercuDoc(aid,id){
+ const a=ACTES.find(x=>x.id===aid); if(!a) return;
+ const d=docsActe(a).find(x=>x.id===id); if(!d) return;
+ if(d.k==='devis') return apercuDevis(d.id);
+ const p=pById(a.patient), st=(DST[d.st]||[d.st])[0];
+ pdfView(d.nom, `${d.id} · ${fn(p)} · ${st}`, docDoc(a,d),
+   [d.env?`<button class="pv-b" onclick="fermerPdf();sendDoc(${aid},'${d.id}')">✉ Envoyer</button>`:'',
+    d.sign?`<button class="pv-b" onclick="fermerPdf();signDoc(${aid},'${d.id}')">✓ Marquer signé</button>`:''].join(''));
 }
 /* aperçu d'un devis en cours de saisie, avant tout enregistrement */
 function apercuBrouillon(){
