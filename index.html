@@ -402,6 +402,28 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .fld2{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);
   margin:16px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--line)}
 .fld2:first-child{margin-top:0}
+.zed{cursor:crosshair}
+.zed-n{width:100%;font-size:12px;padding:4px 7px;margin-bottom:4px}
+.zed-r{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.zed-l{display:flex;align-items:center;gap:4px;font-size:10.5px;color:var(--ink-3);font-weight:500}
+.zed-l .inp{padding:3px 6px;font-size:11.5px}
+.zrow.on{border-color:var(--accent);background:var(--accent-wash)}
+.idc{border:1px solid var(--line);border-radius:14px;background:var(--panel);margin-bottom:14px;overflow:hidden}
+.idc-h{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+.idc-h b{font-size:13.5px;font-weight:670;display:block;letter-spacing:-.01em}
+.idc-h small{font-size:11px;color:var(--ink-3)}
+.idc-h .r{margin-left:auto;display:flex;gap:7px;align-items:center;flex:none}
+.idc-g{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px 0}
+.idc-g>div{padding:9px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-width:0}
+.idc-g>div:nth-child(4n){border-right:none}
+.idc-g label{display:block;font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);margin-bottom:3px}
+.idc-g>div>div{font-size:12.5px;font-weight:560;overflow:hidden;text-overflow:ellipsis}
+.idc-a{padding:9px 14px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.idc-a label{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);margin-right:4px}
+@media(max-width:1100px){.idc-g{grid-template-columns:repeat(2,minmax(0,1fr))}.idc-g>div:nth-child(2n){border-right:none}}
+.zt-r{display:flex;align-items:center;gap:7px;margin-left:auto}
+.zt-i{width:104px;padding:4px 8px;font-size:11.5px;text-align:right}
+.zt-n{font-size:11.5px;color:var(--ink-3)}
 .zsel{font-size:11px;border:1px solid var(--line);border-radius:7px;padding:2px 22px 2px 5px;background:var(--panel);
   color:var(--ink-2);font-family:inherit;cursor:pointer;max-width:100%}
 .zsel:disabled{opacity:.45;cursor:default}
@@ -835,45 +857,45 @@ const courtDevis=f=>trame(f).court;
 const REGIONS =[{id:'visage',n:'Visage',i:'☺'},{id:'corps',n:'Corps',i:'🧍'}];
 const famById=id=>FAMILLES.find(f=>f.id===id)||FAMILLES[0];
 
-const ZDEF=[
- {id:'front',   n:'Front — rides frontales',   k:'Front',        p:'tox',d:12,s:4,  cx:200,cy:130,rx:72,ry:30},
- {id:'glab',    n:'Glabelle — ride du lion',   k:'Glabelle',     p:'tox',d:20,s:4,  cx:200,cy:178,rx:19,ry:17},
- {id:'tempe',   n:'Tempe',                     k:'Tempe',        p:'ah', d:.5,s:.25,cx:106,cy:172,rx:21,ry:27,m:1},
- {id:'sourcil', n:'Queue du sourcil',          k:'Sourcil',      p:'tox',d:4, s:2,  cx:151,cy:170,rx:26,ry:10,m:1},
- {id:'patte',   n:'Patte d’oie',               k:'Patte d’oie',  p:'tox',d:10,s:2,  cx:121,cy:209,rx:19,ry:19,m:1},
- {id:'cerne',   n:'Cerne — vallée des larmes', k:'Cerne',        p:'ah', d:.5,s:.1, cx:157,cy:231,rx:26,ry:12,m:1},
- {id:'pomm',    n:'Pommette — malaire',        k:'Pommette',     p:'ah', d:.5,s:.25,cx:136,cy:256,rx:29,ry:20,m:1},
- {id:'nez',     n:'Nez — profiloplastie',      k:'Nez',          p:'ah', d:.3,s:.1, cx:200,cy:244,rx:16,ry:34},
- {id:'smal',    n:'Creux sous-malaire',        k:'Sous-malaire', p:'ah', d:.5,s:.25,cx:134,cy:300,rx:22,ry:22,m:1},
- {id:'sillon',  n:'Sillon nasogénien',         k:'Sillon',       p:'ah', d:.5,s:.25,cx:168,cy:299,rx:14,ry:26,m:1},
- {id:'perib',   n:'Rides péribuccales',        k:'Péribuccal',   p:'ah', d:.3,s:.1, cx:200,cy:304,rx:34,ry:11},
- {id:'levres',  n:'Lèvres',                    k:'Lèvres',       p:'ah', d:1, s:.25,cx:200,cy:328,rx:36,ry:16},
- {id:'amert',   n:'Pli d’amertume',            k:'Amertume',     p:'ah', d:.3,s:.1, cx:169,cy:352,rx:14,ry:13,m:1},
- {id:'mand',    n:'Mandibule — ovale',         k:'Mandibule',    p:'ah', d:1, s:.25,cx:129,cy:344,rx:21,ry:34,m:1},
- {id:'menton',  n:'Menton',                    k:'Menton',       p:'ah', d:.5,s:.25,cx:200,cy:386,rx:32,ry:22},
- {id:'cou',     n:'Cou — bandes platysmales',  k:'Cou',          p:'tox',d:20,s:5,  cx:200,cy:478,rx:40,ry:24},
+let ZDEF=[
+ {id:'front',   n:'Front — rides frontales',   k:'Front',        p:'tox',d:12,s:4,  cx:200,cy:152,rx:68,ry:28},
+ {id:'glab',    n:'Glabelle — ride du lion',   k:'Glabelle',     p:'tox',d:20,s:4,  cx:200,cy:198,rx:18,ry:16},
+ {id:'tempe',   n:'Tempe',                     k:'Tempe',        p:'ah', d:.5,s:.25,cx:112,cy:196,rx:20,ry:26,m:1},
+ {id:'sourcil', n:'Queue du sourcil',          k:'Sourcil',      p:'tox',d:4, s:2,  cx:152,cy:200,rx:25,ry:10,m:1},
+ {id:'patte',   n:'Patte d’oie',               k:'Patte d’oie',  p:'tox',d:10,s:2,  cx:120,cy:238,rx:19,ry:18,m:1},
+ {id:'cerne',   n:'Cerne — vallée des larmes', k:'Cerne',        p:'ah', d:.5,s:.1, cx:160,cy:256,rx:26,ry:12,m:1},
+ {id:'pomm',    n:'Pommette — malaire',        k:'Pommette',     p:'ah', d:.5,s:.25,cx:138,cy:288,rx:30,ry:21,m:1},
+ {id:'nez',     n:'Nez — profiloplastie',      k:'Nez',          p:'ah', d:.3,s:.1, cx:200,cy:268,rx:16,ry:34},
+ {id:'smal',    n:'Creux sous-malaire',        k:'Sous-malaire', p:'ah', d:.5,s:.25,cx:132,cy:340,rx:23,ry:23,m:1},
+ {id:'sillon',  n:'Sillon nasogénien',         k:'Sillon',       p:'ah', d:.5,s:.25,cx:172,cy:330,rx:14,ry:26,m:1},
+ {id:'perib',   n:'Rides péribuccales',        k:'Péribuccal',   p:'ah', d:.3,s:.1, cx:200,cy:332,rx:32,ry:11},
+ {id:'levres',  n:'Lèvres',                    k:'Lèvres',       p:'ah', d:1, s:.25,cx:200,cy:357,rx:38,ry:17},
+ {id:'amert',   n:'Pli d’amertume',            k:'Amertume',     p:'ah', d:.3,s:.1, cx:170,cy:384,rx:14,ry:13,m:1},
+ {id:'mand',    n:'Mandibule — ovale',         k:'Mandibule',    p:'ah', d:1, s:.25,cx:127,cy:382,rx:21,ry:36,m:1},
+ {id:'menton',  n:'Menton',                    k:'Menton',       p:'ah', d:.5,s:.25,cx:200,cy:420,rx:32,ry:22},
+ {id:'cou',     n:'Cou — bandes platysmales',  k:'Cou',          p:'tox',d:20,s:5,  cx:200,cy:512,rx:42,ry:24},
 ];
 /* dépliage gauche/droite (côté PATIENT : l'image de gauche = côté droit du patient) */
 /* ---------- zones du corps ---------- */
-const BDEF=[
- {id:'cou_c',   n:'Cou',                  k:'Cou',        p:'ah', d:1,s:.5, cx:200,cy:126,rx:26,ry:17},
- {id:'decol',   n:'Décolleté',            k:'Décolleté',  p:'ah', d:2,s:.5, cx:200,cy:182,rx:62,ry:26},
- {id:'aiss',    n:'Aisselle',             k:'Aisselle',   p:'ah', d:1,s:.5, cx:139,cy:192,rx:17,ry:16,m:1},
- {id:'bras',    n:'Bras',                 k:'Bras',       p:'ah', d:2,s:.5, cx:112,cy:258,rx:17,ry:56,m:1},
- {id:'avbras',  n:'Avant-bras',           k:'Avant-bras', p:'ah', d:2,s:.5, cx:92, cy:372,rx:15,ry:54,m:1},
- {id:'main',    n:'Main',                 k:'Main',       p:'ah', d:1,s:.5, cx:82, cy:452,rx:14,ry:21,m:1},
- {id:'abdo',    n:'Abdomen',              k:'Abdomen',    p:'ah', d:3,s:1,  cx:200,cy:292,rx:50,ry:48},
- {id:'flanc',   n:'Flanc — poignée d’amour',k:'Flanc',    p:'ah', d:2,s:.5, cx:146,cy:296,rx:16,ry:40,m:1},
- {id:'maillot', n:'Maillot',              k:'Maillot',    p:'ah', d:1,s:.5, cx:200,cy:390,rx:40,ry:27},
- {id:'cuisse',  n:'Cuisse',               k:'Cuisse',     p:'ah', d:3,s:1,  cx:166,cy:487,rx:29,ry:72,m:1},
- {id:'genou',   n:'Genou',                k:'Genou',      p:'ah', d:1,s:.5, cx:164,cy:580,rx:22,ry:22,m:1},
- {id:'mollet',  n:'Mollet',               k:'Mollet',     p:'ah', d:2,s:.5, cx:163,cy:668,rx:24,ry:58,m:1},
- {id:'cheville',n:'Cheville et pied',     k:'Pied',       p:'ah', d:1,s:.5, cx:161,cy:772,rx:16,ry:26,m:1},
+let BDEF=[
+ {id:'cou_c',   n:'Cou',                  k:'Cou',        p:'ah', d:1,s:.5, cx:200,cy:126,rx:24,ry:16},
+ {id:'decol',   n:'Décolleté',            k:'Décolleté',  p:'ah', d:2,s:.5, cx:200,cy:196,rx:58,ry:26},
+ {id:'aiss',    n:'Aisselle',             k:'Aisselle',   p:'ah', d:1,s:.5, cx:150,cy:198,rx:17,ry:16,m:1},
+ {id:'bras',    n:'Bras',                 k:'Bras',       p:'ah', d:2,s:.5, cx:117,cy:272,rx:16,ry:58,m:1},
+ {id:'avbras',  n:'Avant-bras',           k:'Avant-bras', p:'ah', d:2,s:.5, cx:99, cy:386,rx:14,ry:54,m:1},
+ {id:'main',    n:'Main',                 k:'Main',       p:'ah', d:1,s:.5, cx:90, cy:462,rx:13,ry:20,m:1},
+ {id:'abdo',    n:'Abdomen',              k:'Abdomen',    p:'ah', d:3,s:1,  cx:200,cy:308,rx:46,ry:46},
+ {id:'flanc',   n:'Flanc — poignée d’amour',k:'Flanc',    p:'ah', d:2,s:.5, cx:152,cy:310,rx:16,ry:38,m:1},
+ {id:'maillot', n:'Maillot',              k:'Maillot',    p:'ah', d:1,s:.5, cx:200,cy:410,rx:36,ry:24},
+ {id:'cuisse',  n:'Cuisse',               k:'Cuisse',     p:'ah', d:3,s:1,  cx:169,cy:520,rx:25,ry:70,m:1},
+ {id:'genou',   n:'Genou',                k:'Genou',      p:'ah', d:1,s:.5, cx:167,cy:622,rx:19,ry:22,m:1},
+ {id:'mollet',  n:'Mollet',               k:'Mollet',     p:'ah', d:2,s:.5, cx:170,cy:706,rx:20,ry:56,m:1},
+ {id:'cheville',n:'Cheville et pied',     k:'Pied',       p:'ah', d:1,s:.5, cx:172,cy:812,rx:15,ry:28,m:1},
  {id:'dos',     n:'Dos (vue postérieure)',k:'Dos',        p:'ah', d:3,s:1,  cx:0,cy:0,rx:0,ry:0, post:1},
  {id:'lombes',  n:'Lombes (vue postérieure)',k:'Lombes',  p:'ah', d:2,s:.5, cx:0,cy:0,rx:0,ry:0, post:1},
  {id:'fesses',  n:'Fesses (vue postérieure)',k:'Fesses',  p:'ah', d:3,s:1,  cx:0,cy:0,rx:0,ry:0, post:1},
 ];
-const ZONES=[];
+let ZONES=[];
 const deplier=(L,reg)=>L.forEach(z=>{
   const base={...z, r:reg};
   if(z.m){
@@ -881,7 +903,8 @@ const deplier=(L,reg)=>L.forEach(z=>{
     ZONES.push({...base, id:z.id+'_g', n:z.n+' — gauche', k:z.k+' G', side:'G', cx:400-z.cx});
   } else ZONES.push({...base, side:''});
 });
-deplier(ZDEF,'visage'); deplier(BDEF,'corps');
+function rebuildZones(){ ZONES.length=0; deplier(ZDEF,'visage'); deplier(BDEF,'corps') }
+rebuildZones();
 const zoneById=id=>ZONES.find(z=>z.id===id);
 const zonesDe=r=>ZONES.filter(z=>z.r===r);
 const UNIT=p=>p==='tox'?'U':'ml';
@@ -1503,38 +1526,65 @@ function miniFace(zones,zt){
 
 /* ---- Schémas interactifs : visage et corps, même moteur ---- */
 const SILH={
- visage:{vb:'0 0 400 530', g:`
- <path class="neck" d="M160 404 C160 444 152 460 128 470 C110 478 96 492 88 520 L312 520 C304 492 290 478 272 470 C248 460 240 444 240 404 Z"/>
- <path class="guide" d="M200 68 C284 68 328 126 328 204 C328 244 322 278 312 310 C298 354 270 398 242 420 C228 431 212 438 200 438 C188 438 172 431 158 420 C130 398 102 354 88 310 C78 278 72 244 72 204 C72 126 116 68 200 68 Z"/>
- <path class="guide" d="M73 194 C58 189 51 208 58 225 C64 240 76 247 83 245"/>
- <path class="guide" d="M327 194 C342 189 349 208 342 225 C336 240 324 247 317 245"/>
- <ellipse class="guidef" cx="157" cy="211" rx="25" ry="11"/><ellipse class="guidef" cx="243" cy="211" rx="25" ry="11"/>
- <path class="guide" d="M132 211 C142 200 172 200 182 211 C172 222 142 222 132 211 Z"/>
- <path class="guide" d="M268 211 C258 200 228 200 218 211 C228 222 258 222 268 211 Z"/>
- <circle class="pupil" cx="157" cy="211" r="5.5"/><circle class="pupil" cx="243" cy="211" r="5.5"/>
- <path class="guide" d="M129 185 C143 173 172 172 183 180"/><path class="guide" d="M271 185 C257 173 228 172 217 180"/>
- <path class="guide" d="M200 216 L196 262 C190 271 184 272 180 267 M200 216 L204 262 C210 271 216 272 220 267"/>
- <path class="guide" d="M164 328 C180 316 190 320 200 325 C210 320 220 316 236 328 C220 341 210 344 200 339 C190 344 180 341 164 328 Z"/>
- <path class="guide" d="M164 328 L236 328" stroke-opacity=".12"/>`},
+ /* Visage — tracé anatomique : front bombé, tempes, pommettes, mâchoire fuyant vers le menton. */
+ visage:{vb:'0 0 400 560', g:`
+ <path class="neck" d="M156 452 C156 492 148 508 124 518 C102 527 86 540 76 560 L324 560 C314 540 298 527 276 518 C252 508 244 492 244 452 Z"/>
+ <path class="guide" d="M200 470
+   C181 470 163 459 148 441
+   C131 420 116 391 107 358
+   C98 325 93 289 93 252
+   C93 214 99 175 118 148
+   C139 117 167 100 200 100
+   C233 100 261 117 282 148
+   C301 175 307 214 307 252
+   C307 289 302 325 293 358
+   C284 391 269 420 252 441
+   C237 459 219 470 200 470 Z"/>
+ <path class="guide" d="M95 232 C78 226 69 241 74 260 C78 275 88 287 99 289"/>
+ <path class="guide" d="M305 232 C322 226 331 241 326 260 C322 275 312 287 301 289"/>
+ <path class="guide" d="M112 158 C134 120 168 104 200 104 C232 104 266 120 288 158" stroke-opacity=".13"/>
+ <path class="guide" d="M132 206 C149 191 178 189 192 200"/>
+ <path class="guide" d="M268 206 C251 191 222 189 208 200"/>
+ <path class="guide" d="M133 228 C146 213 177 213 190 228 C177 243 146 243 133 228 Z"/>
+ <path class="guide" d="M267 228 C254 213 223 213 210 228 C223 243 254 243 267 228 Z"/>
+ <circle class="pupil" cx="161" cy="228" r="6"/><circle class="pupil" cx="239" cy="228" r="6"/>
+ <path class="guide" d="M200 236 L193 292 C187 303 178 304 172 298 M200 236 L207 292 C213 303 222 304 228 298"/>
+ <path class="guide" d="M178 300 C189 309 211 309 222 300" stroke-opacity=".16"/>
+ <path class="guide" d="M193 306 L193 340 M207 306 L207 340" stroke-opacity=".1"/>
+ <path class="guide" d="M161 356 C180 341 191 347 200 353 C209 347 220 341 239 356 C220 373 209 376 200 370 C191 376 180 373 161 356 Z"/>
+ <path class="guide" d="M161 356 L239 356" stroke-opacity=".12"/>
+ <path class="guide" d="M156 418 C172 434 228 434 244 418" stroke-opacity=".1"/>`},
+
+ /* Corps — silhouette humaine : épaules, taille marquée, bras détachés du tronc. */
  corps:{vb:'0 0 400 900', g:`
- <ellipse class="guidef" cx="200" cy="58" rx="34" ry="42"/>
- <path class="guide" d="M200 14 C223 14 234 32 234 58 C234 84 221 100 200 100 C179 100 166 84 166 58 C166 32 177 14 200 14 Z"/>
- <path class="neck" d="M184 94 L216 94 L216 128 L184 128 Z"/>
- <path class="guide" d="M168 126
-   C150 132 120 142 110 170 L96 240 L88 330 L82 420 L84 450
-   C84 464 106 464 106 450 L112 420 L118 330 L126 240 L132 186
-   L128 280 L134 380 L138 426
-   L144 560 L150 700 L154 820 L156 862 L188 862
-   L192 740 L196 600 L200 470
-   L204 600 L208 740 L212 862 L244 862
-   L246 820 L250 700 L256 560
-   L262 426 L266 380 L272 280 L268 186
-   L274 240 L282 330 L288 420 L294 450
-   C294 464 316 464 316 450 L318 420 L312 330 L304 240 L290 170
-   C280 142 250 132 232 126 Z"/>
- <path class="guide" d="M200 130 L200 424" stroke-opacity=".11"/>
- <path class="guide" d="M138 426 L262 426" stroke-opacity=".11"/>
- <path class="guide" d="M120 210 C150 224 250 224 280 210" stroke-opacity=".11"/>`}
+ <path class="guide" d="M200 16 C228 16 246 40 246 72 C246 106 226 128 200 128 C174 128 154 106 154 72 C154 40 172 16 200 16 Z"/>
+ <path class="guide" d="M182 118
+   C180 136 173 148 158 156
+   C142 164 132 178 128 196
+   C122 222 120 250 120 278
+   C120 308 124 336 132 362
+   C126 388 124 414 128 438
+   C132 462 137 480 142 496
+   C147 556 150 618 155 678
+   L159 760 L162 838 L164 872 C164 884 192 884 192 872
+   L194 792 L197 712 L199 636 L200 566
+   L201 636 L203 712 L206 792 L208 872 C208 884 236 884 236 872
+   L238 838 L241 760 L245 678
+   C250 618 253 556 258 496
+   C263 480 268 462 272 438
+   C276 414 274 388 268 362
+   C276 336 280 308 280 278
+   C280 250 278 222 272 196
+   C268 178 258 164 242 156
+   C227 148 220 136 218 118 Z"/>
+ <path class="guide" d="M128 200 C114 220 106 250 101 282 L92 344 L84 410 L80 452 C78 468 100 470 102 454 L110 408 L120 342 L131 278 L140 226 Z"/>
+ <path class="guide" d="M272 200 C286 220 294 250 299 282 L308 344 L316 410 L320 452 C322 468 300 470 298 454 L290 408 L280 342 L269 278 L260 226 Z"/>
+ <path class="guide" d="M81 454 C71 466 72 492 85 500 C98 506 107 494 105 474 Z"/>
+ <path class="guide" d="M319 454 C329 466 328 492 315 500 C302 506 293 494 295 474 Z"/>
+ <path class="guide" d="M200 132 L200 560" stroke-opacity=".09"/>
+ <path class="guide" d="M140 186 C168 200 232 200 260 186" stroke-opacity=".11"/>
+ <path class="guide" d="M133 366 C160 380 240 380 267 366" stroke-opacity=".11"/>
+ <path class="guide" d="M136 470 C164 488 236 488 264 470" stroke-opacity=".11"/>`}
 };
 function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=null}={}){
  const R=SILH[region]?region:'visage', S=SILH[R];
@@ -2053,13 +2103,32 @@ function pDetail(p){
 
  const body={
   resume:()=>`
+   <div class="idc">
+    <div class="idc-h"><div class="pav" style="width:34px;height:34px;font-size:12.5px">${esc(ini(p))}</div>
+      <div style="min-width:0"><b>${esc(p.nom)} ${esc(p.prenom)}</b>
+        <small>Fiche d’identité · dossier n° ${p.id}</small></div>
+      <div class="r">${p.ant.length?`<span class="bdg b-warn">⚠ ${p.ant.length} antécédent${p.ant.length>1?'s':''}</span>`:'<span class="bdg b-good">aucun antécédent</span>'}
+        <button class="btn xs" onclick="toast('Modification de la fiche — phase 2')">Modifier</button></div></div>
+    <div class="idc-g">
+      <div><label>Né(e) le</label><div>${p.ddn?DF(p.ddn):'—'} <span class="mu">${ageTxt(p)}</span></div></div>
+      <div><label>Téléphone</label><div>${esc(p.tel)}</div></div>
+      <div><label>E-mail</label><div>${esc(p.mail)}</div></div>
+      <div><label>Adresse</label><div>${esc(p.adr||'—')}</div></div>
+      <div><label>Praticien référent</label><div>${esc(p.prat)}</div></div>
+      <div><label>Patient depuis</label><div>${DF(p.depuis)}</div></div>
+      <div><label>Actes réalisés</label><div>${A.length}${A.length?` <span class="mu">· dernier le ${DF(A[0].date)}</span>`:''}</div></div>
+      ${CAN('prix')?`<div><label>Encaissé</label><div>${EUR(ca)}${rd?` <span style="color:var(--crit);font-weight:600">· reste ${EUR(rd)}</span>`:''}</div></div>`:''}
+    </div>
+    ${p.ant.length?`<div class="idc-a"><label>Antécédents &amp; contre-indications</label>
+      ${p.ant.map(x=>`<span class="bdg b-warn">⚠ ${esc(x)}</span>`).join('')}</div>`:''}
+   </div>
    <div class="grid g2" style="gap:13px;margin-bottom:6px">
     <div class="fld"><label>Notes</label>${ROLES[role].med?`<textarea class="note">${esc(p.notes||'')}</textarea>`:'<div class="v mu">🔒 non accessible à ce rôle</div>'}</div>
     <div>
      <div class="fld"><label>Antécédents &amp; contre-indications</label>
       ${p.ant.length?p.ant.map(a=>`<span class="bdg b-warn" style="margin:0 5px 5px 0">⚠ ${esc(a)}</span>`).join(''):'<div class="v mu">Aucun</div>'}</div>
-     <div class="fld"><label>Coordonnées</label><div class="v">${esc(p.tel)} · ${esc(p.mail)}</div></div>
-     <div class="fld"><label>Suivi</label><div class="v">Patient depuis le ${DF(p.depuis)} · référent ${esc(p.prat)}</div></div>
+     <div class="fld"><label>Objectifs et préférences</label>
+      <div class="v mu">${esc(p.notes||'Rien de particulier noté.')}</div></div>
     </div></div>
    ${p.ant.some(a=>/Allaitement|Anticoagulant/.test(a))?`<div class="tip" style="margin:0 0 14px;background:var(--warn-w)"><span class="e">⚠</span><div><b>Blocage automatique.</b> Un antécédent bloquant est présent : un avertissement s'affiche avant toute saisie d'acte injectable.</div></div>`:''}
    <div class="subh"><h3>Actes réalisés<span>${A.length}</span></h3>
@@ -2561,6 +2630,55 @@ function zoneOptions(exclues){
  return ['tox','ah'].map(p=>{const L=dispo.filter(z=>z.p===p); if(!L.length) return '';
   return `<optgroup label="${PLABEL[p]}">${L.map(z=>`<option value="${z.id}">${esc(z.k)} · ${fmtQ(z.d,p)}</option>`).join('')}</optgroup>`}).join('');
 }
+/* aperçu du schéma dans l'éditeur : la zone choisie est mise en évidence */
+function zoneEditSVG(){
+ const S=SILH[zoneReg]||SILH.visage;
+ const D=zoneDefs();
+ const el=(z,cx,sel)=>`<ellipse class="zone${sel?' act-cur':''}" cx="${cx}" cy="${z.cy}" rx="${z.rx}" ry="${z.ry}"><title>${esc(z.n)}</title></ellipse>`;
+ const zs=D.map((z,i)=>{ if(z.post) return '';
+   const sel=zoneSel===i;
+   return el(z,z.cx,sel)+(z.m?el(z,400-z.cx,sel):'')}).join('');
+ const lbl=D.map((z,i)=>z.post||zoneSel!==i?'':
+   `<text class="zlabel" x="${z.cx}" y="${z.cy+4}">${esc(z.k)}</text>`).join('');
+ return `<svg viewBox="${S.vb}">${S.g}${zs}${lbl}</svg>`;
+}
+/* ---------- éditeur des zones du schéma ---------- */
+let zoneReg='visage', zoneSel=null;
+const zoneDefs=()=>zoneReg==='visage'?ZDEF:BDEF;
+function setZoneChamp(i,k,v){
+ const D=zoneDefs(); if(!D[i]) return;
+ if(k==='m'){ D[i].m=v?1:0; if(!v) delete D[i].m }
+ else if(k==='n'||k==='k') D[i][k]=v;
+ else D[i][k]=+v||0;
+ rebuildZones(); paint();
+}
+function placerZone(ev,reg){
+ if(zoneSel==null){toast('Choisissez d’abord une zone dans la liste');return}
+ const svg=ev.currentTarget.querySelector('svg')||ev.currentTarget;
+ if(!svg||!svg.getAttribute('viewBox')) return;
+ const r=svg.getBoundingClientRect();
+ const vb=svg.getAttribute('viewBox').split(' ').map(Number);
+ const x=Math.round(vb[0]+(ev.clientX-r.left)/r.width*vb[2]);
+ const y=Math.round(vb[1]+(ev.clientY-r.top)/r.height*vb[3]);
+ const D=zoneDefs()[zoneSel]; if(!D) return;
+ D.cx=x; D.cy=y; rebuildZones(); paint();
+ toast(`${D.k} placée en ${x} · ${y}`);
+}
+function addZoneDef(){
+ const D=zoneDefs(), vb=zoneReg==='visage'?[200,300]:[200,300];
+ const id='z'+Date.now().toString(36);
+ D.push({id, n:'Nouvelle zone', k:'Nouvelle', p:'ah', d:1, s:.5,
+   cx:vb[0], cy:vb[1], rx:22, ry:18});
+ zoneSel=D.length-1; rebuildZones(); paint();
+ toast('Zone ajoutée — cliquez sur le schéma pour la placer');
+}
+function rmZoneDef(i){
+ const D=zoneDefs(), z=D[i]; if(!z) return;
+ const used=ACTES.filter(a=>a.zones&&Object.keys(a.zones).some(k=>k===z.id||k===z.id+'_d'||k===z.id+'_g')).length;
+ if(used){toast(`« ${z.k} » figure dans ${used} acte${used>1?'s':''} — suppression refusée`);return}
+ if(D.length<2){toast('Gardez au moins une zone');return}
+ D.splice(i,1); zoneSel=null; rebuildZones(); paint(); toast(`« ${z.k} » supprimée`);
+}
 function setProtoZone(i,z,q){
  if(q>0) PROTOS[i].z[z]=q;
  else { delete PROTOS[i].z[z]; if(PROTOS[i].zt) delete PROTOS[i].zt[z] }
@@ -2698,6 +2816,40 @@ V.params=()=>{
         <td style="text-align:center"><input type="checkbox" ${c.cons?'checked':''} onchange="CATALOGUE[${i}].cons=this.checked;paint()"></td>
         <td class="num mu">${vol(c.id)}</td><td class="num">${EUR(ca(c.id))}</td></tr>`).join('')}
       </tbody></table></div></div>
+
+    <div class="card" style="margin-top:13px;grid-column:1/-1"><div class="h"><h2>Zones du schéma</h2>
+      <span class="s">${zoneDefs().length} définies · ${zonesDe(zoneReg).length} après symétrie</span>
+      <div class="r"><div class="seg">${REGIONS.map(r=>
+        `<button class="${zoneReg===r.id?'on':''}" onclick="zoneReg='${r.id}';zoneSel=null;paint()">${r.i} ${r.n}</button>`).join('')}</div>
+       <button class="btn xs p" onclick="addZoneDef()">+ Zone</button></div></div>
+     <div class="b">
+      <div class="mu" style="font-size:11.5px;margin-bottom:10px">Choisissez une zone dans la liste puis <b>cliquez sur le schéma</b> pour la placer. Une zone symétrique est automatiquement dédoublée à droite et à gauche.</div>
+      <div class="grid g2" style="grid-template-columns:minmax(0,290px) minmax(0,1fr);gap:14px;align-items:start">
+       <div class="facebox zed" onclick="placerZone(event,'${zoneReg}')">${zoneEditSVG()}</div>
+       <div style="max-height:540px;overflow:auto">
+        ${zoneDefs().map((z,i)=>`<div class="zrow ${zoneSel===i?'on':''}" onclick="zoneSel=${zoneSel===i?'null':i};paint()">
+          <span class="zd" style="background:${zoneSel===i?'var(--accent)':'var(--ink-3)'}"></span>
+          <div class="zn" style="flex:1">
+            <input class="inp zed-n" value="${esc(z.n)}" onclick="event.stopPropagation()"
+              onchange="setZoneChamp(${i},'n',this.value)" placeholder="Nom complet de la zone">
+            <div class="zed-r">
+              <input class="inp" style="width:94px" value="${esc(z.k)}" onclick="event.stopPropagation()"
+                onchange="setZoneChamp(${i},'k',this.value)" placeholder="abrégé" title="Nom court, utilisé dans les listes et sur les documents">
+              <label class="zed-l" onclick="event.stopPropagation()" title="Dose proposée au deuxième clic sur la zone">dose
+                <input class="inp" style="width:58px" type="number" min="0" step="0.1" value="${z.d}"
+                  onchange="setZoneChamp(${i},'d',this.value)"></label>
+              <label class="zed-l" onclick="event.stopPropagation()" title="Zone dédoublée droite / gauche">
+                <input type="checkbox" ${z.m?'checked':''} onchange="setZoneChamp(${i},'m',this.checked)"> symétrique</label>
+              ${z.post?'<span class="bdg b-neu">vue postérieure</span>'
+                :`<label class="zed-l" onclick="event.stopPropagation()" title="Taille de la zone sur le schéma">taille
+                   <input class="inp" style="width:52px" type="number" min="4" value="${z.rx}" onchange="setZoneChamp(${i},'rx',this.value)">
+                   <input class="inp" style="width:52px" type="number" min="4" value="${z.ry}" onchange="setZoneChamp(${i},'ry',this.value)"></label>
+                  <span class="mu" style="font-size:10.5px">x ${z.cx} · y ${z.cy}</span>`}
+            </div></div>
+          <button class="rm" onclick="event.stopPropagation();rmZoneDef(${i})">✕</button>
+         </div>`).join('')}
+       </div></div>
+     </div></div>
    </div>`;
   },
 
@@ -3064,7 +3216,8 @@ function openActe(pid,aid,np){
  AS={pid:pid||(a?a.patient:(np?null:PATIENTS[0].id)), aid:aid||null, ro:!!a, mode:acteMode, prix:a?a.prix:null, note:a?(a.note||''):'',
      fam:acteDef(t0).fam||'esth', reg:a&&a.reg?a.reg:regionDef(t0),
      np: np?{nom:(np.nom||'').toUpperCase(),prenom:np.prenom||'',ddn:'',tel:'',mail:''}:null,
-     seances:a?(a.seances||1):1, remise:0, remiseType:'%', validite:30, notePat:'', infosOn:true,
+     seances:a?(a.seances||1):1, zonesNote:a?(a.zonesNote||''):'',
+     remise:0, remiseType:'%', validite:30, notePat:'', infosOn:true,
      type:a?a.type:'AH', date:a?a.date:TODAYS, prat:a?a.praticien:PRATICIENS[0],
      oper:a?a.operateur:'', z:a&&a.zones?{...a.zones}:{}, zt:a&&a.zt?{...a.zt}:{},
      effets:a?a.effets:'', consent:a?a.consent:false};
@@ -3120,13 +3273,7 @@ function renderOver(){
     <div class="ap-t" style="width:100%;margin:0 0 2px">2 · Où ? <span class="mu" style="text-transform:none;letter-spacing:0;font-weight:500">— facultatif${U?`, la dose l’est aussi`:''}</span></div>
     ${regionsDe(AS.type).length>1?`<div class="seg">${regionsDe(AS.type).map(r=>{const R=REGIONS.find(x=>x.id===r);
       return `<button class="${AS.reg===r?'on':''}" onclick="setRegion('${r}')">${R.i} ${R.n}</button>`}).join('')}</div>`:''}
-    <div class="seg">
-      <button class="${AS.mode!=='clavier'?'on':''}" onclick="setMode('schema')">◉ Schéma ${AS.reg==='corps'?'du corps':'du visage'}</button>
-      <button class="${AS.mode==='clavier'?'on':''}" onclick="setMode('clavier')">⌨ Liste des zones</button>
-    </div>
-    <span class="mu" style="font-size:11.5px">${AS.mode==='clavier'
-      ? 'Cochez les zones, choisissez l’acte, la dose est facultative'
-      : 'Cliquez une zone pour choisir l’acte · clic droit pour retirer'}</span>
+    <span class="mu" style="font-size:11.5px">Cliquez une zone du schéma pour choisir l’acte · clic droit pour retirer</span>
     ${AS.reg==='visage'?`<div class="preset" style="margin-left:auto">
       <span class="mu" style="font-size:11.5px;align-self:center;margin-right:2px">Protocole :</span>
       ${PROTOS.map((x,i)=>`<button class="chip" onclick="applyProto(${i})" title="${esc(protoResume(x))}">${esc(x.n)}</button>`).join('')}
@@ -3136,13 +3283,17 @@ function renderOver(){
 
   <div class="facewrap ${AS.ro?'d3 ro':(C.zoned?'d3':'d2')}">
    ${C.zoned?`<div>
-    ${AS.ro||AS.mode!=='clavier'?`<div class="facebox" id="faceLive">${schemaSVG(AS.z,{editable:!AS.ro,hist:zoneHist(AS.pid,AS.aid),type:AS.type,zt:AS.zt,region:AS.reg})}</div>
+    ${`<div class="facebox" id="faceLive">${schemaSVG(AS.z,{editable:!AS.ro,hist:zoneHist(AS.pid,AS.aid),type:AS.type,zt:AS.zt,region:AS.reg})}</div>
     <div class="face-legend">
       ${(actesSaisis().length?actesSaisis():[AS.type]).map(t=>`<span><i style="background:${colActe(t)}"></i>${esc(acteDef(t).n)}${acteDef(t).unite?' ('+acteDef(t).unite+')':''}</span>`).join('')}
       ${Object.keys(zoneHist(AS.pid,AS.aid)).length?'<span><i class="ant"></i>Séances antérieures — date en petit</span>':''}
-      ${zonesDe(AS.reg).some(z=>z.post)?`<span class="mu">zones postérieures dans « Liste des zones »</span>`:''}
-      ${AS.ro?'':`<span class="mu">clic sur une zone = choisir l’acte · clic droit = retirer</span>`}</div>`
-    : grilleClavier()}
+
+      ${AS.ro?'':`<span class="mu">clic sur une zone = choisir l’acte · clic droit = retirer</span>`}</div>
+    ${AS.ro?'':(()=>{const P=zonesDe(AS.reg).filter(z=>z.post&&!Object.prototype.hasOwnProperty.call(AS.z,z.id));
+      return P.length?`<div class="addz" style="margin-top:9px">
+        <span class="mu" style="font-size:11.5px;align-self:center">Vue postérieure</span>
+        <select class="inp" id="zpost" style="flex:1">${P.map(z=>`<option value="${z.id}">${esc(z.n)}</option>`).join('')}</select>
+        <button class="btn xs p" onclick="ajouterZonePost()">+ Ajouter</button></div>`:''})()}`}
    </div>`:`<div>
     <div class="tip"><span class="e">ℹ️</span><div><b>${esc(C.n)}</b> n'est pas localisé sur le schéma de visage : renseignez simplement le nombre de séances et le montant à droite. Si vous souhaitez pouvoir le poser sur le visage, cochez-le comme localisable dans <a onclick="closeAll();go('params');paramTab='actes';paint()">Paramètres → Actes &amp; tarifs</a>.</div></div>
     ${AS.ro?'':`<div class="fld" style="margin-top:12px"><label>Note de séance</label>
@@ -3156,8 +3307,12 @@ function renderOver(){
       ${(actesSaisis().length?actesSaisis():[]).filter(t=>acteDef(t).unite).map(t=>{
         const q=sel.filter(z=>zActe(z)===t).reduce((s2,z)=>s2+(+AS.z[z]||0),0);
         return `<div class="rc-r"><span>Total ${esc(acteDef(t).n.toLowerCase())}</span><b class="tDose" data-t="${t}">${q?fmtDose(q,t):'—'}</b></div>`}).join('')}
-      ${C.zoned?`<div class="rc-r"><span>Zones traitées</span><b id="tZones">${sel.length||'—'}</b></div>`:''}
-      <div class="rc-r"><span>Séances</span>
+      ${C.zoned?`<div class="rc-r"><span>Zones traitées</span>
+        <div class="zt-r"><b id="tZones">${sel.length||'—'}</b>
+          ${AS.ro?(AS.zonesNote?`<span class="zt-n">${esc(AS.zonesNote)}</span>`:'')
+           :`<input class="inp zt-i" placeholder="" value="${esc(AS.zonesNote||'')}"
+              oninput="AS.zonesNote=this.value" title="Note libre sur les zones traitées">`}</div></div>`:''}
+      <div class="rc-r"><span>Quantité</span>
         ${AS.ro?`<b>${AS.seances||1}</b>`:`<div class="step"><button onclick="setSeances(-1)">−</button>
           <input class="qin" type="number" min="1" value="${AS.seances||1}" onchange="setSeances(0,+this.value)">
           <button onclick="setSeances(1)">+</button></div>`}</div>
@@ -3217,7 +3372,7 @@ function devisPane(sel,total,prix){
  return `<div class="dvp">
   <div class="dvp-h"><span>📄</span><b>Devis</b><span class="mu">à remettre au patient</span></div>
   <div class="dvp-g">
-   <label>Séances<div class="step">
+   <label>Quantité<div class="step">
      <button onclick="setSeances(-1)">−</button><span>${st}</span><button onclick="setSeances(1)">+</button></div></label>
    <label>Remise<div style="display:flex;gap:4px">
      <input class="inp" style="width:58px;text-align:right" type="number" min="0" value="${AS.remise||0}" onchange="AS.remise=+this.value||0;renderOver()">
@@ -3338,6 +3493,13 @@ function delZ(id){delete AS.z[id];AS.prix=null;renderOver()}
 /* --- liste des zones au clavier : on coche, la dose est facultative --- */
 let acteMode='schema';
 function setMode(m){ acteMode=m; if(AS) AS.mode=m; renderOver() }
+/* les zones de la vue postérieure ne sont pas dessinées : on les ajoute par leur nom */
+function ajouterZonePost(){
+ const e=document.getElementById('zpost'); if(!e||!e.value) return;
+ const id=e.value;
+ if(choixActePossible()) return choixActeZone(id);
+ zPose(id,1);
+}
 /* l'acte porté par une zone en cours de saisie */
 const zActe=z=>(AS.zt&&AS.zt[z])||AS.type;
 const zUnite=z=>acteDef(zActe(z)).unite;
@@ -3365,31 +3527,6 @@ function setRegion(r){
 function setSeances(d,v){
  AS.seances=Math.max(1, v!=null?v:( (AS.seances||1)+d ));
  AS.prix=null; renderOver();
-}
-function grilleClavier(){
- const H=zoneHist(AS.pid,AS.aid), A=actesZone(), multi=A.length>1;
- const col=L=>`<div class="kbd-c">
-   <div class="kbd-h">${multi?'Zone et acte pratiqué':`<span class="zd" style="background:${colActe(AS.type)}"></span>${esc(acteDef(AS.type).n)}`}
-     <small>${multi?'un acte par zone, dose facultative':(acteDef(AS.type).unite?'dose facultative ('+acteDef(AS.type).unite+')':'cochez les zones traitées')}</small></div>
-   ${L.map(z=>{const on=Object.prototype.hasOwnProperty.call(AS.z,z.id), q=+AS.z[z.id]||0, ant=H[z.id];
-    const t=on?zActe(z.id):AS.type, U=acteDef(t).unite;
-    return `<div class="kbd-r ${on?'on':''}" data-z="${z.id}">
-      <input type="checkbox" class="kbx" ${on?'checked':''} onchange="toggleZ('${z.id}',this.checked)" title="Zone traitée">
-      <label onclick="toggleZ('${z.id}',!${on})">${esc(z.k)}
-        <small>${ant?'dernière : '+DFT(ant[0].d):'jamais traitée'}</small></label>
-      ${multi?`<select class="zsel" ${on?'':'disabled'} onchange="setZActe('${z.id}',this.value)" title="Acte pratiqué sur cette zone">
-        ${A.map(c=>`<option value="${c.id}" ${c.id===t?'selected':''}>${esc(c.n)}</option>`).join('')}</select>`:''}
-      ${U?`<input id="k-${z.id}" class="inp" type="number" min="0" step="${U==='U'?1:0.1}"
-        placeholder="${z.d}" value="${q||''}"
-        oninput="setZLive('${z.id}',this.value)" onchange="renderOver()">
-      <span class="u">${U}</span>`:'<span class="u"></span>'}
-     </div>`}).join('')}
-  </div>`;
- const L=zonesDe(AS.reg), mid=Math.ceil(L.length/2);
- return `<div class="kbd">
-   <div class="tip" style="margin-bottom:11px"><span class="e">⌨</span><div>Cochez les zones traitées${multi?', puis choisissez l’acte pratiqué sur chacune.':'.'}${A.some(c=>c.unite)?' La dose est <b>facultative</b> : laissez vide si vous ne la notez pas.':''}${L.some(z=>z.post)?' Les zones en vue postérieure ne figurent pas sur le schéma.':''}</div></div>
-   <div class="kbd-g">${col(L.slice(0,mid))}${col(L.slice(mid))}</div>
-  </div>`;
 }
 function toggleZ(id,on){
  if(on){ if(!AS.zt[id]) AS.zt[id]=AS.type; AS.z[id]=zUnite(id)?null:1 }
@@ -3460,7 +3597,7 @@ function saveActe(){
   date:AS.date,praticien:AS.prat,operateur:AS.oper||null,
   lot:C.conso?(C.conso==='AH-VOLB'?'L-AH2409':C.conso==='BTX-100'?'L-BX2601':null):null,
   conso:C.conso,zones,consent:AS.consent,effets:AS.effets||'',note:AS.note||'',
-  seances:AS.seances||1,prix});
+  seances:AS.seances||1,zonesNote:AS.zonesNote||'',prix});
  DEVIS.filter(d=>!d.acte&&d.patient===AS.pid&&d.date===AS.date).forEach(d=>{d.acte=ACTES[0].id});
  T.forEach(t=>{const cc=acteDef(t); if(!cc.conso) return;
   const st=STOCK.find(x=>x.ref===cc.conso);
@@ -3614,7 +3751,7 @@ function docPane(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='S';
+const BUILD='T';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
