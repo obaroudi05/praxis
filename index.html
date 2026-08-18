@@ -653,6 +653,70 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
   color:var(--ink-3);cursor:pointer;font-variant-numeric:tabular-nums;transition:.12s}
 .zc b{color:var(--ink-2);font-weight:650}
 .zc:hover{border-color:var(--accent);color:var(--accent-ink)}
+/* --- dossier d'un acte : onglets de section --- */
+.anav{display:flex;align-items:center;gap:5px;background:var(--panel-2);border:1px solid var(--line);
+  border-radius:999px;padding:3px 7px 3px 3px}
+.anav .inp{height:26px;border:none;background:transparent;font-size:12px;max-width:230px;padding:0 4px}
+.anav .nb{width:24px;height:24px;border-radius:50%;border:1px solid var(--line);background:var(--panel);
+  color:var(--ink-2);font-size:13px;line-height:1;cursor:pointer;font-family:inherit;transition:.12s}
+.anav .nb:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.anav .nb:disabled{opacity:.34;cursor:default}
+/* chronologie des actes d'un patient */
+table.chrono tr.yr td{background:var(--panel-3);font-weight:800;font-size:11px;letter-spacing:.08em;
+  color:var(--ink-3);padding:4px 10px;border-top:1px solid var(--line)}
+table.chrono tr.c td{vertical-align:top}
+.apane{display:flex;flex-direction:column;min-height:0;max-height:100%}
+.apane-t{display:flex;flex-wrap:wrap;gap:4px;flex:none;margin-bottom:9px}
+.asec{display:flex;align-items:center;gap:5px;background:var(--panel-2);border:1px solid var(--line);
+  border-radius:999px;padding:4px 9px;font-size:11.5px;color:var(--ink-2);cursor:pointer;
+  font-family:inherit;transition:.12s;line-height:1.5}
+.asec:hover{border-color:var(--accent)}
+.asec.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.asec .ai{font-size:11px}
+.asec .an{background:rgba(0,0,0,.09);border-radius:999px;padding:0 5px;font-size:10.5px;font-weight:700}
+.asec.on .an{background:rgba(255,255,255,.26)}
+.apane-b{flex:1;min-height:0;overflow:auto;padding-right:3px;display:flex;flex-direction:column;gap:7px}
+.apane-b::-webkit-scrollbar{width:6px}
+.apane-b::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+/* photos */
+.phg{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.phc{border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--panel)}
+.phc img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}
+.phl{display:flex;align-items:baseline;gap:6px;padding:5px 8px;font-size:11.5px}
+.phl span{color:var(--ink-3);font-size:11px;margin-left:auto}
+/* consommables */
+.cadd{display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;
+  background:var(--accent-wash);border:1px solid var(--accent);border-radius:11px;padding:8px}
+.cadd .inp{height:30px;background:var(--panel)}
+.ctab{display:flex;flex-direction:column;gap:5px}
+.crow{display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:11px;
+  background:var(--panel-2);padding:7px 9px}
+.crow .cn{min-width:0;flex:1}
+.crow .cn b{display:block;font-size:12px;font-weight:620;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crow .cn small,.crow .clot small{display:block;font-size:10.5px;color:var(--ink-3)}
+.crow .clot{text-align:right;flex:none}
+.crow .clot .mono{font-size:11.5px;font-weight:600}
+.crow .clot small.per{color:var(--crit);font-weight:600}
+.crow .cq{flex:none;font-size:13px;font-weight:700;min-width:46px;text-align:right}
+.crow .cq small{font-size:10px;font-weight:500;color:var(--ink-3);display:block}
+/* effets secondaires */
+.eadd{display:grid;grid-template-columns:1fr auto auto;gap:6px;
+  background:var(--accent-wash);border:1px solid var(--accent);border-radius:11px;padding:8px}
+.eadd .inp{height:30px;background:var(--panel)}
+.erow{border:1px solid var(--line);border-radius:11px;background:var(--panel-2);padding:8px 10px}
+.erow.ok{opacity:.62}
+.erow .eh{display:flex;align-items:center;gap:7px;font-size:12.5px}
+.erow .en{font-size:11.5px;color:var(--ink-2);line-height:1.5;margin-top:4px}
+.erow .ef{display:flex;align-items:center;gap:7px;margin-top:6px;font-size:11px}
+.erow .ef .mu{margin-right:auto}
+/* fichiers */
+.frow{display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:11px;
+  background:var(--panel-2);padding:7px 9px}
+.fx{flex:none;width:34px;height:34px;border-radius:9px;display:grid;place-items:center;
+  font-size:9.5px;font-weight:800;letter-spacing:.02em;background:var(--panel-3);color:var(--ink-2)}
+.fx.x-pdf{background:var(--crit-w);color:#a52a2a}
+.fx.x-jpg,.fx.x-png{background:var(--accent-wash);color:var(--accent-ink)}
+.fx.x-docx{background:var(--good-w);color:#0a7a0a}
 .dpane{display:flex;flex-direction:column;gap:7px}
 .dpane-h{display:flex;align-items:flex-start;gap:8px;padding-bottom:2px}
 .dpane-h h3{font-size:13px;font-weight:700;letter-spacing:-.01em;line-height:1.3}
@@ -770,7 +834,7 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .facewrap.d2>div:last-child>.recap{flex:1;min-height:0;overflow:auto}
 .facewrap.d2>div:last-child>.dvp{flex:none;max-height:none}
 .facewrap.d3{grid-template-columns:minmax(0,1fr) 372px 340px}
-.facewrap.d3.ro{grid-template-columns:minmax(0,1fr) 320px 396px}
+.facewrap.d3.ro{grid-template-columns:minmax(0,1fr) 296px 424px}
 @media(max-width:1250px){.facewrap.d3{grid-template-columns:minmax(0,1fr) 340px}.facewrap.d3>:last-child{grid-column:1/-1}}
 @media(max-width:900px){.facewrap,.facewrap.d3{grid-template-columns:1fr}}
 .facebox{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r-m);padding:6px;position:relative;
@@ -1609,6 +1673,44 @@ const PHOTOS=[];
  });
 })();
 
+/* ==========================================================================
+   Ce qui se rattache à un acte : consommables, effets secondaires, fichiers
+   ==========================================================================
+   Un acte n'est pas qu'une ligne de soins. C'est aussi ce qu'on y a consommé
+   (traçabilité des lots, obligation réglementaire), ce que le patient a
+   ressenti après, et les pièces qu'on y accroche. */
+const CONSO=[];      /* {id, acte, patient, ref, nom, lot, per, q, u, ts, par} */
+const EFFETS=[];     /* {id, acte, patient, date, quoi, grade, note, resolu, ts, par} */
+const FICHIERS=[];   /* {id, acte, patient, nom, ext, ko, date, par} */
+
+const EFF_TYPES=['Ecchymose','Œdème','Rougeur persistante','Douleur','Asymétrie',
+                 'Nodule','Céphalée','Ptosis palpébral','Réaction allergique','Autre'];
+const EFF_GRADE=[['leger','Léger','b-neu'],['modere','Modéré','b-warn'],['severe','Sévère','b-crit']];
+const gradeBdg=g=>{const G=EFF_GRADE.find(x=>x[0]===g)||EFF_GRADE[0]; return bdg(G[2],G[1])};
+
+/* amorce : les actes du jeu de démonstration ont consommé leurs produits */
+(function(){ let n=1, m=1;
+ const st0=(d,k)=>{let h=0; for(const c of String(k)) h=(h*31+c.charCodeAt(0))>>>0;
+   return `${d}T${String(9+h%9).padStart(2,'0')}:${String(h%60).padStart(2,'0')}`};
+ ACTES.forEach((a,i)=>{
+  const c=a.type?CATALOGUE.find(x=>x.id===a.type):null;
+  if(c&&c.conso){ const st=STOCK.find(x=>x.ref===c.conso);
+   if(st) CONSO.push({id:'CS-'+n++, acte:a.id, patient:a.patient, ref:st.ref, nom:st.n,
+     lot:st.lot||'—', per:st.per, q:1+(i%2), u:st.u, ts:st0(a.date,'CS'+a.id), par:a.praticien}) }
+  if(i%9===0) CONSO.push({id:'CS-'+n++, acte:a.id, patient:a.patient, ref:'ANE-EML',
+    nom:'Crème anesthésiante 30 g', lot:'L-EM2508', per:'2026-08-31', q:1, u:'tube',
+    ts:st0(a.date,'CS2'+a.id), par:a.praticien});
+  if(i%11===3) EFFETS.push({id:'ES-'+m++, acte:a.id, patient:a.patient, date:addD(a.date,2),
+    quoi:EFF_TYPES[i%4], grade:i%13===3?'modere':'leger',
+    note:'Signalé par la patiente au contrôle téléphonique.', resolu:i%2===1,
+    ts:st0(addD(a.date,2),'ES'+a.id), par:a.praticien});
+ });
+})();
+const consoActe=a=>CONSO.filter(x=>x.acte===a.id);
+const effetsActe=a=>EFFETS.filter(x=>x.acte===a.id).sort((x,y)=>x.date.localeCompare(y.date));
+const fichiersActe=a=>FICHIERS.filter(x=>x.acte===a.id);
+const photosActe=a=>PHOTOS.filter(x=>x.acte===a.id).sort((x,y)=>x.date.localeCompare(y.date));
+
 /* --- critères de fidélité, modifiables dans Paramètres --- */
 let FID={
  periode:24, mode:'et',
@@ -2072,6 +2174,8 @@ function heroNew(nom,prenom){openActe(null,null,{nom,prenom})}
 
 /* ---------------- Patients (maître-détail) ---------------- */
 let pq='',pPrat='',pSel=null,pTab='resume',docF='tous',docQ='';
+/* suivi chronologique des actes d'un patient */
+let actTri='desc', actCat='', actPrat='', actQ='';
 let schemaReg='visage';
 let pView='liste', fidF='tous', annivF='mois', perP={k:'90j',from:'',to:''}, photoQ='', photoKind='tous';
 function setPerP(x){perP=x;paint()}
@@ -2322,7 +2426,7 @@ function pDetail(p){
  const AG=DOCADD.filter(x=>x.patient===p.id).sort((a,b)=>b.ts.localeCompare(a.ts));   /* produits depuis un modèle */
  const nDoc=O.length+C.length+AD.length+D.length+AG.length;
  const nFac=D.length+F.length+F.filter(f=>f.avoir>0).length;
- const TB=[['resume',`Résumé · ${A.length} acte${A.length>1?'s':''}`],['schema','Schéma cumulé'],
+ const TB=[['resume','Résumé'],['actes',`Actes · ${A.length}`],['schema','Schéma cumulé'],
            ['photos','Avant / après']]
    .concat(ROLES[role].prix?[['factu',`Facturation · ${nFac}`]]:[])
    .concat([['docs',`Documents · ${nDoc}`]]);
@@ -2352,7 +2456,7 @@ function pDetail(p){
      <td>${colDocs(a)}</td>
      <td class="mu" style="white-space:nowrap">${esc(a.praticien)}${a.operateur?`<div style="font-size:11px">op. ${esc(a.operateur)}</div>`:''}</td>
      <td class="mono mu" style="font-size:11.5px">${a.lot||'—'}</td>
-     ${ROLES[role].prix?`<td class="num">${EUR(a.prix)}</td>`:''}</tr>`).join('')}
+     ${ROLES[role].prix?`<td class="num">${montantTxt(a)}</td>`:''}</tr>`).join('')}
    </tbody></table>${A.length?'':'<div class="empty">Aucun acte enregistré pour ce patient.</div>'}</div>`;
 
  /* ---- documents : ordonnances, devis, factures, consentements ---- */
@@ -2420,6 +2524,64 @@ function pDetail(p){
      <button class="btn xs" onclick="dvChoix(${p.id})">📄 Devis sans acte</button>
      <button class="btn xs p" onclick="openActe(${p.id})">✚ Nouvel acte</button></div></div>
    ${tableActes()}`,
+
+  /* --- suivi chronologique : toute la vie du patient au cabinet, dans l'ordre --- */
+  actes:()=>{
+   const L=A.slice()
+     .filter(a=>!actCat||a.cat===actCat)
+     .filter(a=>!actPrat||a.praticien===actPrat)
+     .filter(a=>{const q=actQ.trim().toLowerCase(); if(!q) return true;
+       return (a.nom+' '+(a.zonesNote||'')+' '+(a.note||'')+' '+(a.cat||'')).toLowerCase().includes(q)})
+     .sort((x,y)=>actTri==='asc'?x.date.localeCompare(y.date):y.date.localeCompare(x.date));
+   const cats=[...new Set(A.map(a=>a.cat).filter(Boolean))].sort();
+   const prats=[...new Set(A.map(a=>a.praticien).filter(Boolean))].sort();
+   const nC=L.reduce((s2,a)=>s2+consoActe(a).length,0);
+   const nE=L.reduce((s2,a)=>s2+effetsActe(a).length,0);
+   let an=null;
+   return `<div class="fbar">
+     <span class="mu" style="font-size:11.5px;font-weight:600;align-self:center">Chronologie</span>
+     <button class="btn s" onclick="actTri=actTri==='desc'?'asc':'desc';paint()"
+       title="Basculer l'ordre">${actTri==='desc'?'↓ du plus récent':'↑ du plus ancien'}</button>
+     <select class="inp" onchange="actCat=this.value;paint()">
+       <option value="">Toutes catégories</option>
+       ${cats.map(c=>`<option ${actCat===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
+     <select class="inp" onchange="actPrat=this.value;paint()">
+       <option value="">Tous praticiens</option>
+       ${prats.map(c=>`<option ${actPrat===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
+     <input class="inp" id="aqi" style="min-width:170px" placeholder="Rechercher…" value="${esc(actQ)}"
+       oninput="actQ=this.value;paint();const e=document.getElementById('aqi');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
+     <div style="margin-left:auto;display:flex;gap:6px">
+       <button class="btn s" onclick="toast('Export CSV généré')">Exporter la liste</button>
+       <button class="btn s p" onclick="openActe(${p.id})">✚ Ajouter un acte</button></div>
+   </div>
+   <div class="mu" style="font-size:11.5px;margin:-4px 0 10px">
+     ${L.length} acte${L.length>1?'s':''}${L.length!==A.length?` sur ${A.length}`:''}
+     · ${nC} consommable${nC>1?'s':''} tracé${nC>1?'s':''}
+     · ${nE} effet${nE>1?'s':''} secondaire${nE>1?'s':''} signalé${nE>1?'s':''}</div>
+   <div class="tw"><table class="chrono">
+    <thead><tr><th style="width:96px">Date</th><th>Acte</th><th>Catégorie</th><th>Praticien</th>
+      <th>Zones</th><th>Consommables</th><th>Effets</th><th style="min-width:210px">Documents</th>
+      ${ROLES[role].prix?'<th class="num">Facturé</th>':''}<th style="min-width:150px">Commentaire</th></tr></thead>
+    <tbody>${L.map(a=>{
+      const y=a.date.slice(0,4), sep=(y!==an); an=y;
+      const CS=consoActe(a), ES=effetsActe(a), com=(a.zonesNote||a.note||'').trim();
+      return `${sep?`<tr class="yr"><td colspan="${ROLES[role].prix?10:9}">${y}</td></tr>`:''}
+      <tr class="c" onclick="openActe(${a.patient},${a.id})">
+        <td class="mono">${DF(a.date)}</td>
+        <td><b>${esc(a.nom)}</b></td>
+        <td class="mu">${esc(a.cat||'—')}</td>
+        <td class="mu" style="white-space:nowrap">${esc(a.praticien)}${a.operateur?`<div style="font-size:11px">op. ${esc(a.operateur)}</div>`:''}</td>
+        <td style="max-width:190px">${a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneById(z); if(!Z) return '';
+           const t=acteZone(a,z), C=acteDef(t);
+           return `<span class="bdg ${C.col==='toxine'?'b-info':'b-warn'}" style="margin:0 3px 3px 0">${esc(Z.k)}${q&&uniteDose(t,z)?' '+fmtDose(q,t,z):''}</span>`}).join(''):`<span class="mu">${noZoneTxt(a)}</span>`}</td>
+        <td class="mu" style="font-size:11.5px">${CS.length?CS.map(c=>`<div>${esc(c.nom.split(' —')[0])} <span class="mono">${esc(c.lot)}</span></div>`).join(''):'—'}</td>
+        <td>${ES.length?ES.map(e=>`<div style="margin-bottom:2px">${gradeBdg(e.grade)} <span class="mu" style="font-size:11px">${esc(e.quoi)}</span></div>`).join(''):'<span class="mu">—</span>'}</td>
+        <td>${colDocs(a)}</td>
+        ${ROLES[role].prix?`<td class="num">${montantTxt(a)}</td>`:''}
+        <td class="mu" style="font-size:11.5px;max-width:220px">${com?esc(com.length>90?com.slice(0,90)+'…':com):'—'}</td>
+      </tr>`}).join('')}
+    </tbody></table>${L.length?'':'<div class="empty">Aucun acte ne correspond à ces filtres.</div>'}</div>`;
+  },
 
   schema:()=>{const ZH=zoneHist(p.id);
    const parReg=r=>Object.fromEntries(Object.entries(cumul).filter(([z])=>zoneById(z)?.r===r));
@@ -2570,7 +2732,7 @@ V.actes=()=>{
    <td style="max-width:300px">${a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneById(z);
      return `<span class="bdg ${Z.p==='tox'?'b-info':'b-warn'}" style="margin:0 3px 3px 0">${esc(Z.k)} · ${fmtQ(q,Z.p)}</span>`}).join(''):`<span class="mu">${noZoneTxt(a)}</span>`}</td>
    <td class="mono mu" style="font-size:11.5px">${a.lot||'—'}</td>
-   ${ROLES[role].prix?`<td class="num">${EUR(a.prix)}</td>`:''}</tr>`).join('')}</tbody></table>
+   ${ROLES[role].prix?`<td class="num">${montantTxt(a)}</td>`:''}</tr>`).join('')}</tbody></table>
   ${L.length?'':'<div class="empty">Aucun acte.</div>'}</div></div>`;
 };
 
@@ -2882,8 +3044,9 @@ V.stock=()=>{
 /* ---------------- Statistiques ---------------- */
 V.stats=()=>{
  if(!CAN('compta')) return `<div class="head"><div><h1>Statistiques</h1></div></div><div class="empty">🔒 Le suivi comptable est réservé au praticien. Le rôle « ${ROLES[role].l} » a accès à la facturation et aux encaissements.</div>`;
- const pc=CATS.map(c=>({label:c,v:ACTES.filter(a=>a.cat===c).reduce((s,a)=>s+a.prix,0)})).filter(x=>x.v).sort((a,b)=>b.v-a.v);
- const pp=PRATICIENS.map(p=>({label:p,v:ACTES.filter(a=>a.praticien===p).reduce((s,a)=>s+a.prix,0)}));
+ const mAct=a=>montantActe(a)||0;
+ const pc=CATS.map(c=>({label:c,v:ACTES.filter(a=>a.cat===c).reduce((s,a)=>s+mAct(a),0)})).filter(x=>x.v).sort((a,b)=>b.v-a.v);
+ const pp=PRATICIENS.map(p=>({label:p,v:ACTES.filter(a=>a.praticien===p).reduce((s,a)=>s+mAct(a),0)}));
  const zc={}; ACTES.forEach(a=>zonesOf(a).forEach(([z])=>{const Z=zoneById(z); if(!Z) return;
    const n=(Z.r==='corps'?'Corps · ':'')+Z.k.replace(/ [DG]$/,''); zc[n]=(zc[n]||0)+1}));
  const pz=Object.entries(zc).map(([label,v])=>({label,v})).sort((a,b)=>b.v-a.v).slice(0,8);
@@ -2891,7 +3054,8 @@ V.stats=()=>{
  return `<div class="head"><div><h1>Statistiques</h1><p>Sur l'ensemble des données du prototype</p></div>
   <div class="r"><div class="seg"><button class="on">6 mois</button><button>12 mois</button><button>Année</button></div></div></div>
  <div class="grid g4" style="margin-bottom:14px">
-  ${kpi('Panier moyen',EUR(Math.round(ACTES.reduce((s,a)=>s+a.prix,0)/ACTES.length)))}
+  ${kpi('Panier moyen',(()=>{const F=ACTES.filter(a=>montantActe(a)!=null);
+     return F.length?EUR(Math.round(F.reduce((s,a)=>s+montantActe(a),0)/F.length)):'—'})())}
   ${kpi('Patients fidélisés',fid+' / '+PATIENTS.length,Math.round(fid/PATIENTS.length*100)+' % ont ≥ 2 actes','up')}
   ${kpi('Actes par patient',(ACTES.length/PATIENTS.length).toFixed(1))}
   ${kpi('CA total',EUR(FACTURES.reduce((s,f)=>s+f.paye,0)))}</div>
@@ -3529,6 +3693,11 @@ V.equipe=()=>{
    SLIDE-OVER : saisie d'acte avec schéma de visage
    ========================================================================== */
 let AS=null;   /* état de saisie */
+/* navigation d'une séance à l'autre, dans l'ordre chronologique */
+const actesPatient=pid=>ACTES.filter(a=>a.patient===pid).sort((a,b)=>b.date.localeCompare(a.date));
+function allerActe(id){ const a=ACTES.find(x=>x.id===id); if(a) openActe(a.patient,a.id) }
+function acteVoisin(d){ const L=actesPatient(AS.pid), i=L.findIndex(x=>x.id===AS.aid);
+ const j=i+d; if(j<0||j>=L.length) return; allerActe(L[j].id) }
 function openActe(pid,aid,np){
  const a=aid?ACTES.find(x=>x.id===aid):null;
  const t0=a?a.type:null;
@@ -3556,12 +3725,21 @@ function renderOver(){
  const dosees=sel.filter(z=>+AS.z[z]>0);
  const total=dosees.reduce((s,z)=>s+(+AS.z[z]||0),0);
  const prix=(AS.prix!=null&&AS.prix!=='')?+AS.prix:prixSaisi();
+ /* l'acte ne porte pas de prix : les montants ne s'affichent qu'en mode devis */
+ const EUROS=CAN('prix')&&!AS.ro&&AS.but==='devis';
 
  document.getElementById('overh').innerHTML=`
   <button class="btn g s" onclick="closeAll()">✕</button>
   <div><h2>${AS.ro?'Acte du '+DF(AS.date):(AS.but==='devis'?'Nouveau devis':'Nouvelle consultation')} — ${p?esc(fn(p)):'nouveau patient'}</h2>
    <div class="mu" style="font-size:11.5px">${p?`${ageTxt(p)} · dossier ${p.id}${p.ant.length?' · <span style="color:var(--warn);font-weight:600">⚠ '+esc(p.ant[0])+'</span>':''}`:'le dossier sera créé à l’enregistrement'}</div></div>
-  <div style="margin-left:auto;display:flex;gap:7px">
+  <div style="margin-left:auto;display:flex;gap:7px;align-items:center">
+   ${(AS.ro&&p)?(()=>{const L=actesPatient(p.id), i=L.findIndex(x=>x.id===AS.aid);
+     return L.length<2?'':`<div class="anav">
+       <button class="nb" ${i<=0?'disabled':''} onclick="acteVoisin(-1)" title="Séance suivante">‹</button>
+       <select class="inp" onchange="allerActe(+this.value)" title="Toutes les séances de ce patient">
+         ${L.map((x,k)=>`<option value="${x.id}" ${x.id===AS.aid?'selected':''}>${DF(x.date)} — ${esc(x.nom)}</option>`).join('')}</select>
+       <button class="nb" ${i>=L.length-1?'disabled':''} onclick="acteVoisin(1)" title="Séance précédente">›</button>
+       <span class="mu" style="font-size:11px;white-space:nowrap">${i+1} / ${L.length}</span></div>`})():''}
    ${AS.ro?'<span class="bdg b-neu">lecture seule</span>':''}
    ${p?`<button class="btn s" onclick="openPatient(${p.id})">Fiche complète</button>`:''}</div>`;
 
@@ -3637,7 +3815,7 @@ function renderOver(){
          <select class="inp" id="addSoin" ${dispo.length?'':'disabled'} onchange="setDraftActe(this.value)">
            ${dispo.length?`<option value="">Choisir un acte…</option>`+catsUtilisees().map(k=>{const L2=dispo.filter(c=>(c.cat||'Divers')===k);
              return L2.length?`<optgroup label="${esc(k)}">${L2.map(c=>
-               `<option value="${c.id}" ${D.t===c.id?'selected':''}>${esc(c.n)}${CAN('prix')&&c.prix?' · '+EUR(c.prix):''}</option>`).join('')}</optgroup>`:''}).join('')
+               `<option value="${c.id}" ${D.t===c.id?'selected':''}>${esc(c.n)}${EUROS&&c.prix?' · '+EUR(c.prix):''}</option>`).join('')}</optgroup>`:''}).join('')
              :'<option value="">tous les soins du catalogue sont déjà dans la séance</option>'}</select>
        </div>
        ${D.t?`
@@ -3688,7 +3866,7 @@ function renderOver(){
           ${AS.ro?'':`onclick="ouvrirSoin(${i})" title="${ouvert?'Les zones cliquées sur le schéma iront à ce soin':'Déplier ce soin'}"`}>
         <div class="soinc-h">
           <span class="dot" style="background:${x.t?colActe(x.t):'var(--ink-3)'}"></span>
-          ${x.t?`<b class="sc-nom">${esc(c.n)}</b>${encours&&plusieurs?'<span class="sc-cur">en cours</span>':''}${CAN('prix')&&puSoin(x)?(()=>{const fige=x.pu!=null&&x.pu!==(c.prix||0);
+          ${x.t?`<b class="sc-nom">${esc(c.n)}</b>${encours&&plusieurs?'<span class="sc-cur">en cours</span>':''}${EUROS&&puSoin(x)?(()=>{const fige=x.pu!=null&&x.pu!==(c.prix||0);
              return `<span class="pu${fige?' fige':''}"${fige?` title="prix figé par le devis — tarif du jour ${EUR(c.prix||0)}"`:''}>${EUR(puSoin(x))}</span>`})():''}`
            :((AS.ro||!ouvert)?`<b class="sc-nom">${esc((x.libre||'').trim()||'Prestation libre')}</b>`
             :`<input class="inp sc-lib" placeholder="Soin non catalogué…" value="${esc(x.libre||'')}"
@@ -3696,9 +3874,9 @@ function renderOver(){
               ${CAN('prix')?`<input class="inp sc-px" type="number" min="0" step="5" placeholder="0"
                 value="${x.prix==null?'':x.prix}" onclick="event.stopPropagation()" oninput="majLibre(${i},'prix',this.value)"><span class="mu">€</span>`:''}`)}
           ${ouvert?'':`<span class="sc-min">${[nz?`${nz} zone${nz>1?'s':''}`:(x.t?'sans zone':''),
-            q>1?`× ${q}`:'', rr?`− ${EUR(rr)}`:'', (x.com||'').trim()?esc(x.com.trim()):'']
+            q>1?`× ${q}`:'', (EUROS&&rr)?`− ${EUR(rr)}`:'', (x.com||'').trim()?esc(x.com.trim()):'']
             .filter(Boolean).join(' · ')||'à compléter'}</span>`}
-          ${CAN('prix')?`<b class="sc-tot">${EUR(tot)}</b>`:''}
+          ${EUROS?`<b class="sc-tot">${EUR(tot)}</b>`:''}
           ${AS.ro?'':`<button class="rm" onclick="event.stopPropagation();rmSoin(${i})" title="Retirer ce soin de la séance">✕</button>`}
         </div>
         <div class="soinc-b">
@@ -3739,7 +3917,7 @@ function renderOver(){
              <button onclick="setSoinQ(${i},-1)">−</button>
              <input class="qin" type="number" min="1" value="${q}" onchange="setSoinQ(${i},0,this.value)">
              <button onclick="setSoinQ(${i},1)">+</button></div>`}
-           ${CAN('prix')?(()=>{const rr=remUnSoin(x);
+           ${EUROS?(()=>{const rr=remUnSoin(x);
              return `<span class="sc-rl">Remise</span>
               ${AS.ro?`<b>${rr?'− '+EUR(rr):'—'}</b>`
                :`<div class="rem2" onclick="event.stopPropagation()">
@@ -3756,20 +3934,24 @@ function renderOver(){
         ...lignesLibres().filter(x=>(x.libre||'').trim()).map(x=>
         `<span class="dot" style="background:var(--ink-3)"></span>${esc(x.libre)}`)]
         .join('<span class="mu" style="margin:0 4px">+</span>')||'<span class="mu">Séance vide</span>'}</div>`:''}
-      ${CAN('prix')?`<div class="rc-r prix"><span>Montant total de l’acte ${AS.ro?'':'<small>modifiable</small>'}</span>
-        ${AS.ro?`<b>${EUR(prix)}</b>`:`<div class="pxin"><input class="inp" id="tPrix" type="number" min="0" step="5"
-           value="${prix}" onchange="AS.prix=this.value===''?null:+this.value;renderOver()"><span>€</span></div>`}</div>`:''}
+      ${EUROS?`<div class="rc-r prix"><span>Montant du devis <small>modifiable</small></span>
+        <div class="pxin"><input class="inp" id="tPrix" type="number" min="0" step="5"
+           value="${prix}" onchange="AS.prix=this.value===''?null:+this.value;renderOver()"><span>€</span></div></div>`
+       :(AS.ro&&CAN('prix')?(()=>{const m=montantActe(ACTES.find(x=>x.id===AS.aid));
+          return `<div class="rc-r prix"><span>Facturé</span><b>${m==null?'<span class="mu" style="font-size:13px;font-weight:500">non facturé</span>':EUR(m)}</b></div>`})():'')}
       ${(()=>{ if(AS.ro) return '';
         const P=(AS.soins||[]).filter(x=>x.t||(x.libre||'').trim()).map(x=>{const q=soinQ(x);
-          const n=x.t?acteDef(x.t).n:x.libre, u=puSoin(x);
-          const r=remUnSoin(x);
-          return esc(n)+' '+EUR(u)+(q>1?' × '+q:'')+(r?' − '+EUR(r):'')});
+          const n=x.t?acteDef(x.t).n:x.libre, u=puSoin(x), r=remUnSoin(x);
+          return EUROS ? esc(n)+' '+EUR(u)+(q>1?' × '+q:'')+(r?' − '+EUR(r):'')
+                       : esc(n)+(q>1?' × '+q:'')});
         const rs=remisesSoins();
-        return `<div class="rc-n" id="rcDetail" ${((P.length>1||rs)&&P.length<=2)?'':'style="display:none"'}>${P.join(' + ')} = ${EUR(prixSaisi())}${rs?` (${EUR(rs)} de remise sur les soins)`:''}.</div>`})()}
+        const montre=EUROS?((P.length>1||rs)&&P.length<=2):(P.length>1&&P.length<=3);
+        return `<div class="rc-n" id="rcDetail" ${montre?'':'style="display:none"'}>${P.join(' + ')}${
+          EUROS?` = ${EUR(prixSaisi())}${rs?` (${EUR(rs)} de remise sur les soins)`:''}`:''}.</div>`})()}
     </div>`:''}
 
    </div>
-   ${AS.ro?docPane(ACTES.find(x=>x.id===AS.aid))
+   ${AS.ro?actePane(ACTES.find(x=>x.id===AS.aid))
      :(AS.but==='devis'?devisPane(sel,total,prix):consultPane(prix))}
   </div>`;
 
@@ -3782,14 +3964,14 @@ function renderOver(){
   :`${AS.but==='acte'
       ?`<label style="display:flex;gap:7px;align-items:center;font-size:12.5px;cursor:pointer">
          <input type="checkbox" ${AS.consent?'checked':''} onchange="AS.consent=this.checked"> Consentement éclairé signé${C.cons?' <span class="bdg b-warn" style="margin-left:4px">requis</span>':''}</label>
-       <span class="mu" style="font-size:11.5px">consultation du ${DF(AS.date)} · le stock se décrémente</span>`
+       <span class="mu" style="font-size:11.5px">consultation du ${DF(AS.date)} · aucun montant : la facturation se fait après, sur l'acte</span>`
       :`<span class="mu" style="font-size:11.5px">devis : aucun acte n'est enregistré, aucun stock n'est consommé</span>`}
    <div style="margin-left:auto;display:flex;gap:8px">
     <button class="btn" onclick="closeAll()">Annuler</button>
     ${AS.but==='acte'
-      ? `<button class="btn" id="btnDevis" onclick="saveDevis()">📄 Plutôt un devis${CAN('prix')&&prix>0?' · '+EUR(dvNetActe(prix).net):''}</button>
-         <button class="btn p" id="btnActe" onclick="saveActe()">✚ Enregistrer la consultation${CAN('prix')?' · '+EUR(prix):''}</button>`
-      : `<button class="btn" id="btnActe" onclick="saveActe()">✚ Plutôt une consultation${CAN('prix')?' · '+EUR(prix):''}</button>
+      ? `<button class="btn" id="btnDevis" onclick="saveDevis()">📄 Plutôt un devis</button>
+         <button class="btn p" id="btnActe" onclick="saveActe()">✚ Enregistrer la consultation</button>`
+      : `<button class="btn" id="btnActe" onclick="saveActe()">✚ Plutôt une consultation</button>
          <button class="btn p" id="btnDevis" onclick="saveDevis()">📄 Enregistrer le devis${CAN('prix')&&prix>0?' · '+EUR(dvNetActe(prix).net):''}</button>`}</div>`;
 }
 const dvNetActe=prix=>{const brut=prix;                    /* le montant porte déjà la quantité */
@@ -4003,6 +4185,14 @@ const actesSaisis=()=>{
 const lignesLibres=()=>(AS.soins||[]).filter(x=>!x.t);
 /* les zones posées pour un soin donné */
 const zonesDuSoin=t=>Object.keys(AS.z).filter(z=>zActe(z)===t);
+/* Un acte n'a pas de prix : c'est un objet clinique. Le montant, s'il existe,
+   vient des pièces qui lui sont rattachées — facture, ou à défaut le montant
+   historique du jeu de démonstration. `null` = acte non facturé. */
+function montantActe(a){ if(!a) return null;
+ const F=FACTURES.filter(f=>f.acte===a.id&&f.statut!=='annulee');
+ if(F.length) return F.reduce((s2,f)=>s2+fTTC(f),0);
+ return a.prix!=null?a.prix:null }
+const montantTxt=a=>{const m=montantActe(a); return m==null?'<span class="mu">—</span>':EUR(m)};
 /* prix unitaire d'un soin : le tarif du jour, sauf si le soin vient d'un devis
    qui a figé le sien (pu) — un devis engage le prix qu'il annonce */
 const puSoin=x=>x.t?(x.pu!=null?+x.pu:(acteDef(x.t).prix||0)):(+x.prix||0);
@@ -4229,11 +4419,12 @@ function setZLive(id,v){
 function majActe(){
  const sel=Object.keys(AS.z);
  const prix=(AS.prix!=null&&AS.prix!=='')?+AS.prix:prixSaisi();
+ const EUROS=CAN('prix')&&!AS.ro&&AS.but==='devis';
  const set=(id,v)=>{const e=document.getElementById(id); if(e) e.textContent=v};
  document.querySelectorAll('#over .soinc').forEach(el=>{
    const x=(AS.soins||[])[+el.dataset.i]; if(!x) return;
    const t=el.querySelector('.sc-tot');
-   if(t) t.textContent=EUR(prixUnSoin(x));
+   if(t) t.textContent=EUROS?EUR(prixUnSoin(x)):'';
    const d=el.querySelector('.sc-dose');
    if(d&&x.t){ const Z2=sel.filter(z=>zActe(z)===x.t);
      const q=Z2.reduce((s2,z)=>s2+(+AS.z[z]||0),0);
@@ -4242,17 +4433,20 @@ function majActe(){
    const n=el.querySelector('.sc-nz'); if(n&&x.t) n.textContent=zonesDuSoin(x.t).length||'—' });
  const px=document.getElementById('tPrix'); if(px&&px.tagName==='INPUT') px.value=prix;
  const b=document.getElementById('btnActe');
- if(b) b.textContent="✚ Enregistrer l'acte"+(CAN('prix')?' · '+EUR(prix):'');
+ if(b) b.textContent=AS.but==='acte'?'✚ Enregistrer la consultation':'✚ Plutôt une consultation';
  const bd=document.getElementById('btnDevis');
- if(bd) bd.textContent='📄 Générer un devis'+(CAN('prix')&&prix>0?' · '+EUR(dvNetActe(prix).net):'');
+ if(bd) bd.textContent=AS.but==='devis'
+   ? '📄 Enregistrer le devis'+(CAN('prix')&&prix>0?' · '+EUR(dvNetActe(prix).net):'')
+   : '📄 Plutôt un devis';
  const dt=document.getElementById('dvpTot'); if(dt) dt.innerHTML=dvpTotHTML(prix);
  const rd=document.getElementById('rcDetail');
  if(rd){ const P=(AS.soins||[]).filter(x=>x.t||(x.libre||'').trim()).map(x=>{const q=soinQ(x);
      const n=x.t?acteDef(x.t).n:x.libre, u=puSoin(x), r=remUnSoin(x);
-     return esc(n)+' '+EUR(u)+(q>1?' × '+q:'')+(r?' − '+EUR(r):'')});
+     return EUROS ? esc(n)+' '+EUR(u)+(q>1?' × '+q:'')+(r?' − '+EUR(r):'')
+                  : esc(n)+(q>1?' × '+q:'')});
    const rs=remisesSoins();
-   rd.innerHTML=P.join(' + ')+' = '+EUR(prixSaisi())+(rs?` (${EUR(rs)} de remise sur les soins)`:'')+'.';
-   rd.style.display=(P.length>1||rs)?'':'none' }
+   rd.innerHTML=P.join(' + ')+(EUROS?' = '+EUR(prixSaisi())+(rs?` (${EUR(rs)} de remise sur les soins)`:''):'')+'.';
+   rd.style.display=(EUROS?(P.length>1||rs):(P.length>1&&P.length<=3))?'':'none' }
  document.querySelectorAll('.kbd-r').forEach(r=>{
   const on=Object.prototype.hasOwnProperty.call(AS.z,r.dataset.z);
   r.classList.toggle('on',on);
@@ -4312,7 +4506,8 @@ function saveActe(){
   lot:C.conso?(C.conso==='AH-VOLB'?'L-AH2409':C.conso==='BTX-100'?'L-BX2601':null):null,
   conso:C.conso,zones,consent:AS.consent,effets:AS.effets||'',note:AS.note||'',
   seances:seancesMax(), devis:AS.devis||null,
-  zonesNote:(AS.soins||[]).map(x=>(x.com||'').trim()).filter(Boolean).join(' · ')||AS.zonesNote||'',prix});
+  zonesNote:(AS.soins||[]).map(x=>(x.com||'').trim()).filter(Boolean).join(' · ')||AS.zonesNote||'',
+  prix:null});                       /* l'acte ne porte pas de montant : il se facture après */
  DEVIS.filter(d=>!d.acte&&d.patient===AS.pid&&d.date===AS.date).forEach(d=>{d.acte=ACTES[0].id});
  const nDoc=(AS.docs||[]).filter(m=>addDocActe(ACTES[0].id,m,true)).length;
  if(AS.devis){ const dv=DEVIS.find(x=>x.id===AS.devis);
@@ -4442,7 +4637,179 @@ let docAdd=false, docOpen=null;
 function toggleDocAdd(){docAdd=!docAdd;renderOver()}
 function toggleDocHist(id){docOpen=docOpen===id?null:id;renderOver()}
 
-function docPane(a){
+/* ==========================================================================
+   Le dossier d'un acte : documents, photos, consommables, effets, fichiers
+   ==========================================================================
+   L'acte enregistré n'est pas figé. On y revient pour y accrocher ce qui
+   arrive après : l'ordonnance oubliée, la photo de contrôle à J+15,
+   l'ecchymose signalée au téléphone, la facture. */
+let actSec='documents', consoAdd=false, effetAdd=false, factAdd=false;
+function setActSec(k){ actSec=k; docAdd=consoAdd=effetAdd=factAdd=false; renderOver() }
+const SECTIONS=[['documents','📄','Documents'],['photos','📷','Photos'],
+                ['conso','📦','Consommables'],['effets','⚠','Effets secondaires'],
+                ['fichiers','📁','Fichiers']];
+const secCount=(k,a)=>k==='documents'?docsActe(a).length:k==='photos'?photosActe(a).length
+  :k==='conso'?consoActe(a).length:k==='effets'?effetsActe(a).length:fichiersActe(a).length;
+
+function actePane(a){
+ if(!a) return '';
+ if(!SECTIONS.some(x=>x[0]===actSec)) actSec='documents';
+ const corps=actSec==='documents'?secDocuments(a):actSec==='photos'?secPhotos(a)
+   :actSec==='conso'?secConso(a):actSec==='effets'?secEffets(a):secFichiers(a);
+ return `<div class="apane">
+  <div class="apane-t">${SECTIONS.map(([k,i,l])=>{const n=secCount(k,a);
+    return `<button class="asec ${actSec===k?'on':''}" onclick="setActSec('${k}')" title="${esc(l)}">
+      <span class="ai">${i}</span><span class="al">${esc(l)}</span>${n?`<span class="an">${n}</span>`:''}</button>`}).join('')}</div>
+  <div class="apane-b">${corps}</div></div>`;
+}
+
+/* ---------------- Photos ---------------- */
+function addPhotoActe(aid){
+ const a=ACTES.find(x=>x.id===aid); if(!a) return;
+ const L=photosActe(a);
+ const kind=L.length%2?'apres':'avant';
+ const h=(a.patient*13)%40+8;
+ PHOTOS.push({id:'PH-'+(PHOTOS.length+1),patient:a.patient,acte:a.id,date:TODAYS,kind,
+   h:h+(kind==='apres'?4:0),zone:a.zones?Object.keys(a.zones)[0]:null});
+ toast(`Photo « ${kind==='avant'?'avant':'après'} » ajoutée · ${DF(TODAYS)}`); renderOver();
+}
+function secPhotos(a){
+ const L=photosActe(a);
+ const av=L.filter(x=>x.kind==='avant'), ap=L.filter(x=>x.kind==='apres');
+ return `<div class="dpane-h"><div style="min-width:0"><h3>Photos</h3>
+   <div class="mu" style="font-size:11px">${L.length?`${av.length} avant · ${ap.length} après`:'aucune photo'}</div></div>
+   <div class="r"><button class="btn xs p" onclick="addPhotoActe(${a.id})">＋ Photo</button></div></div>
+  ${(av.length&&ap.length)?`<div class="ba" style="margin-bottom:9px">
+    <img src="${ph('AVANT — '+DFS(av[0].date),av[0].h,0)}" alt="avant simulé">
+    <img class="af" id="baA" src="${ph('APRÈS — '+DFS(ap[ap.length-1].date),ap[ap.length-1].h,8)}" alt="après simulé">
+    <div class="hd" id="baH" style="left:50%"></div><div class="tg l">AVANT</div><div class="tg r">APRÈS</div></div>
+   <input type="range" min="0" max="100" value="50" style="width:100%;margin-bottom:10px" oninput="setBA(this.value)">`:''}
+  ${L.length?`<div class="phg">${L.map(x=>`<div class="phc">
+     <img src="${ph(x.kind==='avant'?'AVANT':'APRÈS',x.h,x.kind==='avant'?0:8)}" alt="${x.kind}">
+     <div class="phl"><b>${x.kind==='avant'?'Avant':'Après'}</b><span>${DFS(x.date)}</span></div></div>`).join('')}</div>`
+   :`<div class="empty" style="padding:20px">Aucune photo sur cet acte.<br>
+      <span class="mu" style="font-size:11.5px">Ajoutez un cliché avant, puis un après : le comparateur apparaît.</span></div>`}
+  <div class="mu" style="font-size:11px;padding:8px 2px 0">Illustrations simulées — aucune photo réelle dans ce prototype.</div>`;
+}
+
+/* ---------------- Consommables ---------------- */
+function toggleConso(){ consoAdd=!consoAdd; renderOver() }
+function addConso(aid){
+ const a=ACTES.find(x=>x.id===aid); if(!a) return;
+ const ref=(document.getElementById('csRef')||{}).value;
+ const q=Math.max(1,+((document.getElementById('csQ')||{}).value)||1);
+ const st=STOCK.find(x=>x.ref===ref); if(!st){toast('Choisissez un produit');return}
+ CONSO.push({id:'CS-'+(CONSO.length+1+9000), acte:a.id, patient:a.patient, ref:st.ref, nom:st.n,
+   lot:st.lot||'—', per:st.per, q, u:st.u, ts:nowStamp(), par:ROLES[role].u});
+ st.q=Math.max(0,st.q-q);
+ consoAdd=false; toast(`${st.n} × ${q} · lot ${st.lot||'—'} — stock à ${st.q}`); renderOver();
+}
+function delConso(id){ const i=CONSO.findIndex(x=>x.id===id); if(i<0) return;
+ const c=CONSO[i], st=STOCK.find(x=>x.ref===c.ref); if(st) st.q+=c.q;
+ CONSO.splice(i,1); toast('Consommable retiré · stock recrédité'); renderOver() }
+function secConso(a){
+ const L=consoActe(a);
+ const perime=d=>d&&d<TODAYS;
+ return `<div class="dpane-h"><div style="min-width:0"><h3>Consommables</h3>
+   <div class="mu" style="font-size:11px">${L.length?`${L.length} ligne${L.length>1?'s':''} · traçabilité des lots`:'rien de tracé sur cet acte'}</div></div>
+   <div class="r"><button class="btn xs ${consoAdd?'g':'p'}" onclick="toggleConso()">${consoAdd?'✕':'＋ Produit'}</button></div></div>
+  ${consoAdd?`<div class="cadd">
+    <select class="inp" id="csRef">${STOCK.map(x=>`<option value="${x.ref}">${esc(x.n)}${x.lot?' · lot '+esc(x.lot):''} — ${x.q} en stock</option>`).join('')}</select>
+    <input class="inp" id="csQ" type="number" min="1" value="1" style="width:64px">
+    <button class="btn xs p" onclick="addConso(${a.id})">Ajouter</button>
+    <div class="mu" style="font-size:11px;grid-column:1/-1">Le lot et la péremption sont repris du stock, et la quantité en est décomptée.</div>
+   </div>`:''}
+  ${L.length?`<div class="ctab">${L.map(c=>`<div class="crow">
+     <div class="cn"><b>${esc(c.nom)}</b><small>${esc(c.par)} · ${DTS(c.ts)}</small></div>
+     <div class="clot"><span class="mono">${esc(c.lot)}</span>
+       <small class="${perime(c.per)?'per':''}">${perime(c.per)?'⚠ périmé le ':'exp. '}${DF(c.per)}</small></div>
+     <div class="cq">${c.q} <small>${esc(c.u)}${c.q>1?'s':''}</small></div>
+     <button class="rm" title="Retirer" onclick="delConso('${c.id}')">✕</button>
+   </div>`).join('')}</div>`
+   :`<div class="empty" style="padding:20px">Aucun consommable tracé.<br>
+      <span class="mu" style="font-size:11.5px">Le numéro de lot est ce qu'on vous demandera en cas de rappel produit.</span></div>`}`;
+}
+
+/* ---------------- Effets secondaires ---------------- */
+function toggleEffet(){ effetAdd=!effetAdd; renderOver() }
+function addEffet(aid){
+ const a=ACTES.find(x=>x.id===aid); if(!a) return;
+ const quoi=(document.getElementById('efQ')||{}).value||'Autre';
+ const grade=(document.getElementById('efG')||{}).value||'leger';
+ const date=(document.getElementById('efD')||{}).value||TODAYS;
+ const note=((document.getElementById('efN')||{}).value||'').trim();
+ EFFETS.push({id:'ES-'+(EFFETS.length+1+9000), acte:a.id, patient:a.patient, date, quoi, grade,
+   note, resolu:false, ts:nowStamp(), par:ROLES[role].u});
+ effetAdd=false; toast(`${quoi} noté sur l'acte du ${DF(a.date)}`); renderOver();
+}
+function resoluEffet(id){ const e=EFFETS.find(x=>x.id===id); if(!e) return;
+ e.resolu=!e.resolu; renderOver() }
+function secEffets(a){
+ const L=effetsActe(a), ouverts=L.filter(x=>!x.resolu).length;
+ return `<div class="dpane-h"><div style="min-width:0"><h3>Effets secondaires</h3>
+   <div class="mu" style="font-size:11px">${L.length?`${L.length} signalé${L.length>1?'s':''}${ouverts?` · ${ouverts} en cours`:' · tous résolus'}`:'rien de signalé'}</div></div>
+   <div class="r"><button class="btn xs ${effetAdd?'g':'p'}" onclick="toggleEffet()">${effetAdd?'✕':'＋ Signaler'}</button></div></div>
+  ${effetAdd?`<div class="eadd">
+    <select class="inp" id="efQ">${EFF_TYPES.map(t=>`<option>${esc(t)}</option>`).join('')}</select>
+    <select class="inp" id="efG">${EFF_GRADE.map(g=>`<option value="${g[0]}">${g[1]}</option>`).join('')}</select>
+    <input class="inp" id="efD" type="date" value="${TODAYS}">
+    <input class="inp" id="efN" placeholder="ce que le patient décrit…" style="grid-column:1/-1">
+    <button class="btn xs p" onclick="addEffet(${a.id})" style="grid-column:1/-1">Enregistrer le signalement</button>
+   </div>`:''}
+  ${L.length?L.map(e=>`<div class="erow ${e.resolu?'ok':''}">
+     <div class="eh"><b>${esc(e.quoi)}</b>${gradeBdg(e.grade)}
+       <span class="mu" style="margin-left:auto;font-size:11px">${DFS(e.date)}</span></div>
+     ${e.note?`<div class="en">${esc(e.note)}</div>`:''}
+     <div class="ef"><span class="mu">${esc(e.par)}</span>
+       <button class="btn xs ${e.resolu?'g':''}" onclick="resoluEffet('${e.id}')">${e.resolu?'✓ résolu':'marquer résolu'}</button></div>
+   </div>`).join('')
+   :`<div class="empty" style="padding:20px">Aucun effet secondaire signalé.<br>
+      <span class="mu" style="font-size:11.5px">Ce qui est noté ici remonte dans la fiche du patient et dans les statistiques.</span></div>`}`;
+}
+
+/* ---------------- Fichiers externes ---------------- */
+const EXTS=[['pdf','Compte rendu (PDF)',180],['jpg','Photo externe (JPG)',2400],
+            ['pdf','Bilan biologique (PDF)',96],['png','Capture (PNG)',420],['docx','Courrier (DOCX)',38]];
+function addFichier(aid){
+ const a=ACTES.find(x=>x.id===aid); if(!a) return;
+ const i=FICHIERS.length%EXTS.length, [ext,nom,ko]=EXTS[i];
+ FICHIERS.push({id:'FX-'+(FICHIERS.length+1+9000), acte:a.id, patient:a.patient,
+   nom:`${nom.split(' (')[0]} — ${DFS(TODAYS)}`, ext, ko, date:TODAYS, par:ROLES[role].u});
+ toast('Fichier joint à l’acte'); renderOver();
+}
+function delFichier(id){ const i=FICHIERS.findIndex(x=>x.id===id); if(i<0) return;
+ FICHIERS.splice(i,1); toast('Fichier retiré'); renderOver() }
+function secFichiers(a){
+ const L=fichiersActe(a);
+ return `<div class="dpane-h"><div style="min-width:0"><h3>Fichiers externes</h3>
+   <div class="mu" style="font-size:11px">${L.length?`${L.length} pièce${L.length>1?'s':''} jointe${L.length>1?'s':''}`:'aucune pièce jointe'}</div></div>
+   <div class="r"><button class="btn xs p" onclick="addFichier(${a.id})">↑ Joindre</button></div></div>
+  ${L.length?L.map(f=>`<div class="frow">
+     <span class="fx x-${esc(f.ext)}">${esc(f.ext.toUpperCase())}</span>
+     <div style="min-width:0;flex:1"><div class="dn">${esc(f.nom)}</div>
+       <div class="dm">${f.ko>1000?(f.ko/1024).toFixed(1)+' Mo':f.ko+' Ko'} · ${esc(f.par)} · ${DFS(f.date)}</div></div>
+     <button class="btn xs" onclick="toast('Aperçu — phase 2')">Ouvrir</button>
+     <button class="rm" onclick="delFichier('${f.id}')">✕</button>
+   </div>`).join('')
+   :`<div class="empty" style="padding:20px">Aucun fichier joint.<br>
+      <span class="mu" style="font-size:11.5px">Compte rendu d'imagerie, bilan, courrier d'un confrère — tout ce qui n'est pas produit ici.</span></div>`}`;
+}
+
+/* ---------------- Facturer l'acte ---------------- */
+function toggleFact(){ factAdd=!factAdd; renderOver() }
+function facturerActe(aid){
+ const a=ACTES.find(x=>x.id===aid); if(!a) return;
+ const m=Math.max(0,+((document.getElementById('fcM')||{}).value)||0);
+ if(!m){toast('Indiquez un montant');return}
+ const moyen=(document.getElementById('fcP')||{}).value||null;
+ const id='F-'+(2600+FACTURES.length);
+ FACTURES.unshift({id,patient:a.patient,acte:a.id,date:TODAYS,montant:m,
+   paye:moyen?m:0,moyen:moyen||null,praticien:a.praticien,cat:a.cat,type:a.type,statut:'ok',avoir:0});
+ logDoc(id,`Facture émise — ${EUR(m)}${moyen?' · encaissée par '+moyen:''}`);
+ factAdd=false; toast(`Facture ${id} · ${EUR(m)}${moyen?' encaissée':' à encaisser'}`); renderOver();
+}
+
+function secDocuments(a){
  const L=docsActe(a), p=pById(a.patient), ca=canalPat(p);
  const nEnv=L.filter(d=>d.env).length;
  return `<div class="dpane">
@@ -4450,8 +4817,22 @@ function docPane(a){
    <div style="min-width:0"><h3>Documents</h3>
      <div class="mu" style="font-size:11px">${L.length} pièce${L.length>1?'s':''} · envoi par ${ca}</div></div>
    <div class="r">
+    ${CAN('prix')?`<button class="btn xs ${factAdd?'g':''}" onclick="toggleFact()">${factAdd?'✕':'€ Facturer'}</button>`:''}
     <button class="btn xs" onclick="toggleDocAdd()">${docAdd?'✕':'+ Doc.'}</button>
     ${nEnv?`<button class="btn xs p" onclick="sendAllDocs(${a.id})">✉ Tout envoyer · ${nEnv}</button>`:''}</div></div>
+  ${(factAdd&&CAN('prix'))?(()=>{const m=montantActe(a);
+    return `<div class="cadd">
+     <input class="inp" id="fcM" type="number" min="0" step="10" placeholder="montant TTC"
+       value="${(()=>{ if(m!=null) return m;
+         /* un devis réalisé engage son prix : c'est lui qu'on propose en premier */
+         const dv=DEVIS.find(x=>x.realise===a.id)||(a.devis?DEVIS.find(x=>x.id===a.devis):null);
+         if(dv) return dv.montant;
+         return (a.soins||[]).reduce((s2,x)=>s2+(x.t?(x.pu!=null?+x.pu:(acteDef(x.t).prix||0)):(+x.prix||0))*(x.q||1),0)||'' })()}">
+     <select class="inp" id="fcP"><option value="">à encaisser plus tard</option>${MOYENS.map(x=>`<option>${x}</option>`).join('')}</select>
+     <button class="btn xs p" onclick="facturerActe(${a.id})">Émettre</button>
+     <div class="mu" style="font-size:11px;grid-column:1/-1">${
+       (DEVIS.some(x=>x.realise===a.id)||a.devis)?'Le montant du devis réalisé est proposé.':'Le tarif du catalogue est proposé.'} Rien ne vous y oblige — un acte peut rester non facturé.</div>
+    </div>`})():''}
   ${docAdd?`<div class="dmod">${['Ordonnance','Consentement','Information','Devis'].map(c=>{
      const M=DOCMOD.filter(x=>x.cat===c); if(!M.length) return '';
      return `<div class="dmod-c">${c}</div>`+M.map(m=>`<button class="dmod-b" onclick="addDocActe(${a.id},'${m.id}')">${esc(m.nom)}</button>`).join('')}).join('')}
@@ -4483,7 +4864,7 @@ function docPane(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='AK';
+const BUILD='AL';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
