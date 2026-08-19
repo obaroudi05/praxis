@@ -686,6 +686,12 @@ table.chrono tr.c td{vertical-align:top}
 .parg label>span+.inp,.parg label>.inp{width:100%}
 .parg .pl{display:flex;align-items:baseline;gap:4px;min-width:0}
 .parbar{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.sc-mat.corr{border:1px solid var(--accent);border-radius:11px;background:var(--accent-wash);
+  padding:8px;margin-top:8px}
+.corrbar{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:8px;flex-wrap:wrap}
+.corrbar .mu{font-size:10.5px;flex-basis:100%;margin-bottom:2px}
+.majl{margin-top:6px;font-size:10.5px;color:var(--ink-3);cursor:help;
+  border-top:1px dotted var(--line);padding-top:5px}
 .parv{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
 .parv span{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:2px 7px;font-size:11.5px}
 .parv span b{font-weight:700;color:var(--ink-3);font-size:10px;text-transform:uppercase;
@@ -2684,6 +2690,8 @@ function pDetail(p){
              return `<div style="margin-bottom:3px"><b style="font-weight:620">
                <span class="mdot" style="background:${mm.col};display:inline-block;margin-right:4px"></span>${esc(mm.n)}</b>
                ${paramsTexte(x)?`<div class="mu">${esc(paramsTexte(x))}</div>`:''}
+               ${majActeHist(a.id).some(h=>/Réglages/.test(h.ev))?`<div class="mu" style="font-size:10.5px"
+                 title="${esc(majActeHist(a.id).filter(h=>/Réglages/.test(h.ev)).map(h=>DTS(h.t)+' — '+h.ev).join('\n'))}">✎ corrigé</div>`:''}
                ${zs.length?`<div class="mu">${zs.length} zone${zs.length>1?'s':''} détaillée${zs.length>1?'s':''}</div>`:''}</div>`}).join('')})()}</td>
         <td class="mu" style="font-size:11.5px">${CS.length?CS.map(c=>`<div>${esc(c.nom.split(' —')[0])} <span class="mono">${esc(c.lot)}</span></div>`).join(''):'—'}</td>
         <td>${ES.length?ES.map(e=>`<div style="margin-bottom:2px">${gradeBdg(e.grade)} <span class="mu" style="font-size:11px">${esc(e.quoi)}</span></div>`).join(''):'<span class="mu">—</span>'}</td>
@@ -3913,6 +3921,7 @@ function openActe(pid,aid,np){
      draft:{t:null,z:{},com:''}, openSoin:0, devis:null, docs:[],
      but:a?'acte':'acte',                       /* 'acte' = consultation du jour · 'devis' = projet */
      effets:a?a.effets:'', consent:a?a.consent:false};
+ editMat=null; matAvant=null;
  renderOver();
  document.getElementById('over').classList.add('on');
  document.getElementById('scrim').classList.add('on');
@@ -3920,6 +3929,67 @@ function openActe(pid,aid,np){
 /* --------------------------------------------------------------------------
    Matériel et paramètres de traitement, sur la carte du soin
    -------------------------------------------------------------------------- */
+/* la forme sous laquelle un soin est rangé dans l'acte — même règle à
+   l'enregistrement et à la correction d'un acte déjà clôturé */
+const soinRange=y=>y.t
+ ? {t:y.t, q:soinQ(y), com:(y.com||'').trim(), rem:+y.rem||0, remT:y.remT||'€',
+    ...(y.pu!=null?{pu:+y.pu}:{}),
+    ...(y.mat?{mat:y.mat, par:{...(y.par||{})},
+        ...(y.zpar&&y.parZ&&Object.keys(y.parZ).length
+            ?{parZ:JSON.parse(JSON.stringify(y.parZ)), zpar:true}:{})}:{})}
+ : {libre:(y.libre||'').trim(), prix:+y.prix||0, q:soinQ(y), com:(y.com||'').trim(),
+    rem:+y.rem||0, remT:y.remT||'€'};
+
+/* Journal des corrections d'un acte : qui a changé quoi, et quand.
+   Un réglage de laser corrigé après coup doit rester lisible comme une
+   correction, pas se substituer silencieusement à ce qui a été noté. */
+const HACTE={};
+function logActe(id,ev,par){ (HACTE[id]=HACTE[id]||[]).push({t:nowStamp(), ev, par:par||ROLES[role].u}) }
+const majActeHist=id=>HACTE[id]||[];
+/* ce qui a changé entre deux jeux de réglages, en clair */
+function diffReglages(av,ap){
+ const out=[];
+ if((av.mat||null)!==(ap.mat||null)){
+   const A=matById(av.mat), B=matById(ap.mat);
+   out.push(`appareil ${A?A.n:'aucun'} → ${B?B.n:'aucun'}`) }
+ const m=matById(ap.mat);
+ if(m){ const P1=av.par||{}, P2=ap.par||{};
+  m.params.forEach(p=>{ const a1=P1[p.n], b1=P2[p.n];
+    if(String(a1==null?'':a1)===String(b1==null?'':b1)) return;
+    const u=p.u?' '+p.u:'';
+    out.push(`${p.n} ${a1==null||a1===''?'—':a1+u} → ${b1==null||b1===''?'—':b1+u}`) }) }
+ const z1=av.parZ?Object.keys(av.parZ).length:0, z2=ap.parZ?Object.keys(ap.parZ).length:0;
+ if(z1!==z2) out.push(`détail par zone : ${z1} → ${z2}`);
+ else if(z2&&JSON.stringify(av.parZ)!==JSON.stringify(ap.parZ)) out.push('détail par zone ajusté');
+ return out.join(' · ');
+}
+
+/* --- correction des réglages sur un acte déjà enregistré --- */
+let editMat=null, matAvant=null;
+function ouvrirEditMat(i){ const x=(AS.soins||[])[i]; if(!x) return;
+ editMat=i; matAvant=JSON.stringify({mat:x.mat||null, par:{...(x.par||{})},
+   parZ:x.parZ?JSON.parse(JSON.stringify(x.parZ)):null, zpar:!!x.zpar});
+ renderOver() }
+function annulerEditMat(){ if(editMat==null) return;
+ const x=(AS.soins||[])[editMat], av=JSON.parse(matAvant||'{}');
+ if(x){ x.mat=av.mat||null; x.par={...(av.par||{})};
+   x.parZ=av.parZ?JSON.parse(JSON.stringify(av.parZ)):null; x.zpar=!!av.zpar }
+ editMat=null; matAvant=null; renderOver() }
+function enregistrerEditMat(){
+ if(editMat==null) return;
+ const a=ACTES.find(x=>x.id===AS.aid);
+ if(!a){ editMat=null; return }
+ const x=(AS.soins||[])[editMat], av=JSON.parse(matAvant||'{}');
+ const ap={mat:x.mat||null, par:{...(x.par||{})}, parZ:x.parZ||null};
+ const d=diffReglages(av,ap);
+ if(!d){ editMat=null; matAvant=null; toast('Aucun changement'); renderOver(); return }
+ /* l'acte reçoit un tableau de soins explicite : la correction s'y inscrit */
+ a.soins=(AS.soins||[]).filter(y=>y.t||(y.libre||'').trim()).map(soinRange);
+ delete a.mat; delete a.par; delete a.parZ;
+ logActe(a.id, `Réglages corrigés — ${d}`);
+ editMat=null; matAvant=null;
+ toast('Réglages corrigés · la modification est tracée'); renderOver();
+}
 function setSoinMat(i,v){ const x=(AS.soins||[])[i]; if(!x||x.mat===(v||null)) return;
  x.mat=v||null;
  if(!v){ delete x.par; delete x.parZ; x.zpar=false } else { x.par=x.par||{} }
@@ -3944,8 +4014,18 @@ const grilleParams=(m,vals,onch)=>`<div class="parg">${m.params.map(p=>`
 function blocMateriel(x,i){
  const M=matsPourActe(x.t);
  const m=matById(x.mat);
- if(AS.ro) return m?`<div class="sc-mat ro">
-    <span class="sc-lb" style="margin:0">Matériel</span>
+ /* acte clôturé : lecture, sauf si l'on est en train de corriger ce soin-là */
+ if(AS.ro&&editMat!==i){
+  const H=majActeHist(AS.aid).filter(h=>/Réglages/.test(h.ev));
+  const der=H[H.length-1];
+  const bouton=(CAN('med')&&M.length)?`<button class="btn xs" style="margin-left:auto"
+     onclick="event.stopPropagation();ouvrirEditMat(${i})"
+     title="Corriger les réglages notés — la modification sera horodatée">✎ Corriger</button>`:'';
+  if(!m) return M.length&&CAN('med')?`<div class="sc-mat ro">
+     <div class="sc-lb" style="margin:0;display:flex;align-items:center">Matériel${bouton}</div>
+     <div class="mu" style="font-size:11.5px">aucun appareil noté sur cette séance</div></div>`:'';
+  return `<div class="sc-mat ro">
+    <div class="sc-lb" style="margin:0;display:flex;align-items:center">Matériel${bouton}</div>
     <div class="matn"><span class="mdot" style="background:${m.col}"></span>${esc(m.n)}
       <small>${esc(m.marque||'')}</small></div>
     ${paramsLisibles(x).length?`<div class="parv">${paramsLisibles(x).map(p=>
@@ -3955,12 +4035,18 @@ function blocMateriel(x,i){
       const vals=m.params.filter(p=>P[p.n]!=null&&P[p.n]!=='');
       return vals.length?`<div class="parzr"><b>${esc(zoneLabel(z))}</b>${vals.map(p=>
         `<span>${esc(p.n)} ${esc(String(P[p.n]))}${p.u?' '+esc(p.u):''}</span>`).join('')}</div>`:''}).join('')}</div>`:''}
-   </div>`:'';
- if(!M.length) return '';
+    ${der?`<div class="majl" title="${esc(H.map(h=>DTS(h.t)+' — '+h.ev+' ('+h.par+')').join('\n'))}">
+      ✎ Corrigé le ${DTS(der.t)} par ${esc(der.par)}${H.length>1?` · ${H.length} corrections`:''}</div>`:''}
+   </div>`;
+ }
+ if(!M.length&&!AS.ro) return '';
  const Z=x.t?zonesDuSoin(x.t):[];
  const d=m?dernierReglage(AS.pid,x.t,x.mat,AS.aid):null;
- return `<div class="sc-mat">
-   <span class="sc-lb" style="margin:0">Matériel et réglages</span>
+ const corr=(AS.ro&&editMat===i);
+ return `<div class="sc-mat ${corr?'corr':''}">
+   <div class="sc-lb" style="margin:0;display:flex;align-items:center">
+     ${corr?'Correction des réglages':'Matériel et réglages'}
+     ${corr?`<span class="mu" style="margin-left:auto;font-size:10px;text-transform:none;letter-spacing:0;font-weight:500">acte du ${DF(AS.date)}</span>`:''}</div>
    <select class="inp" onclick="event.stopPropagation()" onchange="setSoinMat(${i},this.value)">
      <option value="">Matériel non renseigné</option>
      ${M.map(o=>`<option value="${o.id}" ${x.mat===o.id?'selected':''}>${esc(o.n)}</option>`).join('')}
@@ -3978,6 +4064,11 @@ function blocMateriel(x,i){
         ${grilleParams(m,(x.parZ||{})[z],n=>`setZonePar(${i},'${z}','${n.replace(/'/g,"\\'")}',this.value)`)}
        </div>`).join('')}</div>`:''}`
     :`<div class="mu" style="font-size:11.5px">Choisissez l'appareil pour noter fluence, impulsion, spot…</div>`}
+   ${corr?`<div class="corrbar">
+     <span class="mu">La correction sera horodatée et signée.</span>
+     <button class="btn xs g" onclick="event.stopPropagation();annulerEditMat()">Annuler</button>
+     <button class="btn xs p" onclick="event.stopPropagation();enregistrerEditMat()">Enregistrer la correction</button>
+    </div>`:''}
  </div>`;
 }
 
@@ -4757,12 +4848,7 @@ function saveActe(){
  const T=actesSaisis();
  const zt=zones?Object.fromEntries(Object.keys(zones).map(z=>[z,zActe(z)])):null;
  const soins=(AS.soins||[]).filter(x=>x.t||(x.libre||'').trim())
-   .map(x=>x.t?{t:x.t, q:soinQ(x), com:(x.com||'').trim(), rem:+x.rem||0, remT:x.remT||'€',
-                ...(x.pu!=null?{pu:+x.pu}:{}),
-                ...(x.mat?{mat:x.mat, par:{...(x.par||{})},
-                           ...(x.zpar&&x.parZ&&Object.keys(x.parZ).length?{parZ:JSON.parse(JSON.stringify(x.parZ)),zpar:true}:{})}:{})}
-              :{libre:x.libre.trim(), prix:+x.prix||0, q:soinQ(x), com:(x.com||'').trim(),
-                rem:+x.rem||0, remT:x.remT||'€'});
+   .map(soinRange);
  const LB=soins.filter(x=>!x.t);
  const C0=T.length?acteDef(T[0]):CNUL;
  ACTES.unshift({id:Date.now(),patient:AS.pid,type:C0.id,zt,soins,
@@ -5131,7 +5217,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='AM';
+const BUILD='AN';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
