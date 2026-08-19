@@ -688,6 +688,27 @@ table.chrono tr.c td{vertical-align:top}
 .parbar{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
 .sc-mat.corr{border:1px solid var(--accent);border-radius:11px;background:var(--accent-wash);
   padding:8px;margin-top:8px}
+/* actions sur une séance : dupliquer, supprimer */
+td.acts{white-space:nowrap;text-align:right;position:sticky;right:0;background:var(--panel);
+  box-shadow:-7px 0 9px -7px rgba(16,20,28,.18)}
+tr.c:hover td.acts{background:var(--panel-2)}
+table.chrono thead th:last-child{position:sticky;right:0;background:var(--panel-2)}
+.ib{width:26px;height:26px;border-radius:8px;border:1px solid var(--line);background:var(--panel);
+  color:var(--ink-2);font-size:12px;line-height:1;cursor:pointer;font-family:inherit;transition:.12s;margin-left:3px}
+.ib:hover{border-color:var(--accent);color:var(--accent)}
+.ib.d:hover{border-color:var(--crit);color:var(--crit);background:var(--crit-w)}
+tr.supp td{background:var(--crit-w);padding:0}
+.suppb{display:flex;align-items:center;gap:10px;padding:9px 12px}
+.suppb .e{font-size:15px;flex:none}
+.suppb b{font-size:12.5px}
+.suppb .mu{font-size:11.5px;line-height:1.45}
+.btn.crit{background:var(--crit);border-color:var(--crit);color:#fff;font-weight:640}
+.btn.crit:hover{filter:brightness(1.07)}
+.undo{display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--line);
+  border-radius:11px;padding:8px 12px;margin-bottom:10px}
+.undo .e{font-size:15px}
+.undo b{font-size:12.5px}
+.undo .mu{font-size:11px}
 .corrbar{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:8px;flex-wrap:wrap}
 .corrbar .mu{font-size:10.5px;flex-basis:100%;margin-bottom:2px}
 .majl{margin-top:6px;font-size:10.5px;color:var(--ink-3);cursor:help;
@@ -2662,6 +2683,10 @@ function pDetail(p){
        <button class="btn s" onclick="toast('Export CSV généré')">Exporter la liste</button>
        <button class="btn s p" onclick="openActe(${p.id})">✚ Ajouter un acte</button></div>
    </div>
+   ${CORBEILLE.length?`<div class="undo"><span class="e">🗑</span>
+     <div style="flex:1;min-width:0"><b>${esc(CORBEILLE[CORBEILLE.length-1].quoi)}</b> — supprimée
+       <span class="mu">${DTS(CORBEILLE[CORBEILLE.length-1].ts)} par ${esc(CORBEILLE[CORBEILLE.length-1].par)}</span></div>
+     <button class="btn xs" onclick="retablirActe()">↺ Rétablir</button></div>`:''}
    <div class="mu" style="font-size:11.5px;margin:-4px 0 10px">
      ${L.length} acte${L.length>1?'s':''}${L.length!==A.length?` sur ${A.length}`:''}
      · ${nC} consommable${nC>1?'s':''} tracé${nC>1?'s':''}
@@ -2670,7 +2695,8 @@ function pDetail(p){
     <thead><tr><th style="width:96px">Date</th><th>Acte</th><th>Catégorie</th><th>Praticien</th>
       <th>Zones</th><th style="min-width:150px">Matériel &amp; réglages</th>
       <th>Consommables</th><th>Effets</th><th style="min-width:210px">Documents</th>
-      ${ROLES[role].prix?'<th class="num">Facturé</th>':''}<th style="min-width:150px">Commentaire</th></tr></thead>
+      ${ROLES[role].prix?'<th class="num">Facturé</th>':''}<th style="min-width:150px">Commentaire</th>
+      <th style="width:74px"></th></tr></thead>
     <tbody>${L.map(a=>{
       const y=a.date.slice(0,4), sep=(y!==an); an=y;
       const CS=consoActe(a), ES=effetsActe(a), com=(a.zonesNote||a.note||'').trim();
@@ -2698,7 +2724,27 @@ function pDetail(p){
         <td>${colDocs(a)}</td>
         ${ROLES[role].prix?`<td class="num">${montantTxt(a)}</td>`:''}
         <td class="mu" style="font-size:11.5px;max-width:220px">${com?esc(com.length>90?com.slice(0,90)+'…':com):'—'}</td>
-      </tr>`}).join('')}
+        <td class="acts"><button class="ib" title="Dupliquer cette séance — mêmes soins, mêmes réglages"
+             onclick="event.stopPropagation();dupliquerActe(${a.id})">⧉</button>
+           ${CAN('med')?`<button class="ib d" title="Supprimer cette séance"
+             onclick="event.stopPropagation();suppCand=${a.id};paint()">✕</button>`:''}</td>
+      </tr>
+      ${suppCand===a.id?`<tr class="supp"><td colspan="${ROLES[role].prix?12:11}">
+        <div class="suppb">
+          <span class="e">⚠</span>
+          <div style="flex:1;min-width:0"><b>Supprimer la séance du ${DF(a.date)} — ${esc(a.nom)} ?</b>
+            <div class="mu">${(()=>{const L=contenuActe(a), f=factureBloquante(a);
+              if(f&&f.paye>0) return `Impossible : la facture ${f.id} de ${EUR(fTTC(f))} a été encaissée. Émettez un avoir plutôt que d'effacer la séance.`;
+              if(f) return `La facture ${f.id} de ${EUR(fTTC(f))}, émise et non encaissée, sera annulée${L.length?` ; partiront aussi : ${L.filter(x=>!/document/.test(x)).join(', ')||'rien d\'autre'}`:''}. Le stock consommé sera recrédité et la séance restera rattrapable.`;
+              return (L.length?`Partiront avec elle : ${L.join(', ')}.`:'Elle ne porte aucune pièce.')
+                +' Le stock consommé sera recrédité et la séance restera rattrapable.'})()}</div></div>
+          ${(()=>{const f=factureBloquante(a);
+            if(!f) return `<button class="btn xs g" onclick="event.stopPropagation();annulerSupp()">Annuler</button>
+               <button class="btn xs crit" onclick="event.stopPropagation();supprimerActe(${a.id})">Supprimer</button>`;
+            if(f.paye>0) return `<button class="btn xs g" onclick="event.stopPropagation();annulerSupp()">Fermer</button>`;
+            return `<button class="btn xs g" onclick="event.stopPropagation();annulerSupp()">Annuler</button>
+              <button class="btn xs crit" onclick="event.stopPropagation();annulerFactureEtSupprimer(${a.id})">Annuler la facture et supprimer</button>`})()}
+        </div></td></tr>`:''}`}).join('')}
     </tbody></table>${L.length?'':'<div class="empty">Aucun acte ne correspond à ces filtres.</div>'}</div>`;
   },
 
@@ -3921,7 +3967,7 @@ function openActe(pid,aid,np){
      draft:{t:null,z:{},com:''}, openSoin:0, devis:null, docs:[],
      but:a?'acte':'acte',                       /* 'acte' = consultation du jour · 'devis' = projet */
      effets:a?a.effets:'', consent:a?a.consent:false};
- editMat=null; matAvant=null;
+ editMat=null; matAvant=null; suppCand=null;
  renderOver();
  document.getElementById('over').classList.add('on');
  document.getElementById('scrim').classList.add('on');
@@ -3962,6 +4008,104 @@ function diffReglages(av,ap){
  if(z1!==z2) out.push(`détail par zone : ${z1} → ${z2}`);
  else if(z2&&JSON.stringify(av.parZ)!==JSON.stringify(ap.parZ)) out.push('détail par zone ajusté');
  return out.join(' · ');
+}
+
+/* ==========================================================================
+   Supprimer une séance, ou la dupliquer
+   ==========================================================================
+   Supprimer un acte, c'est effacer un morceau de dossier médical. On ne le
+   fait donc pas en silence : ce qui part avec lui est annoncé, le stock
+   consommé est recrédité, et la séance reste rattrapable tant qu'on n'a pas
+   quitté l'écran. Une facture émise bloque la suppression — on annule la
+   facture d'abord, c'est de la comptabilité. */
+const CORBEILLE=[];
+let suppCand=null;
+function annulerSupp(){ suppCand=null; paint&&paint(); if(AS) renderOver() }
+/* ce qui disparaîtrait avec l'acte */
+function contenuActe(a){
+ const L=[];
+ const D=docsActe(a).length; if(D) L.push(`${D} document${D>1?'s':''}`);
+ const C=consoActe(a).length; if(C) L.push(`${C} consommable${C>1?'s':''}`);
+ const P=photosActe(a).length; if(P) L.push(`${P} photo${P>1?'s':''}`);
+ const E=effetsActe(a).length; if(E) L.push(`${E} effet${E>1?'s':''} secondaire${E>1?'s':''}`);
+ const F=fichiersActe(a).length; if(F) L.push(`${F} fichier${F>1?'s':''}`);
+ return L;
+}
+const factureBloquante=a=>FACTURES.find(f=>f.acte===a.id&&f.statut!=='annulee');
+/* une facture émise mais non encaissée s'annule ; une facture encaissée
+   demande un avoir — on ne fait pas disparaître de l'argent reçu */
+const factureEncaissee=a=>{const f=factureBloquante(a); return f&&f.paye>0?f:null};
+function annulerFactureEtSupprimer(id){
+ const a=ACTES.find(x=>x.id===id); if(!a) return;
+ const f=factureBloquante(a); if(!f){supprimerActe(id);return}
+ if(f.paye>0){ toast(`Facture ${f.id} encaissée — passez par un avoir`); return }
+ f.statut='annulee'; f.moyen=null;
+ logDoc(f.id,`Facture annulée avant suppression de la séance du ${DF(a.date)}`);
+ factAnnulee={id:f.id};
+ supprimerActe(id);
+}
+let factAnnulee=null;
+function supprimerActe(id){
+ const a=ACTES.find(x=>x.id===id); if(!a) return;
+ if(!CAN('med')){ toast('Suppression réservée aux rôles médicaux'); return }
+ const f=factureBloquante(a);
+ if(f){ suppCand=null;
+   toast(`Facture ${f.id} rattachée — annulez-la avant de supprimer la séance`);
+   paint&&paint(); return }
+ const pris=x=>{const out=[]; for(let i=x.length-1;i>=0;i--) if(x[i].acte===id) out.unshift(...x.splice(i,1)); return out};
+ const fAnn=factAnnulee?FACTURES.find(x=>x.id===factAnnulee.id):null; factAnnulee=null;
+ const sac={acte:a, i:ACTES.indexOf(a), fAnn:fAnn?{f:fAnn}:null,
+   conso:pris(CONSO), effets:pris(EFFETS), fichiers:pris(FICHIERS),
+   photos:pris(PHOTOS), docadd:pris(DOCADD), ord:pris(ORDONNANCES),
+   devis:DEVIS.filter(d=>d.acte===id||d.realise===id)
+     .map(d=>({d, acte:d.acte, realise:d.realise, statut:d.statut})),
+   ts:nowStamp(), par:ROLES[role].u,
+   quoi:`${a.nom} du ${DF(a.date)} — ${esc(fn(pById(a.patient)))}`};
+ /* le stock consommé revient */
+ sac.conso.forEach(c=>{const st=STOCK.find(x=>x.ref===c.ref); if(st) st.q+=c.q});
+ sac.devis.forEach(o=>{ if(o.d.acte===id) o.d.acte=null;
+   if(o.d.realise===id){ o.d.realise=null; if(o.d.statut==='accepte') o.d.statut='envoye' } });
+ ACTES.splice(sac.i,1);
+ CORBEILLE.push(sac);
+ suppCand=null;
+ if(AS&&AS.aid===id) closeAll();
+ toast(`Séance supprimée · ${sac.conso.length?'stock recrédité · ':''}rattrapable`);
+ paint&&paint();
+}
+function retablirActe(){
+ const sac=CORBEILLE.pop(); if(!sac) return;
+ ACTES.splice(Math.min(sac.i,ACTES.length),0,sac.acte);
+ sac.conso.forEach(c=>{const st=STOCK.find(x=>x.ref===c.ref); if(st) st.q=Math.max(0,st.q-c.q); CONSO.push(c)});
+ sac.effets.forEach(x=>EFFETS.push(x)); sac.fichiers.forEach(x=>FICHIERS.push(x));
+ sac.photos.forEach(x=>PHOTOS.push(x)); sac.docadd.forEach(x=>DOCADD.push(x));
+ sac.ord.forEach(x=>ORDONNANCES.push(x));
+ sac.devis.forEach(o=>{ o.d.acte=o.acte; o.d.realise=o.realise; o.d.statut=o.statut });
+ if(sac.fAnn){ sac.fAnn.f.statut='ok';
+   logDoc(sac.fAnn.f.id,'Annulation levée — la séance a été rétablie') }
+ toast('Séance rétablie'); paint&&paint();
+}
+
+/* --- dupliquer : la même séance, à refaire aujourd'hui --- */
+function dupliquerActe(id){
+ const a=ACTES.find(x=>x.id===id); if(!a){toast('Séance introuvable');return}
+ closeAll();
+ openActe(a.patient);
+ AS.but='acte'; AS.date=TODAYS; AS.prat=a.praticien; AS.oper=a.operateur||'';
+ AS.reg=a.reg||'visage'; AS.note=''; AS.consent=false; AS.dup=a.id;
+ AS.z=a.zones?{...a.zones}:{}; AS.zt=a.zt?{...a.zt}:{};
+ const src=(a.soins&&a.soins.length)?a.soins
+   :[...new Set(a.zones?Object.keys(a.zones).map(z=>acteZone(a,z)):(a.type?[a.type]:[]))]
+      .map(t=>({t, q:a.seances||1, com:a.zonesNote||'',
+        ...(a.mat&&t===a.type?{mat:a.mat, par:{...(a.par||{})}, parZ:a.parZ||null}:{})}));
+ AS.soins=src.map(x=>({...x, q:x.q||a.seances||1, com:x.com||'',
+   rem:0, remT:'€',
+   par:x.par?{...x.par}:undefined,
+   parZ:x.parZ?JSON.parse(JSON.stringify(x.parZ)):undefined,
+   zpar:!!(x.parZ&&Object.keys(x.parZ).length)}));
+ AS.type=(AS.soins.find(x=>x.t)||{}).t||null;
+ AS.openSoin=0; AS.draft={t:null,z:{},com:''};
+ renderOver();
+ toast(`Séance dupliquée du ${DF(a.date)} — ajustez, puis enregistrez`);
 }
 
 /* --- correction des réglages sur un acte déjà enregistré --- */
@@ -4098,6 +4242,12 @@ function renderOver(){
    ${p?`<button class="btn s" onclick="openPatient(${p.id})">Fiche complète</button>`:''}</div>`;
 
  document.getElementById('overb').innerHTML=`
+  ${(AS.ro||!AS.dup)?'':(()=>{const a0=ACTES.find(x=>x.id===AS.dup);
+    return `<div class="tip" style="margin-bottom:10px"><span class="e">⧉</span><div>
+      <b>Séance dupliquée${a0?` de celle du ${DF(a0.date)}`:''}</b> — soins, zones et réglages repris tels quels.
+      Rien n'est enregistré tant que vous n'avez pas validé ; les documents, photos et consommables
+      de la séance d'origine ne sont pas recopiés.
+      <button class="btn xs g" style="margin-left:8px" onclick="AS.dup=null;renderOver()">détacher</button></div></div>`})()}
   ${(AS.ro||!AS.devis)?'':(()=>{const d=DEVIS.find(x=>x.id===AS.devis);
     return `<div class="tip" style="margin-bottom:10px"><span class="e">◫</span><div>
       <b>Séance reprise du devis ${esc(AS.devis)}</b>${d?` — établi le ${DF(d.date)}, ${EUR(d.montant)}`:''}.
@@ -4312,11 +4462,23 @@ function renderOver(){
   </div>`;
 
  document.getElementById('overf').innerHTML=AS.ro?
-  `<div class="mu" style="font-size:12px">Acte clôturé · chaque envoi est horodaté et tracé</div>
+  `${suppCand===AS.aid?(()=>{const ac=ACTES.find(x=>x.id===AS.aid); if(!ac) return '';
+     const L=contenuActe(ac), f=factureBloquante(ac);
+     return `<div class="suppb" style="flex:1"><span class="e">⚠</span>
+       <div style="flex:1;min-width:0"><b>Supprimer cette séance ?</b>
+         <div class="mu">${(f&&f.paye>0)?`Impossible : la facture ${f.id} de ${EUR(fTTC(f))} a été encaissée. Émettez un avoir.`
+           :f?`La facture ${f.id} de ${EUR(fTTC(f))} sera annulée.`
+           :(L.length?`Partiront avec elle : ${L.join(', ')}.`:'Elle ne porte aucune pièce.')+' Rattrapable ensuite.'}</div></div>
+       ${(f&&f.paye>0)?`<button class="btn xs g" onclick="annulerSupp()">Fermer</button>`
+          :`<button class="btn xs g" onclick="annulerSupp()">Annuler</button>
+            <button class="btn xs crit" onclick="${f?`annulerFactureEtSupprimer(${AS.aid})`:`supprimerActe(${AS.aid})`}">${f?'Annuler la facture et supprimer':'Supprimer'}</button>`}</div>`})()
+   :`<div class="mu" style="font-size:12px">Acte clôturé · chaque envoi est horodaté et tracé</div>
    <div style="margin-left:auto;display:flex;gap:8px">
+    <button class="btn" onclick="dupliquerActe(${AS.aid})" title="Refaire la même séance aujourd'hui, réglages compris">⧉ Dupliquer</button>
+    ${CAN('med')?`<button class="btn g" onclick="suppCand=${AS.aid};renderOver()">✕ Supprimer</button>`:''}
     ${(()=>{const ac=ACTES.find(x=>x.id===AS.aid);const n=ac?docsActe(ac).filter(d=>d.env).length:0;
       return n?`<button class="btn p" onclick="sendAllDocs(${AS.aid})">✉ Envoyer ${n>1?`les ${n} documents`:'le document'} en attente</button>`:''})()}
-    <button class="btn" onclick="closeAll()">Fermer</button></div>`
+    <button class="btn" onclick="closeAll()">Fermer</button></div>`}`
   :`${AS.but==='acte'
       ?`<label style="display:flex;gap:7px;align-items:center;font-size:12.5px;cursor:pointer">
          <input type="checkbox" ${AS.consent?'checked':''} onchange="AS.consent=this.checked"> Consentement éclairé signé${C.cons?' <span class="bdg b-warn" style="margin-left:4px">requis</span>':''}</label>
@@ -5217,7 +5379,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='AN';
+const BUILD='AO';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
