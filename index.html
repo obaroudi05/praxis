@@ -696,7 +696,8 @@ table.chrono thead th:last-child{position:sticky;right:0;background:var(--panel-
 .ib{width:26px;height:26px;border-radius:8px;border:1px solid var(--line);background:var(--panel);
   color:var(--ink-2);font-size:12px;line-height:1;cursor:pointer;font-family:inherit;transition:.12s;margin-left:3px}
 .ib:hover{border-color:var(--accent);color:var(--accent)}
-.ib.d:hover{border-color:var(--crit);color:var(--crit);background:var(--crit-w)}
+.ib.d:hover:not(:disabled){border-color:var(--crit);color:var(--crit);background:var(--crit-w)}
+.ib:disabled{opacity:.3;cursor:not-allowed}
 tr.supp td{background:var(--crit-w);padding:0}
 .suppb{display:flex;align-items:center;gap:10px;padding:9px 12px}
 .suppb .e{font-size:15px;flex:none}
@@ -1544,7 +1545,12 @@ const tauxTVA=t=>FACTU.tvaParActe[t]!==undefined?FACTU.tvaParActe[t]:FACTU.tvaDe
 const tauxRetro=pr=>FACTU.retro[pr]!==undefined?FACTU.retro[pr]:70;
 
 const MOYENS=['CB','Espèces','Chèque','Virement'];
+/* Toutes les séances ne sont pas facturées : retouche offerte, geste inclus
+   dans un forfait, séance du jour pas encore passée en caisse. Ce sont celles
+   qu'on peut encore corriger ou supprimer — une séance facturée est figée. */
+ACTES.forEach((a,i)=>{ if(i%9===4) a.prix=null });
 const FACTURES=ACTES.map((a,i)=>{
+ if(a.prix==null) return null;
  const paye=a.date<'2026-07-20'?a.prix:(i%4===0?0:(i%5===0?Math.round(a.prix*.5):a.prix));
  const statut=i%37===0?'annulee':'ok';
  return {id:'F-'+(2600+i),patient:a.patient,acte:a.id,date:a.date,montant:a.prix,
@@ -1552,7 +1558,7 @@ const FACTURES=ACTES.map((a,i)=>{
          moyen:(statut==='annulee'||paye===0)?null:MOYENS[i%4],
          praticien:a.praticien, cat:a.cat, type:a.type, statut,
          avoir:(i%29===0&&statut==='ok')?Math.round(a.prix*0.2/5)*5:0};
-});
+}).filter(Boolean);
 const rdu=f=>f.statut==='annulee'?0:Math.max(0,f.montant-f.avoir-f.paye);
 const fTTC=f=>f.statut==='annulee'?0:f.montant-f.avoir;
 const fHT =f=>Math.round(fTTC(f)/(1+tauxTVA(f.type)/100)*100)/100;
@@ -2575,7 +2581,7 @@ function pDetail(p){
        <span class="dt">${DTS(last?last.t:d.ts)}</span></div>`}).join('')}</div>`};
 
  const tableActes = () => `<div class="tw"><table>
-   <thead><tr><th>Schéma</th><th>Date</th><th>Acte</th><th>Zones injectées</th><th style="min-width:250px">Documents</th><th>Praticien</th><th>Lot</th>${ROLES[role].prix?'<th class="num">Montant</th>':''}</tr></thead>
+   <thead><tr><th>Schéma</th><th>Date</th><th>Acte</th><th>Zones injectées</th><th style="min-width:250px">Documents</th><th>Praticien</th><th>Lot</th>${ROLES[role].prix?'<th class="num">Montant</th>':''}<th style="width:74px"></th></tr></thead>
    <tbody>${A.map(a=>`<tr class="c" onclick="openActe(${a.patient},${a.id})">
      <td>${miniFace(a.zones,a.zt)}</td><td class="mono">${DF(a.date)}</td>
      <td><b>${esc(a.nom)}</b></td>
@@ -2585,7 +2591,9 @@ function pDetail(p){
      <td>${colDocs(a)}</td>
      <td class="mu" style="white-space:nowrap">${esc(a.praticien)}${a.operateur?`<div style="font-size:11px">op. ${esc(a.operateur)}</div>`:''}</td>
      <td class="mono mu" style="font-size:11.5px">${a.lot||'—'}</td>
-     ${ROLES[role].prix?`<td class="num">${montantTxt(a)}</td>`:''}</tr>`).join('')}
+     ${ROLES[role].prix?`<td class="num">${montantTxt(a)}</td>`:''}
+     ${tdActions(a)}</tr>
+     ${trConfirm(a,ROLES[role].prix?9:8)}`).join('')}
    </tbody></table>${A.length?'':'<div class="empty">Aucun acte enregistré pour ce patient.</div>'}</div>`;
 
  /* ---- documents : ordonnances, devis, factures, consentements ---- */
@@ -2724,27 +2732,9 @@ function pDetail(p){
         <td>${colDocs(a)}</td>
         ${ROLES[role].prix?`<td class="num">${montantTxt(a)}</td>`:''}
         <td class="mu" style="font-size:11.5px;max-width:220px">${com?esc(com.length>90?com.slice(0,90)+'…':com):'—'}</td>
-        <td class="acts"><button class="ib" title="Dupliquer cette séance — mêmes soins, mêmes réglages"
-             onclick="event.stopPropagation();dupliquerActe(${a.id})">⧉</button>
-           ${CAN('med')?`<button class="ib d" title="Supprimer cette séance"
-             onclick="event.stopPropagation();suppCand=${a.id};paint()">✕</button>`:''}</td>
+        ${tdActions(a)}
       </tr>
-      ${suppCand===a.id?`<tr class="supp"><td colspan="${ROLES[role].prix?12:11}">
-        <div class="suppb">
-          <span class="e">⚠</span>
-          <div style="flex:1;min-width:0"><b>Supprimer la séance du ${DF(a.date)} — ${esc(a.nom)} ?</b>
-            <div class="mu">${(()=>{const L=contenuActe(a), f=factureBloquante(a);
-              if(f&&f.paye>0) return `Impossible : la facture ${f.id} de ${EUR(fTTC(f))} a été encaissée. Émettez un avoir plutôt que d'effacer la séance.`;
-              if(f) return `La facture ${f.id} de ${EUR(fTTC(f))}, émise et non encaissée, sera annulée${L.length?` ; partiront aussi : ${L.filter(x=>!/document/.test(x)).join(', ')||'rien d\'autre'}`:''}. Le stock consommé sera recrédité et la séance restera rattrapable.`;
-              return (L.length?`Partiront avec elle : ${L.join(', ')}.`:'Elle ne porte aucune pièce.')
-                +' Le stock consommé sera recrédité et la séance restera rattrapable.'})()}</div></div>
-          ${(()=>{const f=factureBloquante(a);
-            if(!f) return `<button class="btn xs g" onclick="event.stopPropagation();annulerSupp()">Annuler</button>
-               <button class="btn xs crit" onclick="event.stopPropagation();supprimerActe(${a.id})">Supprimer</button>`;
-            if(f.paye>0) return `<button class="btn xs g" onclick="event.stopPropagation();annulerSupp()">Fermer</button>`;
-            return `<button class="btn xs g" onclick="event.stopPropagation();annulerSupp()">Annuler</button>
-              <button class="btn xs crit" onclick="event.stopPropagation();annulerFactureEtSupprimer(${a.id})">Annuler la facture et supprimer</button>`})()}
-        </div></td></tr>`:''}`}).join('')}
+      ${trConfirm(a,ROLES[role].prix?12:11)}`}).join('')}
     </tbody></table>${L.length?'':'<div class="empty">Aucun acte ne correspond à ces filtres.</div>'}</div>`;
   },
 
@@ -2889,7 +2879,7 @@ V.actes=()=>{
    ${PRATICIENS.map(x=>`<option ${aPrat===x?'selected':''}>${x}</option>`).join('')}</select>
  </div>
  <div class="card"><div class="tw"><table>
-  <thead><tr><th>Schéma</th><th>Date</th><th>Patient</th><th>Acte</th><th>Zones &amp; quantités</th><th>Lot</th>${ROLES[role].prix?'<th class="num">Montant</th>':''}</tr></thead>
+  <thead><tr><th>Schéma</th><th>Date</th><th>Patient</th><th>Acte</th><th>Zones &amp; quantités</th><th>Lot</th>${ROLES[role].prix?'<th class="num">Montant</th>':''}<th style="width:74px"></th></tr></thead>
   <tbody>${L.map(a=>`<tr class="c" onclick="openActe(${a.patient},${a.id})">
    <td>${miniFace(a.zones)}</td><td class="mono">${DF(a.date)}</td>
    <td class="nm">${esc(fn(pById(a.patient)))}</td>
@@ -2897,7 +2887,9 @@ V.actes=()=>{
    <td style="max-width:300px">${a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneById(z);
      return `<span class="bdg ${Z.p==='tox'?'b-info':'b-warn'}" style="margin:0 3px 3px 0">${esc(Z.k)} · ${fmtQ(q,Z.p)}</span>`}).join(''):`<span class="mu">${noZoneTxt(a)}</span>`}</td>
    <td class="mono mu" style="font-size:11.5px">${a.lot||'—'}</td>
-   ${ROLES[role].prix?`<td class="num">${montantTxt(a)}</td>`:''}</tr>`).join('')}</tbody></table>
+   ${ROLES[role].prix?`<td class="num">${montantTxt(a)}</td>`:''}
+   ${tdActions(a)}</tr>
+   ${trConfirm(a,ROLES[role].prix?8:7)}`).join('')}</tbody></table>
   ${L.length?'':'<div class="empty">Aucun acte.</div>'}</div></div>`;
 };
 
@@ -4020,6 +4012,28 @@ function diffReglages(av,ap){
    facture d'abord, c'est de la comptabilité. */
 const CORBEILLE=[];
 let suppCand=null;
+/* la même paire d'actions au bout de chaque ligne, dans toutes les listes d'actes */
+const tdActions=a=>`<td class="acts">
+  <button class="ib" title="Dupliquer cette séance — mêmes soins, mêmes réglages"
+    onclick="event.stopPropagation();dupliquerActe(${a.id})">⧉</button>
+  ${CAN('med')?(()=>{const f=factureBloquante(a);
+    return f?`<button class="ib d" disabled title="Facture ${f.id} rattachée — une séance facturée ne se supprime pas">✕</button>`
+      :`<button class="ib d" title="Supprimer cette séance"
+         onclick="event.stopPropagation();suppCand=${a.id};paint()">✕</button>`})():''}</td>`;
+/* et le même bloc de confirmation, sur la ligne suivante */
+const trConfirm=(a,cols)=>suppCand!==a.id?'':`<tr class="supp"><td colspan="${cols}">
+  <div class="suppb"><span class="e">⚠</span>
+    <div style="flex:1;min-width:0"><b>Supprimer la séance du ${DF(a.date)} — ${esc(a.nom)} ?</b>
+      <div class="mu">${(()=>{const L=contenuActe(a), f=factureBloquante(a);
+        if(f) return `Impossible : la facture ${f.id} de ${EUR(fTTC(f))} y est rattachée. Une séance facturée ne se supprime pas — passez par la facturation pour l'annuler ou émettre un avoir.`;
+        return (L.length?`Partiront avec elle : ${L.join(', ')}.`:'Elle ne porte aucune pièce.')
+          +' Le stock consommé sera recrédité et la séance restera rattrapable.'})()}</div></div>
+    ${factureBloquante(a)
+      ? `<button class="btn xs" onclick="event.stopPropagation();annulerSupp();closeAll();go('encaiss')">Ouvrir la facturation</button>
+         <button class="btn xs g" onclick="event.stopPropagation();annulerSupp()">Fermer</button>`
+      : `<button class="btn xs g" onclick="event.stopPropagation();annulerSupp()">Annuler</button>
+         <button class="btn xs crit" onclick="event.stopPropagation();supprimerActe(${a.id})">Supprimer</button>`}
+  </div></td></tr>`;
 function annulerSupp(){ suppCand=null; paint&&paint(); if(AS) renderOver() }
 /* ce qui disparaîtrait avec l'acte */
 function contenuActe(a){
@@ -4032,19 +4046,9 @@ function contenuActe(a){
  return L;
 }
 const factureBloquante=a=>FACTURES.find(f=>f.acte===a.id&&f.statut!=='annulee');
-/* une facture émise mais non encaissée s'annule ; une facture encaissée
-   demande un avoir — on ne fait pas disparaître de l'argent reçu */
-const factureEncaissee=a=>{const f=factureBloquante(a); return f&&f.paye>0?f:null};
-function annulerFactureEtSupprimer(id){
- const a=ACTES.find(x=>x.id===id); if(!a) return;
- const f=factureBloquante(a); if(!f){supprimerActe(id);return}
- if(f.paye>0){ toast(`Facture ${f.id} encaissée — passez par un avoir`); return }
- f.statut='annulee'; f.moyen=null;
- logDoc(f.id,`Facture annulée avant suppression de la séance du ${DF(a.date)}`);
- factAnnulee={id:f.id};
- supprimerActe(id);
-}
-let factAnnulee=null;
+/* Une séance facturée ne se supprime pas : la facture est une pièce comptable,
+   elle s'annule ou se solde par un avoir depuis la facturation, jamais par
+   effacement de l'acte qui la porte. */
 function supprimerActe(id){
  const a=ACTES.find(x=>x.id===id); if(!a) return;
  if(!CAN('med')){ toast('Suppression réservée aux rôles médicaux'); return }
@@ -4053,8 +4057,7 @@ function supprimerActe(id){
    toast(`Facture ${f.id} rattachée — annulez-la avant de supprimer la séance`);
    paint&&paint(); return }
  const pris=x=>{const out=[]; for(let i=x.length-1;i>=0;i--) if(x[i].acte===id) out.unshift(...x.splice(i,1)); return out};
- const fAnn=factAnnulee?FACTURES.find(x=>x.id===factAnnulee.id):null; factAnnulee=null;
- const sac={acte:a, i:ACTES.indexOf(a), fAnn:fAnn?{f:fAnn}:null,
+ const sac={acte:a, i:ACTES.indexOf(a),
    conso:pris(CONSO), effets:pris(EFFETS), fichiers:pris(FICHIERS),
    photos:pris(PHOTOS), docadd:pris(DOCADD), ord:pris(ORDONNANCES),
    devis:DEVIS.filter(d=>d.acte===id||d.realise===id)
@@ -4080,8 +4083,6 @@ function retablirActe(){
  sac.photos.forEach(x=>PHOTOS.push(x)); sac.docadd.forEach(x=>DOCADD.push(x));
  sac.ord.forEach(x=>ORDONNANCES.push(x));
  sac.devis.forEach(o=>{ o.d.acte=o.acte; o.d.realise=o.realise; o.d.statut=o.statut });
- if(sac.fAnn){ sac.fAnn.f.statut='ok';
-   logDoc(sac.fAnn.f.id,'Annulation levée — la séance a été rétablie') }
  toast('Séance rétablie'); paint&&paint();
 }
 
@@ -4466,16 +4467,17 @@ function renderOver(){
      const L=contenuActe(ac), f=factureBloquante(ac);
      return `<div class="suppb" style="flex:1"><span class="e">⚠</span>
        <div style="flex:1;min-width:0"><b>Supprimer cette séance ?</b>
-         <div class="mu">${(f&&f.paye>0)?`Impossible : la facture ${f.id} de ${EUR(fTTC(f))} a été encaissée. Émettez un avoir.`
-           :f?`La facture ${f.id} de ${EUR(fTTC(f))} sera annulée.`
+         <div class="mu">${f?`Impossible : la facture ${f.id} de ${EUR(fTTC(f))} y est rattachée. Une séance facturée ne se supprime pas.`
            :(L.length?`Partiront avec elle : ${L.join(', ')}.`:'Elle ne porte aucune pièce.')+' Rattrapable ensuite.'}</div></div>
-       ${(f&&f.paye>0)?`<button class="btn xs g" onclick="annulerSupp()">Fermer</button>`
+       ${f?`<button class="btn xs g" onclick="annulerSupp()">Fermer</button>`
           :`<button class="btn xs g" onclick="annulerSupp()">Annuler</button>
-            <button class="btn xs crit" onclick="${f?`annulerFactureEtSupprimer(${AS.aid})`:`supprimerActe(${AS.aid})`}">${f?'Annuler la facture et supprimer':'Supprimer'}</button>`}</div>`})()
+            <button class="btn xs crit" onclick="supprimerActe(${AS.aid})">Supprimer</button>`}</div>`})()
    :`<div class="mu" style="font-size:12px">Acte clôturé · chaque envoi est horodaté et tracé</div>
    <div style="margin-left:auto;display:flex;gap:8px">
     <button class="btn" onclick="dupliquerActe(${AS.aid})" title="Refaire la même séance aujourd'hui, réglages compris">⧉ Dupliquer</button>
-    ${CAN('med')?`<button class="btn g" onclick="suppCand=${AS.aid};renderOver()">✕ Supprimer</button>`:''}
+    ${CAN('med')?(()=>{const ac=ACTES.find(x=>x.id===AS.aid), fb=ac?factureBloquante(ac):null;
+      return fb?`<button class="btn g" disabled title="Facture ${fb.id} rattachée — une séance facturée ne se supprime pas">✕ Supprimer</button>`
+        :`<button class="btn g" onclick="suppCand=${AS.aid};renderOver()">✕ Supprimer</button>`})():''}
     ${(()=>{const ac=ACTES.find(x=>x.id===AS.aid);const n=ac?docsActe(ac).filter(d=>d.env).length:0;
       return n?`<button class="btn p" onclick="sendAllDocs(${AS.aid})">✉ Envoyer ${n>1?`les ${n} documents`:'le document'} en attente</button>`:''})()}
     <button class="btn" onclick="closeAll()">Fermer</button></div>`}`
@@ -5379,7 +5381,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='AO';
+const BUILD='AP';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
