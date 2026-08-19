@@ -302,6 +302,15 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .cpane .note{background:var(--panel)}
 .prep{display:flex;flex-direction:column;gap:4px}
 .prep-c{font-size:10px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-top:5px}
+.prep-g{display:flex;align-items:center;gap:6px;width:100%;text-align:left;background:transparent;
+  border:none;padding:5px 2px 3px;font-size:10.5px;color:var(--ink-3);text-transform:uppercase;
+  letter-spacing:.05em;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px}
+.prep-g:hover{color:var(--accent)}
+.prep-g.on{color:var(--ink)}
+.prep-g .ch{width:10px;font-size:11px}
+.prep-g .mu{text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
+.crow.c-s .cn b{font-size:12px}
+.crow.c-s .step{flex:none}
 .prep-b{display:flex;align-items:center;gap:7px;width:100%;text-align:left;background:var(--panel);
   border:1px solid var(--line);border-radius:9px;padding:6px 9px;font-size:12px;color:var(--ink);
   cursor:pointer;transition:.12s;font-family:inherit}
@@ -3957,6 +3966,7 @@ function openActe(pid,aid,np){
           .map(t=>({t, q:a.seances||1, com:a.zonesNote||'',
              ...(a.mat&&t===a.type?{mat:a.mat, par:{...(a.par||{})}}:{})}))):[],
      draft:{t:null,z:{},com:''}, openSoin:0, devis:null, docs:[],
+     conso:[], consoOff:[], consoAdd:false, prepOpen:null,
      but:a?'acte':'acte',                       /* 'acte' = consultation du jour · 'devis' = projet */
      effets:a?a.effets:'', consent:a?a.consent:false};
  editMat=null; matAvant=null; suppCand=null;
@@ -3964,6 +3974,44 @@ function openActe(pid,aid,np){
  document.getElementById('over').classList.add('on');
  document.getElementById('scrim').classList.add('on');
 }
+/* --------------------------------------------------------------------------
+   Consommables préparés pendant la séance
+   --------------------------------------------------------------------------
+   Le produit employé se note au moment où on l'emploie, pas après. La liste
+   se pré-remplit d'après les soins saisis — un acide hyaluronique appelle sa
+   seringue — et reste entièrement modifiable : c'est elle, et elle seule,
+   qui décrémente le stock à l'enregistrement. */
+const consoDuSoin=t=>{ const c=acteDef(t); if(!c||!c.conso) return null;
+ const q=Object.keys(AS.z).filter(z=>zActe(z)===t).reduce((s2,z)=>s2+(+AS.z[z]||0),0);
+ return {ref:c.conso, q:Math.max(1, q?Math.ceil(c.unite==='U'?q/100:q):qDe(t))} };
+function syncConsoAuto(){
+ if(!AS||AS.ro) return;
+ AS.conso=AS.conso||[]; AS.consoOff=AS.consoOff||[];
+ const T=actesSaisis();
+ /* les lignes proposées suivent les soins ; celles qu'on a saisies à la main restent */
+ AS.conso=AS.conso.filter(l=>!l.auto||T.some(t=>{const c=consoDuSoin(t); return c&&c.ref===l.ref}));
+ T.forEach(t=>{ const c=consoDuSoin(t); if(!c||AS.consoOff.includes(c.ref)) return;
+  const ex=AS.conso.find(l=>l.ref===c.ref);
+  if(!ex) AS.conso.push({ref:c.ref, q:c.q, auto:true});
+  else if(ex.auto) ex.q=c.q });
+}
+function addConsoSaisie(){
+ const sel=document.getElementById('csSref'); if(!sel) return;
+ const ref=sel.value, q=Math.max(1,+((document.getElementById('csSq')||{}).value)||1);
+ const st=STOCK.find(x=>x.ref===ref); if(!st){toast('Choisissez un produit');return}
+ AS.conso=AS.conso||[];
+ AS.consoOff=(AS.consoOff||[]).filter(r=>r!==ref);
+ const ex=AS.conso.find(l=>l.ref===ref);
+ if(ex){ ex.q+=q; ex.auto=false } else AS.conso.push({ref, q, auto:false});
+ AS.consoAdd=false; toast(`${st.n} × ${q} ajouté à la séance`); renderOver();
+}
+function majConsoSaisie(i,d,v){ const l=(AS.conso||[])[i]; if(!l) return;
+ l.q=Math.max(1, v!=null?(+v||1):(l.q+d)); l.auto=false; majActe() }
+function rmConsoSaisie(i){ const l=(AS.conso||[])[i]; if(!l) return;
+ AS.consoOff=AS.consoOff||[]; if(l.auto&&!AS.consoOff.includes(l.ref)) AS.consoOff.push(l.ref);
+ AS.conso.splice(i,1); renderOver() }
+function toggleConsoSaisie(){ AS.consoAdd=!AS.consoAdd; renderOver() }
+
 /* --------------------------------------------------------------------------
    Matériel et paramètres de traitement, sur la carte du soin
    -------------------------------------------------------------------------- */
@@ -4105,6 +4153,7 @@ function dupliquerActe(id){
    zpar:!!(x.parZ&&Object.keys(x.parZ).length)}));
  AS.type=(AS.soins.find(x=>x.t)||{}).t||null;
  AS.openSoin=0; AS.draft={t:null,z:{},com:''};
+ AS.conso=[]; AS.consoOff=[];
  renderOver();
  toast(`Séance dupliquée du ${DF(a.date)} — ajustez, puis enregistrez`);
 }
@@ -4511,9 +4560,13 @@ const dvpTotHTML=prix=>{const {brut,rem,net}=dvNetActe(prix);
 function togglePrep(mid){ if(!AS) return;
  AS.docs=AS.docs||[]; const i=AS.docs.indexOf(mid);
  i<0?AS.docs.push(mid):AS.docs.splice(i,1); renderOver() }
+function togglePrepCat(c){ AS.prepOpen=AS.prepOpen===c?null:c; renderOver() }
 function consultPane(prix){
  const prep=AS.docs||[];
  const d=AS.devis?DEVIS.find(x=>x.id===AS.devis):null;
+ syncConsoAuto();
+ const CS=AS.conso||[];
+ const dispo=STOCK.filter(x=>!CS.some(l=>l.ref===x.ref));
  return `<div class="dvp cpane">
   <div class="dvp-h"><span>✚</span><b>Consultation</b><span class="mu">du ${DF(AS.date)}</span></div>
   <div class="dvp-inf">
@@ -4521,20 +4574,47 @@ function consultPane(prix){
      <div class="dvi-l"><b>Établi le</b>${DF(d.date)}${CAN('prix')?' · '+EUR(d.montant):''}</div>
      <div class="dvi-l"><b>Soins</b>repris tels quels — ajustez librement, le devis sera marqué réalisé.</div></div>`:''}
    <div class="fld"><label>Note de séance</label>
-     <textarea class="note" style="min-height:96px" oninput="AS.note=this.value"
+     <textarea class="note" style="min-height:88px" oninput="AS.note=this.value"
        placeholder="produit et lot, paramètres, ressenti du patient, suites annoncées…">${esc(AS.note||'')}</textarea></div>
+
+   <div class="dvp-h" style="margin-top:11px"><span>📦</span><b>Consommables</b>
+     <button class="btn xs ${AS.consoAdd?'g':''}" style="margin-left:auto"
+       onclick="toggleConsoSaisie()">${AS.consoAdd?'✕':'＋ Produit'}</button></div>
+   ${AS.consoAdd?`<div class="cadd" style="margin-bottom:6px">
+     <select class="inp" id="csSref">${(dispo.length?dispo:STOCK).map(x=>
+       `<option value="${x.ref}">${esc(x.n)}${x.lot?' · lot '+esc(x.lot):''} — ${x.q} en stock</option>`).join('')}</select>
+     <input class="inp" id="csSq" type="number" min="1" value="1" style="width:60px">
+     <button class="btn xs p" onclick="addConsoSaisie()">Ajouter</button></div>`:''}
+   ${CS.length?`<div class="ctab" style="margin-bottom:4px">${CS.map((l,i)=>{const st=STOCK.find(x=>x.ref===l.ref)||{};
+     const reste=(st.q||0)-l.q;
+     return `<div class="crow c-s">
+       <div class="cn"><b title="${esc(st.n||l.ref)}">${esc(st.n||l.ref)}</b>
+         <small>${st.lot?'lot '+esc(st.lot)+' · ':''}${reste<0?'<span style="color:var(--crit);font-weight:600">stock insuffisant</span>':'reste '+reste+' après la séance'}</small></div>
+       <div class="step" onclick="event.stopPropagation()">
+         <button onclick="majConsoSaisie(${i},-1)">−</button>
+         <input class="qin" type="number" min="1" value="${l.q}" onchange="majConsoSaisie(${i},0,this.value)">
+         <button onclick="majConsoSaisie(${i},1)">+</button></div>
+       <button class="rm" title="Retirer" onclick="rmConsoSaisie(${i})">✕</button></div>`}).join('')}</div>`
+    :`<div class="mu" style="font-size:11px;padding:2px 2px 6px">Les produits appelés par les soins s'ajoutent d'eux-mêmes. Vous pouvez en ajouter d'autres.</div>`}
+   ${CS.length?`<div class="mu" style="font-size:11px;padding:0 2px 4px">Le stock sera décompté à l'enregistrement, lot compris.</div>`:''}
+
    <div class="dvp-h" style="margin-top:11px"><span>℞</span><b>Ordonnances et documents</b>
      ${prep.length?`<span class="bdg b-info" style="margin-left:auto">${prep.length}</span>`:''}</div>
    <div class="prep">
     ${['Ordonnance','Consentement','Information'].map(c=>{
       const M=DOCMOD.filter(x=>x.cat===c); if(!M.length) return '';
-      return `<div class="prep-c">${c}${c==='Ordonnance'?'s':'s'}</div>`+
-        M.map(m=>`<button class="prep-b ${prep.includes(m.id)?'on':''}" onclick="togglePrep('${m.id}')">
-          <span class="pk">${prep.includes(m.id)?'✓':'+'}</span>${esc(m.nom)}</button>`).join('')}).join('')}
+      const n=M.filter(m=>prep.includes(m.id)).length;
+      const ouvert=AS.prepOpen===c;
+      return `<button class="prep-g ${ouvert?'on':''}" onclick="togglePrepCat('${c}')">
+          <span class="ch">${ouvert?'▾':'›'}</span>${esc(c)}s
+          <span class="mu">${M.length}</span>
+          ${n?`<span class="bdg b-info" style="margin-left:auto">${n}</span>`:''}</button>
+        ${ouvert?M.map(m=>`<button class="prep-b ${prep.includes(m.id)?'on':''}" onclick="togglePrep('${m.id}')">
+          <span class="pk">${prep.includes(m.id)?'✓':'+'}</span>${esc(m.nom)}</button>`).join(''):''}`}).join('')}
    </div>
    <div class="mu" style="font-size:11px;padding:7px 2px 2px">
      ${prep.length?`${prep.length} pièce${prep.length>1?'s':''} éditée${prep.length>1?'s':''} et horodatée${prep.length>1?'s':''} à l'enregistrement — envoi ensuite depuis le dossier.`
-      :`Cochez ce que vous remettez au patient. Vous pourrez aussi en ajouter après l'enregistrement.`}
+      :`Dépliez une catégorie pour cocher ce que vous remettez au patient.`}
      <br>Modèles réglés dans <a onclick="closeAll();go('params');paramTab='documents';paint()">Paramètres → Modèles de document</a>.</div>
   </div>
  </div>`;
@@ -5031,12 +5111,16 @@ function saveActe(){
   if(dv){ dv.realise=ACTES[0].id; dv.acte=dv.acte||ACTES[0].id;
    if(dv.statut!=='accepte'){ dv.statut='accepte'; dv.derniere=TODAYS }
    logDoc(dv.id,`Devis réalisé — consultation du ${DF(AS.date)}`) } }
- T.forEach(t=>{const cc=acteDef(t); if(!cc.conso) return;
-  const st=STOCK.find(x=>x.ref===cc.conso);
-  if(st){ const q=Object.keys(AS.z).filter(z=>zActe(z)===t).reduce((s2,z)=>s2+(+AS.z[z]||0),0);
-   st.q=Math.max(0,st.q-(q?Math.ceil(cc.unite==='U'?q/100:q):qDe(t))) }});
+ /* les consommables préparés deviennent les lignes tracées de l'acte,
+    et ce sont eux — et rien d'autre — qui décomptent le stock */
+ syncConsoAuto();
+ (AS.conso||[]).forEach(l=>{ const st=STOCK.find(x=>x.ref===l.ref); if(!st) return;
+  CONSO.push({id:'CS-'+(CONSO.length+1+9000), acte:ACTES[0].id, patient:AS.pid, ref:st.ref,
+    nom:st.n, lot:st.lot||'—', per:st.per, q:l.q, u:st.u, ts:nowStamp(), par:ROLES[role].u});
+  st.q=Math.max(0,st.q-l.q) });
  closeAll(); pSel=AS.pid; pTab='resume'; go('patients');
- toast(`${T.map(t=>acteDef(t).n).join(' + ')||'Séance'} enregistré${nDoc?` · ${nDoc} document${nDoc>1?'s':''} édité${nDoc>1?'s':''}`:''} · consentement ${AS.consent?'signé':'à faire signer'}`);
+ const nCs=(AS.conso||[]).length;
+ toast(`${T.map(t=>acteDef(t).n).join(' + ')||'Séance'} enregistré${nCs?` · ${nCs} consommable${nCs>1?'s':''} tracé${nCs>1?'s':''}`:''}${nDoc?` · ${nDoc} document${nDoc>1?'s':''} édité${nDoc>1?'s':''}`:''} · consentement ${AS.consent?'signé':'à faire signer'}`);
 }
 
 /* ==========================================================================
@@ -5381,7 +5465,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='AP';
+const BUILD='AQ';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -6076,7 +6160,14 @@ function paint(){
  document.getElementById('main').innerHTML=(V[view]||V.dash)();
  bindBA();
 }
-document.querySelectorAll('#nav a[data-v]').forEach(a=>a.onclick=()=>go(a.dataset.v));
+/* Un clic sur une entrée du menu ramène toujours à la vue d'ensemble :
+   « Patients » ouvre la liste, pas le dernier dossier consulté. */
+document.querySelectorAll('#nav a[data-v]').forEach(a=>a.onclick=()=>{
+ const v=a.dataset.v;
+ if(v==='patients'){ pSel=null; pTab='resume'; pView='liste'; pq=''; pPrat=''; }
+ if(v==='devis') dSel=null;
+ go(v);
+});
 paint();
 initVersion();
 </script>
