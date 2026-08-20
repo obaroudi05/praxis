@@ -293,7 +293,10 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .dvp-tot>div{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;padding:2px 0}
 .dvp-tot .big{border-top:1px solid var(--line);margin-top:5px;padding-top:6px;font-size:14px}
 .dvp-tot .big b{font-size:18px;letter-spacing:-.03em}
-.dvp-inf{flex:1;min-height:0;overflow:auto;padding-right:3px}
+.dvp-inf{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding-right:3px}
+.dvp,.cpane{overflow:hidden}
+.ctab,.crow{min-width:0;max-width:100%}
+.crow .cn{overflow:hidden}
 .dvp-inf::-webkit-scrollbar{width:6px}
 .dvp-inf::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
 .pu.fige{border-bottom:1px dotted var(--accent);color:var(--accent-ink);cursor:help}
@@ -755,9 +758,36 @@ tr.supp td{background:var(--crit-w);padding:0}
 .phl{display:flex;align-items:baseline;gap:6px;padding:5px 8px;font-size:11.5px}
 .phl span{color:var(--ink-3);font-size:11px;margin-left:auto}
 /* consommables */
-.cadd{display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;
-  background:var(--accent-wash);border:1px solid var(--accent);border-radius:11px;padding:8px}
-.cadd .inp{height:30px;background:var(--panel)}
+.cadd{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;align-items:center;
+  background:var(--accent-wash);border:1px solid var(--accent);border-radius:11px;padding:8px;overflow:hidden}
+.cadd .inp{height:30px;background:var(--panel);min-width:0;max-width:100%}
+.cadd select.inp{text-overflow:ellipsis}
+/* catalogue produit rangé par famille et sous-famille */
+.cpick{background:var(--accent-wash);border:1px solid var(--accent);border-radius:11px;
+  padding:7px;margin-bottom:7px;overflow:hidden}
+.cpick>.inp{height:30px;background:var(--panel);width:100%;min-width:0;font-size:12px}
+.cpick-f{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 5px}
+.cpick-l{max-height:206px;overflow:auto;padding-right:3px}
+.cpick-l::-webkit-scrollbar{width:6px}
+.cpick-l::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.cpick-f1{font-size:11px;font-weight:800;color:var(--accent-ink);padding:8px 2px 1px;
+  border-bottom:1px solid var(--line);margin-bottom:2px}
+.cpick-f1:first-child{padding-top:2px}
+.cpick-s{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--ink-3);padding:6px 2px 3px}
+.cpick-b{display:grid;grid-template-columns:15px minmax(0,1fr) auto auto;gap:6px;align-items:center;
+  width:100%;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:9px;
+  padding:5px 8px;margin-bottom:3px;font-size:11.5px;color:var(--ink);cursor:pointer;
+  font-family:inherit;transition:.12s}
+.cpick-b:hover{border-color:var(--accent)}
+.cpick-b.in{background:var(--accent-wash);border-color:var(--accent)}
+.cpick-b .pk{width:15px;height:15px;border-radius:5px;background:var(--panel-2);border:1px solid var(--line);
+  display:grid;place-items:center;font-size:10px;color:var(--ink-3);line-height:1}
+.cpick-b.in .pk{background:var(--accent);border-color:var(--accent);color:#fff}
+.cpick-b .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cpick-b .lo{font-size:10px;color:var(--ink-3);font-family:var(--mono,inherit);white-space:nowrap}
+.cpick-b .st{font-size:10.5px;font-weight:700;color:var(--ink-3);min-width:16px;text-align:right}
+.cpick-b .st.bas{color:var(--crit)}
 .ctab{display:flex;flex-direction:column;gap:5px}
 .crow{display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:11px;
   background:var(--panel-2);padding:7px 9px}
@@ -919,7 +949,17 @@ tr.supp td{background:var(--crit-w);padding:0}
 .zone.act-ah{fill:var(--ah);fill-opacity:.30;stroke:var(--ah);stroke-dasharray:none;stroke-width:1.6;stroke-opacity:.9}
 .guide{fill:none;stroke:var(--ink);stroke-opacity:.26;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
 .guidef{fill:var(--ink);fill-opacity:.07;pointer-events:none}
-.pupil{fill:var(--ink);fill-opacity:.28;pointer-events:none}
+.pupil{fill:var(--ink);fill-opacity:.62;pointer-events:none}
+.skin{fill:var(--ink);fill-opacity:.022;pointer-events:none}
+.guide.fin{stroke-opacity:.15;stroke-width:1.2}
+.brow{fill:var(--ink);fill-opacity:.30;pointer-events:none}
+.hair{fill:none;stroke:var(--ink);stroke-opacity:.22;stroke-width:.8;stroke-linecap:round;pointer-events:none}
+.lash{fill:none;stroke:var(--ink);stroke-opacity:.42;stroke-width:2.4;stroke-linecap:round;pointer-events:none}
+.iris{fill:var(--ink);fill-opacity:.16;stroke:var(--ink);stroke-opacity:.35;stroke-width:1;pointer-events:none}
+.catch{fill:#fff;fill-opacity:.9;pointer-events:none}
+:root[data-theme="dark"] .catch{fill:#fff;fill-opacity:.75}
+.nostril{fill:var(--ink);fill-opacity:.34;pointer-events:none}
+.lip{fill:var(--ink);fill-opacity:.055;pointer-events:none}
 .neck{fill:var(--ink);fill-opacity:.028;stroke:var(--ink);stroke-opacity:.20;stroke-width:1.6;pointer-events:none}
 .zlabel{font:700 11px var(--sans);fill:#fff;text-anchor:middle;pointer-events:none;paint-order:stroke;
   stroke:rgba(0,0,0,.28);stroke-width:2.4px}
@@ -1152,22 +1192,22 @@ const REGIONS =[{id:'visage',n:'Visage',i:'☺'},{id:'corps',n:'Corps',i:'🧍'}
 const famById=id=>FAMILLES.find(f=>f.id===id)||FAMILLES[0];
 
 let ZDEF=[
- {id:'front',   n:'Front — rides frontales',   k:'Front',        p:'tox',d:12,s:4,  cx:200,cy:152,rx:68,ry:28},
+ {id:'front',   n:'Front — rides frontales',   k:'Front',        p:'tox',d:12,s:4,  cx:200,cy:158,rx:66,ry:28},
  {id:'glab',    n:'Glabelle — ride du lion',   k:'Glabelle',     p:'tox',d:20,s:4,  cx:200,cy:198,rx:18,ry:16},
- {id:'tempe',   n:'Tempe',                     k:'Tempe',        p:'ah', d:.5,s:.25,cx:112,cy:196,rx:20,ry:26,m:1},
+ {id:'tempe',   n:'Tempe',                     k:'Tempe',        p:'ah', d:.5,s:.25,cx:117,cy:198,rx:18,ry:26,m:1},
  {id:'sourcil', n:'Queue du sourcil',          k:'Sourcil',      p:'tox',d:4, s:2,  cx:152,cy:200,rx:25,ry:10,m:1},
- {id:'patte',   n:'Patte d’oie',               k:'Patte d’oie',  p:'tox',d:10,s:2,  cx:120,cy:238,rx:19,ry:18,m:1},
+ {id:'patte',   n:'Patte d’oie',               k:'Patte d’oie',  p:'tox',d:10,s:2,  cx:124,cy:240,rx:18,ry:18,m:1},
  {id:'cerne',   n:'Cerne — vallée des larmes', k:'Cerne',        p:'ah', d:.5,s:.1, cx:160,cy:256,rx:26,ry:12,m:1},
- {id:'pomm',    n:'Pommette — malaire',        k:'Pommette',     p:'ah', d:.5,s:.25,cx:138,cy:288,rx:30,ry:21,m:1},
+ {id:'pomm',    n:'Pommette — malaire',        k:'Pommette',     p:'ah', d:.5,s:.25,cx:142,cy:288,rx:28,ry:21,m:1},
  {id:'nez',     n:'Nez — profiloplastie',      k:'Nez',          p:'ah', d:.3,s:.1, cx:200,cy:268,rx:16,ry:34},
- {id:'smal',    n:'Creux sous-malaire',        k:'Sous-malaire', p:'ah', d:.5,s:.25,cx:132,cy:340,rx:23,ry:23,m:1},
- {id:'sillon',  n:'Sillon nasogénien',         k:'Sillon',       p:'ah', d:.5,s:.25,cx:172,cy:330,rx:14,ry:26,m:1},
+ {id:'smal',    n:'Creux sous-malaire',        k:'Sous-malaire', p:'ah', d:.5,s:.25,cx:143,cy:338,rx:22,ry:23,m:1},
+ {id:'sillon',  n:'Sillon nasogénien',         k:'Sillon',       p:'ah', d:.5,s:.25,cx:175,cy:332,rx:13,ry:26,m:1},
  {id:'perib',   n:'Rides péribuccales',        k:'Péribuccal',   p:'ah', d:.3,s:.1, cx:200,cy:332,rx:32,ry:11},
  {id:'levres',  n:'Lèvres',                    k:'Lèvres',       p:'ah', d:1, s:.25,cx:200,cy:357,rx:38,ry:17},
- {id:'amert',   n:'Pli d’amertume',            k:'Amertume',     p:'ah', d:.3,s:.1, cx:170,cy:384,rx:14,ry:13,m:1},
- {id:'mand',    n:'Mandibule — ovale',         k:'Mandibule',    p:'ah', d:1, s:.25,cx:127,cy:382,rx:21,ry:36,m:1},
+ {id:'amert',   n:'Pli d’amertume',            k:'Amertume',     p:'ah', d:.3,s:.1, cx:174,cy:386,rx:13,ry:13,m:1},
+ {id:'mand',    n:'Mandibule — ovale',         k:'Mandibule',    p:'ah', d:1, s:.25,cx:150,cy:384,rx:20,ry:34,m:1},
  {id:'menton',  n:'Menton',                    k:'Menton',       p:'ah', d:.5,s:.25,cx:200,cy:420,rx:32,ry:22},
- {id:'cou',     n:'Cou — bandes platysmales',  k:'Cou',          p:'tox',d:20,s:5,  cx:200,cy:512,rx:42,ry:24},
+ {id:'cou',     n:'Cou — bandes platysmales',  k:'Cou',          p:'tox',d:20,s:5,  cx:200,cy:508,rx:40,ry:26},
 ];
 /* dépliage gauche/droite (côté PATIENT : l'image de gauche = côté droit du patient) */
 /* ---------- zones du corps ---------- */
@@ -1607,17 +1647,35 @@ const ORDONNANCES=[];
 })();
 
 const STOCK=[
- {ref:'AH-VOLB',n:'Acide hyaluronique — volumateur 1 ml',cat:'Injectable',u:'seringue',q:11,s:8,lot:'L-AH2409',per:'2027-03-31',pu:78,f:'Allergan France'},
- {ref:'AH-LYFT',n:'Acide hyaluronique — comblement profond 1 ml',cat:'Injectable',u:'seringue',q:4,s:6,lot:'L-RL2502',per:'2027-01-31',pu:82,f:'Galderma'},
- {ref:'BTX-100',n:'Toxine botulique 100 U',cat:'Injectable',u:'flacon',q:3,s:5,lot:'L-BX2601',per:'2026-11-30',pu:210,f:'Allergan France'},
- {ref:'SKB-PRO',n:'Skinbooster 2 ml',cat:'Injectable',u:'seringue',q:9,s:5,lot:'L-PF2603',per:'2027-05-31',pu:96,f:'IBSA'},
- {ref:'MESO-K',n:'Cocktail mésothérapie',cat:'Injectable',u:'flacon',q:14,s:6,lot:'L-MK2602',per:'2026-09-30',pu:34,f:'Filorga'},
- {ref:'PEEL-S',n:'Peeling — acide glycolique',cat:'Topique',u:'flacon',q:6,s:3,lot:'L-PE2604',per:'2027-02-28',pu:41,f:'SkinCeuticals'},
- {ref:'ANE-EML',n:'Crème anesthésiante 30 g',cat:'Topique',u:'tube',q:5,s:4,lot:'L-EM2508',per:'2026-08-31',pu:12,f:'Cooper'},
- {ref:'AIG-30G',n:'Aiguilles 30 G',cat:'Consommable',u:'boîte 100',q:9,s:4,lot:null,per:'2028-06-30',pu:14,f:'B. Braun'},
- {ref:'CAN-25G',n:'Canules 25 G × 50 mm',cat:'Consommable',u:'boîte 20',q:2,s:4,lot:null,per:'2028-01-31',pu:46,f:'TSK'},
- {ref:'CMP-ST',n:'Compresses stériles',cat:'Consommable',u:'boîte 100',q:18,s:6,lot:null,per:'2029-04-30',pu:6,f:'Hartmann'},
+ {ref:'AH-VOLB',n:'Acide hyaluronique — volumateur 1 ml',cat:'Injectable',sfam:'Acide hyaluronique',u:'seringue',q:11,s:8,lot:'L-AH2409',per:'2027-03-31',pu:78,f:'Allergan France'},
+ {ref:'AH-LYFT',n:'Acide hyaluronique — comblement profond 1 ml',cat:'Injectable',sfam:'Acide hyaluronique',u:'seringue',q:4,s:6,lot:'L-RL2502',per:'2027-01-31',pu:82,f:'Galderma'},
+ {ref:'BTX-100',n:'Toxine botulique 100 U',cat:'Injectable',sfam:'Toxine botulique',u:'flacon',q:3,s:5,lot:'L-BX2601',per:'2026-11-30',pu:210,f:'Allergan France'},
+ {ref:'SKB-PRO',n:'Skinbooster 2 ml',cat:'Injectable',sfam:'Skinboosters',u:'seringue',q:9,s:5,lot:'L-PF2603',per:'2027-05-31',pu:96,f:'IBSA'},
+ {ref:'MESO-K',n:'Cocktail mésothérapie',cat:'Injectable',sfam:'Mésothérapie',u:'flacon',q:14,s:6,lot:'L-MK2602',per:'2026-09-30',pu:34,f:'Filorga'},
+ {ref:'PEEL-S',n:'Peeling — acide glycolique',cat:'Topique',sfam:'Peelings',u:'flacon',q:6,s:3,lot:'L-PE2604',per:'2027-02-28',pu:41,f:'SkinCeuticals'},
+ {ref:'ANE-EML',n:'Crème anesthésiante 30 g',cat:'Topique',sfam:'Anesthésiques',u:'tube',q:5,s:4,lot:'L-EM2508',per:'2026-08-31',pu:12,f:'Cooper'},
+ {ref:'AIG-30G',n:'Aiguilles 30 G',cat:'Consommable',sfam:'Aiguilles & canules',u:'boîte 100',q:9,s:4,lot:null,per:'2028-06-30',pu:14,f:'B. Braun'},
+ {ref:'CAN-25G',n:'Canules 25 G × 50 mm',cat:'Consommable',sfam:'Aiguilles & canules',u:'boîte 20',q:2,s:4,lot:null,per:'2028-01-31',pu:46,f:'TSK'},
+ {ref:'CMP-ST',n:'Compresses stériles',cat:'Consommable',sfam:'Pansements & compresses',u:'boîte 100',q:18,s:6,lot:null,per:'2029-04-30',pu:6,f:'Hartmann'},
 ];
+/* le catalogue produit, rangé pour s'y retrouver : famille puis sous-famille */
+const FAMS=['Injectable','Topique','Consommable'];
+const FAM_L={Injectable:'Injectables', Topique:'Topiques', Consommable:'Consommables'};
+const sfamDe=x=>x.sfam||x.cat||'Divers';
+/* deux niveaux : la famille, puis la sous-famille */
+function stockRange(q,fam){
+ const t=(q||'').trim().toLowerCase();
+ const L=STOCK.filter(x=>(!fam||x.cat===fam)
+   && (!t || (x.n+' '+x.ref+' '+(x.lot||'')+' '+sfamDe(x)+' '+(x.f||'')).toLowerCase().includes(t)));
+ const ordre=f=>{const i=FAMS.indexOf(f); return i<0?99:i};
+ const par={};
+ L.forEach(x=>{const f=x.cat||'Divers', k=sfamDe(x);
+   (par[f]=par[f]||{})[k]=(par[f][k]||[]).concat([x])});
+ return Object.keys(par).sort((a,b)=>ordre(a)-ordre(b)).map(f=>({
+   fam:f, label:FAM_L[f]||f,
+   sfams:Object.keys(par[f]).sort().map(k=>({sfam:k, items:par[f][k]}))}));
+}
+const nbRange=G=>G.reduce((n,f)=>n+f.sfams.reduce((m,g)=>m+g.items.length,0),0);
 /* recalage : toutes les dates du jeu de démonstration glissent d'autant que l'ancre */
 (function recaler(){
  const n=new Date();
@@ -2017,32 +2075,86 @@ function miniFace(zones,zt){
 const SILH={
  /* Visage — tracé anatomique : front bombé, tempes, pommettes, mâchoire fuyant vers le menton. */
  visage:{vb:'0 0 400 560', g:`
- <path class="neck" d="M156 452 C156 492 148 508 124 518 C102 527 86 540 76 560 L324 560 C314 540 298 527 276 518 C252 508 244 492 244 452 Z"/>
- <path class="guide" d="M200 470
-   C181 470 163 459 148 441
-   C131 420 116 391 107 358
-   C98 325 93 289 93 252
-   C93 214 99 175 118 148
-   C139 117 167 100 200 100
-   C233 100 261 117 282 148
-   C301 175 307 214 307 252
-   C307 289 302 325 293 358
-   C284 391 269 420 252 441
-   C237 459 219 470 200 470 Z"/>
- <path class="guide" d="M95 232 C78 226 69 241 74 260 C78 275 88 287 99 289"/>
- <path class="guide" d="M305 232 C322 226 331 241 326 260 C322 275 312 287 301 289"/>
- <path class="guide" d="M112 158 C134 120 168 104 200 104 C232 104 266 120 288 158" stroke-opacity=".13"/>
- <path class="guide" d="M132 206 C149 191 178 189 192 200"/>
- <path class="guide" d="M268 206 C251 191 222 189 208 200"/>
- <path class="guide" d="M133 228 C146 213 177 213 190 228 C177 243 146 243 133 228 Z"/>
- <path class="guide" d="M267 228 C254 213 223 213 210 228 C223 243 254 243 267 228 Z"/>
- <circle class="pupil" cx="161" cy="228" r="6"/><circle class="pupil" cx="239" cy="228" r="6"/>
- <path class="guide" d="M200 236 L193 292 C187 303 178 304 172 298 M200 236 L207 292 C213 303 222 304 228 298"/>
- <path class="guide" d="M178 300 C189 309 211 309 222 300" stroke-opacity=".16"/>
- <path class="guide" d="M193 306 L193 340 M207 306 L207 340" stroke-opacity=".1"/>
- <path class="guide" d="M161 356 C180 341 191 347 200 353 C209 347 220 341 239 356 C220 373 209 376 200 370 C191 376 180 373 161 356 Z"/>
- <path class="guide" d="M161 356 L239 356" stroke-opacity=".12"/>
- <path class="guide" d="M156 418 C172 434 228 434 244 418" stroke-opacity=".1"/>`},
+ <!-- Visage : crâne large, mâchoire pleine, menton rond. Les traits sont posés
+      aux mêmes coordonnées que les zones cliquables. -->
+ <path class="neck" d="M164 418 C164 464 156 486 132 496 C107 507 88 530 78 560 L322 560
+   C312 530 293 507 268 496 C244 486 236 464 236 418 Z"/>
+ <path class="skin" d="M200 76 C162 76 132 90 115 116 C98 142 89 178 89 216
+   C89 252 94 288 104 320 C114 352 128 382 146 408
+   C158 428 170 445 186 450 C191 452 195 452 200 452
+   C205 452 209 452 214 450 C230 445 242 428 254 408
+   C272 382 286 352 296 320 C306 288 311 252 311 216
+   C311 178 302 142 285 116 C268 90 238 76 200 76 Z"/>
+ <path class="guide" d="M200 76 C162 76 132 90 115 116 C98 142 89 178 89 216
+   C89 252 94 288 104 320 C114 352 128 382 146 408
+   C158 428 170 445 186 450 C191 452 195 452 200 452
+   C205 452 209 452 214 450 C230 445 242 428 254 408
+   C272 382 286 352 296 320 C306 288 311 252 311 216
+   C311 178 302 142 285 116 C268 90 238 76 200 76 Z"/>
+ <path class="guide fin" d="M104 158 C132 112 166 94 200 94 C234 94 268 112 296 158"/>
+
+ <!-- oreilles -->
+ <path class="guide" d="M93 206 C77 200 65 212 65 233 C65 258 74 286 89 300 C97 307 104 304 105 295"/>
+ <path class="guide fin" d="M89 220 C79 224 75 238 77 254 C79 272 86 287 94 295"/>
+ <path class="guide fin" d="M85 250 C82 259 84 271 91 277"/>
+ <path class="guide" d="M307 206 C323 200 335 212 335 233 C335 258 326 286 311 300 C303 307 296 304 295 295"/>
+ <path class="guide fin" d="M311 220 C321 224 325 238 323 254 C321 272 314 287 306 295"/>
+ <path class="guide fin" d="M315 250 C318 259 316 271 309 277"/>
+
+ <!-- sourcils -->
+ <path class="brow" d="M128 212 C140 196 161 187 180 191 C188 193 192 198 193 204
+   C186 199 174 196 160 199 C146 202 136 206 128 212 Z"/>
+ <path class="brow" d="M272 212 C260 196 239 187 220 191 C212 193 208 198 207 204
+   C214 199 226 196 240 199 C254 202 264 206 272 212 Z"/>
+ <g class="hair">
+  <path d="M134 209 C145 199 158 194 171 193"/><path d="M139 213 C150 203 163 198 178 197"/>
+  <path d="M146 215 C157 207 169 203 184 202"/>
+  <path d="M266 209 C255 199 242 194 229 193"/><path d="M261 213 C250 203 237 198 222 197"/>
+  <path d="M254 215 C243 207 231 203 216 202"/>
+ </g>
+
+ <!-- yeux -->
+ <path class="guide fin" d="M138 219 C149 204 174 202 184 216"/>
+ <path class="guide" d="M139 229 C149 213 174 212 182 228 C173 243 148 244 139 229 Z"/>
+ <path class="lash" d="M139 229 C149 213 174 212 182 228"/>
+ <circle class="iris" cx="161" cy="228" r="8.4"/>
+ <circle class="pupil" cx="161" cy="228" r="3.7"/>
+ <circle class="catch" cx="163.8" cy="225" r="1.9"/>
+ <path class="guide fin" d="M182 228 C185 226 187 231 183 234"/>
+ <path class="guide fin" d="M262 219 C251 204 226 202 216 216"/>
+ <path class="guide" d="M261 229 C251 213 226 212 218 228 C227 243 252 244 261 229 Z"/>
+ <path class="lash" d="M261 229 C251 213 226 212 218 228"/>
+ <circle class="iris" cx="239" cy="228" r="8.4"/>
+ <circle class="pupil" cx="239" cy="228" r="3.7"/>
+ <circle class="catch" cx="241.8" cy="225" r="1.9"/>
+ <path class="guide fin" d="M218 228 C215 226 213 231 217 234"/>
+
+ <!-- nez -->
+ <path class="guide fin" d="M193 254 C190 272 188 284 186 292"/>
+ <path class="guide fin" d="M207 254 C210 272 212 284 214 292"/>
+ <path class="guide" d="M186 292 C181 301 190 310 200 310 C210 310 219 301 214 292"/>
+ <path class="guide" d="M186 293 C176 292 168 299 168 307 C168 315 177 319 188 315"/>
+ <path class="guide" d="M214 293 C224 292 232 299 232 307 C232 315 223 319 212 315"/>
+ <ellipse class="nostril" cx="188" cy="308" rx="5.4" ry="2.8" transform="rotate(-16 188 308)"/>
+ <ellipse class="nostril" cx="212" cy="308" rx="5.4" ry="2.8" transform="rotate(16 212 308)"/>
+ <path class="guide fin" d="M194 312 C196 316 204 316 206 312"/>
+
+ <!-- lèvres -->
+ <path class="guide fin" d="M194 319 C193 330 193 341 195 347"/>
+ <path class="guide fin" d="M206 319 C207 330 207 341 205 347"/>
+ <path class="lip" d="M163 356 C174 344 187 341 195 347 C197 349 203 349 205 347
+   C213 341 226 344 237 356 C226 373 174 373 163 356 Z"/>
+ <path class="guide" d="M163 356 C174 344 187 341 195 347 C197 349 203 349 205 347 C213 341 226 344 237 356"/>
+ <path class="guide" d="M163 356 C174 373 226 373 237 356"/>
+ <path class="guide" d="M163 356 C181 361 219 361 237 356"/>
+ <path class="guide fin" d="M172 364 C185 369 215 369 228 364"/>
+
+ <!-- menton, mâchoire, cou -->
+ <path class="guide fin" d="M180 394 C189 402 211 402 220 394"/>
+ <path class="guide fin" d="M152 406 C172 436 228 436 248 406"/>
+ <path class="guide fin" d="M176 458 C182 490 184 528 183 560"/>
+ <path class="guide fin" d="M224 458 C218 490 216 528 217 560"/>`},
+
 
  /* Corps — silhouette humaine : épaules, taille marquée, bras détachés du tronc. */
  corps:{vb:'0 0 400 900', g:`
@@ -3966,7 +4078,7 @@ function openActe(pid,aid,np){
           .map(t=>({t, q:a.seances||1, com:a.zonesNote||'',
              ...(a.mat&&t===a.type?{mat:a.mat, par:{...(a.par||{})}}:{})}))):[],
      draft:{t:null,z:{},com:''}, openSoin:0, devis:null, docs:[],
-     conso:[], consoOff:[], consoAdd:false, prepOpen:null,
+     conso:[], consoOff:[], consoAdd:false, prepOpen:null, csQ:'', csFam:'',
      but:a?'acte':'acte',                       /* 'acte' = consultation du jour · 'devis' = projet */
      effets:a?a.effets:'', consent:a?a.consent:false};
  editMat=null; matAvant=null; suppCand=null;
@@ -3994,6 +4106,14 @@ function syncConsoAuto(){
   const ex=AS.conso.find(l=>l.ref===c.ref);
   if(!ex) AS.conso.push({ref:c.ref, q:c.q, auto:true});
   else if(ex.auto) ex.q=c.q });
+}
+function ajouterProduit(ref){
+ const st=STOCK.find(x=>x.ref===ref); if(!st) return;
+ AS.conso=AS.conso||[];
+ AS.consoOff=(AS.consoOff||[]).filter(r=>r!==ref);
+ const ex=AS.conso.find(l=>l.ref===ref);
+ if(ex){ ex.q+=1; ex.auto=false } else AS.conso.push({ref, q:1, auto:false});
+ toast(`${st.n} ajouté à la séance`); renderOver();
 }
 function addConsoSaisie(){
  const sel=document.getElementById('csSref'); if(!sel) return;
@@ -4580,11 +4700,27 @@ function consultPane(prix){
    <div class="dvp-h" style="margin-top:11px"><span>📦</span><b>Consommables</b>
      <button class="btn xs ${AS.consoAdd?'g':''}" style="margin-left:auto"
        onclick="toggleConsoSaisie()">${AS.consoAdd?'✕':'＋ Produit'}</button></div>
-   ${AS.consoAdd?`<div class="cadd" style="margin-bottom:6px">
-     <select class="inp" id="csSref">${(dispo.length?dispo:STOCK).map(x=>
-       `<option value="${x.ref}">${esc(x.n)}${x.lot?' · lot '+esc(x.lot):''} — ${x.q} en stock</option>`).join('')}</select>
-     <input class="inp" id="csSq" type="number" min="1" value="1" style="width:60px">
-     <button class="btn xs p" onclick="addConsoSaisie()">Ajouter</button></div>`:''}
+   ${AS.consoAdd?(()=>{const G=stockRange(AS.csQ,AS.csFam);
+     const nTot=nbRange(G);
+     return `<div class="cpick">
+      <input class="inp" id="csQi" placeholder="Rechercher un produit, un lot…" value="${esc(AS.csQ||'')}"
+        oninput="AS.csQ=this.value;renderOver();const e=document.getElementById('csQi');if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length)}">
+      <div class="cpick-f">
+        <button class="chip xs ${AS.csFam?'':'on'}" onclick="AS.csFam='';renderOver()">Tout</button>
+        ${FAMS.map(f=>`<button class="chip xs ${AS.csFam===f?'on':''}" onclick="AS.csFam='${f}';renderOver()">${esc(FAM_L[f]||f)}</button>`).join('')}
+      </div>
+      <div class="cpick-l">
+        ${nTot?G.map(f=>`${AS.csFam?'':`<div class="cpick-f1">${esc(f.label)}</div>`}
+          ${f.sfams.map(g=>`<div class="cpick-s">${esc(g.sfam)}</div>`+
+            g.items.map(x=>{const dedans=CS.some(l=>l.ref===x.ref);
+              return `<button class="cpick-b ${dedans?'in':''}" onclick="ajouterProduit('${x.ref}')"
+                title="${esc(x.n)}${x.f?' · '+esc(x.f):''}${x.per?' · exp. '+DF(x.per):''}">
+                <span class="pk">${dedans?'✓':'+'}</span>
+                <span class="nm">${esc(x.n)}</span>
+                <span class="lo">${x.lot?esc(x.lot):'—'}</span>
+                <span class="st ${x.q<=x.s?'bas':''}">${x.q}</span></button>`}).join('')).join('')}`).join('')
+         :`<div class="mu" style="font-size:11.5px;padding:10px 4px">Aucun produit ne correspond.</div>`}
+      </div></div>`})():''}
    ${CS.length?`<div class="ctab" style="margin-bottom:4px">${CS.map((l,i)=>{const st=STOCK.find(x=>x.ref===l.ref)||{};
      const reste=(st.q||0)-l.q;
      return `<div class="crow c-s">
@@ -5465,7 +5601,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='AQ';
+const BUILD='AR';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
