@@ -324,7 +324,8 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .lotl .inp{height:19px;border:none;background:transparent;padding:0;margin:0;font-size:11px;
   font-weight:600;min-width:0;width:100%}
 .lotl label>span{min-width:26px}
-.lotl .inp[type=date]{width:auto;flex:1}
+.lotl .inp[type=date],.lotl .inp.pdate{width:auto;flex:1}
+.lotl .inp.pdate{font-variant-numeric:tabular-nums;letter-spacing:.01em}
 .lotl .inp.per{color:var(--crit)}
 .lotl .inp.pro{color:#8a6100}
 .prep-g.gros{font-size:12.5px;text-transform:none;letter-spacing:0;font-weight:660;color:var(--ink);
@@ -963,8 +964,8 @@ tr.supp td{background:var(--crit-w);padding:0}
   display:flex;justify-content:center}
 .face{width:auto;max-width:100%;height:auto;max-height:calc(100vh - 250px);display:block;touch-action:manipulation}
 /* l'illustration porte déjà ses tracés : au repos la zone cliquable s'efface derrière eux */
-.zone{fill:var(--ink);fill-opacity:.012;stroke:var(--ink);stroke-opacity:.06;stroke-width:1;stroke-dasharray:3 4;cursor:pointer;transition:fill-opacity .12s,stroke-opacity .12s}
-.zone:hover{fill-opacity:.15;stroke-opacity:.55;stroke-dasharray:none;stroke-width:1.5}
+.zone{fill:var(--ink);fill-opacity:.012;stroke:var(--ink);stroke-opacity:0;stroke-width:1.6;stroke-linejoin:round;cursor:pointer;transition:fill-opacity .12s,stroke-opacity .12s}
+.zone:hover{fill-opacity:.15;stroke-opacity:.6}
 .zone.ro{cursor:default}
 .zone.ro:not(.act-tox):not(.act-ah){fill-opacity:0;stroke-opacity:.08}
 .zone.ro:hover{fill-opacity:inherit}
@@ -1150,6 +1151,22 @@ const EUR=n=>new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',maxi
 const NUM=n=>new Intl.NumberFormat('fr-FR').format(n);
 const DF=d=>new Date(d).toLocaleDateString('fr-FR');
 const DFS=d=>new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});
+/* la péremption d'un lot se lit et se saisit en jj/mm/aa — « 27/05/26 » */
+const DFP=d=>d?new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'2-digit'}):'';
+const masquePer=t=>{const c=String(t||'').replace(/\D/g,'').slice(0,8);
+ return c.length>4?c.slice(0,2)+'/'+c.slice(2,4)+'/'+c.slice(4)
+      :c.length>2?c.slice(0,2)+'/'+c.slice(2):c};
+/* rend l'ISO, '' si le champ est vidé, null si la saisie n'est pas une date */
+function parsePer(t){
+ const v=String(t||'').trim(); if(!v) return '';
+ if(/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+ const c=v.replace(/\D/g,'');
+ if(c.length!==6&&c.length!==8) return null;
+ const j=+c.slice(0,2), m=+c.slice(2,4), an=c.length===6?2000+ +c.slice(4,6):+c.slice(4,8);
+ if(m<1||m>12||j<1||j>31||an<2000||an>2199) return null;
+ const d=new Date(Date.UTC(an,m-1,j));
+ if(d.getUTCDate()!==j||d.getUTCMonth()!==m-1) return null;
+ return an+'-'+String(m).padStart(2,'0')+'-'+String(j).padStart(2,'0')}
 /* Le jeu de démonstration est écrit autour d'une date d'ancrage ; au chargement,
    tout est décalé pour que « aujourd'hui » soit réellement aujourd'hui. */
 const ANCRE='2026-08-03';
@@ -1217,22 +1234,20 @@ const REGIONS =[{id:'visage',n:'Visage',i:'☺'},{id:'corps',n:'Corps',i:'🧍'}
 const famById=id=>FAMILLES.find(f=>f.id===id)||FAMILLES[0];
 
 let ZDEF=[
- {id:'front',   n:'Front — rides frontales',   k:'Front',        p:'tox',d:12,s:4,  cx:200,cy:112,rx:140,ry:60},
- {id:'tempe',   n:'Tempe',                     k:'Tempe',        p:'ah', d:.5,s:.25,cx:50, cy:148,rx:20, ry:56,m:1},
- {id:'glab',    n:'Glabelle — ride du lion',   k:'Glabelle',     p:'tox',d:20,s:4,  cx:194,cy:160,rx:32, ry:27},
- {id:'sourcil', n:'Queue du sourcil',          k:'Sourcil',      p:'tox',d:4, s:2,  cx:76, cy:180,rx:24, ry:13,m:1},
- {id:'patte',   n:'Patte d’oie',               k:'Patte d’oie',  p:'tox',d:10,s:2,  cx:42, cy:236,rx:18, ry:34,m:1},
- {id:'cerne',   n:'Cerne — vallée des larmes', k:'Cerne',        p:'ah', d:.5,s:.1, cx:104,cy:252,rx:34, ry:22,m:1},
- {id:'pomm',    n:'Pommette — malaire',        k:'Pommette',     p:'ah', d:.5,s:.25,cx:102,cy:295,rx:38, ry:31,m:1},
- {id:'nez',     n:'Nez — profiloplastie',      k:'Nez',          p:'ah', d:.3,s:.1, cx:196,cy:285,rx:40, ry:62},
- {id:'smal',    n:'Creux sous-malaire',        k:'Sous-malaire', p:'ah', d:.5,s:.25,cx:84, cy:372,rx:32, ry:36,m:1},
- {id:'sillon',  n:'Sillon nasogénien',         k:'Sillon',       p:'ah', d:.5,s:.25,cx:146,cy:366,rx:16, ry:42,m:1},
- {id:'perib',   n:'Rides péribuccales',        k:'Péribuccal',   p:'ah', d:.3,s:.1, cx:198,cy:362,rx:50, ry:15},
- {id:'levres',  n:'Lèvres',                    k:'Lèvres',       p:'ah', d:1, s:.25,cx:198,cy:396,rx:62, ry:24},
- {id:'amert',   n:'Pli d’amertume',            k:'Amertume',     p:'ah', d:.3,s:.1, cx:146,cy:424,rx:16, ry:23,m:1},
- {id:'mand',    n:'Mandibule — ovale',         k:'Mandibule',    p:'ah', d:1, s:.25,cx:88, cy:415,rx:32, ry:56,m:1},
- {id:'menton',  n:'Menton',                    k:'Menton',       p:'ah', d:.5,s:.25,cx:198,cy:468,rx:48, ry:28},
- {id:'cou',     n:'Cou — bandes platysmales',  k:'Cou',          p:'tox',d:20,s:5,  cx:200,cy:528,rx:104,ry:34},
+ {id:'front',n:'Front — rides frontales',k:'Front',p:'tox',d:12,s:4,cx:200,cy:96,rx:139,ry:67,pa:[[336.3,75.3,329.7,61.5,325,56.2,319.2,51.9,302.8,45.2,282.3,40.8,227.4,36.9,224.1,37.6,168,37.4,131.1,39.2,114.8,41.1,100.1,44.3,86.3,49.4,74.6,57.2,69.5,63.2,64.8,71.5,61.3,84.9,60.9,101.6,62.5,116.3,65.3,130.5,68.3,138.4,72,143.3,76.6,146.4,89.2,149.1,114.3,149.4,144.9,152.8,156.6,157,167.1,165.2,169.2,164.7,170.7,162.7,168.5,151.8,169.1,147.6,173.8,143.1,182.2,141.9,222.4,142.4,227.3,144.9,229.7,149.3,229.2,155.2,225,167.7,225.9,170.5,228.7,171.4,231.3,169.8,234,164.4,237.9,160,249.6,153.8,276.4,149.7,315.8,148.3,322.1,146.6,327.1,143.6,332.8,135.1,335.8,123.8,338.4,99.5,338.4,89.9]]},
+ {id:'tempe',n:'Tempe',k:'Tempe',p:'ah',d:0.5,s:0.25,cx:43,cy:148,rx:14,ry:58,m:1,pa:[[46.9,93.2,44,93.8,40.8,96.2,36.1,105,32.3,119.6,30,140.5,30.4,167.7,33.6,192.8,36.4,204.3,38.7,207.2,41.5,208.3,45.6,205.6,48.4,196.4,54.8,156,57.1,134.7,57.1,121.3,55.4,105.9,51.5,95.9]]},
+ {id:'glab',n:'Glabelle — ride du lion',k:'Glabelle',p:'tox',d:20,s:4,cx:199,cy:169,rx:30,ry:32,pa:[[174.2,144,169.9,148.1,169.7,153.5,184.8,196.4,187.8,201.4,191.8,205,199,206.9,205.7,205.4,211,200.8,215.4,191.1,227.7,157.5,228.7,151.8,227.8,147.2,224.9,144.6,219.1,143,180.1,142.9]]},
+ {id:'cerne',n:'Cerne — vallée des larmes',k:'Cerne',p:'ah',d:0.5,s:0.1,cx:112,cy:253,rx:40,ry:20,m:1,pa:[[72.2,234.2,72.1,239.2,75,248.9,81.3,258.3,93,266.4,106,270.5,121.9,270.9,136.1,266.5,146.1,258.9,152.1,248,151.7,242.2,147,239.4,141.2,240,123.6,245.4,109.3,245.6,93.4,241.9,76.6,231.3,73.8,231.7]]},
+ {id:'pomm',n:'Pommette — joue latérale',k:'Pommette',p:'ah',d:1,s:0.25,cx:82,cy:309,rx:43,ry:86,m:1,pa:[[45.2,223.9,41.3,226.4,38.7,230.9,37.6,244.7,41.4,270.2,48,294.4,72.1,342.1,89,388,95.2,395.3,100.9,396.7,104.4,394.6,106.5,389.8,110.3,366.4,122.9,330,124.5,319.1,123.3,305.1,118.9,295.9,109.9,286.6,83.8,269.7,76.9,264,68.9,253.5,54.9,228,50.3,224.2]]},
+ {id:'nez',n:'Nez — profiloplastie',k:'Nez',p:'ah',d:0.3,s:0.1,cx:199,cy:257,rx:19,ry:54,pa:[[196.4,213.6,188.7,217.4,185.1,224.6,182.5,294,183.5,296.2,185.6,296.9,200.6,295,213.5,297,215.6,295.7,216.3,292.8,215.3,277.3,216.5,271.7,214.9,264.3,214.2,224.2,212,219.2,207.7,215.4,202.7,213.7],[216.8,302.7,212.7,299.1,207.3,296.9,200.2,296,191.8,296.6,186.1,298.7,182.2,302.2,180.3,306.3,180.6,310.8,183.5,316.2,188.9,320.2,195.6,322,204.8,321.7,210.7,319.3,215.9,314.7,218.1,307.8]]},
+ {id:'sillon',n:'Sillon nasogénien',k:'Sillon',p:'ah',d:0.5,s:0.25,cx:156,cy:297,rx:25,ry:48,m:1,pa:[[176.3,251.8,172.2,253.2,166.7,260.8,158.6,274.9,148.1,296.3,129.6,340,128,346.3,129.5,348.6,131.9,348.4,134.9,344.8,146.6,325,167.5,295.6,171.3,288.6,175.2,278.1,178,264.3,178.3,254.7]]},
+ {id:'perib',n:'Rides péribuccales',k:'Péribuccal',p:'ah',d:0.3,s:0.1,cx:200,cy:363,rx:62,ry:16,pa:[[137.4,377.3,138.8,381,142.8,381.6,165.9,369.9,178.8,365.7,187.2,365.4,200.2,367.1,216.1,365.2,229.9,369,253.8,381.7,258.8,381.5,260.8,378.9,257.5,369.3,248.4,359.7,234.6,352,221.2,349.5,199.8,351.7,178,349.6,166.7,351.6,158.3,355.1,148.9,361.1,141.8,368.5]]},
+ {id:'levres',n:'Lèvres',k:'Lèvres',p:'ah',d:1,s:0.25,cx:200,cy:396,rx:70,ry:32,pa:[[129.8,396.5,130,404.9,132.8,407.9,136.1,407.9,140.9,403,143.2,402.7,160.4,417,168.8,422.1,182.2,427,196.4,429.3,215.7,427.2,228.3,423.2,239.2,416.5,255.1,402.6,257.9,402.2,262.2,406.6,265.5,407.3,268.6,405.3,269.7,400.3,269.1,388.6,268.2,384.4,266.4,382.2,263.9,381.4,256.8,382.8,227.9,369.5,214.9,366.3,199,368.3,184.3,366.2,172.1,368.7,144.5,382.2,133.2,383,131.3,385.6]]},
+ {id:'sslev',n:'Sous-lèvre — houppe du menton',k:'Sous-lèvre',p:'ah',d:0.3,s:0.1,cx:199,cy:434,rx:60,ry:19,pa:[[259.1,406.6,258.2,403.9,255.9,403.5,242.9,415,232,422.5,219.9,427.6,205.2,430.3,189.7,429.9,175.9,426.4,162.5,419.7,144,404.2,141,404.4,139.8,407.4,142.2,413.5,147.6,420.7,155.1,427.8,166.5,434.7,186,440.8,202.7,442,218.2,439.8,231.2,435.4,237.3,432.1,251.7,419.8,257.1,412.7]]},
+ {id:'amert',n:'Pli d’amertume',k:'Amertume',p:'ah',d:0.3,s:0.1,cx:125,cy:395,rx:9,ry:40,m:1,pa:[[128.7,356.9,126,359.5,121.2,368.9,118,379.8,116.3,395.3,116.7,408.2,118.8,420.1,123.7,432.4,128.6,435.5,131.4,434.1,132.5,430,129.1,396.9,130.1,386.9,135.1,364.7,134.6,358.9,131.5,356.4]]},
+ {id:'mand',n:'Mandibule — ovale',k:'Mandibule',p:'ah',d:1,s:0.25,cx:93,cy:415,rx:36,ry:49,m:1,pa:[[57.7,358.9,57.1,362.2,62.8,381,69.2,394,77.3,406.4,92.6,425.1,122.8,455.4,126.5,457.8,128.9,457.6,129.7,455.9,129.2,452.1,125.1,444.2,80.4,396.2,67.6,377.3,60.3,359.9]]},
+ {id:'menton',n:'Menton',k:'Menton',p:'ah',d:0.5,s:0.25,cx:199,cy:470,rx:40,ry:22,pa:[[159.7,465.5,159.9,474.7,161.7,479.3,164.7,483,173,488.6,182.6,491.1,192.7,492,216.1,491,226.2,488.1,231.6,485,236.1,480.8,239.9,470.9,237.8,461.4,231.8,454.3,225.3,451.3,210.3,448.7,190.2,448.6,175.5,450.8,164.3,456.5,161.5,460.2]]},
+ {id:'cou',n:'Cou — bandes platysmales',k:'Cou',p:'tox',d:20,s:5,cx:199,cy:523,rx:108,ry:49,pa:[[94.6,465.9,92.8,480.2,92.6,520.3,94.2,530.4,96,535.1,99.7,539.9,105.5,543.8,116.4,548.4,139.5,553.8,163.8,556.6,211.1,556.9,237.9,555.6,269.3,551.6,287.7,546.9,299.8,540,305.2,531,308.1,510.2,307.6,476.4,305.3,463.1,300.7,459,297.4,459.4,293.4,462.7,276.8,496.5,270.3,504.7,265.5,508.9,257.6,513.4,244.2,518,229.1,520.9,212.8,522.4,175.5,521.5,155.8,517.8,141.2,512.2,132.8,506.4,126,498.1,120.8,488.9,110.2,465.2,107.1,461.1,103.5,459,99.3,459.1,96.9,460.9]]},
 ];
 /* dépliage gauche/droite (côté PATIENT : l'image de gauche = côté droit du patient) */
 /* ---------- zones du corps ---------- */
@@ -1255,11 +1270,17 @@ let BDEF=[
  {id:'fesses',  n:'Fesses (vue postérieure)',k:'Fesses',  p:'ah', d:3,s:1,  cx:0,cy:0,rx:0,ry:0, post:1},
 ];
 let ZONES=[];
+/* le tracé d'une zone : une suite d'anneaux [x,y,x,y…] relevés sur l'illustration */
+const zPath=pa=>(pa||[]).map(r=>{let d='M';
+  for(let i=0;i<r.length;i+=2) d+=(i?'L':'')+r[i]+' '+r[i+1];
+  return d+'Z'}).join('');
+const zMiroir=pa=>(pa||[]).map(r=>r.map((v,i)=>i%2?v:Math.round((400-v)*10)/10));
 const deplier=(L,reg)=>L.forEach(z=>{
   const base={...z, r:reg};
   if(z.m){
     ZONES.push({...base, id:z.id+'_d', n:z.n+' — droite', k:z.k+' D', side:'D'});
-    ZONES.push({...base, id:z.id+'_g', n:z.n+' — gauche', k:z.k+' G', side:'G', cx:400-z.cx});
+    ZONES.push({...base, id:z.id+'_g', n:z.n+' — gauche', k:z.k+' G', side:'G',
+                cx:400-z.cx, pa:z.pa?zMiroir(z.pa):undefined});
   } else ZONES.push({...base, side:''});
 });
 function rebuildZones(){ ZONES.length=0; deplier(ZDEF,'visage'); deplier(BDEF,'corps') }
@@ -1282,9 +1303,9 @@ const UNIT=p=>p==='tox'?'U':'ml';
    une séance de toxine est facturée au forfait, quelle que soit la dose injectée. */
 const PLABEL={tox:'Toxine botulique', ah:'Acide hyaluronique'};
 /* durée d'effet par zone — sert à renseigner le patient et à programmer le rappel de soin */
-const ZDUREE={front:'4 à 6 mois',glab:'4 à 6 mois',patte:'4 à 6 mois',sourcil:'4 à 6 mois',cou:'4 à 6 mois',
- levres:'6 à 9 mois',perib:'6 à 9 mois',cerne:'9 à 12 mois',sillon:'9 à 12 mois',amert:'9 à 12 mois',
- tempe:'12 à 18 mois',pomm:'12 à 18 mois',mand:'12 à 18 mois',menton:'12 à 18 mois',nez:'12 à 18 mois',smal:'12 à 18 mois'};
+const ZDUREE={front:'4 à 6 mois',glab:'4 à 6 mois',cou:'4 à 6 mois',
+ levres:'6 à 9 mois',perib:'6 à 9 mois',sslev:'6 à 9 mois',cerne:'9 à 12 mois',sillon:'9 à 12 mois',amert:'9 à 12 mois',
+ tempe:'12 à 18 mois',pomm:'12 à 18 mois',mand:'12 à 18 mois',menton:'12 à 18 mois',nez:'12 à 18 mois'};
 const zDuree=id=>ZDUREE[String(id).replace(/_[dg]$/,'')]||'variable';
 const INFOS={
  tox:{produit:'Toxine botulique de type A',
@@ -1311,16 +1332,16 @@ const fmtQ=(q,p)=>p==='tox'?`${nb(q)} U`:`${nb(q)} ml`;
 /* protocoles = 1 clic pour une ordonnance complète de zones */
 /* Un protocole relie chaque zone à l'acte qu'on y pratique, et à sa dose usuelle. */
 let PROTOS=[
- {n:'Haut du visage', z:{front:12, glab:20, patte_d:10, patte_g:10},
-  zt:{front:'BTX', glab:'BTX', patte_d:'BTX', patte_g:'BTX'}},
+ {n:'Haut du visage', z:{front:12, glab:20, tempe_d:.5, tempe_g:.5},
+  zt:{front:'BTX', glab:'BTX', tempe_d:'AH', tempe_g:'AH'}},
  {n:'Lèvres + menton', z:{levres:1, menton:.5, amert_d:.3, amert_g:.3},
   zt:{levres:'AH', menton:'AH', amert_d:'AH', amert_g:'AH'}},
  {n:'Restructuration', z:{pomm_d:1, pomm_g:1, mand_d:1, mand_g:1, menton:.5},
   zt:{pomm_d:'AH', pomm_g:'AH', mand_d:'AH', mand_g:'AH', menton:'AH'}},
- {n:'Regard', z:{cerne_d:.5, cerne_g:.5, tempe_d:.5, tempe_g:.5, sourcil_d:4, sourcil_g:4},
-  zt:{cerne_d:'AH', cerne_g:'AH', tempe_d:'AH', tempe_g:'AH', sourcil_d:'BTX', sourcil_g:'BTX'}},
- {n:'Séance complète', z:{front:12, glab:20, patte_d:10, patte_g:10, pomm_d:1, pomm_g:1, levres:1},
-  zt:{front:'BTX', glab:'BTX', patte_d:'BTX', patte_g:'BTX', pomm_d:'AH', pomm_g:'AH', levres:'AH'}},
+ {n:'Regard', z:{cerne_d:.5, cerne_g:.5, tempe_d:.5, tempe_g:.5, glab:20},
+  zt:{cerne_d:'AH', cerne_g:'AH', tempe_d:'AH', tempe_g:'AH', glab:'BTX'}},
+ {n:'Séance complète', z:{front:12, glab:20, pomm_d:1, pomm_g:1, levres:1, menton:.5},
+  zt:{front:'BTX', glab:'BTX', pomm_d:'AH', pomm_g:'AH', levres:'AH', menton:'AH'}},
 ];
 const protoActe=(P,z)=>(P.zt&&P.zt[z])||'AH';
 const protoActes=P=>[...new Set(Object.keys(P.z).map(z=>protoActe(P,z)))];
@@ -1471,7 +1492,7 @@ let ACTES=[];
   [1055,'AH','2025-02-11','Dr O. Baroudi','L. Roche','L-AH2331',{levres:1},true,''],
   [1055,'BTX','2024-09-24','Dr O. Baroudi','L. Roche','L-BX2512',{front:12,glab:18},true,''],
   [1055,'AH','2024-03-05','Dr O. Baroudi',null,'L-AH2331',{pomm_d:1,pomm_g:1},true,''],
-  [1056,'BTX','2024-11-19','Dr A. Merlin','S. Vidal','L-BX2512',{front:10,glab:16,patte_d:8,patte_g:8},true,''],
+  [1056,'BTX','2024-11-19','Dr A. Merlin','S. Vidal','L-BX2512',{front:10,glab:16,cou:16},true,''],
   [1056,'BTX','2024-05-07','Dr A. Merlin','S. Vidal','L-BX2512',{front:10,glab:16},true,''],
   [1057,'LAS1','2024-06-18','Dr O. Baroudi','L. Roche',null,null,false,''],
   [1057,'LAS1','2024-04-16','Dr O. Baroudi','L. Roche',null,null,false,''],
@@ -1484,8 +1505,8 @@ let ACTES=[];
   [1042,'PEEL','2026-07-21','Dr O. Baroudi','S. Vidal','L-PE2604',null,false,'Érythème 24 h (attendu)'],
   [1042,'MESO','2026-05-12','Dr O. Baroudi','S. Vidal','L-MK2602',null,false,''],
   [1043,'AH','2026-07-30','Dr A. Merlin','L. Roche','L-AH2409',{cerne_d:.5,cerne_g:.5},false,''],
-  [1044,'BTX','2026-06-18','Dr O. Baroudi','L. Roche','L-BX2601',{front:14,glab:20,patte_d:12,patte_g:12},true,'Ecchymose légère J+2, résorbée à J+7'],
-  [1044,'BTX','2026-01-22','Dr O. Baroudi','L. Roche','L-BX2512',{front:12,glab:20,patte_d:10,patte_g:10},true,''],
+  [1044,'BTX','2026-06-18','Dr O. Baroudi','L. Roche','L-BX2601',{front:14,glab:20,cou:20},true,'Ecchymose légère J+2, résorbée à J+7'],
+  [1044,'BTX','2026-01-22','Dr O. Baroudi','L. Roche','L-BX2512',{front:12,glab:20,tempe_d:.5,tempe_g:.5},true,''],
   [1044,'AH','2025-09-09','Dr O. Baroudi',null,'L-AH2331',{pomm_d:1,pomm_g:1},true,''],
   [1045,'AH','2026-07-15','Dr A. Merlin','S. Vidal','L-RL2502',{pomm_d:1,pomm_g:1,mand_d:1,mand_g:1},true,'Œdème modéré 48 h'],
   [1045,'SKB','2026-06-02','Dr A. Merlin','S. Vidal','L-PF2603',{pomm_d:.5,pomm_g:.5},true,''],
@@ -1495,7 +1516,7 @@ let ACTES=[];
   [1048,'BTX','2026-07-02','Dr A. Merlin',null,'L-BX2601',{front:16},true,''],
   [1049,'PEEL','2026-03-17','Dr O. Baroudi','S. Vidal','L-PE2511',null,false,''],
   [1050,'AH','2026-07-22','Dr O. Baroudi','L. Roche','L-RL2502',{pomm_d:1,pomm_g:1},true,''],
-  [1050,'SKB','2026-05-28','Dr O. Baroudi','L. Roche','L-PF2603',{smal_d:.5,smal_g:.5},true,''],
+  [1050,'SKB','2026-05-28','Dr O. Baroudi','L. Roche','L-PF2603',{mand_d:.5,mand_g:.5},true,''],
   [1050,'BTX','2026-02-11','Dr O. Baroudi','L. Roche','L-BX2512',{front:12,glab:20},true,''],
   [1051,'RF','2026-07-17','Dr A. Merlin','S. Vidal',null,null,false,''],
   [1052,'AH','2026-06-11','Dr O. Baroudi',null,'L-AH2331',{menton:.5,mand_d:.5,mand_g:.5},true,''],
@@ -1516,9 +1537,9 @@ let ACTES=[];
  });
  /* Volume complémentaire (fictif, déterministe) pour que les mois précédents ne soient pas vides */
  let sd=7; const rnd=()=>{sd=(sd*1103515245+12345)%2147483648;return sd/2147483648};
- const PZ=[{front:12,glab:20},{front:14,glab:20,patte_d:10,patte_g:10},{levres:1},{pomm_d:1,pomm_g:1},
+ const PZ=[{front:12,glab:20},{front:14,glab:20,perib:.3},{levres:1},{pomm_d:1,pomm_g:1},
   {cerne_d:.5,cerne_g:.5},{sillon_d:.5,sillon_g:.5},{menton:.5,mand_d:.5,mand_g:.5},
-  {levres:1,amert_d:.3,amert_g:.3},{smal_d:.5,smal_g:.5},{front:12,glab:16,patte_d:8,patte_g:8}];
+  {levres:1,amert_d:.3,amert_g:.3},{mand_d:.5,mand_g:.5},{front:12,glab:16,sslev:.3}];
  const LOTS={AH:['L-AH2409','L-AH2331','L-RL2502'],BTX:['L-BX2601','L-BX2512'],SKB:['L-PF2603']};
  /* les patients perdus de vue sont exclus du tirage : leur dernier acte doit rester ancien */
  const ACTIFS=PATIENTS.filter(p=>!PERDUS.includes(p.id));
@@ -1569,7 +1590,7 @@ const zoneSummary=a=>{
 /* ---------- Devis / factures / stock / règles ---------- */
 const DEVIS=[
  {id:'D-2606-011',patient:1043,date:'2026-06-08',montant:1180,statut:'relance2',envoye:'2026-06-08',relances:2,derniere:'2026-07-13',lignes:[['AH','Acide hyaluronique',2,350],['LAS2','Photorajeunissement',1,280],['SKB','Skinbooster',1,200]],
-  zs:[{cerne_d:.5,cerne_g:.5,pomm_d:1,pomm_g:1},{pomm_d:null,pomm_g:null},{smal_d:null,smal_g:null}],
+  zs:[{cerne_d:.5,cerne_g:.5,pomm_d:1,pomm_g:1},{pomm_d:null,pomm_g:null},{mand_d:null,mand_g:null}],
   cs:['Reprise du volume, résultat progressif en deux temps','Cure de 3 séances espacées de 4 semaines','']},
  {id:'D-2607-004',patient:1047,date:'2026-07-11',montant:700, statut:'relance1',envoye:'2026-07-11',relances:1,derniere:'2026-07-14',lignes:[['AH','Acide hyaluronique',2,350]],
   zs:[{levres:1}]},
@@ -1580,7 +1601,7 @@ const DEVIS=[
  {id:'D-2607-015',patient:1054,date:'2026-07-28',montant:840, statut:'envoye',  envoye:'2026-07-28',relances:0,derniere:null,lignes:[['LAS2','Cure photorajeunissement',3,280]],
   zs:[{decol:null}]},
  {id:'D-2605-006',patient:1052,date:'2026-05-14',montant:390, statut:'expire',  envoye:'2026-05-14',relances:3,derniere:'2026-06-25',lignes:[['BTX','Haut du visage',1,390]],
-  zs:[{front:12,glab:20,patte_d:8,patte_g:8}], cs:['Retouche incluse à 15 jours si besoin']},
+  zs:[{front:12,glab:20,cou:16}], cs:['Retouche incluse à 15 jours si besoin']},
  {id:'D-2607-002',patient:1045,date:'2026-07-06',montant:970, statut:'accepte', envoye:'2026-07-06',relances:0,derniere:null,lignes:[['AH','Acide hyaluronique',2,325],['SKB','Skinbooster',1,320]],
   zs:[{pomm_d:1,pomm_g:1,mand_d:.5,mand_g:.5},{cerne_d:null,cerne_g:null}]},
  {id:'D-2606-018',patient:1050,date:'2026-06-20',montant:970, statut:'accepte', envoye:'2026-06-20',relances:1,derniere:'2026-06-24',lignes:[['AH','Acide hyaluronique',2,325],['SKB','Skinbooster',1,320]],
@@ -1588,7 +1609,7 @@ const DEVIS=[
  {id:'D-2607-021',patient:1042,date:'2026-07-30',montant:340, statut:'brouillon',envoye:null,relances:0,derniere:null,lignes:[['MESO','Mésothérapie',1,180],['PEEL','Peeling',1,160]],
   zs:[{cou:null},{front:null,pomm_d:null,pomm_g:null}]},
  {id:'D-2604-007',patient:1048,date:'2026-04-15',montant:390, statut:'refuse',  envoye:'2026-04-15',relances:2,derniere:'2026-05-06',lignes:[['BTX','Haut du visage',1,390]],
-  zs:[{front:12,glab:20,patte_d:8,patte_g:8}]},
+  zs:[{front:12,glab:20,cou:16}]},
 ];
 /* rattachement d'un devis à l'acte de la consultation où il a été établi
    (l'acte le plus proche en date chez le même patient, à 10 jours près) */
@@ -2093,7 +2114,9 @@ function miniFace(zones,zt){
  ${corps?'<ellipse class="mo" cx="200" cy="58" rx="34" ry="42"/><rect class="mo" x="122" y="130" width="156" height="290" rx="46"/><rect class="mo" x="158" y="420" width="36" height="430" rx="18"/><rect class="mo" x="206" y="420" width="36" height="430" rx="18"/>'
         :'<ellipse class="mo" cx="200" cy="282" rx="120" ry="208"/>'}
  ${K.filter(z=>!z.post).map(z=>{const t=zt&&zt[z.id];
-    return `<ellipse class="mz ${((t?acteDef(t).col:null)||(z.p==='tox'?'toxine':'ah'))==='toxine'?'t':''}" cx="${z.cx}" cy="${z.cy}" rx="${z.rx*.85}" ry="${z.ry*.85}"/>`}).join('')}</svg>`;
+    const c=`mz ${((t?acteDef(t).col:null)||(z.p==='tox'?'toxine':'ah'))==='toxine'?'t':''}`;
+    return z.pa?`<path class="${c}" d="${zPath(z.pa)}"/>`
+              :`<ellipse class="${c}" cx="${z.cx}" cy="${z.cy}" rx="${z.rx*.85}" ry="${z.ry*.85}"/>`}).join('')}</svg>`;
 }
 
 /* ---- Schémas interactifs : visage et corps, même moteur ---- */
@@ -2151,7 +2174,8 @@ function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=n
   const st=on&&CT?` style="fill:${colActe(t)};stroke:${colActe(t)}"`:'';
   const ev=editable?`onclick="zClick(event,'${z.id}')" oncontextmenu="zClick(event,'${z.id}',-1);return false"`:'';
   const tt=esc(z.n)+(ant?'\n'+ant.map(x=>`${DFT(x.d)}${x.q?' · '+x.q:''}`).join('\n'):'');
-  return `<ellipse class="${cls}"${st} cx="${z.cx}" cy="${z.cy}" rx="${z.rx}" ry="${z.ry}" ${ev}><title>${tt}</title></ellipse>`;
+  return z.pa?`<path class="${cls}"${st} d="${zPath(z.pa)}" ${ev}><title>${tt}</title></path>`
+            :`<ellipse class="${cls}"${st} cx="${z.cx}" cy="${z.cy}" rx="${z.rx}" ry="${z.ry}" ${ev}><title>${tt}</title></ellipse>`;
  }).join('');
  /* étiquettes anti-chevauchement : quantité au centre, date en tout petit dessous */
  const pris=[];
@@ -3253,7 +3277,7 @@ V.stock=()=>{
     <td class="num"><b>${s.q}</b> <span class="mu" style="font-size:11px">/ ${s.s}</span></td>
     <td><div class="bar"><i style="width:${pct}%;background:${col}"></i></div></td>
     <td class="mono" style="font-size:11.5px">${s.lot||'<span class="mu">n/a</span>'}</td>
-    <td class="mono" ${per<90?'style="color:var(--warn);font-weight:620"':'class="mono mu"'}>${DF(s.per)}</td>
+    <td class="mono" ${per<90?'style="color:var(--warn);font-weight:620"':'class="mono mu"'}>${DFP(s.per)}</td>
     <td class="num">${bes?`<b>${bes}</b>`:'<span class="mu">—</span>'}</td>
     <td>${bdg(st.c,st.l)}</td><td class="mu" style="font-size:11.5px">${esc(s.f)}</td></tr>`}).join('')}
   </tbody></table></div></div>
@@ -3315,10 +3339,12 @@ function zoneOptions(exclues){
 function zoneEditSVG(){
  const S=SILH[zoneReg]||SILH.visage;
  const D=zoneDefs();
- const el=(z,cx,sel)=>`<ellipse class="zone${sel?' act-cur':''}" cx="${cx}" cy="${z.cy}" rx="${z.rx}" ry="${z.ry}"><title>${esc(z.n)}</title></ellipse>`;
+ const el=(z,cx,sel,pa)=>{const c=`zone${sel?' act-cur':''}`;
+   return pa?`<path class="${c}" d="${zPath(pa)}"><title>${esc(z.n)}</title></path>`
+            :`<ellipse class="${c}" cx="${cx}" cy="${z.cy}" rx="${z.rx}" ry="${z.ry}"><title>${esc(z.n)}</title></ellipse>`};
  const zs=D.map((z,i)=>{ if(z.post) return '';
    const sel=zoneSel===i;
-   return el(z,z.cx,sel)+(z.m?el(z,400-z.cx,sel):'')}).join('');
+   return el(z,z.cx,sel,z.pa)+(z.m?el(z,400-z.cx,sel,z.pa?zMiroir(z.pa):null):'')}).join('');
  const lbl=D.map((z,i)=>z.post||zoneSel!==i?'':
    `<text class="zlabel" x="${z.cx}" y="${z.cy+4}">${esc(z.k)}</text>`).join('');
  return `<svg viewBox="${S.vb}">${S.g}${zs}${lbl}</svg>`;
@@ -3343,6 +3369,8 @@ function placerZone(ev,reg){
  const x=Math.round(vb[0]+(ev.clientX-r.left)/r.width*vb[2]);
  const y=Math.round(vb[1]+(ev.clientY-r.top)/r.height*vb[3]);
  const D=zoneDefs()[zoneSel]; if(!D) return;
+ if(D.pa){ const dx=x-D.cx, dy=y-D.cy;      /* un contour relevé se translate, il ne se recentre pas */
+   D.pa=D.pa.map(r=>r.map((v,i)=>Math.round((v+(i%2?dy:dx))*10)/10)) }
  D.cx=x; D.cy=y; rebuildZones(); paint();
  toast(`${D.k} placée en ${x} · ${y}`);
 }
@@ -3580,6 +3608,7 @@ V.params=()=>{
               <label class="zed-l" onclick="event.stopPropagation()" title="Zone dédoublée droite / gauche">
                 <input type="checkbox" ${z.m?'checked':''} onchange="setZoneChamp(${i},'m',this.checked)"> symétrique</label>
               ${z.post?'<span class="bdg b-neu">vue postérieure</span>'
+                :z.pa?'<span class="bdg b-neu" title="Le contour est relevé sur l’illustration : il se déplace mais ne se redimensionne pas">contour relevé</span>'
                 :`<label class="zed-l" onclick="event.stopPropagation()" title="Taille de la zone sur le schéma">taille
                    <input class="inp" style="width:52px" type="number" min="4" value="${z.rx}" onchange="setZoneChamp(${i},'rx',this.value)">
                    <input class="inp" style="width:52px" type="number" min="4" value="${z.ry}" onchange="setZoneChamp(${i},'ry',this.value)"></label>
@@ -4070,7 +4099,13 @@ function ajouterProduit(ref){
 }
 /* le lot et sa péremption se corrigent ligne par ligne : deux boîtes du même
    produit, voire du même lot, ne se périment pas toujours à la même date */
-function majLot(i,k,v){ const l=(AS.conso||[])[i]; if(!l) return; l[k]=v; l.auto=false }
+function majLot(i,k,v,el){ const l=(AS.conso||[])[i]; if(!l) return;
+ if(k==='per'){ const iso=parsePer(v);
+   /* une saisie incomprise ne s'enregistre pas : le champ reprend sa valeur, le curseur y reste */
+   if(iso===null){ toast('Péremption : indiquez jj/mm/aa, par exemple 27/05/26');
+     if(el){ el.value=DFP(l.per||''); el.focus(); el.select() } return }
+   v=iso }
+ l[k]=v; l.auto=false; if(k==='per') renderOver() }
 
 function majConsoSaisie(i,d,v){ const l=(AS.conso||[])[i]; if(!l) return;
  l.q=Math.max(1, v!=null?(+v||1):(l.q+d)); l.auto=false; majActe() }
@@ -4664,10 +4699,10 @@ function consultPane(prix){
           ${f.sfams.map(g=>`<div class="cpick-s">${esc(g.sfam)}</div>`+
             g.items.map(x=>{const dedans=CS.some(l=>l.ref===x.ref);
               return `<button class="cpick-b ${dedans?'in':''}" onclick="ajouterProduit('${x.ref}')"
-                title="${esc(x.n)}${x.f?' · '+esc(x.f):''}${x.per?' · exp. '+DF(x.per):''}">
+                title="${esc(x.n)}${x.f?' · '+esc(x.f):''}${x.per?' · exp. '+DFP(x.per):''}">
                 <span class="pk">${dedans?'✓':'+'}</span>
                 <span class="nm">${esc(x.n)}</span>
-                <span class="lo">${x.lot?esc(x.lot):'—'}${x.per?`<i>${DFS(x.per)}</i>`:''}</span>
+                <span class="lo">${x.lot?esc(x.lot):'—'}${x.per?`<i>${DFP(x.per)}</i>`:''}</span>
                 <span class="st ${x.q<=x.s?'bas':''}">${x.q}</span></button>`}).join('')).join('')}`).join('')
          :`<div class="mu" style="font-size:11.5px;padding:10px 4px">Aucun produit ne correspond.</div>`}
       </div></div>`})():''}
@@ -4682,8 +4717,10 @@ function consultPane(prix){
              <input class="inp" value="${esc(l.lot||st.lot||'')}" placeholder="—"
                onchange="majLot(${i},'lot',this.value)"></label>
            <label title="Date de péremption de ce lot"><span>Exp.</span>
-             <input class="inp ${perime?'per':proche?'pro':''}" type="date" value="${per}"
-               onchange="majLot(${i},'per',this.value)"></label>
+             <input class="inp pdate ${perime?'per':proche?'pro':''}" inputmode="numeric" maxlength="10"
+               value="${DFP(per)}" placeholder="jj/mm/aa"
+               oninput="this.value=masquePer(this.value)"
+               onchange="majLot(${i},'per',this.value,this)"></label>
          </div>
          <small>${perime?'<span style="color:var(--crit);font-weight:700">⚠ périmé</span> · '
                  :proche?'<span style="color:var(--warn-ink,#8a6100);font-weight:600">périme bientôt</span> · ':''
@@ -5422,7 +5459,7 @@ function secConso(a){
   ${L.length?`<div class="ctab">${L.map(c=>`<div class="crow">
      <div class="cn"><b>${esc(c.nom)}</b><small>${esc(c.par)} · ${DTS(c.ts)}</small></div>
      <div class="clot"><span class="mono">${esc(c.lot)}</span>
-       <small class="${perime(c.per)?'per':''}">${perime(c.per)?'⚠ périmé le ':'exp. '}${DF(c.per)}</small></div>
+       <small class="${perime(c.per)?'per':''}">${perime(c.per)?'⚠ périmé le ':'exp. '}${DFP(c.per)}</small></div>
      <div class="cq">${c.q} <small>${esc(c.u)}${c.q>1?'s':''}</small></div>
      <button class="rm" title="Retirer" onclick="delConso('${c.id}')">✕</button>
    </div>`).join('')}</div>`
@@ -5564,7 +5601,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='AS';
+const BUILD='AT';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
