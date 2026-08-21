@@ -472,6 +472,45 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .schbar .seg button{padding:5px 11px;font-size:12px}
 .schbar-h{font-size:11px;flex:1 1 auto;min-width:0}
 .schbar .chip{flex:none;margin-left:auto}
+/* barème d'épilation : une liste tarifée, à la place de la silhouette */
+.barp{flex:1;min-height:0;max-width:560px;overflow:auto;padding-right:3px}
+.barg{margin-bottom:13px}
+.barg-h{display:flex;align-items:center;gap:7px;font-size:10.5px;font-weight:800;letter-spacing:.05em;
+ text-transform:uppercase;color:var(--ink-3);padding:0 2px 5px;border-bottom:1px solid var(--line);margin-bottom:5px}
+.barg-h .n{font-weight:700;color:var(--ink-3);opacity:.7}
+.barg-h .all{margin-left:auto;font-size:10.5px;font-weight:700;letter-spacing:0;text-transform:none;
+ border:1px solid var(--line);background:var(--panel);color:var(--ink-2);border-radius:999px;
+ padding:2px 9px;cursor:pointer}
+.barg-h .all:hover{border-color:var(--accent);color:var(--accent-ink)}
+.barz{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:6px 9px;border-radius:9px;
+ border:1px solid transparent;background:transparent;cursor:pointer;font-size:12.5px;color:var(--ink);
+ font-family:inherit;transition:background .1s,border-color .1s}
+.barz:hover{background:var(--hover);border-color:var(--line)}
+.barz.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink);font-weight:620}
+.barz .ck{flex:none;width:15px;height:15px;border-radius:5px;border:1.5px solid var(--line);
+ display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#fff}
+.barz.on .ck{background:var(--accent);border-color:var(--accent)}
+.barz .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.barz .ant{flex:none;font-size:10px;font-weight:700;color:var(--ink-3);background:var(--hover);
+ border-radius:999px;padding:1px 6px}
+.barz .pu{flex:none;font-variant-numeric:tabular-nums;font-weight:700;font-size:12px;color:var(--ink-2)}
+.barz.on .pu{color:var(--accent-ink)}
+.barz:disabled{cursor:default;opacity:.75}
+.bar-ed-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:11px;margin-bottom:11px;
+ border-bottom:1px solid var(--line)}
+.bar-ed{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:14px;align-items:start}
+.bar-edg{border:1px solid var(--line);border-radius:12px;padding:9px 10px 8px;background:var(--panel-2,transparent)}
+.bar-edg-h{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+.bar-edg-h .inp{flex:1;min-width:0;font-weight:650}
+.bar-edg-h .mu{font-size:11px;font-weight:700}
+.bar-edz{display:flex;align-items:center;gap:6px;padding:2px 0}
+.bar-edz .inp{flex:1;min-width:0;font-size:12px}
+.bar-pu{display:flex;align-items:center;gap:3px;flex:none}
+.bar-pu .inp{width:62px;text-align:right;font-variant-numeric:tabular-nums}
+.bar-pu span{font-size:11.5px;color:var(--ink-3);font-weight:650}
+.bar-tot{position:sticky;bottom:0;display:flex;align-items:center;gap:9px;padding:9px 10px;margin-top:2px;
+ background:var(--panel);border:1px solid var(--line);border-radius:11px;font-size:12.5px;font-weight:650}
+.bar-tot b{margin-left:auto;font-size:15px;font-variant-numeric:tabular-nums}
 .soins{margin-bottom:9px;padding:9px 10px;border:1px solid var(--line);border-radius:13px;background:var(--panel-2);
   transition:.15s}
 .soins.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-wash);background:var(--panel)}
@@ -1231,6 +1270,9 @@ const trame=f=>TRAMES[f&&TRAMES[f]?f:'esth'];
 const nomDevis=d=>trame(d&&d.fam||'esth').titre;
 const courtDevis=f=>trame(f).court;
 const REGIONS =[{id:'visage',n:'Visage',i:'☺'},{id:'corps',n:'Corps',i:'🧍'}];
+/* le sélecteur de schéma affiche aussi les barèmes, qui n'ont pas de silhouette */
+const regDef=id=>{const r=REGIONS.find(x=>x.id===id); if(r) return r;
+ const b=baremeById(id); return b?{id,n:b.n,i:b.i,court:b.court}:{id,n:id,i:'▫'}};
 const famById=id=>FAMILLES.find(f=>f.id===id)||FAMILLES[0];
 
 let ZDEF=[
@@ -1269,6 +1311,55 @@ let BDEF=[
  {id:'lombes',  n:'Lombes (vue postérieure)',k:'Lombes',  p:'ah', d:2,s:.5, cx:0,cy:0,rx:0,ry:0, post:1},
  {id:'fesses',  n:'Fesses (vue postérieure)',k:'Fesses',  p:'ah', d:3,s:1,  cx:0,cy:0,rx:0,ry:0, post:1},
 ];
+/* ==========================================================================
+   Barèmes d'épilation — femme, homme, électrolyse
+   Ces zones-là se chevauchent (demi-jambes / jambes complètes, mains /
+   avant-bras et mains) : elles se cochent dans une liste tarifée plutôt que
+   de se cliquer sur une silhouette. Tarifs à la séance, réglables dans
+   Paramètres → Actes & tarifs.
+   ========================================================================== */
+const bz=(p,L)=>L.map(([i,n,pu])=>({id:p+i,n,pu}));
+let BAREMES=[
+ {id:'epil_f',n:'Épilation laser — femme',i:'♀',court:'Femme',g:[
+  {n:'Corps',z:bz('ef_',[['areo','Aréole mammaire',45],['deco','Décolleté',140],
+    ['dosb','Bas du dos',70],['dosh','Haut du dos',110],['dose','Dos entier',170],
+    ['fess','Fesses',70],['lign','Ligne ventrale',40],
+    ['mail','Maillot échancré (SIF compris)',80],['mabr','Maillot brésilien (SIF compris)',95],
+    ['main','Maillot intégral (SIF compris)',110],['sif','Sillon interfessier (SIF compris)',40],
+    ['vent','Ventre',70]])},
+  {n:'Visage',z:bz('ef_',[['ints','Inter-sourcil',35],['levs','Lèvre supérieure',40],
+    ['ment','Menton',40],['nuqu','Nuque',55],['pomm','Pommettes',50],['sour','Sourcils',40],
+    ['tcou','Tour de cou',50],['fron','Front',70],['vise','Visage entier',115],['joue','Joues',50]])},
+  {n:'Jambes',z:bz('ef_',[['dcui','Demi-cuisses',100],['cuis','Cuisses',200],
+    ['djam','Demi-jambes',140],['jamb','Jambes complètes',270],['pied','Pieds',45]])},
+  {n:'Bras',z:bz('ef_',[['aiss','Aisselles',50],['avbr','Avant-bras et mains',90],
+    ['bras','Bras entiers',165],['brsu','Bras (partie sup.)',80],['epau','Épaules',95],
+    ['mns','Mains',40]])}]},
+ {id:'epil_h',n:'Épilation laser — homme',i:'♂',court:'Homme',g:[
+  {n:'Corps',z:bz('eh_',[['dosb','Bas du dos',85],['dosh','Haut du dos',140],
+    ['dose','Dos entier',200],['fess','Fesses',140],['main','Maillot intégral',180],
+    ['geni','Parties génitales',90],['tors','Torse',125],['vent','Ventre',110]])},
+  {n:'Visage',z:bz('eh_',[['barb','Barbe entière',105],['colc','Col de chemise',50],
+    ['ints','Inter-sourcils',40],['nez','Nez',40],['nuqu','Nuque',50],['orei','Oreilles',40],
+    ['pomm','Pommettes',50],['tcou','Tour de cou',65],['sour','Sourcils',80],
+    ['vise','Visage entier',115]])},
+  {n:'Jambes',z:bz('eh_',[['cuis','Cuisses',220],['djam','Demi-jambes',190],
+    ['jamb','Jambes complètes',350],['pied','Pieds',50]])},
+  {n:'Bras',z:bz('eh_',[['aiss','Aisselles',60],['avbr','Avant-bras et mains',110],
+    ['bras','Bras entiers',160],['brsu','Bras supérieurs (sauf épaules)',95],
+    ['epau','Épaules',105],['mns','Mains',55]])}]},
+ {id:'electro',n:'Électrolyse',i:'⚡',court:'Électrolyse',g:[
+  {n:'Durée de séance',z:bz('el_',[['5','5 minutes',20],['15','15 minutes',50],
+    ['30','30 minutes',95],['45','45 minutes',140],['60','1 heure',180]])}]},
+];
+const baremeById=id=>BAREMES.find(b=>b.id===id);
+const estBareme=r=>!!baremeById(r);
+/* une zone de barème rejoint ZONES comme les autres : tout ce qui suit
+   (historique, soins, documents) la traite sans rien savoir de son origine */
+const deplierBareme=()=>BAREMES.forEach(b=>b.g.forEach(g=>g.z.forEach(z=>
+  ZONES.push({id:z.id,n:z.n,k:z.n,p:'epil',d:1,s:1,r:b.id,side:'',bar:1,grp:g.n,pu:+z.pu||0}))));
+const zoneTarif=id=>{const z=zoneById(id); return z&&z.bar?(+z.pu||0):0};
+
 let ZONES=[];
 /* le tracé d'une zone : une suite d'anneaux [x,y,x,y…] relevés sur l'illustration */
 const zPath=pa=>(pa||[]).map(r=>{let d='M';
@@ -1283,7 +1374,7 @@ const deplier=(L,reg)=>L.forEach(z=>{
                 cx:400-z.cx, pa:z.pa?zMiroir(z.pa):undefined});
   } else ZONES.push({...base, side:''});
 });
-function rebuildZones(){ ZONES.length=0; deplier(ZDEF,'visage'); deplier(BDEF,'corps') }
+function rebuildZones(){ ZONES.length=0; deplier(ZDEF,'visage'); deplier(BDEF,'corps'); deplierBareme() }
 rebuildZones();
 const zoneById=id=>ZONES.find(z=>z.id===id);
 /* une zone peut être saisie librement : sa clé commence par « ~ » */
@@ -1306,8 +1397,16 @@ const PLABEL={tox:'Toxine botulique', ah:'Acide hyaluronique'};
 const ZDUREE={front:'4 à 6 mois',glab:'4 à 6 mois',cou:'4 à 6 mois',
  levres:'6 à 9 mois',perib:'6 à 9 mois',sslev:'6 à 9 mois',cerne:'9 à 12 mois',sillon:'9 à 12 mois',amert:'9 à 12 mois',
  tempe:'12 à 18 mois',pomm:'12 à 18 mois',mand:'12 à 18 mois',menton:'12 à 18 mois',nez:'12 à 18 mois'};
-const zDuree=id=>ZDUREE[String(id).replace(/_[dg]$/,'')]||'variable';
+const zDuree=id=>{const z=zoneById(id);
+ if(z&&z.bar) return z.r==='electro'?'séances rapprochées, 2 à 4 semaines':'4 à 8 semaines';
+ return ZDUREE[String(id).replace(/_[dg]$/,'')]||'variable'};
 const INFOS={
+ epil:{produit:'Épilation définitive',
+   effet:'Réduction progressive de la pilosité : 6 à 8 séances en moyenne, davantage sur le visage.',
+   suites:'Rougeur péri-folliculaire pendant 24 à 48 heures. Pas d’éviction sociale.',
+   avant:'Ni épilation à la cire ni pince pendant 4 semaines : le poil doit être en place. Rasage la veille.',
+   apres:'Pas d’exposition solaire ni d’UV pendant 15 jours. Photoprotection SPF 50+.',
+   seances:'Une séance toutes les 4 à 8 semaines selon la zone.'},
  tox:{produit:'Toxine botulique de type A',
    effet:'Effet visible à partir du 3ᵉ jour, résultat complet à 15 jours.',
    suites:'Pas d’éviction sociale. Rougeurs et petites papules pendant 20 à 30 minutes.',
@@ -1323,7 +1422,7 @@ const INFOS={
 };
 function infosPatient(z){
  const K=Object.keys(z||{});
- const fams=[...new Set(K.map(k=>zoneById(k)?.p).filter(Boolean))];
+ const fams=[...new Set(K.map(k=>zoneById(k)?.p).filter(f=>f&&INFOS[f]))];
  const dur={}; K.forEach(k=>{const Z=zoneById(k); if(!Z)return; const d=zDuree(k);(dur[d]=dur[d]||[]).push(Z.k)});
  return {fams, dur};
 }
@@ -1394,8 +1493,9 @@ const CATALOGUE=[
  {id:'PEEL',n:'Peeling',           cat:'Peeling',    fam:'esth', reg:['visage','corps'], conso:'PEEL-S', cons:false,zoned:true, unite:null, prix:160, col:'peel'},
  {id:'LAS2',n:'Photorajeunissement',cat:'Laser',     fam:'esth', reg:['visage','corps'], conso:null,     cons:true, zoned:true, unite:null, prix:280, col:'las'},
  {id:'RF', n:'Radiofréquence',     cat:'Radiofréquence',fam:'esth',reg:['visage','corps'],conso:null,    cons:false,zoned:true, unite:null, prix:220, col:'rf'},
- {id:'LAS1',n:'Laser épilation',   cat:'Épilation',  fam:'epil', reg:['corps','visage'], conso:null,     cons:false,zoned:true, unite:null, prix:120, col:'epil'},
- {id:'EPIL2',n:'Épilation — forfait',cat:'Épilation',fam:'epil', reg:['corps','visage'], conso:null,     cons:false,zoned:true, unite:null, prix:600, col:'epil'},
+ {id:'LAS1',n:'Laser épilation',   cat:'Épilation',  fam:'epil', reg:['epil_f','epil_h'],conso:null,     cons:false,zoned:true, unite:null, prix:120, col:'epil'},
+ {id:'EPIL2',n:'Épilation — forfait',cat:'Épilation',fam:'epil', reg:['epil_f','epil_h'],conso:null,     cons:false,zoned:true, unite:null, prix:600, col:'epil'},
+ {id:'ELEC',n:'Électrolyse',       cat:'Épilation',  fam:'epil', reg:['electro'],        conso:null,     cons:false,zoned:true, unite:null, prix:50,  col:'epil'},
 ];
 /* Mentions médico-légales portées sur le devis (arrêté du 17 oct. 1996, art. 2) :
    nature de l'anesthésie, durée des soins post-interventionnels, arrêt de travail prévisible.
@@ -1419,6 +1519,8 @@ const MEDLEG={
        su:'Érythème péri-folliculaire pendant 24 à 48 heures. Pas d’exposition solaire 15 jours avant et après.', ar:0},
  EPIL2:{an:'aucune',
        su:'Érythème péri-folliculaire pendant 24 à 48 heures. Séances espacées de 4 à 8 semaines selon la zone.', ar:0},
+ ELEC:{an:'aucune',
+       su:'Rougeur et petites croûtes au point de traitement pendant quelques jours. Ne pas gratter.', ar:0},
 };
 const medleg=t=>MEDLEG[t]||{an:'aucune',su:'Aucune suite particulière attendue.',ar:0};
 const catById=id=>CATALOGUE.find(c=>c.id===id);
@@ -1437,7 +1539,10 @@ const uniteDose=(t,id)=>uniteZone(id);
 const fmtDose=(q,t,id)=>{if(q==null||q==='') return '';
  const u=uniteDose(t,id); return u?`${nb(q)} ${u}`:`${nb(q)}`};
 /* montant proposé : le tarif de l'acte, multiplié par la quantité */
-function prixActe(type,z,seances){ return (acteDef(type).prix||0)*(seances||1) }
+function prixActe(type,z,seances){
+ /* une prestation d'épilation se chiffre sur les zones cochées, chacune à son tarif */
+ const b=Object.keys(z||{}).reduce((t,k)=>{const Z=zoneById(k); return t+((Z&&Z.bar)?(+Z.pu||0):0)},0);
+ return (b>0?b:(acteDef(type).prix||0))*(seances||1) }
 /* l'acte porté par une zone : chaque zone peut avoir le sien */
 const acteZone=(a,z)=>(a&&a.zt&&a.zt[z])||(a?a.type:'AH');
 const actesDeLActe=a=>[...new Set(a&&a.zones?Object.keys(a.zones).map(z=>acteZone(a,z)):[a?a.type:'AH'])];
@@ -1494,9 +1599,9 @@ let ACTES=[];
   [1055,'AH','2024-03-05','Dr O. Baroudi',null,'L-AH2331',{pomm_d:1,pomm_g:1},true,''],
   [1056,'BTX','2024-11-19','Dr A. Merlin','S. Vidal','L-BX2512',{front:10,glab:16,cou:16},true,''],
   [1056,'BTX','2024-05-07','Dr A. Merlin','S. Vidal','L-BX2512',{front:10,glab:16},true,''],
-  [1057,'LAS1','2024-06-18','Dr O. Baroudi','L. Roche',null,null,false,''],
-  [1057,'LAS1','2024-04-16','Dr O. Baroudi','L. Roche',null,null,false,''],
-  [1057,'LAS1','2024-02-13','Dr O. Baroudi','L. Roche',null,null,false,''],
+  [1057,'LAS1','2024-06-18','Dr O. Baroudi','L. Roche',null,{ef_levs:1,ef_ment:1},false,''],
+  [1057,'LAS1','2024-04-16','Dr O. Baroudi','L. Roche',null,{ef_levs:1,ef_ment:1},false,''],
+  [1057,'LAS1','2024-02-13','Dr O. Baroudi','L. Roche',null,{ef_levs:1,ef_ment:1},false,''],
   [1058,'PEEL','2025-03-25','Dr O. Baroudi','S. Vidal','L-PE2604',null,false,''],
   [1058,'MESO','2025-01-14','Dr O. Baroudi','S. Vidal','L-MK2602',null,false,''],
   [1041,'AH','2026-07-28','Dr O. Baroudi','L. Roche','L-AH2409',{levres:1,amert_d:.3,amert_g:.3},true,''],
@@ -1510,8 +1615,10 @@ let ACTES=[];
   [1044,'AH','2025-09-09','Dr O. Baroudi',null,'L-AH2331',{pomm_d:1,pomm_g:1},true,''],
   [1045,'AH','2026-07-15','Dr A. Merlin','S. Vidal','L-RL2502',{pomm_d:1,pomm_g:1,mand_d:1,mand_g:1},true,'Œdème modéré 48 h'],
   [1045,'SKB','2026-06-02','Dr A. Merlin','S. Vidal','L-PF2603',{pomm_d:.5,pomm_g:.5},true,''],
-  [1046,'LAS1','2026-07-24','Dr O. Baroudi','L. Roche',null,null,false,''],
-  [1046,'LAS1','2026-06-26','Dr O. Baroudi','L. Roche',null,null,false,''],
+  [1046,'LAS1','2026-07-24','Dr O. Baroudi','L. Roche',null,{ef_djam:1,ef_aiss:1,ef_mabr:1},true,''],
+  [1046,'LAS1','2026-06-26','Dr O. Baroudi','L. Roche',null,{ef_djam:1,ef_aiss:1,ef_mabr:1},false,''],
+  [1048,'LAS1','2026-07-11','Dr A. Merlin','S. Vidal',null,{eh_dose:1,eh_tors:1},false,''],
+  [1048,'ELEC','2026-06-13','Dr A. Merlin','S. Vidal',null,{el_15:1},false,'Poils blancs résiduels du col de chemise'],
   [1047,'AH','2026-07-09','Dr O. Baroudi','L. Roche','L-AH2409',{levres:1},true,''],
   [1048,'BTX','2026-07-02','Dr A. Merlin',null,'L-BX2601',{front:16},true,''],
   [1049,'PEEL','2026-03-17','Dr O. Baroudi','S. Vidal','L-PE2511',null,false,''],
@@ -1634,7 +1741,7 @@ let FACTU={
  centre:{nom:'Centre Gemelia', siret:'812 456 789 00021'},
  retro:{'Dr O. Baroudi':70, 'Dr A. Merlin':60},   /* part praticien en % */
  tvaDefaut:20,
- tvaParActe:{AH:20,BTX:20,SKB:20,MESO:20,PEEL:20,LAS1:20,LAS2:20,RF:20}
+ tvaParActe:{AH:20,BTX:20,SKB:20,MESO:20,PEEL:20,LAS1:20,LAS2:20,RF:20,EPIL2:20,ELEC:20}
 };
 const tauxTVA=t=>FACTU.tvaParActe[t]!==undefined?FACTU.tvaParActe[t]:FACTU.tvaDefaut;
 const tauxRetro=pr=>FACTU.retro[pr]!==undefined?FACTU.retro[pr]:70;
@@ -2109,6 +2216,8 @@ function miniFace(zones,zt){
  if(!zones||!Object.keys(zones).length) return '<span class="mu">—</span>';
  const K=Object.keys(zones).map(zoneById).filter(Boolean);
  if(!K.length) return '<span class="mu">—</span>';
+ if(K.some(z=>z.bar)){ const B=baremeById(K[0].r);   /* un barème se résume en clair */
+   return `<span class="mu" style="font-size:11.5px;white-space:nowrap">${B?esc(B.i)+' ':''}${K.length} zone${K.length>1?'s':''}</span>` }
  const corps=K[0].r==='corps';
  return `<svg class="minif" viewBox="${corps?'0 0 400 900':'0 0 400 568'}">
  ${corps?'<ellipse class="mo" cx="200" cy="58" rx="34" ry="42"/><rect class="mo" x="122" y="130" width="156" height="290" rx="46"/><rect class="mo" x="158" y="420" width="36" height="430" rx="18"/><rect class="mo" x="206" y="420" width="36" height="430" rx="18"/>'
@@ -2161,6 +2270,37 @@ const SILH={
  <path class="guide" d="M133 366 C160 380 240 380 267 366" stroke-opacity=".11"/>
  <path class="guide" d="M136 470 C164 488 236 488 264 470" stroke-opacity=".11"/>`}
 };
+/* ---- Barème d'épilation : la liste tarifée qui tient lieu de schéma ----
+   Les zones s'y chevauchent volontiers (demi-jambes / jambes complètes) :
+   on les coche, on ne les pointe pas sur une silhouette. Le même rendu sert
+   à la séance, au composeur de devis et au cumul de la fiche patient. */
+function baremeListe(B,Z,o={}){
+ if(!B) return '';
+ const H=o.hist||{}, prix=!!o.prix, ro=!!o.ro, clic=o.clic, grp=o.groupe;
+ const coche=id=>Object.prototype.hasOwnProperty.call(Z||{},id);
+ let n=0,tot=0;
+ B.g.forEach(g=>g.z.forEach(z=>{ if(coche(z.id)){ n++; tot+=+z.pu||0 } }));
+ return `<div class="barp">
+  ${B.g.map((g,gi)=>{const tous=g.z.length&&g.z.every(z=>coche(z.id));
+   return `<div class="barg"><div class="barg-h">${esc(g.n)}<span class="n">${g.z.length}</span>
+    ${(!ro&&grp)?`<button class="all" onclick="${grp}(${gi},${tous?0:1})"
+       title="${tous?'Retirer tout le groupe':'Cocher tout le groupe d’un seul clic'}">${tous?'tout retirer':'tout cocher'}</button>`:''}</div>
+   ${g.z.map(z=>{const on=coche(z.id), ant=H[z.id];
+     return `<button class="barz ${on?'on':''}"${(ro||!clic)?' disabled':''}
+       ${(!ro&&clic)?`onclick="${clic}(event,'${z.id}')" oncontextmenu="${clic}(event,'${z.id}',-1);return false"`:''}
+       title="${esc(z.n)}${ant?' — déjà traitée le '+ant.map(x=>DFT(x.d)).join(', '):''}">
+       <span class="ck">${on?'✓':''}</span><span class="nm">${esc(z.n)}</span>
+       ${ant?`<span class="ant">${DFT(ant[0].d)}${ant.length>1?' ×'+ant.length:''}</span>`:''}
+       ${prix?`<span class="pu">${EUR(z.pu)}</span>`:''}</button>`}).join('')}</div>`}).join('')}
+  ${n?`<div class="bar-tot"><span>${n} zone${n>1?'s':''} ${o.motTotal||'retenue'+(n>1?'s':'')}</span>${prix?`<b>${EUR(tot)}</b>`:''}</div>`:''}
+ </div>`;
+}
+/* le barème dans la saisie d'une séance */
+const baremePane=zAll=>baremeListe(baremeById(AS.reg), zAll||AS.z, {
+ hist:zoneHist(AS.pid,AS.aid), ro:AS.ro,
+ prix:CAN('prix')&&!AS.ro&&AS.but==='devis',
+ clic:'zClick', groupe:'baremeGroupe'});
+
 function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=null}={}){
  const R=SILH[region]?region:'visage', S=SILH[R];
  const az=z=>(zt&&zt[z])||type;                       /* l'acte de cette zone */
@@ -2836,18 +2976,24 @@ function pDetail(p){
 
   schema:()=>{const ZH=zoneHist(p.id);
    const parReg=r=>Object.fromEntries(Object.entries(cumul).filter(([z])=>zoneById(z)?.r===r));
-   const nC=Object.keys(parReg('corps')).length;
-   if(schemaReg==='corps'&&!nC) schemaReg='visage';
+   /* les barèmes d'épilation prennent place à côté du visage et du corps,
+      dès lors que ce patient y a déjà été traité */
+   const ONGLETS=[...REGIONS, ...BAREMES.filter(x=>Object.keys(parReg(x.id)).length).map(x=>({id:x.id,n:x.court||x.n,i:x.i}))];
+   if(!ONGLETS.some(r=>r.id===schemaReg)||!Object.keys(parReg(schemaReg)).length&&schemaReg!=='visage') schemaReg='visage';
    const cur=parReg(schemaReg);
-   return `<div class="fbar" style="margin-bottom:12px"><div class="seg">${REGIONS.map(r=>{
+   const BAR=baremeById(schemaReg);
+   return `<div class="fbar" style="margin-bottom:12px"><div class="seg">${ONGLETS.map(r=>{
       const n=Object.keys(parReg(r.id)).length;
-      return `<button class="${schemaReg===r.id?'on':''}" onclick="schemaReg='${r.id}';paint()">${r.i} ${r.n} · ${n}</button>`}).join('')}</div></div>
+      return `<button class="${schemaReg===r.id?'on':''}" onclick="schemaReg='${r.id}';paint()">${r.i} ${esc(r.n)} · ${n}</button>`}).join('')}</div></div>
    <div class="facewrap">
-    <div><div class="facebox">${schemaSVG(cur,{editable:false,hist:ZH,region:schemaReg,zt:cumulT})}</div>
+    <div>${BAR?baremeListe(BAR,cur,{ro:true,hist:ZH,motTotal:'déjà traitée'+(Object.keys(cur).length>1?'s':'')})
+     :`<div class="facebox">${schemaSVG(cur,{editable:false,hist:ZH,region:schemaReg,zt:cumulT})}</div>
      <div class="face-legend"><span><i style="background:var(--toxine)"></i>Toxine</span><span><i style="background:var(--ah)"></i>Acide hyaluronique</span>
-      <span class="mu">quantité cumulée · date de la dernière injection</span></div></div>
+      <span class="mu">quantité cumulée · date de la dernière injection</span></div>`}</div>
     <div>
-     <div class="tip" style="margin-bottom:10px"><span class="e">🗺️</span><div><b>Cumul historique.</b> Toutes les injections de ce patient sur un seul schéma. Sous chaque quantité, la date de la dernière séance sur cette zone — et le nombre de fois qu'elle a été traitée.</div></div>
+     <div class="tip" style="margin-bottom:10px"><span class="e">🗺️</span><div>${BAR
+       ?`<b>Cure d'épilation.</b> Les zones déjà traitées de ce barème sont cochées ; à droite de chacune, la date de la dernière séance et le nombre de passages.`
+       :`<b>Cumul historique.</b> Toutes les injections de ce patient sur un seul schéma. Sous chaque quantité, la date de la dernière séance sur cette zone — et le nombre de fois qu'elle a été traitée.`}</div></div>
      ${Object.keys(cur).length?Object.entries(cur).sort((a,b)=>b[1]-a[1]).map(([z,q])=>{const Z=zoneById(z), L=ZH[z]||[];
        const t=cumulT[z]||(Z.p==='tox'?'BTX':'AH'), CZ=acteDef(t);
        return `<div class="zrow" style="display:block">
@@ -3351,6 +3497,46 @@ function zoneEditSVG(){
 }
 /* ---------- éditeur des zones du schéma ---------- */
 let zoneReg='visage', zoneSel=null;
+let barSel='epil_f';
+/* combien d'actes déjà enregistrés portent cette zone — une zone utilisée ne se supprime pas */
+const usageZone=id=>ACTES.filter(a=>a.zones&&Object.prototype.hasOwnProperty.call(a.zones,id)).length;
+const barTrouve=(bid,gi,zi)=>{const B=baremeById(bid); if(!B) return {};
+ const g=gi==null?null:B.g[gi]; return {B,g,z:(g&&zi!=null)?g.z[zi]:null}};
+function setBaremeNom(bid,v){const {B}=barTrouve(bid); if(!B) return;
+ const t=String(v||'').trim(); if(t) B.n=t; rebuildZones(); paint()}
+function setBaremeChamp(bid,k,v){const {B}=barTrouve(bid); if(!B) return;
+ const t=String(v||'').trim(); if(t) B[k]=t; else delete B[k]; paint()}
+function setBarGroupe(bid,gi,v){const {g}=barTrouve(bid,gi); if(!g) return;
+ const t=String(v||'').trim(); if(t) g.n=t; rebuildZones(); paint()}
+function setBarZone(bid,gi,zi,k,v){const {z}=barTrouve(bid,gi,zi); if(!z) return;
+ if(k==='pu') z.pu=Math.max(0,+v||0);
+ else { const t=String(v||'').trim(); if(!t) return; z.n=t }
+ rebuildZones(); paint()}
+function addBarZone(bid,gi){const {g}=barTrouve(bid,gi); if(!g) return;
+ g.z.push({id:bid.slice(0,2)+'_'+Date.now().toString(36), n:'Nouvelle zone', pu:0});
+ rebuildZones(); paint(); toast('Zone ajoutée au barème')}
+function rmBarZone(bid,gi,zi){const {g,z}=barTrouve(bid,gi,zi); if(!g||!z) return;
+ const u=usageZone(z.id);
+ if(u){toast(`« ${z.n} » figure dans ${u} acte${u>1?'s':''} — suppression refusée`);return}
+ g.z.splice(zi,1); rebuildZones(); paint(); toast(`« ${z.n} » retirée du barème`)}
+function addBarGroupe(bid){const {B}=barTrouve(bid); if(!B) return;
+ B.g.push({n:'Nouveau groupe', z:[]}); paint(); toast('Groupe ajouté')}
+function rmBarGroupe(bid,gi){const {B,g}=barTrouve(bid,gi); if(!B||!g) return;
+ const u=g.z.reduce((s,z)=>s+usageZone(z.id),0);
+ if(u){toast(`« ${g.n} » contient des zones déjà utilisées — suppression refusée`);return}
+ if(B.g.length<2){toast('Gardez au moins un groupe');return}
+ B.g.splice(gi,1); rebuildZones(); paint(); toast(`« ${g.n} » supprimé`)}
+function addBareme(){
+ const id='bar'+Date.now().toString(36);
+ BAREMES.push({id,n:'Nouveau barème',i:'▫',court:'Nouveau',g:[{n:'Zones',z:[]}]});
+ barSel=id; rebuildZones(); paint(); toast('Barème créé — reliez-le à un acte dans le tableau ci-dessus')}
+function rmBareme(bid){const {B}=barTrouve(bid); if(!B) return;
+ if(BAREMES.length<2){toast('Gardez au moins un barème');return}
+ const u=B.g.reduce((s,g)=>s+g.z.reduce((t,z)=>t+usageZone(z.id),0),0);
+ if(u){toast(`« ${B.n} » est utilisé par ${u} acte${u>1?'s':''} — suppression refusée`);return}
+ const lie=CATALOGUE.filter(c=>(c.reg||[]).includes(bid)).map(c=>c.n);
+ if(lie.length){toast(`${lie.join(', ')} pointe${lie.length>1?'nt':''} sur ce barème — détachez-le d'abord`);return}
+ BAREMES.splice(BAREMES.indexOf(B),1); barSel=BAREMES[0].id; rebuildZones(); paint(); toast(`« ${B.n} » supprimé`)}
 const zoneDefs=()=>zoneReg==='visage'?ZDEF:BDEF;
 function setZoneChamp(i,k,v){
  const D=zoneDefs(); if(!D[i]) return;
@@ -3618,6 +3804,49 @@ V.params=()=>{
          </div>`).join('')}
        </div></div>
      </div></div>
+
+    ${(()=>{const B=baremeById(barSel)||BAREMES[0]; if(!B) return '';
+      const nz=B.g.reduce((t,g)=>t+g.z.length,0);
+      const som=B.g.reduce((t,g)=>t+g.z.reduce((u,z)=>u+(+z.pu||0),0),0);
+      return `<div class="card" style="margin-top:13px;grid-column:1/-1"><div class="h"><h2>Barèmes d'épilation</h2>
+      <span class="s">${nz} zones tarifées · ${B.g.length} groupes</span>
+      <div class="r"><div class="seg">${BAREMES.map(x=>
+        `<button class="${B.id===x.id?'on':''}" onclick="barSel='${x.id}';paint()">${x.i} ${esc(x.court||x.n)}</button>`).join('')}</div>
+       <button class="btn xs p" onclick="addBareme()">+ Barème</button></div></div>
+     <div class="b">
+      <div class="mu" style="font-size:11.5px;margin-bottom:10px">Ces zones se recoupent volontiers — « demi-jambes » et « jambes complètes »,
+       « mains » et « avant-bras et mains » : elles se cochent dans une liste tarifée à la saisie d'un acte ou d'un devis,
+       elles ne se pointent pas sur une silhouette. Les tarifs s'entendent <b>à la séance</b>.</div>
+      <div class="bar-ed-h">
+        <input class="inp" style="max-width:320px" value="${esc(B.n)}" onchange="setBaremeNom('${B.id}',this.value)"
+          placeholder="Nom du barème">
+        <input class="inp" style="width:64px;text-align:center" value="${esc(B.i||'')}" onchange="setBaremeChamp('${B.id}','i',this.value)"
+          title="Pictogramme affiché dans le sélecteur" placeholder="♀">
+        <input class="inp" style="width:130px" value="${esc(B.court||'')}" onchange="setBaremeChamp('${B.id}','court',this.value)"
+          title="Libellé court du sélecteur" placeholder="libellé court">
+        <span class="mu" style="font-size:11.5px;margin-left:auto">barème complet : <b>${EUR(som)}</b></span>
+        <button class="btn xs" onclick="addBarGroupe('${B.id}')">+ Groupe</button>
+        <button class="rm" title="${BAREMES.length<2?'Gardez au moins un barème':'Supprimer ce barème'}"
+          ${BAREMES.length<2?'disabled':''} onclick="rmBareme('${B.id}')">✕</button>
+      </div>
+      <div class="bar-ed">
+       ${B.g.map((g,gi)=>`<div class="bar-edg">
+         <div class="bar-edg-h">
+           <input class="inp" value="${esc(g.n)}" onchange="setBarGroupe('${B.id}',${gi},this.value)" placeholder="Nom du groupe">
+           <span class="mu">${g.z.length}</span>
+           <button class="btn xs" onclick="addBarZone('${B.id}',${gi})">+ Zone</button>
+           <button class="rm" onclick="rmBarGroupe('${B.id}',${gi})" title="Supprimer le groupe">✕</button></div>
+         ${g.z.map((z,zi)=>{const u=usageZone(z.id);
+           return `<div class="bar-edz">
+            <input class="inp" value="${esc(z.n)}" onchange="setBarZone('${B.id}',${gi},${zi},'n',this.value)">
+            <label class="bar-pu"><input class="inp" type="number" min="0" step="5" value="${+z.pu||0}"
+              onchange="setBarZone('${B.id}',${gi},${zi},'pu',this.value)"><span>€</span></label>
+            <button class="rm" ${u?'disabled':''} onclick="rmBarZone('${B.id}',${gi},${zi})"
+              title="${u?u+' acte(s) portent cette zone — suppression refusée':'Supprimer'}">✕</button></div>`}).join('')}
+         ${g.z.length?'':'<div class="mu" style="font-size:11.5px;padding:6px 2px">Groupe vide.</div>'}
+        </div>`).join('')}
+      </div>
+     </div></div>`})()}
    </div>`;
   },
 
@@ -4428,9 +4657,9 @@ function renderOver(){
   <div class="facewrap ${AS.ro?'d3 ro':((!AS.type||C.zoned)?'d3':'d2')}">
    ${(!AS.type||C.zoned)?`<div>
     ${AS.ro?'':`<div class="schbar">
-      <div class="seg">${(AS.type?regionsDe(AS.type):['visage','corps']).map(r=>{const R=REGIONS.find(x=>x.id===r);
-        return `<button class="${AS.reg===r?'on':''}" onclick="setRegion('${r}')">${R.i} ${R.n}</button>`}).join('')}</div>
-      <span class="mu schbar-h" title="Un clic sur une zone choisit l’acte qu’on y pratique, un clic droit la retire">clic droit = retirer</span>
+      <div class="seg">${(AS.type?regionsDe(AS.type):['visage','corps']).map(r=>{const R=regDef(r);
+        return `<button class="${AS.reg===r?'on':''}" onclick="setRegion('${r}')" title="${esc(R.n)}">${R.i} ${esc(R.court||R.n)}</button>`}).join('')}</div>
+      <span class="mu schbar-h" title="Un clic sur une zone choisit l’acte qu’on y pratique, un clic droit la retire">${estBareme(AS.reg)?'tarifs à la séance':'clic droit = retirer'}</span>
       ${sel.length?`<button class="chip" onclick="AS.z={};AS.zt={};elaguerSoins();renderOver()">Effacer les zones</button>`:''}
      </div>`}
     ${AS.ro||AS.reg!=='visage'?'':`<div class="preset">
@@ -4440,8 +4669,9 @@ function renderOver(){
     ${(()=>{const D=AS.draft||{}, dz=D.t?D.z:{};
       const zAll={...AS.z,...dz};
       const ztAll={...AS.zt}; Object.keys(dz).forEach(k=>ztAll[k]=D.t);
-      return `<div class="facebox" id="faceLive">${schemaSVG(zAll,{editable:!AS.ro,hist:zoneHist(AS.pid,AS.aid),type:D.t||AS.type,zt:ztAll,region:AS.reg})}</div>`})()}
-    ${''}${`
+      return estBareme(AS.reg)?baremePane(zAll)
+        :`<div class="facebox" id="faceLive">${schemaSVG(zAll,{editable:!AS.ro,hist:zoneHist(AS.pid,AS.aid),type:D.t||AS.type,zt:ztAll,region:AS.reg})}</div>`})()}
+    ${estBareme(AS.reg)?'':`
     <div class="face-legend">
       ${[...new Set([...(draftActif()?[AS.draft.t]:[]),...actesSaisis()])].map(t=>`<span><i style="background:${colActe(t)}"></i>${esc(acteDef(t).n)}${acteDef(t).unite?' ('+acteDef(t).unite+')':''}</span>`).join('')}
       ${Object.keys(zoneHist(AS.pid,AS.aid)).length?'<span><i class="ant"></i>Séances précédentes — date en petit</span>':''}
@@ -4479,15 +4709,16 @@ function renderOver(){
         ${CD.zoned?`<div class="sc-lb">Zones traitées <span class="n">${DZ.length||'—'}</span>
           <span class="mu">clic sur le schéma</span></div>
          ${DZ.length?`<div class="sc-z">${DZ.map(z=>{
-            const qz=D.z[z];
+            const qz=D.z[z], ZB=zoneById(z), bar=!!(ZB&&ZB.bar);
             return `<div class="zrow"><span class="zd" style="background:${colActe(D.t)}"></span>
-             <div class="zn">${esc(zoneLabel(z))}<small>${qz>0?((qz!==1||uniteDose(D.t,z))?fmtDose(qz,D.t,z):''):'traitée'}</small></div>
-             <div class="step">
+             <div class="zn">${esc(zoneLabel(z))}<small>${bar?(ZB.grp||''):(qz>0?((qz!==1||uniteDose(D.t,z))?fmtDose(qz,D.t,z):''):'traitée')}</small></div>
+             ${bar?`${(CAN('prix')&&AS.but==='devis')?`<b class="mono">${EUR(ZB.pu)}</b>`:''}`
+             :`<div class="step">
                 <button onclick="draftZone('${z}',-1)">−</button>
                 <input class="qin" type="number" min="0" step="${zonePas(z)}" value="${qz>0?qz:''}"
                   onchange="setDraftZ('${z}',this.value)">
                 <button onclick="draftZone('${z}',1)">+</button></div>
-             ${(()=>{const UZ=uniteDose(D.t,z); return UZ?`<span class="mu" style="font-size:11px;width:15px">${esc(UZ)}</span>`:''})()}
+             ${(()=>{const UZ=uniteDose(D.t,z); return UZ?`<span class="mu" style="font-size:11px;width:15px">${esc(UZ)}</span>`:''})()}`}
              <button class="rm" onclick="delDraftZone('${z}')">✕</button></div>`}).join('')}</div>`:''}
          <div class="dft-z" style="margin-top:6px">
            <input class="inp" id="draftZ" placeholder="zone traitée — saisie libre…"
@@ -4542,14 +4773,17 @@ function renderOver(){
             <span class="mu sc-dose">${(()=>{const U=[...new Set(Z.map(z=>uniteDose(x.t,z)))];
               return (dose&&U.length===1&&U[0])?'total '+nb(dose)+' '+U[0]:''})()}</span></div>
           ${Z.length?`<div class="sc-z">${Z.map(z=>{
-            const qz=AS.z[z], UZ=uniteDose(x.t,z);
+            const qz=AS.z[z], UZ=uniteDose(x.t,z), ZB=zoneById(z), bar=!!(ZB&&ZB.bar);
+            const tar=(bar&&CAN('prix')&&AS.but==='devis')?EUR(ZB.pu):'';
             return `<div class="zrow"><span class="zd" style="background:${colActe(x.t)}"></span>
              <div class="zn">${esc(zoneLabel(z))}
-              <small>${qz>0?((qz!==1||uniteDose(x.t,z))?fmtDose(qz,x.t,z):''):'quantité non renseignée'}</small>
+              <small>${bar?(ZB.grp||''):(qz>0?((qz!==1||uniteDose(x.t,z))?fmtDose(qz,x.t,z):''):'quantité non renseignée')}</small>
               </div>
              ${(!AS.ro&&plusieurs)?`<button class="zmv" title="Déplacer cette zone vers un autre soin"
                 onclick="event.stopPropagation();choixActeZone('${z}',1)">⇄</button>`:''}
-             ${AS.ro?(qz>0?`<b class="mono">${fmtDose(qz,x.t,z)}</b>`:'<span class="mu">—</span>')
+             ${bar?`${tar?`<b class="mono">${tar}</b>`:''}
+                ${AS.ro?'':`<button class="rm" onclick="event.stopPropagation();delZ('${z}')">✕</button>`}`
+             :AS.ro?(qz>0?`<b class="mono">${fmtDose(qz,x.t,z)}</b>`:'<span class="mu">—</span>')
              :`<div class="step" onclick="event.stopPropagation()">
                  <button onclick="bump('${z}',-1)">−</button>
                  <input class="qin" type="number" min="0" step="${zonePas(z)}" placeholder="—" value="${qz>0?qz:''}"
@@ -4773,7 +5007,7 @@ function devisPane(sel,total,prix){
     <button class="sw ${AS.infosOn?'on':''}" style="margin-left:auto" onclick="AS.infosOn=!AS.infosOn;renderOver()"></button></div>
   ${AS.infosOn?`<div class="dvp-inf">
     ${inf.fams.map(f=>`<div class="dvi">
-      <div class="dvi-t"><span class="zd" style="background:var(--${f==='tox'?'toxine':'ah'})"></span>${INFOS[f].produit}</div>
+      <div class="dvi-t"><span class="zd" style="background:var(--${f==='tox'?'toxine':f==='epil'?'epil':'ah'})"></span>${INFOS[f].produit}</div>
       <div class="dvi-l"><b>Résultat</b>${INFOS[f].effet}</div>
       <div class="dvi-l"><b>Suites</b>${INFOS[f].suites}</div>
       <div class="dvi-l"><b>Avant</b>${INFOS[f].avant}</div>
@@ -4820,8 +5054,16 @@ function saveDevis(){
   brut=force;
  }
  /* un devis peut être à 0 € : prestation offerte */
- const lignes=prest.map(x=>{const nom=x.libre||acteDef(x.type).n, zs=x.libre?'':zonesTexte(x.z,x.type);
-   return [x.type, nom+(zs?' — '+zs:''), x.seances, Math.round((x.brut!=null?x.brut:x.montant)/x.seances)]});
+ const lignes=prest.flatMap(x=>{
+   const brutU=Math.round((x.brut!=null?x.brut:x.montant)/x.seances);
+   const Zb=Object.keys(x.z||{}).map(zoneById).filter(z=>z&&z.bar);
+   const somme=Zb.reduce((t,z)=>t+(+z.pu||0),0);
+   /* une séance d'épilation se détaille zone par zone, chacune à son tarif —
+      sauf si le montant a été repris à la main, auquel cas la ligne reste globale */
+   if(x.type&&Zb.length&&Zb.length===Object.keys(x.z).length&&somme===brutU)
+     return Zb.map(z=>[x.type, acteDef(x.type).n+' — '+z.n, x.seances, +z.pu||0]);
+   const nom=x.libre||acteDef(x.type).n, zs=x.libre?'':zonesTexte(x.z,x.type);
+   return [[x.type, nom+(zs?' — '+zs:''), x.seances, brutU]]});
  const rem=AS.remiseType==='%'?Math.round(brut*(AS.remise||0)/100):(AS.remise||0);
  const net=Math.max(0,brut-rem);
  const num='D-'+String(TODAYS.slice(2,4))+String(TODAYS.slice(5,7))+'-'+String(DEVIS.length+22).padStart(3,'0');
@@ -4850,16 +5092,36 @@ const actesZone=()=>{const T=actesSaisis();
  return CATALOGUE.filter(c=>c.zoned&&(c.reg||['visage']).includes(AS.reg))
    .sort((a,b)=>(T.includes(b.id)-T.includes(a.id)))};
 const choixActePossible=()=>actesZone().length>1;
-function zPose(id,d,t){
+function zPose(id,d,t,muet){
  const z=zoneById(id);
  if(t){ AS.zt[id]=t; inscrireSoin(t,1) }
  const pas=zonePas(id);
  const on=Object.prototype.hasOwnProperty.call(AS.z,id), cur=+AS.z[id]||0;
  AS.prix=null;
- if(d>0){ AS.z[id]=on?+(cur+pas).toFixed(2):1 }
+ /* une zone d'épilation se traite ou ne se traite pas : elle n'a pas de dose */
+ if(z&&z.bar){
+   if(d>0&&!on) AS.z[id]=1;
+   else if(on){ delete AS.z[id]; delete AS.zt[id] }
+ }
+ else if(d>0){ AS.z[id]=on?+(cur+pas).toFixed(2):1 }
  else { if(!on) return; const nv=+(cur-pas).toFixed(2);
         if(!cur||nv<=0){delete AS.z[id];delete AS.zt[id]} else AS.z[id]=nv }
+ if(muet) return;
  elaguerSoins(); renderOver();
+}
+/* cocher ou décocher un groupe entier du barème d'un seul geste */
+function baremeGroupe(gi,poser){
+ if(AS.ro) return;
+ const B=baremeById(AS.reg), g=B&&B.g[gi]; if(!g) return;
+ const D=draftActif()?AS.draft:null;
+ if(!D&&!AS.type&&choixActePossible()){ toast('Choisissez d’abord l’acte, puis cochez le groupe'); return }
+ g.z.forEach(z=>{
+   if(D){ const o=Object.prototype.hasOwnProperty.call(D.z,z.id);
+     if(poser&&!o) D.z[z.id]=1; else if(!poser&&o) delete D.z[z.id]; return }
+   const o=Object.prototype.hasOwnProperty.call(AS.z,z.id);
+   if(poser&&!o) zPose(z.id,1,AS.type||null,1); else if(!poser&&o) zPose(z.id,-1,null,1) });
+ elaguerSoins(); renderOver();
+ toast(poser?`${g.n} — ${g.z.length} zones cochées`:`${g.n} — zones retirées`);
 }
 /* le choix de l'acte pour une zone donnée */
 function choixActeZone(id,move){
@@ -4930,7 +5192,14 @@ function montantActe(a){ if(!a) return null;
 const montantTxt=a=>{const m=montantActe(a); return m==null?'<span class="mu">—</span>':EUR(m)};
 /* prix unitaire d'un soin : le tarif du jour, sauf si le soin vient d'un devis
    qui a figé le sien (pu) — un devis engage le prix qu'il annonce */
-const puSoin=x=>x.t?(x.pu!=null?+x.pu:(acteDef(x.t).prix||0)):(+x.prix||0);
+/* le tarif d'un soin d'épilation est la somme des zones cochées à son barème ;
+   un prix saisi à la main reprend toujours le dessus */
+const tarifBareme=t=>{ if(!AS||!AS.z) return 0;
+ return Object.keys(AS.z).reduce((s,z)=>{const Z=zoneById(z);
+   return s+((Z&&Z.bar&&zActe(z)===t)?(+Z.pu||0):0)},0)};
+const puSoin=x=>{ if(!x.t) return +x.prix||0;
+ if(x.pu!=null) return +x.pu;
+ const b=tarifBareme(x.t); return b>0?b:(acteDef(x.t).prix||0)};
 /* le montant d'un soin avant remise */
 const brutUnSoin=x=>puSoin(x)*soinQ(x);
 /* remise propre au soin : en € ou en % de son montant */
@@ -5601,7 +5870,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='AT';
+const BUILD='AU';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -5639,12 +5908,23 @@ function detLigne(nom,lib){ let t=String(lib||'').trim();
  if(nom&&t.startsWith(nom)) t=t.slice(nom.length).replace(/^\s*[—-]\s*/,'');
  return t===nom?'':t.trim() }
 function lignesDoc(d){
+ /* les libellés écrits ne s'alignent sur les prestations que si le devis
+    n'a pas été détaillé zone par zone à l'enregistrement */
+ const alignes=!!(d.prest&&d.lignes&&d.lignes.length===d.prest.length);
  const src=(d.prest&&d.prest.length)
-  ? d.prest.map((x,i)=>({type:x.libre?null:x.type, libre:x.libre||null, z:x.z||null, com:x.com||'',
-      lib:(d.lignes&&d.lignes[i]&&d.lignes[i][1])||null, q:x.seances||1,
+  ? d.prest.flatMap((x,i)=>{
+     const base={type:x.libre?null:x.type, libre:x.libre||null, z:x.z||null, com:x.com||'',
+      lib:(alignes&&d.lignes[i]&&d.lignes[i][1])||null, q:x.seances||1,
       tot:(x.brut!=null?x.brut:x.montant), net:x.montant,
       rem:Math.max(0,(x.brut!=null?x.brut:x.montant)-x.montant),
-      remT:x.remiseType||'€', remV:+x.remise||0}))
+      remT:x.remiseType||'€', remV:+x.remise||0};
+     /* une prestation d'épilation se détaille zone par zone, chacune à son tarif */
+     const Zb=Object.keys(x.z||{}).map(zoneById).filter(z=>z&&z.bar);
+     const som=Zb.reduce((t,z)=>t+(+z.pu||0),0)*base.q;
+     if(!x.libre&&Zb.length&&Zb.length===Object.keys(x.z).length&&som===base.tot&&!base.rem)
+       return Zb.map(z=>({...base, z:{[z.id]:1}, lib:null,
+         tot:(+z.pu||0)*base.q, net:(+z.pu||0)*base.q, rem:0, remV:0}));
+     return [base]})
   : (d.lignes||[]).map(l=>({type:l[0], libre:null, z:null, com:'', lib:l[1], q:l[2],
       tot:l[2]*l[3], net:l[2]*l[3], rem:0, remT:'€', remV:0}));
  return src.map(x=>{
@@ -5770,6 +6050,7 @@ const CONSENT_TXT={
  LAS2:{prod:'lumière pulsée / laser', risq:'Érythème transitoire, œdème. Plus rarement : brûlure superficielle, trouble pigmentaire.'},
  LAS1:{prod:'laser épilatoire', risq:'Érythème péri-folliculaire, œdème transitoire. Plus rarement : brûlure superficielle, trouble pigmentaire, repousse paradoxale.'},
  RF:{prod:'radiofréquence', risq:'Chaleur, rougeur transitoire. Plus rarement : brûlure superficielle.'},
+ ELEC:{prod:'électrolyse à l’aiguille', risq:'Rougeur, œdème et petites croûtes transitoires. Plus rarement : trouble pigmentaire, cicatrice punctiforme.'},
 };
 const consentTxt=t=>CONSENT_TXT[t]||{prod:acteDef(t).n.toLowerCase(), risq:'Effets indésirables transitoires au point de traitement.'};
 
@@ -6006,6 +6287,15 @@ function dvZone(ev,id,dir){
  renderDevis();
 }
 function dvToggle(id,on){ const l=dvL(); if(on) l.z[id]=acteDef(l.type).unite?null:1; else delete l.z[id]; l.prix=null; renderDevis() }
+/* barème : une zone se coche ou se décoche, un groupe entier d'un seul clic */
+function dvBarClic(ev,id,d){ if(ev&&ev.preventDefault) ev.preventDefault();
+ const l=dvL(); if(!l) return;
+ const on=Object.prototype.hasOwnProperty.call(l.z,id);
+ if(on||d<0) delete l.z[id]; else l.z[id]=1;
+ l.prix=null; renderDevis() }
+function dvBarGroupe(gi,poser){ const l=dvL(), B=baremeById(l&&l.reg); const g=B&&B.g[gi]; if(!g) return;
+ g.z.forEach(z=>{ if(poser) l.z[z.id]=1; else delete l.z[z.id] });
+ l.prix=null; renderDevis(); toast(poser?`${g.n} — ${g.z.length} zones cochées`:`${g.n} — zones retirées`) }
 function dvAdd(){ DV.lignes.push({type:null,libre:null,com:'',reg:'visage',z:{},seances:1,prix:null,remise:0,remiseType:'€'});
  dvLigne=DV.lignes.length-1; renderDevis() }
 function dvDel(i){ if(DV.lignes.length<2){toast('Un devis comporte au moins une prestation');return} DV.lignes.splice(i,1); dvLigne=Math.max(0,dvLigne-(i<=dvLigne?1:0)); renderDevis() }
@@ -6083,16 +6373,18 @@ function renderDevis(){
   </div>
   ${C.zoned&&!LIB?`<div class="modebar">
     <div class="ap-t" style="width:100%;margin:0 0 2px">3 · Où ? <span class="mu" style="text-transform:none;letter-spacing:0;font-weight:500">— facultatif</span></div>
-    ${regionsDe(L.type).length>1?`<div class="seg">${regionsDe(L.type).map(r=>{const R=REGIONS.find(x=>x.id===r);
-      return `<button class="${L.reg===r?'on':''}" onclick="dvSetReg('${r}')">${R.i} ${R.n}</button>`}).join('')}</div>`:''}
-    <div class="seg">
+    ${regionsDe(L.type).length>1?`<div class="seg">${regionsDe(L.type).map(r=>{const R=regDef(r);
+      return `<button class="${L.reg===r?'on':''}" onclick="dvSetReg('${r}')" title="${esc(R.n)}">${R.i} ${esc(R.court||R.n)}</button>`}).join('')}</div>`:''}
+    ${estBareme(L.reg)?'<span class="mu" style="font-size:11.5px">tarifs à la séance</span>':`<div class="seg">
       <button class="${DV.mode!=='clavier'?'on':''}" onclick="DV.mode='schema';renderDevis()">◉ Schéma ${L.reg==='corps'?'du corps':'du visage'}</button>
-      <button class="${DV.mode==='clavier'?'on':''}" onclick="DV.mode='clavier';renderDevis()">⌨ Liste des zones</button></div>
+      <button class="${DV.mode==='clavier'?'on':''}" onclick="DV.mode='clavier';renderDevis()">⌨ Liste des zones</button></div>`}
     ${Object.keys(L.z).length?`<button class="chip" style="margin-left:auto" onclick="dvL().z={};renderDevis()">Effacer les zones</button>`:''}
    </div>`:''}
   <div class="facewrap d2">
    <div>
-    ${C.zoned&&!LIB?(DV.mode==='clavier'?dvGrille():`<div class="facebox">${schemaSVG(L.z,{editable:true,type:L.type,region:L.reg})}</div>
+    ${C.zoned&&!LIB?(estBareme(L.reg)
+      ?baremeListe(baremeById(L.reg),L.z,{prix:CAN('prix'),clic:'dvBarClic',groupe:'dvBarGroupe'})
+      :DV.mode==='clavier'?dvGrille():`<div class="facebox">${schemaSVG(L.z,{editable:true,type:L.type,region:L.reg})}</div>
       <div class="face-legend"><span><i style="background:${colActe(L.type)}"></i>${esc(C.n)}${U?' ('+U+')':''}</span>
         <span class="mu">clic = ajouter · clic droit = retirer</span></div>`)
      :`<div class="tip"><span class="e">ℹ️</span><div><b>${esc(LIB?(L.libre||'Prestation libre'):C.n)}</b> ne se localise pas : indiquez la quantité et le montant.</div></div>`}
@@ -6105,7 +6397,7 @@ function renderDevis(){
        return `<div class="dvl ${i===dvLigne?'on':''}" onclick="dvLigne=${i};renderDevis()">
         <div class="dvl-h"><span class="dot" style="background:${(lb||vd)?'var(--ink-3)':'var(--'+(c.col||'accent')+')'}"></span>
          <div style="flex:1;min-width:0"><div class="nm">${vd?'<span class="mu">Acte à choisir</span>':esc(lb?(l.libre||'Prestation libre'):c.n)}</div>
-          <div class="mu" style="font-size:10.5px">${vd?'rien de sélectionné':lb?'ligne libre':((REGIONS.find(x=>x.id===l.reg)||{}).n||'')+(zs?' · '+zs+' zone'+(zs>1?'s':''):' · sans zone')}${dvRemL(l)?` · <b style="color:var(--good)">remise ${l.remiseType==='%'?nb(l.remise)+' %':EUR(l.remise)}</b>`:''}</div></div>
+          <div class="mu" style="font-size:10.5px">${vd?'rien de sélectionné':lb?'ligne libre':(regDef(l.reg).n||'')+(zs?' · '+zs+' zone'+(zs>1?'s':''):' · sans zone')}${dvRemL(l)?` · <b style="color:var(--good)">remise ${l.remiseType==='%'?nb(l.remise)+' %':EUR(l.remise)}</b>`:''}</div></div>
          ${CAN('prix')?`<b>${EUR(dvNetL(l))}</b>`:''}
          <button class="rm" onclick="event.stopPropagation();dvDel(${i})">✕</button></div>
         ${i===dvLigne?`<div class="dvl-b">
