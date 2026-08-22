@@ -1024,7 +1024,12 @@ tr.supp td{background:var(--crit-w);padding:0}
 .rc-l .dvl{border:1px solid var(--line);border-radius:10px;background:var(--panel);overflow:hidden}
 .rc-l .dvl.on{grid-column:1/-1;border-color:var(--accent)}
 .rc-l .dvl-h{padding:7px 9px}
-.rc-l .dvl-b{padding:0 10px 9px 10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.rc-l .dvl-b{padding:0 10px 9px 10px;gap:7px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+/* les zones de la prestation : lisibles sans faire enfler la carte */
+.rc-l .dvl-z .sc-lb{margin:2px 0 4px}
+.rc-l .dvl-z .sc-z{max-height:148px;overflow:auto}
+.rc-l .dvl-z .zrow{padding:4px 8px;margin-bottom:4px}
+.rc-l .dvl-z .dft-z{margin-top:4px}
 /* le schéma sert à pointer, pas à occuper l'écran : il garde une largeur sobre et
    laisse la place aux soins, qui s'empilent et qu'il faut lire d'un coup d'œil */
 .facewrap.d3{grid-template-columns:minmax(0,352px) minmax(0,1fr) 336px}
@@ -2896,7 +2901,9 @@ function pDetail(p){
     a:`<button class="btn xs" onclick="event.stopPropagation();apercuDevis('${d.id}')">◫ PDF</button>
         ${d.realise?'':`<button class="btn xs p" title="Reprendre ces soins pour la consultation d’aujourd’hui"
           onclick="event.stopPropagation();realiserDevis('${d.id}')">✚ Réaliser</button>`}
-        <button class="btn xs" onclick="event.stopPropagation();go('devis','${d.id}')">Ouvrir</button>`})),
+        <button class="btn xs" onclick="event.stopPropagation();go('devis','${d.id}')">Ouvrir</button>
+        ${btnSuppDevis(d)}`,
+    cf:confirmSuppDevis(d,5)})),
   ...C.map(a=>({k:'consentement',id:'CONS-'+a.id,date:a.date,
     t:`Consentement — ${esc(a.nom)}`, s:`acte du ${DF(a.date)}`,
     st:a.consent?bdg('b-good','Signé'):bdg('b-crit','⚠ Non signé'),
@@ -3085,6 +3092,10 @@ function pDetail(p){
        <button class="btn s" onclick="toast('Ordonnance créée')">℞ Ordonnance</button>
        <button class="btn s" onclick="toast('Document téléversé')">↑ Téléverser</button>
      </div></div>
+    ${(CORBEILLE.length&&CORBEILLE[CORBEILLE.length-1].kind==='devis')?`<div class="undo"><span class="e">🗑</span>
+      <div style="flex:1;min-width:0"><b>${esc(CORBEILLE[CORBEILLE.length-1].quoi)}</b> — supprimé
+        <span class="mu">${DTS(CORBEILLE[CORBEILLE.length-1].ts)} par ${esc(CORBEILLE[CORBEILLE.length-1].par)}</span></div>
+      <button class="btn xs" onclick="retablirActe()">↺ Rétablir</button></div>`:''}
     ${C.some(a=>!a.consent)?`<div class="tip" style="background:var(--crit-w);border-color:rgba(208,59,59,.25)"><span class="e">⚠</span><div><b>${C.filter(a=>!a.consent).length} consentement${C.filter(a=>!a.consent).length>1?'s non signés':' non signé'}.</b> Un acte injectable sans consentement signé n'est pas défendable en cas de litige — le lien de signature part par SMS en un clic.</div></div>`:''}
     <div class="tw"><table>
      <thead><tr><th style="width:130px">Type</th><th>Document</th><th style="width:96px">Date</th><th style="width:130px">Statut</th><th style="width:96px"></th></tr></thead>
@@ -3093,7 +3104,7 @@ function pDetail(p){
        <td><b>${d.t}</b><div class="mu" style="font-size:11.5px">${esc(d.s)}</div></td>
        <td class="mono" style="white-space:nowrap">${DF(d.date)}</td>
        <td>${d.st}</td>
-       <td class="num">${d.a}</td></tr>`).join('')}
+       <td class="num" style="white-space:nowrap">${d.a}</td></tr>${d.cf||''}`).join('')}
      </tbody></table>${L.length?'':'<div class="empty">Aucun document de ce type.</div>'}</div>
     <div class="mu" style="font-size:11.5px;margin-top:10px">Tout document produit ici est archivé à valeur probante et horodaté. Les factures et avoirs, qui relèvent du suivi financier, sont dans l'onglet <a onclick="pTab='factu';paint()">Facturation</a>.</div>`;
   },
@@ -3258,7 +3269,8 @@ V.devis=()=>{
     <td class="num" style="white-space:nowrap">
       ${nx&&nx.du?`<button class="btn xs p" onclick="event.stopPropagation();sendRel('${d.id}')">Envoyer</button>`:''}
       ${(d.realise||['refuse','expire'].includes(d.statut))?'':`<button class="btn xs" title="Reprendre ces soins pour la consultation d’aujourd’hui"
-        onclick="event.stopPropagation();realiserDevis('${d.id}')">✚ Réaliser</button>`}</td></tr>`}).join('')}
+        onclick="event.stopPropagation();realiserDevis('${d.id}')">✚ Réaliser</button>`}
+      ${btnSuppDevis(d)}</td></tr>${confirmSuppDevis(d,8)}`}).join('')}
   </tbody></table>${L.length?'':'<div class="empty">Aucun devis sur cette période.</div>'}</div></div>`;
 };
 
@@ -4533,8 +4545,53 @@ function supprimerActe(id){
  toast(`Séance supprimée · ${sac.conso.length?'stock recrédité · ':''}rattrapable`);
  paint&&paint();
 }
+/* Un devis n'est qu'une proposition : tant qu'il n'a pas été accepté ni réalisé,
+   il se supprime — et se rattrape. Accepté ou réalisé, il engage le cabinet
+   et se refuse ; on passe alors par le devis lui-même pour le corriger. */
+let suppDevis=null;
+/* seul un devis que le patient a accepté, ou qui a déjà été réalisé, engage le
+   cabinet. Un devis simplement rapproché d'une séance du même jour, lui, reste
+   une proposition : il se supprime. */
+const devisBloquant=d=>d.statut==='accepte'?'accepté par le patient'
+  :(d.realise?'déjà réalisé en séance':null);
+function supprimerDevis(id){
+ const d=DEVIS.find(x=>x.id===id); if(!d) return;
+ const b=devisBloquant(d);
+ if(b){ suppDevis=null; toast(`Devis ${d.id} ${b} — il ne se supprime pas`); paint&&paint(); return }
+ const i=DEVIS.indexOf(d);
+ CORBEILLE.push({kind:'devis', devis:d, i, hist:(DOCH[d.id]||[]).slice(),
+   ts:nowStamp(), par:ROLES[role].u,
+   quoi:`Devis ${d.id} — ${fn(pById(d.patient))}`});
+ DEVIS.splice(i,1); delete DOCH[d.id];
+ if(dSel===id) dSel=null;
+ suppDevis=null;
+ toast(`Devis ${id} supprimé · rattrapable`);
+ paint&&paint();
+}
+/* la même paire de boutons au bout d'une ligne de devis, partout où on la voit */
+/* tout rôle qui tient la liste des devis peut retirer celui qu'il vient de créer
+   par erreur : le geste est réversible et se refuse dès que le devis engage */
+const btnSuppDevis=d=>{
+ const b=devisBloquant(d);
+ return b?`<button class="ib d" disabled title="Devis ${b} — il ne se supprime pas">✕</button>`
+   :`<button class="ib d" title="Supprimer ce devis"
+      onclick="event.stopPropagation();suppDevis='${d.id}';paint()">✕</button>` };
+const confirmSuppDevis=(d,cols)=>suppDevis!==d.id?'':`<tr class="supp"><td colspan="${cols}">
+  <div class="suppb"><span class="e">⚠</span>
+    <div style="flex:1;min-width:0"><b>Supprimer le devis ${d.id} du ${DF(d.date)} ?</b>
+      <div class="mu">${d.statut==='brouillon'?'Ce brouillon n’a jamais été remis au patient.'
+        :`Il a été ${d.statut==='envoye'?'envoyé':'relancé'} le ${DF(d.envoye||d.date)} — le patient en a peut-être une copie.`}
+        Son historique part avec lui ; la suppression reste rattrapable.</div></div>
+    <button class="btn xs g" onclick="event.stopPropagation();suppDevis=null;paint()">Annuler</button>
+    <button class="btn xs crit" onclick="event.stopPropagation();supprimerDevis('${d.id}')">Supprimer</button>
+  </div></td></tr>`;
 function retablirActe(){
- const sac=CORBEILLE.pop(); if(!sac) return;
+ const sac=CORBEILLE[CORBEILLE.length-1]; if(!sac) return;
+ CORBEILLE.pop();
+ if(sac.kind==='devis'){
+   DEVIS.splice(Math.min(sac.i,DEVIS.length),0,sac.devis);
+   if(sac.hist&&sac.hist.length) DOCH[sac.devis.id]=sac.hist;
+   toast(`Devis ${sac.devis.id} rétabli`); paint&&paint(); return }
  ACTES.splice(Math.min(sac.i,ACTES.length),0,sac.acte);
  sac.conso.forEach(c=>{const st=STOCK.find(x=>x.ref===c.ref); if(st) st.q=Math.max(0,st.q-c.q); CONSO.push(c)});
  sac.effets.forEach(x=>EFFETS.push(x)); sac.fichiers.forEach(x=>FICHIERS.push(x));
@@ -6016,7 +6073,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='AX';
+const BUILD='AY';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -6463,6 +6520,25 @@ function dvActeZone(id,t){
  if(DV.fam!==(acteDef(t).fam||'esth')){ DV.fam=acteDef(t).fam||'esth'; DV.validite=trame(DV.fam).validiteJours }
  dvZone(null,id,1);
 }
+/* les zones d'une prestation se lisent et se corrigent en clair, comme dans une séance */
+function dvZoneQ(i,z,d,v){ const l=DV.lignes[i]; if(!l) return;
+ const cur=+l.z[z]||0;
+ const nv=(v!=null&&v!=='')?Math.max(0,+v||0):+(cur+d*zonePas(z)).toFixed(2);
+ if(v==='') l.z[z]=null;
+ else if(nv<=0) l.z[z]=null;
+ else l.z[z]=nv;
+ l.prix=null; renderDevis() }
+function dvZoneDel(i,z){ const l=DV.lignes[i]; if(!l) return;
+ delete l.z[z]; l.prix=null; renderDevis() }
+/* une zone que le schéma ne porte pas : on l'écrit */
+function dvZoneAjout(i){
+ const l=DV.lignes[i]; if(!l||l.type===null) return;
+ const e=document.getElementById('dvz'+i); if(!e) return;
+ const id=zoneCle(e.value);
+ if(!id){toast('Écrivez la zone traitée');return}
+ if(Object.prototype.hasOwnProperty.call(l.z,id)){toast('Cette zone figure déjà dans la prestation');e.value='';return}
+ e.value=''; l.z[id]=acteDef(l.type).unite?null:1; l.prix=null; renderDevis();
+}
 /* une prestation peut être libre d'emblée : rien n'oblige à passer par un acte */
 function dvLibreIci(i){ const l=DV.lignes[i!=null?i:dvLigne]; if(!l) return;
  l.type=null; l.libre=l.libre||''; l.z={}; renderDevis();
@@ -6597,6 +6673,30 @@ function renderDevis(){
             <select class="inp" style="width:52px" onclick="event.stopPropagation()" onchange="dvRemSet(${i},'remiseType',this.value)">
               ${['€','%'].map(u=>`<option ${((l.remiseType||'€')===u)?'selected':''}>${u}</option>`).join('')}</select>
             ${dvRemL(l)?`<span class="mu" style="font-size:11px;align-self:center">− ${EUR(dvRemL(l))}</span>`:''}</div></label>`:''}
+          ${l.type!==null?`<div class="dvl-z" style="grid-column:1/-1">
+            ${!zs?'':`<div class="sc-lb">Zones traitées <span class="n">${zs}</span>${(()=>{
+              const D=Object.keys(l.z).reduce((t,z)=>t+(+l.z[z]||0),0);
+              const U=[...new Set(Object.keys(l.z).map(z=>uniteDose(l.type,z)))];
+              return (D&&U.length===1&&U[0])?`<span class="mu sc-dose">total ${nb(D)} ${U[0]}</span>`:''})()}</div>`}
+            ${zs?`<div class="sc-z">${Object.keys(l.z).map(z=>{
+              const q=l.z[z], Z=zoneById(z), bar=!!(Z&&Z.bar), UZ=uniteDose(l.type,z);
+              return `<div class="zrow"><span class="zd" style="background:${colActe(l.type)}"></span>
+                <div class="zn">${esc(zoneLabel(z))}<small>${bar?esc((Z&&Z.grp)||''):(q>0?fmtDose(q,l.type,z):'quantité non renseignée')}</small></div>
+                ${bar?(CAN('prix')?`<b class="mono">${EUR(Z.pu)}</b>`:'')
+                 :`<div class="step" onclick="event.stopPropagation()">
+                     <button onclick="event.stopPropagation();dvZoneQ(${i},'${z}',-1)">−</button>
+                     <input class="qin" type="number" min="0" step="${zonePas(z)}" placeholder="—" value="${q>0?q:''}"
+                       onclick="event.stopPropagation()" onchange="dvZoneQ(${i},'${z}',0,this.value)">
+                     <button onclick="event.stopPropagation();dvZoneQ(${i},'${z}',1)">+</button></div>
+                   ${UZ?`<span class="mu" style="font-size:11px;width:15px">${esc(UZ)}</span>`:''}`}
+                <button class="rm" onclick="event.stopPropagation();dvZoneDel(${i},'${z}')">✕</button></div>`}).join('')}</div>`:''}
+            <div class="dft-z" style="margin-top:${zs?'4px':'0'}">
+              <input class="inp" id="dvz${i}"
+                placeholder="${zs?'ajouter une zone — saisie libre…':'zone traitée — cliquez le schéma, ou écrivez-la ici…'}"
+                onclick="event.stopPropagation()"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();dvZoneAjout(${i})}">
+              <button class="btn xs" onclick="event.stopPropagation();dvZoneAjout(${i})">＋ Zone</button></div>
+           </div>`:''}
           <label style="grid-column:1/-1">Commentaire
             <input class="inp" style="width:100%" placeholder="précision libre, imprimée sur le devis…" value="${esc(l.com||'')}"
               onclick="event.stopPropagation()" oninput="dvCom(${i},this.value)"></label>
