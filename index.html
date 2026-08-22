@@ -2357,7 +2357,7 @@ const baremePane=zAll=>baremeListe(baremeById(AS.reg), zAll||AS.z, {
  prix:CAN('prix')&&!AS.ro&&AS.but==='devis',
  clic:'zClick', groupe:'baremeGroupe'});
 
-function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=null,clic='zClick'}={}){
+function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=null,clic='zClick',libre=false}={}){
  const R=SILH[region]?region:'visage', S=SILH[R];
  const az=z=>(zt&&zt[z])||type;                       /* l'acte de cette zone */
  const H=hist||{};
@@ -2385,7 +2385,8 @@ function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=n
   .map(z=>{
    const q=+state[z.id]||0, ant=H[z.id];
    const t=az(z.id), CT=t?acteDef(t):null, UT=CT?CT.unite:null;
-   const qt=q?(CT?(UT?fmtDose(q,t):''):fmtQ(q,z.p)):'';
+   /* une prestation libre n'a ni produit ni unité : on n'affiche que ce qui a un sens */
+   const qt=q?(CT?(UT?fmtDose(q,t):''):(libre?(q!==1?nb(q):''):fmtQ(q,z.p))):'';
    const dt=ant?DFT(ant[0].d)+(ant.length>1?` ×${ant.length}`:''):'';
    const w=Math.max(qt.length*6.2, dt.length*4.1), h=(qt?11:0)+(dt?8:0);
    const y=place(z.cx, z.cy, w, h);
@@ -6073,7 +6074,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='AY';
+const BUILD='AZ';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -6397,7 +6398,7 @@ function apercuBrouillon(){
  const prest=DV.lignes.map(l=>({...l, z:{...l.z}, brut:dvPrix(l), montant:dvNetL(l),
    remise:+l.remise||0, remiseType:l.remiseType||'€'}));
  const lignes=prest.map(l=>{const nom=l.type===null?(l.libre||'Prestation'):acteDef(l.type).n;
-   const zs=l.type===null?'':zonesTexte(l.z,l.type);
+   const zs=zonesTexte(l.z,l.type);   /* une ligne libre peut elle aussi porter des zones */
    return [l.type, nom+(zs?' — '+zs:''), l.seances||1, Math.round(l.montant/(l.seances||1))]});
  apercuDevis({id:DV.id, patient:DV.pid, date:DV.date, fam:DV.fam, praticien:DV.prat,
    remise:dvNet().rem, validite:DV.validite, note:DV.note, statut:'brouillon', prest, lignes,
@@ -6484,11 +6485,11 @@ function dvZone(ev,id,dir){
  ev&&ev.preventDefault&&ev.preventDefault();
  const l=dvL(); if(!l) return;
  if(l.type===null&&l.libre==null){ if(dir>0||!dir) dvChoixActeZone(id); return }
- const U=acteDef(l.type).unite, z=zoneById(id);
+ const U=l.type===null?null:acteDef(l.type).unite, z=zoneById(id);   /* une ligne libre n'a pas d'unité */
  const on=Object.prototype.hasOwnProperty.call(l.z,id), cur=+l.z[id]||0;
  const d=dir||((ev&&(ev.shiftKey||ev.altKey))?-1:1);
- l.prix=null;
- if(!U||!z){ if(on) delete l.z[id]; else l.z[id]=1; renderDevis(); return }
+ dvRecalc(l);
+ if(!U||!z){ if(on&&d>0) delete l.z[id]; else if(on&&d<0) delete l.z[id]; else l.z[id]=1; renderDevis(); return }
  if(d>0) l.z[id]=on?+(cur+(cur?z.s:z.d)).toFixed(2):null;
  else { if(!on) return; const nv=+(cur-z.s).toFixed(2); if(!cur||nv<=0) delete l.z[id]; else l.z[id]=nv }
  renderDevis();
@@ -6520,6 +6521,9 @@ function dvActeZone(id,t){
  if(DV.fam!==(acteDef(t).fam||'esth')){ DV.fam=acteDef(t).fam||'esth'; DV.validite=trame(DV.fam).validiteJours }
  dvZone(null,id,1);
 }
+/* poser une zone invalide le montant calculé — mais pas celui d'une ligne libre,
+   qui est saisi à la main et que rien ne saurait recalculer */
+const dvRecalc=l=>{ if(l&&l.type!==null) l.prix=null };
 /* les zones d'une prestation se lisent et se corrigent en clair, comme dans une séance */
 function dvZoneQ(i,z,d,v){ const l=DV.lignes[i]; if(!l) return;
  const cur=+l.z[z]||0;
@@ -6527,33 +6531,33 @@ function dvZoneQ(i,z,d,v){ const l=DV.lignes[i]; if(!l) return;
  if(v==='') l.z[z]=null;
  else if(nv<=0) l.z[z]=null;
  else l.z[z]=nv;
- l.prix=null; renderDevis() }
+ dvRecalc(l); renderDevis() }
 function dvZoneDel(i,z){ const l=DV.lignes[i]; if(!l) return;
- delete l.z[z]; l.prix=null; renderDevis() }
+ delete l.z[z]; dvRecalc(l); renderDevis() }
 /* une zone que le schéma ne porte pas : on l'écrit */
 function dvZoneAjout(i){
- const l=DV.lignes[i]; if(!l||l.type===null) return;
+ const l=DV.lignes[i]; if(!l||(l.type===null&&l.libre==null)) return;
  const e=document.getElementById('dvz'+i); if(!e) return;
  const id=zoneCle(e.value);
  if(!id){toast('Écrivez la zone traitée');return}
  if(Object.prototype.hasOwnProperty.call(l.z,id)){toast('Cette zone figure déjà dans la prestation');e.value='';return}
- e.value=''; l.z[id]=acteDef(l.type).unite?null:1; l.prix=null; renderDevis();
+ e.value=''; l.z[id]=(l.type!==null&&acteDef(l.type).unite)?null:1; dvRecalc(l); renderDevis();
 }
 /* une prestation peut être libre d'emblée : rien n'oblige à passer par un acte */
 function dvLibreIci(i){ const l=DV.lignes[i!=null?i:dvLigne]; if(!l) return;
  l.type=null; l.libre=l.libre||''; l.z={}; renderDevis();
  const e=document.getElementById('dvLibre'); if(e) e.focus();
 }
-function dvToggle(id,on){ const l=dvL(); if(on) l.z[id]=acteDef(l.type).unite?null:1; else delete l.z[id]; l.prix=null; renderDevis() }
+function dvToggle(id,on){ const l=dvL(); if(on) l.z[id]=(l.type!==null&&acteDef(l.type).unite)?null:1; else delete l.z[id]; dvRecalc(l); renderDevis() }
 /* barème : une zone se coche ou se décoche, un groupe entier d'un seul clic */
 function dvBarClic(ev,id,d){ if(ev&&ev.preventDefault) ev.preventDefault();
  const l=dvL(); if(!l) return;
  const on=Object.prototype.hasOwnProperty.call(l.z,id);
  if(on||d<0) delete l.z[id]; else l.z[id]=1;
- l.prix=null; renderDevis() }
+ dvRecalc(l); renderDevis() }
 function dvBarGroupe(gi,poser){ const l=dvL(), B=baremeById(l&&l.reg); const g=B&&B.g[gi]; if(!g) return;
  g.z.forEach(z=>{ if(poser) l.z[z.id]=1; else delete l.z[z.id] });
- l.prix=null; renderDevis(); toast(poser?`${g.n} — ${g.z.length} zones cochées`:`${g.n} — zones retirées`) }
+ dvRecalc(l); renderDevis(); toast(poser?`${g.n} — ${g.z.length} zones cochées`:`${g.n} — zones retirées`) }
 function dvAdd(){ DV.lignes.push({type:null,libre:null,com:'',reg:'visage',z:{},seances:1,prix:null,remise:0,remiseType:'%'});
  dvLigne=DV.lignes.length-1; renderDevis() }
 function dvDel(i){ if(DV.lignes.length<2){toast('Un devis comporte au moins une prestation');return} DV.lignes.splice(i,1); dvLigne=Math.max(0,dvLigne-(i<=dvLigne?1:0)); renderDevis() }
@@ -6575,7 +6579,7 @@ function dvEnregistrer(envoyer){
  const prest=DV.lignes.map(l=>({...l, z:{...l.z}, brut:dvPrix(l), montant:dvNetL(l),
    remise:+l.remise||0, remiseType:l.remiseType||'€'}));
  const lignes=prest.map(l=>{const nom=l.type===null?(l.libre||'Prestation'):acteDef(l.type).n;
-   const zs=l.type===null?'':zonesTexte(l.z,l.type);
+   const zs=zonesTexte(l.z,l.type);   /* une ligne libre peut elle aussi porter des zones */
    return [l.type, nom+(zs?' — '+zs:''), l.seances||1, Math.round(l.montant/(l.seances||1))]});
  if(DV.id){
   const d=DEVIS.find(x=>x.id===DV.id);
@@ -6631,7 +6635,7 @@ function renderDevis(){
      <span class="dot" style="background:var(--${c.col||'accent'})"></span>${esc(c.n)}
      <small>${CAN('prix')&&c.prix?EUR(c.prix):'à l’unité'}</small></button>`).join('')}</div>`}
   </div>
-  ${C.zoned&&!LIB?`<div class="modebar">
+  ${C.zoned?`<div class="modebar">
     <div class="ap-t" style="width:100%;margin:0 0 2px">3 · Où ? <span class="mu" style="text-transform:none;letter-spacing:0;font-weight:500">— facultatif</span></div>
     ${regionsDe(L.type).length>1?`<div class="seg">${regionsDe(L.type).map(r=>{const R=regDef(r);
       return `<button class="${L.reg===r?'on':''}" onclick="dvSetReg('${r}')" title="${esc(R.n)}">${R.i} ${esc(R.court||R.n)}</button>`}).join('')}</div>`:''}
@@ -6640,16 +6644,17 @@ function renderDevis(){
       <button class="${DV.mode==='clavier'?'on':''}" onclick="DV.mode='clavier';renderDevis()">⌨ Liste des zones</button></div>`}
     ${Object.keys(L.z).length?`<button class="chip" style="margin-left:auto" onclick="dvL().z={};renderDevis()">Effacer les zones</button>`:''}
    </div>`:''}
-  <div class="facewrap dvw ${(C.zoned&&!LIB)?(estBareme(L.reg)?'bar':''):'nosch'}">
-   ${(C.zoned&&!LIB)?`<div>
+  <div class="facewrap dvw ${C.zoned?(estBareme(L.reg)?'bar':''):'nosch'}">
+   ${C.zoned?`<div>
     ${estBareme(L.reg)
       ?baremeListe(baremeById(L.reg),L.z,{prix:CAN('prix'),clic:'dvBarClic',groupe:'dvBarGroupe'})
-      :DV.mode==='clavier'?dvGrille():`<div class="facebox">${schemaSVG(L.z,{editable:true,type:L.type,region:L.reg,clic:'dvZone'})}</div>
-      <div class="face-legend">${L.type?`<span><i style="background:${colActe(L.type)}"></i>${esc(C.n)}${U?' ('+U+')':''}</span>`:''}
-        <span class="mu">${L.type?'clic = ajouter · clic droit = retirer':'cliquez une zone : l’acte vous sera demandé'}</span></div>`}
+      :DV.mode==='clavier'?dvGrille():`<div class="facebox">${schemaSVG(L.z,{editable:true,type:L.type,region:L.reg,clic:'dvZone',libre:LIB})}</div>
+      <div class="face-legend">${L.type?`<span><i style="background:${colActe(L.type)}"></i>${esc(C.n)}${U?' ('+U+')':''}</span>`
+          :LIB?`<span><i style="background:var(--ink-3)"></i>${esc((L.libre||'').trim()||'Prestation libre')}</span>`:''}
+        <span class="mu">${(L.type||LIB)?'clic = ajouter · clic droit = retirer':'cliquez une zone : l’acte vous sera demandé'}</span></div>`}
    </div>`:''}
    <div>
-    ${(C.zoned&&!LIB)?'':`<div class="tip" style="margin-bottom:11px"><span class="e">ℹ️</span><div><b>${esc(LIB?((L.libre||'').trim()||'Prestation libre'):C.n)}</b> ne se localise pas : indiquez la quantité et le montant.</div></div>`}
+    ${C.zoned?'':`<div class="tip" style="margin-bottom:11px"><span class="e">ℹ️</span><div><b>${esc(C.n)}</b> ne se localise pas : indiquez la quantité et le montant.</div></div>`}
     <div class="recap">
      <div class="rc-h">📄 Devis ${famById(DV.fam).n.toLowerCase()}</div>
      <div class="rc-l">
@@ -6658,7 +6663,7 @@ function renderDevis(){
        return `<div class="dvl ${i===dvLigne?'on':''}" onclick="dvLigne=${i};renderDevis()">
         <div class="dvl-h"><span class="dot" style="background:${(lb||vd)?'var(--ink-3)':'var(--'+(c.col||'accent')+')'}"></span>
          <div style="flex:1;min-width:0"><div class="nm">${vd?'<span class="mu">Acte à choisir</span>':esc(lb?(l.libre||'Prestation libre'):c.n)}</div>
-          <div class="mu" style="font-size:10.5px">${vd?'rien de sélectionné':lb?'ligne libre':(regDef(l.reg).n||'')+(zs?' · '+zs+' zone'+(zs>1?'s':''):' · sans zone')}${dvRemL(l)?` · <b style="color:var(--good)">remise ${l.remiseType==='%'?nb(l.remise)+' %':EUR(l.remise)}</b>`:''}</div></div>
+          <div class="mu" style="font-size:10.5px">${vd?'rien de sélectionné':lb?('ligne libre'+(zs?' · '+zs+' zone'+(zs>1?'s':''):'')):(regDef(l.reg).n||'')+(zs?' · '+zs+' zone'+(zs>1?'s':''):' · sans zone')}${dvRemL(l)?` · <b style="color:var(--good)">remise ${l.remiseType==='%'?nb(l.remise)+' %':EUR(l.remise)}</b>`:''}</div></div>
          ${CAN('prix')?`<b>${EUR(dvNetL(l))}</b>`:''}
          <button class="rm" onclick="event.stopPropagation();dvDel(${i})">✕</button></div>
         ${i===dvLigne?`<div class="dvl-b">
@@ -6673,7 +6678,7 @@ function renderDevis(){
             <select class="inp" style="width:52px" onclick="event.stopPropagation()" onchange="dvRemSet(${i},'remiseType',this.value)">
               ${['€','%'].map(u=>`<option ${((l.remiseType||'€')===u)?'selected':''}>${u}</option>`).join('')}</select>
             ${dvRemL(l)?`<span class="mu" style="font-size:11px;align-self:center">− ${EUR(dvRemL(l))}</span>`:''}</div></label>`:''}
-          ${l.type!==null?`<div class="dvl-z" style="grid-column:1/-1">
+          ${(l.type!==null||l.libre!=null)?`<div class="dvl-z" style="grid-column:1/-1">
             ${!zs?'':`<div class="sc-lb">Zones traitées <span class="n">${zs}</span>${(()=>{
               const D=Object.keys(l.z).reduce((t,z)=>t+(+l.z[z]||0),0);
               const U=[...new Set(Object.keys(l.z).map(z=>uniteDose(l.type,z)))];
@@ -6681,7 +6686,8 @@ function renderDevis(){
             ${zs?`<div class="sc-z">${Object.keys(l.z).map(z=>{
               const q=l.z[z], Z=zoneById(z), bar=!!(Z&&Z.bar), UZ=uniteDose(l.type,z);
               return `<div class="zrow"><span class="zd" style="background:${colActe(l.type)}"></span>
-                <div class="zn">${esc(zoneLabel(z))}<small>${bar?esc((Z&&Z.grp)||''):(q>0?fmtDose(q,l.type,z):'quantité non renseignée')}</small></div>
+                <div class="zn">${esc(zoneLabel(z))}<small>${bar?esc((Z&&Z.grp)||'')
+                  :(q>0?((q!==1||UZ)?fmtDose(q,l.type,z):''):'quantité non renseignée')}</small></div>
                 ${bar?(CAN('prix')?`<b class="mono">${EUR(Z.pu)}</b>`:'')
                  :`<div class="step" onclick="event.stopPropagation()">
                      <button onclick="event.stopPropagation();dvZoneQ(${i},'${z}',-1)">−</button>
