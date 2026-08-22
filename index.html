@@ -1010,6 +1010,13 @@ tr.supp td{background:var(--crit-w);padding:0}
 .facebox{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r-m);padding:6px;position:relative;
   display:flex;justify-content:center}
 .face{width:auto;max-width:100%;height:auto;max-height:calc(100vh - 250px);display:block;touch-action:manipulation}
+/* schéma cumulé de la fiche patient : il tient dans l'écran, la colonne de droite défile seule */
+.facewrap.cumul{align-items:start}
+.facewrap.cumul>div:first-child{overflow:visible;display:block}
+.facewrap.cumul>div:first-child .facebox{max-height:none}
+.facewrap.cumul>div:first-child .face{height:auto;max-height:calc(100vh - 300px)}
+.facewrap.cumul>div:first-child .barp{max-height:calc(100vh - 300px)}
+.facewrap.cumul>div:last-child{max-height:calc(100vh - 240px);overflow:auto}
 /* l'illustration porte déjà ses tracés : au repos la zone cliquable s'efface derrière eux */
 .zone{fill:var(--ink);fill-opacity:.012;stroke:var(--ink);stroke-opacity:0;stroke-width:1.6;stroke-linejoin:round;cursor:pointer;transition:fill-opacity .12s,stroke-opacity .12s}
 .zone:hover{fill-opacity:.15;stroke-opacity:.6}
@@ -2313,7 +2320,7 @@ const baremePane=zAll=>baremeListe(baremeById(AS.reg), zAll||AS.z, {
  prix:CAN('prix')&&!AS.ro&&AS.but==='devis',
  clic:'zClick', groupe:'baremeGroupe'});
 
-function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=null}={}){
+function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=null,clic='zClick'}={}){
  const R=SILH[region]?region:'visage', S=SILH[R];
  const az=z=>(zt&&zt[z])||type;                       /* l'acte de cette zone */
  const H=hist||{};
@@ -2324,7 +2331,7 @@ function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=n
   const cls=(on?(CT?'zone act-cur':(z.p==='tox'?'zone act-tox':'zone act-ah'))
             :ant?(z.p==='tox'?'zone ant ant-tox':'zone ant ant-ah'):'zone')+(editable?'':' ro');
   const st=on&&CT?` style="fill:${colActe(t)};stroke:${colActe(t)}"`:'';
-  const ev=editable?`onclick="zClick(event,'${z.id}')" oncontextmenu="zClick(event,'${z.id}',-1);return false"`:'';
+  const ev=editable?`onclick="${clic}(event,'${z.id}')" oncontextmenu="${clic}(event,'${z.id}',-1);return false"`:'';
   const tt=esc(z.n)+(ant?'\n'+ant.map(x=>`${DFT(x.d)}${x.q?' · '+x.q:''}`).join('\n'):'');
   return z.pa?`<path class="${cls}"${st} d="${zPath(z.pa)}" ${ev}><title>${tt}</title></path>`
             :`<ellipse class="${cls}"${st} cx="${z.cx}" cy="${z.cy}" rx="${z.rx}" ry="${z.ry}" ${ev}><title>${tt}</title></ellipse>`;
@@ -2997,7 +3004,7 @@ function pDetail(p){
    return `<div class="fbar" style="margin-bottom:12px"><div class="seg">${ONGLETS.map(r=>{
       const n=Object.keys(parReg(r.id)).length;
       return `<button class="${schemaReg===r.id?'on':''}" onclick="schemaReg='${r.id}';paint()">${r.i} ${esc(r.n)} · ${n}</button>`}).join('')}</div></div>
-   <div class="facewrap">
+   <div class="facewrap cumul">
     <div>${BAR?baremeListe(BAR,cur,{ro:true,hist:ZH,motTotal:'déjà traitée'+(Object.keys(cur).length>1?'s':'')})
      :`<div class="facebox">${schemaSVG(cur,{editable:false,hist:ZH,region:schemaReg,zt:cumulT})}</div>
      <div class="face-legend"><span><i style="background:var(--toxine)"></i>Toxine</span><span><i style="background:var(--ah)"></i>Acide hyaluronique</span>
@@ -4307,7 +4314,7 @@ function openActe(pid,aid,np){
      remise:0, remiseType:'%', validite:30, notePat:'', infosOn:true,
      type:a?a.type:null, date:a?a.date:TODAYS, prat:a?a.praticien:PRATICIENS[0],
      oper:a?a.operateur:'', z:a&&a.zones?{...a.zones}:{}, zt:a&&a.zt?{...a.zt}:{},
-     soins:a?((a.soins&&a.soins.length)?a.soins.map(x=>({q:a.seances||1, com:x.com||x.zn||'', rem:0, remT:'€', ...x}))
+     soins:a?((a.soins&&a.soins.length)?a.soins.map(x=>({q:a.seances||1, com:x.com||x.zn||'', rem:0, remT:'%', ...x}))
         :[...new Set(a.zones?Object.keys(a.zones).map(z=>acteZone(a,z)):(a.type?[a.type]:[]))]
           .map(t=>({t, q:a.seances||1, com:a.zonesNote||'',
              ...(a.mat&&t===a.type?{mat:a.mat, par:{...(a.par||{})}}:{})}))):[],
@@ -4518,7 +4525,7 @@ function dupliquerActe(id){
       .map(t=>({t, q:a.seances||1, com:a.zonesNote||'',
         ...(a.mat&&t===a.type?{mat:a.mat, par:{...(a.par||{})}, parZ:a.parZ||null}:{})}));
  AS.soins=src.map(x=>({...x, q:x.q||a.seances||1, com:x.com||'',
-   rem:0, remT:'€',
+   rem:0, remT:'%',
    par:x.par?{...x.par}:undefined,
    parZ:x.parZ?JSON.parse(JSON.stringify(x.parZ)):undefined,
    zpar:!!(x.parZ&&Object.keys(x.parZ).length)}));
@@ -5258,7 +5265,7 @@ function soinPour(t,auto){
  if(cur&&cur.t===t) return cur;
  const x=AS.soins.find(y=>y.t===t);
  if(x){ if(!auto) x.auto=false; return x }
- const n={t, q:1, com:'', auto:!!auto, sid:nouveauSid()};
+ const n={t, q:1, com:'', auto:!!auto, remT:'%', sid:nouveauSid()};
  AS.soins.push(n);
  if(!AS.type){ AS.type=t; AS.openSoin=AS.soins.length-1 }
  return n;
@@ -5320,7 +5327,7 @@ function ajouterSoin(t){
  if(!t){toast('Choisissez d’abord un acte dans la liste');return}
  AS.soins=AS.soins||[];
  const deja=AS.soins.filter(x=>x.t===t).length;
- AS.soins.push({t, q:1, com:'', auto:false, sid:nouveauSid()}); AS.prix=null;
+ AS.soins.push({t, q:1, com:'', auto:false, remT:'%', sid:nouveauSid()}); AS.prix=null;
  AS.type=t;                                   /* c'est lui qui recevra les zones cliquées */
  AS.openSoin=AS.soins.length-1;
  if(actesSaisis().length===1) AS.fam=acteDef(t).fam||'esth';
@@ -5330,7 +5337,7 @@ function ajouterSoin(t){
 }
 function ajouterLibre(){
  AS.soins=AS.soins||[];
- AS.soins.push({libre:'', prix:null, q:1, com:'', sid:nouveauSid()}); AS.openSoin=AS.soins.length-1;
+ AS.soins.push({libre:'', prix:null, q:1, com:'', remT:'%', sid:nouveauSid()}); AS.openSoin=AS.soins.length-1;
  AS.prix=null; renderOver();
 }
 function majLibre(i,k,v){
@@ -5447,7 +5454,7 @@ function ajouterLibreCompose(){
  const D=AS.draft||{}, com=D.com||'';
  AS.draft={t:null,z:{},com:''};
  AS.soins=AS.soins||[];
- AS.soins.push({libre:'', prix:null, q:1, com, sid:nouveauSid()}); AS.openSoin=AS.soins.length-1;
+ AS.soins.push({libre:'', prix:null, q:1, com, remT:'%', sid:nouveauSid()}); AS.openSoin=AS.soins.length-1;
  AS.prix=null; renderOver();
 }
 /* en lecture seule, la séance est reconstituée depuis l'acte enregistré */
@@ -5977,7 +5984,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='AV';
+const BUILD='AW';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -6331,14 +6338,15 @@ function dvChoix(pid){
 function openDevis(pid,fam,did){
  const d=did?DEVIS.find(x=>x.id===did):null;
  const f=fam||(d?d.fam:'esth')||'esth';
- const a0=actesDe(f)[0];
+ /* aucune prestation prédéfinie : c'est au praticien de choisir l'acte */
  DV={ id:d?d.id:null, pid:pid||(d?d.patient:PATIENTS[0].id), fam:f,
       date:d?d.date:TODAYS, prat:d?(d.praticien||PRATICIENS[0]):PRATICIENS[0],
-      remise:d?(d.remise||0):0, remiseType:'€', validite:d?(d.validite||trame(f).validiteJours):trame(f).validiteJours,
+      remise:d?(d.remise||0):0, remiseType:d?'€':'%',   /* un devis enregistré stocke sa remise en euros */
+      validite:d?(d.validite||trame(f).validiteJours):trame(f).validiteJours,
       note:d?(d.note||''):'', infosOn:true, mode:'schema',
       lignes:(d&&d.prest&&d.prest.length)?d.prest.map(x=>({...x,z:{...x.z},com:x.com||'',
-              prix:(x.brut!=null?x.brut:x.prix), remise:+x.remise||0, remiseType:x.remiseType||'€'}))
-            :[{type:a0.id, reg:regionDef(a0.id), z:{}, seances:1, prix:null, remise:0, remiseType:'€'}] };
+              prix:(x.brut!=null?x.brut:x.prix), remise:+x.remise||0, remiseType:x.remiseType||'%'}))
+            :[{type:null, libre:null, reg:'visage', z:{}, seances:1, prix:null, remise:0, remiseType:'%'}] };
  dvLigne=0; renderDevis();
  document.getElementById('over').classList.add('on');
  document.getElementById('scrim').classList.add('on');
@@ -6364,7 +6372,7 @@ function dvRemSet(i,k,v){ const l=DV.lignes[i]; if(!l) return;
  if(k==='remise') l.remise=(v===''||v==null)?0:Math.max(0,+v||0); else l.remiseType=v;
  renderDevis() }
 function dvAddLibre(){ DV.lignes.push({type:null, libre:'', com:'', reg:DV.lignes[0]?DV.lignes[0].reg:'visage',
-  z:{}, seances:1, prix:null, remise:0, remiseType:'€'}); dvLigne=DV.lignes.length-1; renderDevis() }
+  z:{}, seances:1, prix:null, remise:0, remiseType:'%'}); dvLigne=DV.lignes.length-1; renderDevis() }
 function dvSetLibre(i,v){ DV.lignes[i].libre=v }
 function dvReprendreActe(i){ const l=DV.lignes[i]; l.libre=null; l.type=null;
   l.prix=null; l.z={}; l.reg='visage'; renderDevis() }
@@ -6378,20 +6386,50 @@ function dvSetActe(t){
 function dvSetFam(f){
  if(DV.fam===f) return;
  DV.fam=f; DV.validite=trame(f).validiteJours; const L=actesDe(f);
- DV.lignes.forEach(l=>{ if(!L.some(c=>c.id===l.type)){ l.type=L[0].id; l.z={}; l.prix=null; l.reg=regionDef(l.type) } });
+ DV.lignes.forEach(l=>{ if(l.type===null) return;          /* une ligne encore vierge le reste */
+   if(!L.some(c=>c.id===l.type)){ l.type=null; l.z={}; l.prix=null; l.reg='visage' } });
  renderDevis();
 }
 function dvSetReg(r){ const l=dvL(); if(l.reg===r) return; l.reg=r; l.z={}; l.prix=null; renderDevis() }
 function dvZone(ev,id,dir){
  ev&&ev.preventDefault&&ev.preventDefault();
- const l=dvL(), U=acteDef(l.type).unite, z=zoneById(id);
+ const l=dvL(); if(!l) return;
+ if(l.type===null&&l.libre==null){ if(dir>0||!dir) dvChoixActeZone(id); return }
+ const U=acteDef(l.type).unite, z=zoneById(id);
  const on=Object.prototype.hasOwnProperty.call(l.z,id), cur=+l.z[id]||0;
- const d=dir||1;
+ const d=dir||((ev&&(ev.shiftKey||ev.altKey))?-1:1);
  l.prix=null;
- if(!U){ if(on) delete l.z[id]; else l.z[id]=1; renderDevis(); return }
+ if(!U||!z){ if(on) delete l.z[id]; else l.z[id]=1; renderDevis(); return }
  if(d>0) l.z[id]=on?+(cur+(cur?z.s:z.d)).toFixed(2):null;
  else { if(!on) return; const nv=+(cur-z.s).toFixed(2); if(!cur||nv<=0) delete l.z[id]; else l.z[id]=nv }
  renderDevis();
+}
+/* aucun acte n'est encore choisi sur la prestation : on le demande, puis on pose la zone —
+   exactement le geste de l'écran d'acte */
+function dvChoixActeZone(id){
+ const o=document.getElementById('famchoix'); if(o) o.remove();
+ const z=zoneById(id);
+ const L=CATALOGUE.filter(c=>c.zoned&&(c.reg||['visage']).includes(dvL().reg));
+ if(!L.length){toast('Aucun acte ne se pose sur cette région');return}
+ const d=document.createElement('div');
+ d.id='famchoix'; d.className='famchoix';
+ const bloc=c=>`<button class="fc-b" onclick="document.getElementById('famchoix').remove();dvActeZone('${id}','${c.id}')">
+    <span class="fc-i" style="background:${colActe(c.id)};color:#fff">${esc(c.n[0])}</span>
+    <div><b>${esc(c.n)}</b><small>tarif ${EUR(c.prix||0)}</small></div></button>`;
+ d.innerHTML=`<div class="fc-t">Quel acte sur « ${esc(z?z.n:id)} » ?</div>
+  ${catsUtilisees().map(k=>{const G=L.filter(c=>(c.cat||'Divers')===k);
+    return G.length?`<div class="fc-g">${esc(k)}</div>`+G.map(bloc).join(''):''}).join('')}
+  <button class="fc-x" onclick="document.getElementById('famchoix').remove()">Annuler</button>`;
+ d.onclick=e=>{if(e.target===d) d.remove()};
+ document.body.appendChild(d);
+ setTimeout(()=>d.classList.add('on'),10);
+}
+function dvActeZone(id,t){
+ const l=dvL(); if(!l) return;
+ l.type=t; l.prix=null;
+ if(!regionsDe(t).includes(l.reg)){ l.reg=regionDef(t); l.z={} }
+ if(DV.fam!==(acteDef(t).fam||'esth')){ DV.fam=acteDef(t).fam||'esth'; DV.validite=trame(DV.fam).validiteJours }
+ dvZone(null,id,1);
 }
 function dvToggle(id,on){ const l=dvL(); if(on) l.z[id]=acteDef(l.type).unite?null:1; else delete l.z[id]; l.prix=null; renderDevis() }
 /* barème : une zone se coche ou se décoche, un groupe entier d'un seul clic */
@@ -6403,7 +6441,7 @@ function dvBarClic(ev,id,d){ if(ev&&ev.preventDefault) ev.preventDefault();
 function dvBarGroupe(gi,poser){ const l=dvL(), B=baremeById(l&&l.reg); const g=B&&B.g[gi]; if(!g) return;
  g.z.forEach(z=>{ if(poser) l.z[z.id]=1; else delete l.z[z.id] });
  l.prix=null; renderDevis(); toast(poser?`${g.n} — ${g.z.length} zones cochées`:`${g.n} — zones retirées`) }
-function dvAdd(){ DV.lignes.push({type:null,libre:null,com:'',reg:'visage',z:{},seances:1,prix:null,remise:0,remiseType:'€'});
+function dvAdd(){ DV.lignes.push({type:null,libre:null,com:'',reg:'visage',z:{},seances:1,prix:null,remise:0,remiseType:'%'});
  dvLigne=DV.lignes.length-1; renderDevis() }
 function dvDel(i){ if(DV.lignes.length<2){toast('Un devis comporte au moins une prestation');return} DV.lignes.splice(i,1); dvLigne=Math.max(0,dvLigne-(i<=dvLigne?1:0)); renderDevis() }
 function dvSeances(i,d,v){ const l=DV.lignes[i]; l.seances=Math.max(1, v!=null?v:((l.seances||1)+d)); l.prix=null; renderDevis() }
@@ -6491,9 +6529,9 @@ function renderDevis(){
    <div>
     ${C.zoned&&!LIB?(estBareme(L.reg)
       ?baremeListe(baremeById(L.reg),L.z,{prix:CAN('prix'),clic:'dvBarClic',groupe:'dvBarGroupe'})
-      :DV.mode==='clavier'?dvGrille():`<div class="facebox">${schemaSVG(L.z,{editable:true,type:L.type,region:L.reg})}</div>
-      <div class="face-legend"><span><i style="background:${colActe(L.type)}"></i>${esc(C.n)}${U?' ('+U+')':''}</span>
-        <span class="mu">clic = ajouter · clic droit = retirer</span></div>`)
+      :DV.mode==='clavier'?dvGrille():`<div class="facebox">${schemaSVG(L.z,{editable:true,type:L.type,region:L.reg,clic:'dvZone'})}</div>
+      <div class="face-legend">${L.type?`<span><i style="background:${colActe(L.type)}"></i>${esc(C.n)}${U?' ('+U+')':''}</span>`:''}
+        <span class="mu">${L.type?'clic = ajouter · clic droit = retirer':'cliquez une zone : l’acte vous sera demandé'}</span></div>`)
      :`<div class="tip"><span class="e">ℹ️</span><div><b>${esc(LIB?(L.libre||'Prestation libre'):C.n)}</b> ne se localise pas : indiquez la quantité et le montant.</div></div>`}
    </div>
    <div>
@@ -6693,8 +6731,29 @@ function paint(){
  document.getElementById('avat').textContent=ROLES[role].i;
  document.getElementById('who').innerHTML=`${ROLES[role].u}<small>${ROLES[role].l}</small>`;
  document.getElementById('main').innerHTML=(V[view]||V.dash)();
- bindBA();
+ bindBA(); calerCumul();
 }
+/* Le schéma cumulé prend la hauteur qui reste réellement sous lui : l'en-tête
+   du patient passe sur deux lignes quand la fenêtre se resserre, une hauteur
+   fixe en CSS ne suffirait donc pas. */
+function calerCumul(){
+ const w=document.querySelector('#main .facewrap.cumul'); if(!w) return;
+ const f=w.querySelector('.face, .barp'), col=w.children[1], m=document.getElementById('main');
+ if(f) f.style.maxHeight='';
+ if(col) col.style.maxHeight='';
+ /* on retire à la plus haute des deux colonnes ce que la vue fait défiler en trop,
+    jusqu'à ce que tout tienne — deux ou trois passes suffisent */
+ for(let i=0;i<4;i++){
+  const trop=m.scrollHeight-m.clientHeight;
+  if(trop<=0) break;
+  const hc=col?col.getBoundingClientRect().height:0;
+  const hf=f?f.getBoundingClientRect().height:0;
+  if(col&&hc>=hf) col.style.maxHeight=Math.max(200,Math.round(hc-trop))+'px';
+  else if(f) f.style.maxHeight=Math.max(200,Math.round(hf-trop))+'px';
+  else break;
+ }
+}
+addEventListener('resize',()=>{ if(document.querySelector('#main .facewrap.cumul')) calerCumul() });
 /* Un clic sur une entrée du menu ramène toujours à la vue d'ensemble :
    « Patients » ouvre la liste, pas le dernier dossier consulté. */
 document.querySelectorAll('#nav a[data-v]').forEach(a=>a.onclick=()=>{
