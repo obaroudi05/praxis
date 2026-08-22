@@ -1998,7 +1998,33 @@ function periodBar(per,setter,info,presets){
 }
 const RELS=fileRelances();
 const RDUE=RELS.filter(r=>r.du);
-const CONSENT_KO=ACTES.filter(a=>catById(a.type).cons&&!a.consent);
+/* Un consentement éclairé signé pour un soin donné couvre les séances suivantes
+   du même soin : on ne le redemande pas à chaque fois. La règle se coupe dans
+   Paramètres → Cabinet pour les praticiens qui font signer à chaque séance. */
+const typesActe=a=>{ if(!a) return [];
+ if(a.soins&&a.soins.length) return [...new Set(a.soins.filter(x=>x.t).map(x=>x.t))];
+ if(a.zt) return [...new Set(Object.values(a.zt))];
+ return a.type?[a.type]:[] };
+/* Chaque soin de la séance qui exige un consentement doit l'avoir obtenu : on
+   cherche, pour chacun, la séance signée la plus récente qui le portait. S'il
+   en manque un seul, le consentement reste à faire signer. */
+function consentAnterieur(a){
+ if(!a||!CABINET.consentReconduit) return null;
+ const T=typesActe(a).filter(t=>{const c=catById(t); return c&&c.cons});
+ if(!T.length) return null;
+ const ant=ACTES.filter(x=>x.patient===a.patient&&x.id!==a.id&&x.consent&&x.date<=a.date)
+   .sort((x,y)=>y.date.localeCompare(x.date));
+ const src=T.map(t=>ant.find(x=>typesActe(x).includes(t)));
+ if(src.some(x=>!x)) return null;
+ return src.slice().sort((x,y)=>y.date.localeCompare(x.date))[0] };
+/* pendant la saisie : la séance en cours est-elle déjà couverte ? */
+const consentDejaSigne=()=>AS?consentAnterieur({patient:AS.pid, id:AS.aid, date:AS.date,
+  soins:(AS.soins||[]).filter(x=>x.t).map(x=>({t:x.t}))}):null;
+/* le consentement est en règle : signé pour cette séance, ou repris d'une précédente */
+const consentOK=a=>!!(a&&(a.consent||consentAnterieur(a)));
+/* évalué à la demande : CABINET est déclaré plus bas, et le réglage
+   « consentement reconduit » peut changer en cours de session */
+const consentKO=()=>ACTES.filter(a=>catById(a.type).cons&&!consentOK(a));
 
 /* ==========================================================================
    Photothèque, fidélité, anniversaires, modèles — paramétrables au back-office
@@ -2191,7 +2217,9 @@ let CABINET={
  tel:'01 45 00 12 34', mail:'contact@cabinet-baroudi.fr', site:'www.cabinet-baroudi.fr',
  entete:'{{raison}} — {{cabinet}}\n{{adresse}}\nTél. {{tel}} · {{mail}}',
  pied:'{{raison}} · SIRET {{siret}} · TVA {{tva}} · APE {{ape}}\n{{praticien}} — RPPS {{rpps}} · Assurance RCP {{rcp}}\nActes de médecine esthétique non pris en charge par l’Assurance Maladie, soumis à TVA au taux de 20 %.',
- enteteOn:true, piedOn:true
+ enteteOn:true, piedOn:true,
+ /* un consentement signé vaut pour les séances suivantes du même soin */
+ consentReconduit:true
 };
 let PRATS=[
  {nom:'Dr O. Baroudi', specialite:'Médecine esthétique', rpps:'10101234567', adeli:'751234567',
@@ -2417,7 +2445,7 @@ V.dash=()=>{
  ALERTES.forEach(s=>todo.push({i:'▧',b:'var(--crit-w)',c:'#a52a2a',t:`${sst(s).l} — ${s.n}`,
    d:`${s.q} ${s.u} en stock · seuil ${s.s} · ${s.f}`,
    a:`<button class="btn s" onclick="toast('Bon de commande préparé pour ${esc(s.f)}')">Commander</button>`}));
- CONSENT_KO.forEach(a=>todo.push({i:'✎',b:'var(--accent-wash)',c:'var(--accent-ink)',
+ consentKO().forEach(a=>todo.push({i:'✎',b:'var(--accent-wash)',c:'var(--accent-ink)',
    t:`Consentement manquant — ${fn(pById(a.patient))}`,d:`${a.nom} du ${DF(a.date)}`,
    a:`<button class="btn s" onclick="toast('Lien de signature envoyé par SMS')">Faire signer</button>`}));
 
@@ -2905,10 +2933,12 @@ function pDetail(p){
         <button class="btn xs" onclick="event.stopPropagation();go('devis','${d.id}')">Ouvrir</button>
         ${btnSuppDevis(d)}`,
     cf:confirmSuppDevis(d,5)})),
-  ...C.map(a=>({k:'consentement',id:'CONS-'+a.id,date:a.date,
-    t:`Consentement — ${esc(a.nom)}`, s:`acte du ${DF(a.date)}`,
-    st:a.consent?bdg('b-good','Signé'):bdg('b-crit','⚠ Non signé'),
-    a:pdfBtn(a.id,'CONS-'+a.id)+(a.consent?'':`<button class="btn xs p" onclick="event.stopPropagation();sendDoc(${a.id},'CONS-${a.id}')">Faire signer</button>`)})),
+  ...C.map(a=>{const rep=a.consent?null:consentAnterieur(a);
+   return {k:'consentement',id:'CONS-'+a.id,date:a.date,
+    t:`Consentement — ${esc(a.nom)}`,
+    s:rep?`acte du ${DF(a.date)} · couvert par celui du ${DF(rep.date)}`:`acte du ${DF(a.date)}`,
+    st:a.consent?bdg('b-good','Signé'):rep?bdg('b-good','Reconduit'):bdg('b-crit','⚠ Non signé'),
+    a:pdfBtn(a.id,'CONS-'+a.id)+((a.consent||rep)?'':`<button class="btn xs p" onclick="event.stopPropagation();sendDoc(${a.id},'CONS-${a.id}')">Faire signer</button>`)}}),
   ...AG.map(x=>({k:x.cat==='Courrier'?'courrier':x.cat.toLowerCase(),id:x.id,date:x.ts.slice(0,10),
     t:esc(x.nom), s:`${esc(x.cat)} · généré le ${DTS(x.ts)}`,
     st:x.signe?bdg('b-good','Signé'):x.envoye?bdg('b-info','Envoyé'):bdg('b-neu','Généré'),
@@ -3097,7 +3127,7 @@ function pDetail(p){
       <div style="flex:1;min-width:0"><b>${esc(CORBEILLE[CORBEILLE.length-1].quoi)}</b> — supprimé
         <span class="mu">${DTS(CORBEILLE[CORBEILLE.length-1].ts)} par ${esc(CORBEILLE[CORBEILLE.length-1].par)}</span></div>
       <button class="btn xs" onclick="retablirActe()">↺ Rétablir</button></div>`:''}
-    ${C.some(a=>!a.consent)?`<div class="tip" style="background:var(--crit-w);border-color:rgba(208,59,59,.25)"><span class="e">⚠</span><div><b>${C.filter(a=>!a.consent).length} consentement${C.filter(a=>!a.consent).length>1?'s non signés':' non signé'}.</b> Un acte injectable sans consentement signé n'est pas défendable en cas de litige — le lien de signature part par SMS en un clic.</div></div>`:''}
+    ${C.some(a=>!consentOK(a))?`<div class="tip" style="background:var(--crit-w);border-color:rgba(208,59,59,.25)"><span class="e">⚠</span><div><b>${C.filter(a=>!consentOK(a)).length} consentement${C.filter(a=>!consentOK(a)).length>1?'s non signés':' non signé'}.</b> Un acte injectable sans consentement signé n'est pas défendable en cas de litige — le lien de signature part par SMS en un clic.</div></div>`:''}
     <div class="tw"><table>
      <thead><tr><th style="width:130px">Type</th><th>Document</th><th style="width:96px">Date</th><th style="width:130px">Statut</th><th style="width:96px"></th></tr></thead>
      <tbody>${L.map(d=>`<tr>
@@ -4831,7 +4861,7 @@ function renderOver(){
       const dispo=CATALOGUE.slice();   /* un acte déjà présent peut être repris : deux produits, deux séries */
       const D=AS.draft||{t:null,z:{},com:''}, CD=D.t?acteDef(D.t):null, UD=CD?CD.unite:null;
       const DZ=draftZones();
-      return `<div class="soins ${D.t?'on':''}">
+      return `<div class="soins ${D.t?'on':''}" onkeydown="soinsKey(event)">
        ${((AS.soins||[]).length&&!D.t)?'':`<div class="soins-h"><span class="soins-t">Soins de la séance</span>
          ${D.t?`<button class="chip xs" style="margin-left:auto" onclick="setDraftActe('')">Annuler</button>`:''}</div>`}
        <div class="soins-a">
@@ -4867,13 +4897,17 @@ function renderOver(){
           value="${esc(D.com||'')}" oninput="draftCom(this.value)">
        </div>`:''}
        <div class="soins-a" style="margin-top:${D.t?'9px':'6px'}">
-         <button class="btn xs p" id="btnAddSoin" ${D.t?'':'disabled'} onclick="ajouterSoinCompose()">＋ Ajouter un soin</button>
+         <button class="btn xs p" id="btnConfSoin" ${D.t?'':'disabled'} onclick="confirmerSoin()"
+           title="Entrée">✓ Confirmer</button>
+         <button class="btn xs" id="btnAddSoin" onclick="ajouterSoinCompose()">＋ Ajouter un soin</button>
          <button class="btn xs" onclick="ajouterLibreCompose()">＋ Ligne libre</button>
        </div>
       </div>`})()}
 
     ${(()=>{const S0=AS.ro?soinsLecture():(AS.soins||[]);
-      if(!S0.length) return AS.ro?'':`<div class="sc-vide" style="padding:2px 0 4px">Aucun soin pour l’instant — choisissez un acte ci-dessus, ou cliquez une zone du schéma.</div>`;
+      if(!S0.length) return AS.ro?'':`<div class="sc-vide" style="padding:2px 0 4px">${draftActif()
+        ?'Ce soin n’est pas encore dans la séance — validez-le avec ✓ Confirmer, ou la touche Entrée.'
+        :'Aucun soin pour l’instant — choisissez un acte ci-dessus, ou cliquez une zone du schéma.'}</div>`;
       const plusieurs=S0.filter(x=>x.t).length>1;
       /* le soin en cours vient en tête : ses zones sont juste sous la liste d'ajout */
       /* un seul soin reçoit les zones cliquées : celui qu'on a ouvert, à défaut
@@ -5011,9 +5045,12 @@ function renderOver(){
       return n?`<button class="btn p" onclick="sendAllDocs(${AS.aid})">✉ Envoyer ${n>1?`les ${n} documents`:'le document'} en attente</button>`:''})()}
     <button class="btn" onclick="closeAll()">Fermer</button></div>`}`
   :`${AS.but==='acte'
-      ?`<label style="display:flex;gap:7px;align-items:center;font-size:12.5px;cursor:pointer">
-         <input type="checkbox" ${AS.consent?'checked':''} onchange="AS.consent=this.checked"> Consentement éclairé signé${C.cons?' <span class="bdg b-warn" style="margin-left:4px">requis</span>':''}</label>
-       <span class="mu" style="font-size:11.5px">consultation du ${DF(AS.date)} · aucun montant : la facturation se fait après, sur l'acte</span>`
+      ?(()=>{const rep=C.cons?consentDejaSigne():null;
+        return `<label style="display:flex;gap:7px;align-items:center;font-size:12.5px;cursor:pointer">
+         <input type="checkbox" ${AS.consent?'checked':''} onchange="AS.consent=this.checked"> Consentement éclairé signé${
+          C.cons?(rep?` <span class="bdg b-good" style="margin-left:4px" title="Signé le ${DF(rep.date)} pour « ${esc(rep.nom)} » — il couvre cette séance">reconduit du ${DFT(rep.date)}</span>`
+                     :' <span class="bdg b-warn" style="margin-left:4px">requis</span>'):''}</label>
+       <span class="mu" style="font-size:11.5px">consultation du ${DF(AS.date)} · aucun montant : la facturation se fait après, sur l'acte</span>`})()
       :`<span class="mu" style="font-size:11.5px">devis : aucun acte n'est enregistré, aucun stock n'est consommé</span>`}
    <div style="margin-left:auto;display:flex;gap:8px">
     <button class="btn" onclick="closeAll()">Annuler</button>
@@ -5527,10 +5564,11 @@ function ajouterZoneSoin(i){
  if(Object.prototype.hasOwnProperty.call(AS.z,id)){toast('Cette zone figure déjà dans la séance');e.value='';return}
  e.value=''; AS.zs=AS.zs||{}; AS.zt[id]=x.t; AS.zs[id]=x.sid; AS.z[id]=1; AS.prix=null; renderOver();
 }
-/* l'ajout : l'acte, ses zones et son commentaire entrent ensemble dans la séance */
-function ajouterSoinCompose(){
+/* ✓ Confirmer : l'acte en cours de composition, ses zones et son commentaire
+   entrent ensemble dans la séance, et le composeur se vide. */
+function confirmerSoin(){
  const D=AS.draft||{};
- if(!D.t){toast('Choisissez d’abord un acte dans la liste');return}
+ if(!D.t){toast('Choisissez d’abord un acte dans la liste');return false}
  const t=D.t, z={...D.z}, com=D.com||'';
  AS.draft={t:null,z:{},com:''};
  ajouterSoin(t);
@@ -5539,6 +5577,24 @@ function ajouterSoinCompose(){
  AS.zs=AS.zs||{};
  Object.entries(z).forEach(([k,q])=>{ AS.zt[k]=t; if(nouv) AS.zs[k]=nouv.sid; AS.z[k]=q });
  AS.prix=null; renderOver();
+ toast(acteDef(t).n+' ajouté à la séance');
+ return true;
+}
+/* ＋ Ajouter un soin : on valide ce qui est en cours, puis on rouvre la liste
+   des actes pour composer le suivant. */
+function ajouterSoinCompose(){
+ if((AS.draft||{}).t&&!confirmerSoin()) return;
+ const e=document.getElementById('addSoin');
+ if(e&&!e.disabled){ e.focus(); e.scrollIntoView({block:'nearest'}) }
+}
+/* Entrée valide le soin en cours — sauf dans la saisie libre de zone,
+   qui possède déjà son propre Entrée. */
+function soinsKey(e){
+ if(e.key!=='Enter') return;
+ const id=(e.target&&e.target.id)||'';
+ if(id==='draftZ') return;
+ e.preventDefault();
+ if((AS.draft||{}).t) confirmerSoin();
 }
 function ajouterLibreCompose(){
  const D=AS.draft||{}, com=D.com||'';
@@ -5768,12 +5824,13 @@ const DST={
 function docsActe(a){
  const out=[], p=pById(a.patient), c=catById(a.type);
  if(c&&c.cons){
-  const id='CONS-'+a.id;
-  const st=a.consent?'signe':(DOCH[id]||[]).some(h=>/Lien/.test(h.ev))?'lien':'attente';
+  const id='CONS-'+a.id, rep=a.consent?null:consentAnterieur(a);
+  const st=(a.consent||rep)?'signe':(DOCH[id]||[]).some(h=>/Lien/.test(h.ev))?'lien':'attente';
   out.push({id, k:'consentement', ic:'✎', nom:'Consentement — '+a.nom, st, ts:hStamp(a.date,id),
     seed:[{t:hStamp(a.date,id),ev:'Généré depuis le modèle',par:a.praticien}].concat(
-      a.consent?[{t:hStamp(a.date,id,1),ev:'Signé électroniquement par le patient',par:fn(p)}]:[]),
-    env:!a.consent, sign:!a.consent});
+      a.consent?[{t:hStamp(a.date,id,1),ev:'Signé électroniquement par le patient',par:fn(p)}]
+      :rep?[{t:hStamp(a.date,id,1),ev:`Couvert par le consentement signé le ${DF(rep.date)} pour « ${rep.nom} »`,par:a.praticien}]:[]),
+    env:!(a.consent||rep), sign:!(a.consent||rep)});
  }
  ORDONNANCES.filter(o=>o.acte===a.id).forEach(o=>{
   const st=(DOCH[o.id]||[]).some(h=>/Envoy/.test(h.ev))?'envoye':'editee';
@@ -6074,7 +6131,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='AZ';
+const BUILD='dev';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -6411,6 +6468,9 @@ function fermerPdf(){document.getElementById('pdfv').classList.remove('on'); PV=
    Un devis = une famille + une ou plusieurs prestations (acte · région · zones · quantité · prix)
    ========================================================================== */
 let DV=null, dvLigne=0;
+/* une prestation confirmée se replie dans la liste : le devis reste lisible
+   quand il compte plusieurs lignes */
+let dvPlie=false;
 /* choix de la famille avant d'ouvrir le composeur, quand on part du résumé */
 function dvChoix(pid){
  const o=document.getElementById('famchoix');
@@ -6437,7 +6497,7 @@ function openDevis(pid,fam,did){
       lignes:(d&&d.prest&&d.prest.length)?d.prest.map(x=>({...x,z:{...x.z},com:x.com||'',
               prix:(x.brut!=null?x.brut:x.prix), remise:+x.remise||0, remiseType:x.remiseType||'%'}))
             :[{type:null, libre:null, reg:'visage', z:{}, seances:1, prix:null, remise:0, remiseType:'%'}] };
- dvLigne=0; renderDevis();
+ dvLigne=0; dvPlie=false; renderDevis();
  document.getElementById('over').classList.add('on');
  document.getElementById('scrim').classList.add('on');
 }
@@ -6462,26 +6522,28 @@ function dvRemSet(i,k,v){ const l=DV.lignes[i]; if(!l) return;
  if(k==='remise') l.remise=(v===''||v==null)?0:Math.max(0,+v||0); else l.remiseType=v;
  renderDevis() }
 function dvAddLibre(){ DV.lignes.push({type:null, libre:'', com:'', reg:DV.lignes[0]?DV.lignes[0].reg:'visage',
-  z:{}, seances:1, prix:null, remise:0, remiseType:'%'}); dvLigne=DV.lignes.length-1; renderDevis() }
+  z:{}, seances:1, prix:null, remise:0, remiseType:'%'}); dvLigne=DV.lignes.length-1; dvPlie=false; renderDevis() }
+/* cliquer une prestation du récapitulatif la rouvre */
+function dvSel(i){ dvLigne=i; dvPlie=false; renderDevis() }
 function dvSetLibre(i,v){ DV.lignes[i].libre=v }
-function dvReprendreActe(i){ const l=DV.lignes[i]; l.libre=null; l.type=null;
+function dvReprendreActe(i){ dvPlie=false; const l=DV.lignes[i]; l.libre=null; l.type=null;
   l.prix=null; l.z={}; l.reg='visage'; renderDevis() }
-function dvSetActe(t){
+function dvSetActe(t){ dvPlie=false;
  const l=dvL(), av=acteDef(l.type), ap=acteDef(t);
  l.type=t; l.prix=null;
  if(av.unite!==ap.unite) Object.keys(l.z).forEach(z=>l.z[z]=null);
  if(!regionsDe(t).includes(l.reg)){ l.reg=regionDef(t); l.z={} }
  renderDevis();
 }
-function dvSetFam(f){
+function dvSetFam(f){ dvPlie=false;
  if(DV.fam===f) return;
  DV.fam=f; DV.validite=trame(f).validiteJours; const L=actesDe(f);
  DV.lignes.forEach(l=>{ if(l.type===null) return;          /* une ligne encore vierge le reste */
    if(!L.some(c=>c.id===l.type)){ l.type=null; l.z={}; l.prix=null; l.reg='visage' } });
  renderDevis();
 }
-function dvSetReg(r){ const l=dvL(); if(l.reg===r) return; l.reg=r; l.z={}; l.prix=null; renderDevis() }
-function dvZone(ev,id,dir){
+function dvSetReg(r){ dvPlie=false; const l=dvL(); if(l.reg===r) return; l.reg=r; l.z={}; l.prix=null; renderDevis() }
+function dvZone(ev,id,dir){ dvPlie=false;
  ev&&ev.preventDefault&&ev.preventDefault();
  const l=dvL(); if(!l) return;
  if(l.type===null&&l.libre==null){ if(dir>0||!dir) dvChoixActeZone(id); return }
@@ -6514,7 +6576,7 @@ function dvChoixActeZone(id){
  document.body.appendChild(d);
  setTimeout(()=>d.classList.add('on'),10);
 }
-function dvActeZone(id,t){
+function dvActeZone(id,t){ dvPlie=false;
  const l=dvL(); if(!l) return;
  l.type=t; l.prix=null;
  if(!regionsDe(t).includes(l.reg)){ l.reg=regionDef(t); l.z={} }
@@ -6544,22 +6606,40 @@ function dvZoneAjout(i){
  e.value=''; l.z[id]=(l.type!==null&&acteDef(l.type).unite)?null:1; dvRecalc(l); renderDevis();
 }
 /* une prestation peut être libre d'emblée : rien n'oblige à passer par un acte */
-function dvLibreIci(i){ const l=DV.lignes[i!=null?i:dvLigne]; if(!l) return;
+function dvLibreIci(i){ dvPlie=false; const l=DV.lignes[i!=null?i:dvLigne]; if(!l) return;
  l.type=null; l.libre=l.libre||''; l.z={}; renderDevis();
  const e=document.getElementById('dvLibre'); if(e) e.focus();
 }
-function dvToggle(id,on){ const l=dvL(); if(on) l.z[id]=(l.type!==null&&acteDef(l.type).unite)?null:1; else delete l.z[id]; dvRecalc(l); renderDevis() }
+function dvToggle(id,on){ dvPlie=false; const l=dvL(); if(on) l.z[id]=(l.type!==null&&acteDef(l.type).unite)?null:1; else delete l.z[id]; dvRecalc(l); renderDevis() }
 /* barème : une zone se coche ou se décoche, un groupe entier d'un seul clic */
-function dvBarClic(ev,id,d){ if(ev&&ev.preventDefault) ev.preventDefault();
+function dvBarClic(ev,id,d){ dvPlie=false; if(ev&&ev.preventDefault) ev.preventDefault();
  const l=dvL(); if(!l) return;
  const on=Object.prototype.hasOwnProperty.call(l.z,id);
  if(on||d<0) delete l.z[id]; else l.z[id]=1;
  dvRecalc(l); renderDevis() }
-function dvBarGroupe(gi,poser){ const l=dvL(), B=baremeById(l&&l.reg); const g=B&&B.g[gi]; if(!g) return;
+function dvBarGroupe(gi,poser){ dvPlie=false; const l=dvL(), B=baremeById(l&&l.reg); const g=B&&B.g[gi]; if(!g) return;
  g.z.forEach(z=>{ if(poser) l.z[z.id]=1; else delete l.z[z.id] });
  dvRecalc(l); renderDevis(); toast(poser?`${g.n} — ${g.z.length} zones cochées`:`${g.n} — zones retirées`) }
 function dvAdd(){ DV.lignes.push({type:null,libre:null,com:'',reg:'visage',z:{},seances:1,prix:null,remise:0,remiseType:'%'});
- dvLigne=DV.lignes.length-1; renderDevis() }
+ dvLigne=DV.lignes.length-1; dvPlie=false; renderDevis() }
+/* ✓ Confirmer : la prestation en cours est vérifiée, puis repliée dans la liste */
+function dvConfirmer(){
+ const l=dvL(); if(!l) return false;
+ if(l.type===null&&l.libre==null){
+   toast(`Prestation ${dvLigne+1} : choisissez l’acte, ou écrivez une ligne libre`); return false }
+ if(l.type===null&&!String(l.libre||'').trim()){
+   toast(`Prestation ${dvLigne+1} : donnez un intitulé à la ligne libre`); return false }
+ dvPlie=true; renderDevis();
+ toast((l.type===null?String(l.libre).trim():acteDef(l.type).n)+' — prestation confirmée');
+ return true;
+}
+/* Entrée confirme la prestation — sauf dans une saisie libre de zone */
+function dvKey(e){
+ if(e.key!=='Enter') return;
+ const id=(e.target&&e.target.id)||'';
+ if(id.indexOf('dvz')===0) return;
+ e.preventDefault(); dvConfirmer();
+}
 function dvDel(i){ if(DV.lignes.length<2){toast('Un devis comporte au moins une prestation');return} DV.lignes.splice(i,1); dvLigne=Math.max(0,dvLigne-(i<=dvLigne?1:0)); renderDevis() }
 function dvSeances(i,d,v){ const l=DV.lignes[i]; l.seances=Math.max(1, v!=null?v:((l.seances||1)+d)); l.prix=null; renderDevis() }
 function dvCom(i,v){ DV.lignes[i].com=v }
@@ -6620,7 +6700,7 @@ function renderDevis(){
    <input class="inp" type="date" value="${DV.date}" onchange="DV.date=this.value">
    <select class="inp" onchange="DV.prat=this.value">${PRATICIENS.map(x=>`<option ${DV.prat===x?'selected':''}>${x}</option>`).join('')}</select>
   </div>
-  <div class="actepick">
+  <div class="actepick" onkeydown="dvKey(event)">
    <div class="ap-t">1 · Type de devis</div>
    <div class="seg" style="margin-bottom:8px">${FAMILLES.map(f=>
      `<button class="${DV.fam===f.id?'on':''}" onclick="dvSetFam('${f.id}')">${f.i} ${esc(trame(f.id).titre)}</button>`).join('')}</div>
@@ -6655,18 +6735,19 @@ function renderDevis(){
    </div>`:''}
    <div>
     ${C.zoned?'':`<div class="tip" style="margin-bottom:11px"><span class="e">ℹ️</span><div><b>${esc(C.n)}</b> ne se localise pas : indiquez la quantité et le montant.</div></div>`}
-    <div class="recap">
+    <div class="recap" onkeydown="dvKey(event)">
      <div class="rc-h">📄 Devis ${famById(DV.fam).n.toLowerCase()}</div>
      <div class="rc-l">
      ${DV.lignes.map((l,i)=>{const lb=l.type===null&&l.libre!=null, vd=l.type===null&&l.libre==null;
        const c=(lb||vd)?CNUL:acteDef(l.type), zs=Object.keys(l.z||{}).length;
-       return `<div class="dvl ${i===dvLigne?'on':''}" onclick="dvLigne=${i};renderDevis()">
+       const ouv=i===dvLigne&&!dvPlie;
+       return `<div class="dvl ${ouv?'on':''}" onclick="dvSel(${i})">
         <div class="dvl-h"><span class="dot" style="background:${(lb||vd)?'var(--ink-3)':'var(--'+(c.col||'accent')+')'}"></span>
          <div style="flex:1;min-width:0"><div class="nm">${vd?'<span class="mu">Acte à choisir</span>':esc(lb?(l.libre||'Prestation libre'):c.n)}</div>
           <div class="mu" style="font-size:10.5px">${vd?'rien de sélectionné':lb?('ligne libre'+(zs?' · '+zs+' zone'+(zs>1?'s':''):'')):(regDef(l.reg).n||'')+(zs?' · '+zs+' zone'+(zs>1?'s':''):' · sans zone')}${dvRemL(l)?` · <b style="color:var(--good)">remise ${l.remiseType==='%'?nb(l.remise)+' %':EUR(l.remise)}</b>`:''}</div></div>
          ${CAN('prix')?`<b>${EUR(dvNetL(l))}</b>`:''}
          <button class="rm" onclick="event.stopPropagation();dvDel(${i})">✕</button></div>
-        ${i===dvLigne?`<div class="dvl-b">
+        ${ouv?`<div class="dvl-b">
           <label>Quantité<div class="step"><button onclick="event.stopPropagation();dvSeances(${i},-1)">−</button>
             <input class="qin" type="number" min="1" value="${l.seances||1}" onclick="event.stopPropagation()" onchange="dvSeances(${i},0,+this.value)">
             <button onclick="event.stopPropagation();dvSeances(${i},1)">+</button></div></label>
@@ -6709,7 +6790,9 @@ function renderDevis(){
          </div>`:''}
        </div>`}).join('')}
      </div>
-     <div class="soins-a" style="padding:8px 10px"><button class="btn xs" onclick="dvAdd()">+ Prestation</button>
+     <div class="soins-a" style="padding:8px 10px">
+       <button class="btn xs p" id="btnConfDv" onclick="dvConfirmer()" title="Entrée">✓ Confirmer</button>
+       <button class="btn xs" onclick="dvAdd()">+ Prestation</button>
        <button class="btn xs" onclick="dvAddLibre()">+ Ligne libre</button></div>
     </div>
    </div>
@@ -6816,7 +6899,18 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&palItems[palIdx]) palItems[palIdx].go();
   return;
  }
- if(document.getElementById('over').classList.contains('on')) return;
+ if(document.getElementById('over').classList.contains('on')){
+  /* Entrée valide le soin — ou la prestation — en cours de composition,
+     où que soit le curseur dans la fenêtre. */
+  if(e.key==='Enter'){
+   const t=e.target, id=(t&&t.id)||'';
+   if(id==='draftZ'||id.indexOf('dvz')===0||id.indexOf('zs')===0) return;  /* saisies de zone */
+   if(t&&t.matches&&t.matches('textarea')) return;                         /* les notes gardent leurs retours */
+   if(document.getElementById('btnConfSoin')&&AS&&(AS.draft||{}).t){e.preventDefault();confirmerSoin();return}
+   if(document.getElementById('btnConfDv')&&DV){e.preventDefault();dvConfirmer();return}
+  }
+  return;
+ }
  if(e.target.matches('input,textarea,select')) return;
  const map={a:()=>openActe(),p:()=>go('patients'),d:()=>go('devis'),s:()=>go('stock'),g:()=>go('dash')};
  if(map[e.key.toLowerCase()]){e.preventDefault();map[e.key.toLowerCase()]()}
