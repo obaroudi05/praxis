@@ -473,7 +473,9 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .schbar-h{font-size:11px;flex:1 1 auto;min-width:0}
 .schbar .chip{flex:none;margin-left:auto}
 /* barème d'épilation : une liste tarifée, à la place de la silhouette */
-.barp{flex:1;min-height:0;max-width:560px;overflow:auto;padding-right:3px}
+.barp{flex:1;min-height:0;overflow:auto;padding-right:3px}
+.barp-g{columns:250px 4;column-gap:26px}
+.barp-g .barg{break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid}
 .barg{margin-bottom:13px}
 .barg-h{display:flex;align-items:center;gap:7px;font-size:10.5px;font-weight:800;letter-spacing:.05em;
  text-transform:uppercase;color:var(--ink-3);padding:0 2px 5px;border-bottom:1px solid var(--line);margin-bottom:5px}
@@ -508,6 +510,11 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .bar-pu{display:flex;align-items:center;gap:3px;flex:none}
 .bar-pu .inp{width:62px;text-align:right;font-variant-numeric:tabular-nums}
 .bar-pu span{font-size:11.5px;color:var(--ink-3);font-weight:650}
+.bar-mv{display:flex;flex-direction:column;gap:1px;flex:none}
+.bar-mv button{width:17px;height:11px;line-height:9px;font-size:7px;padding:0;border:1px solid var(--line);
+ background:var(--panel);color:var(--ink-3);border-radius:4px;cursor:pointer}
+.bar-mv button:hover:not(:disabled){border-color:var(--accent);color:var(--accent-ink)}
+.bar-mv button:disabled{opacity:.3;cursor:default}
 .bar-tot{position:sticky;bottom:0;display:flex;align-items:center;gap:9px;padding:9px 10px;margin-top:2px;
  background:var(--panel);border:1px solid var(--line);border-radius:11px;font-size:12.5px;font-weight:650}
 .bar-tot b{margin-left:auto;font-size:15px;font-variant-numeric:tabular-nums}
@@ -991,9 +998,10 @@ tr.supp td{background:var(--crit-w);padding:0}
 .facewrap>div:first-child .face{max-height:100%;height:100%}
 .facewrap>div::-webkit-scrollbar{width:7px}
 .facewrap>div::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
-/* composeur de devis : la liste des prestations défile, les totaux restent en vue */
-.facewrap.d2>div:last-child{display:flex;flex-direction:column;overflow:hidden}
-.facewrap.d2>div:last-child>.recap{flex:1;min-height:0;overflow:auto}
+/* composeur de devis : la colonne de droite défile d'un seul tenant — une carte
+   de prestation ne doit jamais être coupée en deux par un partage de hauteur */
+.facewrap.d2>div:last-child{display:flex;flex-direction:column;gap:11px;overflow:auto}
+.facewrap.d2>div:last-child>.recap{flex:0 0 auto;overflow:visible}
 .facewrap.d2>div:last-child>.dvp{flex:none;max-height:none}
 .facewrap.d3{grid-template-columns:minmax(0,1fr) 372px 340px}
 .facewrap.d3.ro{grid-template-columns:minmax(0,1fr) 296px 424px}
@@ -1318,36 +1326,39 @@ let BDEF=[
    de se cliquer sur une silhouette. Tarifs à la séance, réglables dans
    Paramètres → Actes & tarifs.
    ========================================================================== */
+/* les groupes et les zones descendent le corps : visage, bras, torse et maillot,
+   jambes — l'ordre de cette table est l'ordre d'affichage, il se règle dans les paramètres */
 const bz=(p,L)=>L.map(([i,n,pu])=>({id:p+i,n,pu}));
 let BAREMES=[
  {id:'epil_f',n:'Épilation laser — femme',i:'♀',court:'Femme',g:[
-  {n:'Corps',z:bz('ef_',[['areo','Aréole mammaire',45],['deco','Décolleté',140],
-    ['dosb','Bas du dos',70],['dosh','Haut du dos',110],['dose','Dos entier',170],
-    ['fess','Fesses',70],['lign','Ligne ventrale',40],
+  {n:'Visage',z:bz('ef_',[['vise','Visage entier',115],['fron','Front',70],
+    ['sour','Sourcils',40],['ints','Inter-sourcil',35],['pomm','Pommettes',50],
+    ['joue','Joues',50],['levs','Lèvre supérieure',40],['ment','Menton',40],
+    ['nuqu','Nuque',55],['tcou','Tour de cou',50]])},
+  {n:'Bras',z:bz('ef_',[['bras','Bras entiers',165],['epau','Épaules',95],
+    ['aiss','Aisselles',50],['brsu','Bras (partie sup.)',80],
+    ['avbr','Avant-bras et mains',90],['mns','Mains',40]])},
+  {n:'Corps',z:bz('ef_',[['deco','Décolleté',140],['areo','Aréole mammaire',45],
+    ['vent','Ventre',70],['lign','Ligne ventrale',40],['dose','Dos entier',170],
+    ['dosh','Haut du dos',110],['dosb','Bas du dos',70],
     ['mail','Maillot échancré (SIF compris)',80],['mabr','Maillot brésilien (SIF compris)',95],
     ['main','Maillot intégral (SIF compris)',110],['sif','Sillon interfessier (SIF compris)',40],
-    ['vent','Ventre',70]])},
-  {n:'Visage',z:bz('ef_',[['ints','Inter-sourcil',35],['levs','Lèvre supérieure',40],
-    ['ment','Menton',40],['nuqu','Nuque',55],['pomm','Pommettes',50],['sour','Sourcils',40],
-    ['tcou','Tour de cou',50],['fron','Front',70],['vise','Visage entier',115],['joue','Joues',50]])},
-  {n:'Jambes',z:bz('ef_',[['dcui','Demi-cuisses',100],['cuis','Cuisses',200],
-    ['djam','Demi-jambes',140],['jamb','Jambes complètes',270],['pied','Pieds',45]])},
-  {n:'Bras',z:bz('ef_',[['aiss','Aisselles',50],['avbr','Avant-bras et mains',90],
-    ['bras','Bras entiers',165],['brsu','Bras (partie sup.)',80],['epau','Épaules',95],
-    ['mns','Mains',40]])}]},
+    ['fess','Fesses',70]])},
+  {n:'Jambes',z:bz('ef_',[['jamb','Jambes complètes',270],['cuis','Cuisses',200],
+    ['dcui','Demi-cuisses',100],['djam','Demi-jambes',140],['pied','Pieds',45]])}]},
  {id:'epil_h',n:'Épilation laser — homme',i:'♂',court:'Homme',g:[
-  {n:'Corps',z:bz('eh_',[['dosb','Bas du dos',85],['dosh','Haut du dos',140],
-    ['dose','Dos entier',200],['fess','Fesses',140],['main','Maillot intégral',180],
-    ['geni','Parties génitales',90],['tors','Torse',125],['vent','Ventre',110]])},
-  {n:'Visage',z:bz('eh_',[['barb','Barbe entière',105],['colc','Col de chemise',50],
-    ['ints','Inter-sourcils',40],['nez','Nez',40],['nuqu','Nuque',50],['orei','Oreilles',40],
-    ['pomm','Pommettes',50],['tcou','Tour de cou',65],['sour','Sourcils',80],
-    ['vise','Visage entier',115]])},
-  {n:'Jambes',z:bz('eh_',[['cuis','Cuisses',220],['djam','Demi-jambes',190],
-    ['jamb','Jambes complètes',350],['pied','Pieds',50]])},
-  {n:'Bras',z:bz('eh_',[['aiss','Aisselles',60],['avbr','Avant-bras et mains',110],
-    ['bras','Bras entiers',160],['brsu','Bras supérieurs (sauf épaules)',95],
-    ['epau','Épaules',105],['mns','Mains',55]])}]},
+  {n:'Visage',z:bz('eh_',[['vise','Visage entier',115],['barb','Barbe entière',105],
+    ['sour','Sourcils',80],['ints','Inter-sourcils',40],['orei','Oreilles',40],
+    ['nez','Nez',40],['pomm','Pommettes',50],['nuqu','Nuque',50],
+    ['tcou','Tour de cou',65],['colc','Col de chemise',50]])},
+  {n:'Bras',z:bz('eh_',[['bras','Bras entiers',160],['epau','Épaules',105],
+    ['aiss','Aisselles',60],['brsu','Bras supérieurs (sauf épaules)',95],
+    ['avbr','Avant-bras et mains',110],['mns','Mains',55]])},
+  {n:'Corps',z:bz('eh_',[['tors','Torse',125],['vent','Ventre',110],
+    ['dose','Dos entier',200],['dosh','Haut du dos',140],['dosb','Bas du dos',85],
+    ['main','Maillot intégral',180],['geni','Parties génitales',90],['fess','Fesses',140]])},
+  {n:'Jambes',z:bz('eh_',[['jamb','Jambes complètes',350],['cuis','Cuisses',220],
+    ['djam','Demi-jambes',190],['pied','Pieds',50]])}]},
  {id:'electro',n:'Électrolyse',i:'⚡',court:'Électrolyse',g:[
   {n:'Durée de séance',z:bz('el_',[['5','5 minutes',20],['15','15 minutes',50],
     ['30','30 minutes',95],['45','45 minutes',140],['60','1 heure',180]])}]},
@@ -2280,7 +2291,7 @@ function baremeListe(B,Z,o={}){
  const coche=id=>Object.prototype.hasOwnProperty.call(Z||{},id);
  let n=0,tot=0;
  B.g.forEach(g=>g.z.forEach(z=>{ if(coche(z.id)){ n++; tot+=+z.pu||0 } }));
- return `<div class="barp">
+ return `<div class="barp"><div class="barp-g">
   ${B.g.map((g,gi)=>{const tous=g.z.length&&g.z.every(z=>coche(z.id));
    return `<div class="barg"><div class="barg-h">${esc(g.n)}<span class="n">${g.z.length}</span>
     ${(!ro&&grp)?`<button class="all" onclick="${grp}(${gi},${tous?0:1})"
@@ -2292,6 +2303,7 @@ function baremeListe(B,Z,o={}){
        <span class="ck">${on?'✓':''}</span><span class="nm">${esc(z.n)}</span>
        ${ant?`<span class="ant">${DFT(ant[0].d)}${ant.length>1?' ×'+ant.length:''}</span>`:''}
        ${prix?`<span class="pu">${EUR(z.pu)}</span>`:''}</button>`}).join('')}</div>`}).join('')}
+  </div>
   ${n?`<div class="bar-tot"><span>${n} zone${n>1?'s':''} ${o.motTotal||'retenue'+(n>1?'s':'')}</span>${prix?`<b>${EUR(tot)}</b>`:''}</div>`:''}
  </div>`;
 }
@@ -3519,6 +3531,13 @@ function rmBarZone(bid,gi,zi){const {g,z}=barTrouve(bid,gi,zi); if(!g||!z) retur
  const u=usageZone(z.id);
  if(u){toast(`« ${z.n} » figure dans ${u} acte${u>1?'s':''} — suppression refusée`);return}
  g.z.splice(zi,1); rebuildZones(); paint(); toast(`« ${z.n} » retirée du barème`)}
+/* l'ordre de la table est l'ordre d'affichage : on le remonte ou on le descend */
+function moveBarGroupe(bid,gi,d){const {B}=barTrouve(bid); if(!B) return;
+ const j=gi+d; if(j<0||j>=B.g.length) return;
+ [B.g[gi],B.g[j]]=[B.g[j],B.g[gi]]; rebuildZones(); paint()}
+function moveBarZone(bid,gi,zi,d){const {g}=barTrouve(bid,gi); if(!g) return;
+ const j=zi+d; if(j<0||j>=g.z.length) return;
+ [g.z[zi],g.z[j]]=[g.z[j],g.z[zi]]; rebuildZones(); paint()}
 function addBarGroupe(bid){const {B}=barTrouve(bid); if(!B) return;
  B.g.push({n:'Nouveau groupe', z:[]}); paint(); toast('Groupe ajouté')}
 function rmBarGroupe(bid,gi){const {B,g}=barTrouve(bid,gi); if(!B||!g) return;
@@ -3816,7 +3835,9 @@ V.params=()=>{
      <div class="b">
       <div class="mu" style="font-size:11.5px;margin-bottom:10px">Ces zones se recoupent volontiers — « demi-jambes » et « jambes complètes »,
        « mains » et « avant-bras et mains » : elles se cochent dans une liste tarifée à la saisie d'un acte ou d'un devis,
-       elles ne se pointent pas sur une silhouette. Les tarifs s'entendent <b>à la séance</b>.</div>
+       elles ne se pointent pas sur une silhouette. Les tarifs s'entendent <b>à la séance</b>.
+       L'ordre de cette page est celui de la saisie : les flèches ▲▼ remontent un groupe ou une zone,
+       pour suivre le corps de haut en bas.</div>
       <div class="bar-ed-h">
         <input class="inp" style="max-width:320px" value="${esc(B.n)}" onchange="setBaremeNom('${B.id}',this.value)"
           placeholder="Nom du barème">
@@ -3832,12 +3853,16 @@ V.params=()=>{
       <div class="bar-ed">
        ${B.g.map((g,gi)=>`<div class="bar-edg">
          <div class="bar-edg-h">
+           <span class="bar-mv"><button ${gi===0?'disabled':''} onclick="moveBarGroupe('${B.id}',${gi},-1)" title="Monter le groupe">▲</button>
+             <button ${gi===B.g.length-1?'disabled':''} onclick="moveBarGroupe('${B.id}',${gi},1)" title="Descendre le groupe">▼</button></span>
            <input class="inp" value="${esc(g.n)}" onchange="setBarGroupe('${B.id}',${gi},this.value)" placeholder="Nom du groupe">
            <span class="mu">${g.z.length}</span>
            <button class="btn xs" onclick="addBarZone('${B.id}',${gi})">+ Zone</button>
            <button class="rm" onclick="rmBarGroupe('${B.id}',${gi})" title="Supprimer le groupe">✕</button></div>
          ${g.z.map((z,zi)=>{const u=usageZone(z.id);
            return `<div class="bar-edz">
+            <span class="bar-mv"><button ${zi===0?'disabled':''} onclick="moveBarZone('${B.id}',${gi},${zi},-1)" title="Monter">▲</button>
+              <button ${zi===g.z.length-1?'disabled':''} onclick="moveBarZone('${B.id}',${gi},${zi},1)" title="Descendre">▼</button></span>
             <input class="inp" value="${esc(z.n)}" onchange="setBarZone('${B.id}',${gi},${zi},'n',this.value)">
             <label class="bar-pu"><input class="inp" type="number" min="0" step="5" value="${+z.pu||0}"
               onchange="setBarZone('${B.id}',${gi},${zi},'pu',this.value)"><span>€</span></label>
@@ -4286,14 +4311,29 @@ function openActe(pid,aid,np){
         :[...new Set(a.zones?Object.keys(a.zones).map(z=>acteZone(a,z)):(a.type?[a.type]:[]))]
           .map(t=>({t, q:a.seances||1, com:a.zonesNote||'',
              ...(a.mat&&t===a.type?{mat:a.mat, par:{...(a.par||{})}}:{})}))):[],
-     draft:{t:null,z:{},com:''}, openSoin:0, devis:null, docs:[],
+     draft:{t:null,z:{},com:''}, openSoin:0, devis:null, docs:[], zs:{},
      conso:[], consoOff:[], consoAdd:false, prepOpen:null, csQ:'', csFam:'', csOpen:true,
      but:a?'acte':'acte',                       /* 'acte' = consultation du jour · 'devis' = projet */
      effets:a?a.effets:'', consent:a?a.consent:false};
+ rattacherZones(a&&a.zs);
  editMat=null; matAvant=null; suppCand=null;
  renderOver();
  document.getElementById('over').classList.add('on');
  document.getElementById('scrim').classList.add('on');
+}
+/* une séance rouverte ou dupliquée ne connaît que le type de chaque zone :
+   on donne un identifiant à chaque soin, puis on relie chaque zone au premier
+   soin de son type — l'ordre d'origine est ainsi conservé */
+function rattacherZones(carte){
+ if(!AS) return;
+ AS.zs=AS.zs||{};
+ (AS.soins||[]).forEach(x=>{ if(x.sid==null) x.sid=nouveauSid() });
+ /* la séance enregistrée dit à quel rang de soin va chaque zone : on le relit */
+ if(carte) Object.entries(carte).forEach(([z,i])=>{ const x=(AS.soins||[])[i];
+   if(x && Object.prototype.hasOwnProperty.call(AS.z||{},z)) AS.zs[z]=x.sid });
+ Object.keys(AS.z||{}).forEach(z=>{ if(AS.zs[z]!=null) return;
+   const t=(AS.zt||{})[z]; const s0=t?premierDuType(t):null;
+   if(s0) AS.zs[z]=s0.sid });
 }
 /* --------------------------------------------------------------------------
    Consommables préparés pendant la séance
@@ -4483,7 +4523,7 @@ function dupliquerActe(id){
    parZ:x.parZ?JSON.parse(JSON.stringify(x.parZ)):undefined,
    zpar:!!(x.parZ&&Object.keys(x.parZ).length)}));
  AS.type=(AS.soins.find(x=>x.t)||{}).t||null;
- AS.openSoin=0; AS.draft={t:null,z:{},com:''};
+ AS.openSoin=0; AS.draft={t:null,z:{},com:''}; AS.zs={}; rattacherZones(a.zs);
  AS.conso=[]; AS.consoOff=[];
  renderOver();
  toast(`Séance dupliquée du ${DF(a.date)} — ajustez, puis enregistrez`);
@@ -4660,7 +4700,7 @@ function renderOver(){
       <div class="seg">${(AS.type?regionsDe(AS.type):['visage','corps']).map(r=>{const R=regDef(r);
         return `<button class="${AS.reg===r?'on':''}" onclick="setRegion('${r}')" title="${esc(R.n)}">${R.i} ${esc(R.court||R.n)}</button>`}).join('')}</div>
       <span class="mu schbar-h" title="Un clic sur une zone choisit l’acte qu’on y pratique, un clic droit la retire">${estBareme(AS.reg)?'tarifs à la séance':'clic droit = retirer'}</span>
-      ${sel.length?`<button class="chip" onclick="AS.z={};AS.zt={};elaguerSoins();renderOver()">Effacer les zones</button>`:''}
+      ${sel.length?`<button class="chip" onclick="AS.z={};AS.zt={};AS.zs={};elaguerSoins();renderOver()">Effacer les zones</button>`:''}
      </div>`}
     ${AS.ro||AS.reg!=='visage'?'':`<div class="preset">
       <span class="mu" style="font-size:11px;align-self:center;margin-right:2px">Protocole :</span>
@@ -4691,7 +4731,7 @@ function renderOver(){
 
    <div>
     ${AS.ro?'':(()=>{const T=actesSaisis();
-      const dispo=CATALOGUE.filter(c=>!T.includes(c.id));
+      const dispo=CATALOGUE.slice();   /* un acte déjà présent peut être repris : deux produits, deux séries */
       const D=AS.draft||{t:null,z:{},com:''}, CD=D.t?acteDef(D.t):null, UD=CD?CD.unite:null;
       const DZ=draftZones();
       return `<div class="soins ${D.t?'on':''}">
@@ -4739,21 +4779,28 @@ function renderOver(){
       if(!S0.length) return AS.ro?'':`<div class="sc-vide" style="padding:2px 0 4px">Aucun soin pour l’instant — choisissez un acte ci-dessus, ou cliquez une zone du schéma.</div>`;
       const plusieurs=S0.filter(x=>x.t).length>1;
       /* le soin en cours vient en tête : ses zones sont juste sous la liste d'ajout */
+      /* un seul soin reçoit les zones cliquées : celui qu'on a ouvert, à défaut
+         le premier de l'acte courant — deux soins du même acte ne peuvent pas
+         porter tous les deux la mention « en cours » */
+      const sidCourant=(()=>{ if(AS.ro||!AS.type) return null;
+        const cur=(AS.soins||[])[AS.openSoin];
+        if(cur&&cur.t===AS.type) return cur.sid;
+        const y=(AS.soins||[]).find(z=>z.t===AS.type); return y?y.sid:null })();
       const S=AS.ro?S0.map((x,i)=>[x,i])
         :[...S0.map((x,i)=>[x,i])].sort((a,b)=>(b[0].t===AS.type)-(a[0].t===AS.type));
       return S.map(([x,i])=>{
        const c=x.t?acteDef(x.t):null, q=soinQ(x);
-       const Z=x.t?zonesDuSoin(x.t):[];
+       const Z=x.t?zonesDuSoin(x):[];
        const dose=Z.reduce((s2,z)=>s2+(+AS.z[z]||0),0);
        const tot=prixUnSoin(x);
-       const encours=!AS.ro&&AS.type===x.t;
+       const encours=!AS.ro&&x.sid!=null&&x.sid===sidCourant;
        const ouvert=(AS.openSoin==null?i===0:AS.openSoin===i);
        const nz=x.t?Z.length:0, rr=remUnSoin(x);
        return `<div class="soinc ${encours?'cur':''} ${x.t?'':'libre'} ${ouvert?'':'plie'}" data-i="${i}"
           ${AS.ro?'':`onclick="ouvrirSoin(${i})" title="${ouvert?'Les zones cliquées sur le schéma iront à ce soin':'Déplier ce soin'}"`}>
         <div class="soinc-h">
           <span class="dot" style="background:${x.t?colActe(x.t):'var(--ink-3)'}"></span>
-          ${x.t?`<b class="sc-nom">${esc(c.n)}</b>${encours&&plusieurs?'<span class="sc-cur">en cours</span>':''}${EUROS&&puSoin(x)?(()=>{const fige=x.pu!=null&&x.pu!==(c.prix||0);
+          ${x.t?`<b class="sc-nom">${esc(soinNom(x))}</b>${encours&&plusieurs?'<span class="sc-cur">en cours</span>':''}${EUROS&&puSoin(x)?(()=>{const fige=x.pu!=null&&x.pu!==(c.prix||0);
              return `<span class="pu${fige?' fige':''}"${fige?` title="prix figé par le devis — tarif du jour ${EUR(c.prix||0)}"`:''}>${EUR(puSoin(x))}</span>`})():''}`
            :((AS.ro||!ouvert)?`<b class="sc-nom">${esc((x.libre||'').trim()||'Prestation libre')}</b>`
             :`<input class="inp sc-lib" placeholder="Soin non catalogué…" value="${esc(x.libre||'')}"
@@ -5035,11 +5082,11 @@ function saveDevis(){
  const S=(AS.soins||[]).filter(x=>x.t||(x.libre||'').trim()||+x.prix>0);
  if(!S.length){toast('Ajoutez au moins un soin avant de générer le devis');return}
  /* une prestation par soin : chacune garde ses zones, sa quantité et son tarif */
- const zmap=t=>Object.fromEntries(Object.keys(AS.z).filter(z=>zActe(z)===t).map(z=>[z,AS.z[z]]));
+ const zmap=x=>Object.fromEntries(zonesDuSoin(x).map(z=>[z,AS.z[z]]));
  const prest=S.map(x=>{const q=soinQ(x), com=(x.com||'').trim();
    const rem=+x.rem||0, remT=x.remT||'€', net=prixUnSoin(x);
    return x.t
-    ? {type:x.t, libre:null, com, reg:AS.reg, z:zmap(x.t), seances:q, prix:null,
+    ? {type:x.t, libre:null, com, reg:AS.reg, z:zmap(x), seances:q, prix:null,
        remise:rem, remiseType:remT, brut:brutUnSoin(x), montant:net}
     : {type:null, libre:(x.libre||'').trim()||'Prestation', com, reg:AS.reg, z:{}, seances:q,
        prix:(+x.prix||0)*q, remise:rem, remiseType:remT, brut:brutUnSoin(x), montant:net}});
@@ -5094,18 +5141,20 @@ const actesZone=()=>{const T=actesSaisis();
 const choixActePossible=()=>actesZone().length>1;
 function zPose(id,d,t,muet){
  const z=zoneById(id);
- if(t){ AS.zt[id]=t; inscrireSoin(t,1) }
+ AS.zs=AS.zs||{};
+ if(t){ AS.zt[id]=t; AS.zs[id]=soinPour(t,1).sid }
+ else if(AS.zs[id]==null&&AS.zt[id]){ const s0=premierDuType(AS.zt[id]); if(s0) AS.zs[id]=s0.sid }
  const pas=zonePas(id);
  const on=Object.prototype.hasOwnProperty.call(AS.z,id), cur=+AS.z[id]||0;
  AS.prix=null;
  /* une zone d'épilation se traite ou ne se traite pas : elle n'a pas de dose */
  if(z&&z.bar){
    if(d>0&&!on) AS.z[id]=1;
-   else if(on){ delete AS.z[id]; delete AS.zt[id] }
+   else if(on){ delete AS.z[id]; delete AS.zt[id]; delete AS.zs[id] }
  }
  else if(d>0){ AS.z[id]=on?+(cur+pas).toFixed(2):1 }
  else { if(!on) return; const nv=+(cur-pas).toFixed(2);
-        if(!cur||nv<=0){delete AS.z[id];delete AS.zt[id]} else AS.z[id]=nv }
+        if(!cur||nv<=0){delete AS.z[id];delete AS.zt[id];delete AS.zs[id]} else AS.z[id]=nv }
  if(muet) return;
  elaguerSoins(); renderOver();
 }
@@ -5129,9 +5178,17 @@ function choixActeZone(id,move){
  const z=zoneById(id), L=actesZone();
  const d=document.createElement('div');
  d.id='famchoix'; d.className='famchoix';
- const bloc=c=>`<button class="fc-b" onclick="document.getElementById('famchoix').remove();${move?`setZActe('${id}','${c.id}')`:`zPose('${id}',1,'${c.id}')`}">
+ /* quand un acte figure deux fois dans la séance, on choisit lequel des deux soins */
+ const doubles=c=>(AS.soins||[]).filter(y=>y.t===c.id);
+ const btn=(c,geste,lib,sous)=>`<button class="fc-b" onclick="document.getElementById('famchoix').remove();${geste}">
     <span class="fc-i" style="background:${colActe(c.id)};color:#fff">${esc(c.n[0])}</span>
-    <div><b>${esc(c.n)}</b><small>tarif ${EUR(c.prix||0)}</small></div></button>`;
+    <div><b>${esc(lib)}</b><small>${esc(sous)}</small></div></button>`;
+ const bloc=c=>{const D=doubles(c);
+   if(D.length>1) return D.map(y=>btn(c,
+     move?`setZSoin('${id}',${y.sid})`:`zPoseSoin('${id}',${y.sid})`,
+     soinNom(y), `${zonesDuSoin(y).length} zone${zonesDuSoin(y).length>1?'s':''} déjà`)).join('');
+   return btn(c, move?`setZActe('${id}','${c.id}')`:`zPose('${id}',1,'${c.id}')`,
+     c.n, 'tarif '+EUR(c.prix||0))};
  d.innerHTML=`<div class="fc-t">${move?'Déplacer':'Quel acte sur'} « ${esc(z?z.n:id)} »${move?' vers quel soin ?':' ?'}</div>
   ${catsUtilisees().map(k=>{const G=L.filter(c=>(c.cat||'Divers')===k);
     return G.length?`<div class="fc-g">${esc(k)}</div>`+G.map(bloc).join(''):''}).join('')}
@@ -5142,15 +5199,24 @@ function choixActeZone(id,move){
 }
 /* changer l'acte d'une zone déjà posée */
 function setZActe(id,t){
- AS.zt[id]=t; inscrireSoin(t,1); AS.prix=null;
+ AS.zs=AS.zs||{}; AS.zt[id]=t; AS.zs[id]=soinPour(t,1).sid; AS.prix=null;
  elaguerSoins(); renderOver() }
+/* déplacer une zone déjà posée vers un soin précis */
+function setZSoin(id,sid){ const x=soinBySid(+sid); if(!x) return;
+ AS.zs=AS.zs||{}; AS.zt[id]=x.t; AS.zs[id]=x.sid; AS.prix=null;
+ elaguerSoins(); renderOver() }
+/* poser une zone sur un soin précis — utile quand le même acte figure deux fois */
+function zPoseSoin(id,sid){ const x=soinBySid(+sid); if(!x) return;
+ AS.zs=AS.zs||{}; AS.zt[id]=x.t; AS.zs[id]=x.sid;
+ if(!Object.prototype.hasOwnProperty.call(AS.z,id)) AS.z[id]=1;
+ AS.prix=null; elaguerSoins(); renderOver() }
 function bump(id,d){
  const cur=+AS.z[id]||0, nv=+(cur+d*zonePas(id)).toFixed(2);
  AS.prix=null;
  if(nv<=0) AS.z[id]=null; else AS.z[id]=nv;
  renderOver();
 }
-function delZ(id){delete AS.z[id];delete AS.zt[id];AS.prix=null;elaguerSoins();renderOver()}
+function delZ(id){delete AS.z[id];delete AS.zt[id];if(AS.zs)delete AS.zs[id];AS.prix=null;elaguerSoins();renderOver()}
 /* --- liste des zones au clavier : on coche, la dose est facultative --- */
 let acteMode='schema';
 function setMode(m){ acteMode=m; if(AS) AS.mode=m; renderOver() }
@@ -5172,6 +5238,31 @@ const CNUL={id:null,n:'',cat:'',fam:'esth',reg:['visage','corps'],conso:null,con
 /* la quantité est portée par chaque soin, jamais par la séance entière */
 const soinQ=x=>Math.max(1,+((x&&x.q)||1));
 const soinDe=t=>(AS.soins||[]).find(x=>x.t===t);
+/* Un même acte peut figurer deux fois dans une séance — deux produits, deux
+   séries d'injections. C'est donc le soin qui possède ses zones, pas le type
+   d'acte : AS.zs relie chaque zone au soin qui la traite, tandis que AS.zt
+   garde le type, seul utile aux documents et à l'historique. */
+let sidSeq=1;
+const nouveauSid=()=>sidSeq++;
+const soinBySid=sid=>(AS.soins||[]).find(x=>x.sid===sid);
+const sidZone=z=>(AS&&AS.zs)?AS.zs[z]:undefined;
+/* deux soins du même acte se numérotent pour rester distinguables */
+const soinNum=x=>{const L=(AS.soins||[]).filter(y=>y.t&&y.t===x.t);
+ return L.length>1?(L.indexOf(x)+1):0};
+const soinNom=x=>x?(x.t?acteDef(x.t).n+(soinNum(x)?' · '+soinNum(x):''):((x.libre||'').trim()||'Ligne libre')):'';
+/* le soin qui doit recevoir une zone de ce type : celui qu'on a sous les yeux,
+   sinon le premier de ce type, sinon un nouveau */
+function soinPour(t,auto){
+ AS.soins=AS.soins||[];
+ const cur=AS.soins[AS.openSoin];
+ if(cur&&cur.t===t) return cur;
+ const x=AS.soins.find(y=>y.t===t);
+ if(x){ if(!auto) x.auto=false; return x }
+ const n={t, q:1, com:'', auto:!!auto, sid:nouveauSid()};
+ AS.soins.push(n);
+ if(!AS.type){ AS.type=t; AS.openSoin=AS.soins.length-1 }
+ return n;
+}
 const qDe=t=>soinQ(soinDe(t));
 /* les actes du catalogue pratiqués, dans l'ordre où ils ont été ajoutés */
 const actesSaisis=()=>{
@@ -5180,8 +5271,14 @@ const actesSaisis=()=>{
  return [...L,...orph];
 };
 const lignesLibres=()=>(AS.soins||[]).filter(x=>!x.t);
-/* les zones posées pour un soin donné */
-const zonesDuSoin=t=>Object.keys(AS.z).filter(z=>zActe(z)===t);
+/* les zones posées pour un soin donné — par son identifiant quand il en a un,
+   par son type pour les séances reprises d'anciennes versions */
+const premierDuType=t=>(AS.soins||[]).find(y=>y.t===t);
+const zonesDuSoin=x=>{ if(!x||!AS||!AS.z) return [];
+ if(typeof x!=='object'){ const s0=premierDuType(x);
+   return Object.keys(AS.z).filter(z=>sidZone(z)!=null?!!(s0&&sidZone(z)===s0.sid):zActe(z)===x) }
+ return Object.keys(AS.z).filter(z=>{const sd=sidZone(z);
+   return sd!=null ? sd===x.sid : (zActe(z)===x.t && premierDuType(x.t)===x)}) };
 /* Un acte n'a pas de prix : c'est un objet clinique. Le montant, s'il existe,
    vient des pièces qui lui sont rattachées — facture, ou à défaut le montant
    historique du jeu de démonstration. `null` = acte non facturé. */
@@ -5194,12 +5291,12 @@ const montantTxt=a=>{const m=montantActe(a); return m==null?'<span class="mu">�
    qui a figé le sien (pu) — un devis engage le prix qu'il annonce */
 /* le tarif d'un soin d'épilation est la somme des zones cochées à son barème ;
    un prix saisi à la main reprend toujours le dessus */
-const tarifBareme=t=>{ if(!AS||!AS.z) return 0;
- return Object.keys(AS.z).reduce((s,z)=>{const Z=zoneById(z);
-   return s+((Z&&Z.bar&&zActe(z)===t)?(+Z.pu||0):0)},0)};
+const tarifBareme=x=>{ if(!AS||!AS.z||!x) return 0;
+ return zonesDuSoin(x).reduce((s,z)=>{const Z=zoneById(z);
+   return s+((Z&&Z.bar)?(+Z.pu||0):0)},0)};
 const puSoin=x=>{ if(!x.t) return +x.prix||0;
  if(x.pu!=null) return +x.pu;
- const b=tarifBareme(x.t); return b>0?b:(acteDef(x.t).prix||0)};
+ const b=tarifBareme(x); return b>0?b:(acteDef(x.t).prix||0)};
 /* le montant d'un soin avant remise */
 const brutUnSoin=x=>puSoin(x)*soinQ(x);
 /* remise propre au soin : en € ou en % de son montant */
@@ -5217,19 +5314,23 @@ function setSoinRem(i,k,v){ const x=(AS.soins||[])[i]; if(!x) return;
 /* quantité de la séance : celle du soin le plus répété, pour les listes et les documents */
 const seancesMax=()=>Math.max(1,...(AS.soins||[]).map(soinQ));
 /* ajouter / retirer un soin de la séance */
+/* un même acte peut être ajouté plusieurs fois : deux produits, deux séries,
+   deux jeux de zones tarifés à part — chaque ajout devient un soin entier */
 function ajouterSoin(t){
  if(!t){toast('Choisissez d’abord un acte dans la liste');return}
  AS.soins=AS.soins||[];
- if(AS.soins.some(x=>x.t===t)||Object.values(AS.zt).includes(t)){toast(acteDef(t).n+' figure déjà dans la séance');return}
- AS.soins.push({t, q:1, com:'', auto:false}); AS.prix=null;
+ const deja=AS.soins.filter(x=>x.t===t).length;
+ AS.soins.push({t, q:1, com:'', auto:false, sid:nouveauSid()}); AS.prix=null;
  AS.type=t;                                   /* c'est lui qui recevra les zones cliquées */
  AS.openSoin=AS.soins.length-1;
  if(actesSaisis().length===1) AS.fam=acteDef(t).fam||'esth';
- renderOver(); toast('Ajouté à la séance : '+acteDef(t).n);
+ renderOver();
+ toast(deja?`${acteDef(t).n} · ${deja+1} — deuxième soin ajouté à la séance`
+           :'Ajouté à la séance : '+acteDef(t).n);
 }
 function ajouterLibre(){
  AS.soins=AS.soins||[];
- AS.soins.push({libre:'', prix:null, q:1, com:''}); AS.openSoin=AS.soins.length-1;
+ AS.soins.push({libre:'', prix:null, q:1, com:'', sid:nouveauSid()}); AS.openSoin=AS.soins.length-1;
  AS.prix=null; renderOver();
 }
 function majLibre(i,k,v){
@@ -5238,11 +5339,12 @@ function majLibre(i,k,v){
 }
 function rmSoin(i){
  const L=AS.soins||[], x=L[i]; if(!x) return;
+ const zonesDuSoinFige=zonesDuSoin(x);
  L.splice(i,1);
  AS.openSoin=Math.max(0,Math.min(L.length-1,(AS.openSoin>i?AS.openSoin-1:AS.openSoin)));
  let nz=0;
- if(x.t){ Object.keys(AS.z).forEach(z=>{ if(zActe(z)===x.t){ delete AS.z[z]; delete AS.zt[z]; nz++ } });
-   if(AS.type===x.t) AS.type=(L.find(y=>y.t)||{}).t||null; }
+ if(x.t){ zonesDuSoinFige.forEach(z=>{ delete AS.z[z]; delete AS.zt[z]; if(AS.zs) delete AS.zs[z]; nz++ });
+   if(AS.type===x.t&&!L.some(y=>y.t===x.t)) AS.type=(L.find(y=>y.t)||{}).t||null; }
  AS.prix=null; renderOver();
  toast((x.t?acteDef(x.t).n:(x.libre||'Ligne libre'))+' retiré'+(nz?` · ${nz} zone${nz>1?'s':''} libérée${nz>1?'s':''}`:''));
 }
@@ -5256,17 +5358,14 @@ function rmSoinActe(t){
 /* inscrit un acte dans la séance s'il n'y figure pas encore, à la suite des autres */
 function inscrireSoin(t,auto){
  if(!t) return false;
- AS.soins=AS.soins||[];
- const x=AS.soins.find(y=>y.t===t);
- if(x){ if(!auto) x.auto=false; return false }
- AS.soins.push({t, q:1, com:'', auto:!!auto});
- if(!AS.type){ AS.type=t; AS.openSoin=AS.soins.length-1 }
- return true;
+ const avant=(AS.soins||[]).length;
+ soinPour(t,auto);
+ return (AS.soins||[]).length>avant;
 }
 /* les soins nés d'une zone qui n'en ont plus quittent la séance */
 function elaguerSoins(){
  if(!AS||!AS.soins) return;
- AS.soins=AS.soins.filter(x=>!(x.auto&&x.t&&zonesDuSoin(x.t).length===0));
+ AS.soins=AS.soins.filter(x=>!(x.auto&&x.t&&zonesDuSoin(x).length===0));
  if(AS.type&&!AS.soins.some(x=>x.t===AS.type)) AS.type=(AS.soins.find(x=>x.t)||{}).t||null;
 }
 function setActe(t){
@@ -5281,12 +5380,12 @@ function setActe(t){
 function setFam(f){
  if(AS.fam===f) return;
  AS.fam=f; const L=actesDe(f);
- if(L.length&&!L.some(c=>c.id===AS.type)) { AS.type=L[0].id; AS.z={}; AS.zt={}; AS.prix=null; AS.reg=regionDef(AS.type) }
+ if(L.length&&!L.some(c=>c.id===AS.type)) { AS.type=L[0].id; AS.z={}; AS.zt={}; AS.zs={}; AS.prix=null; AS.reg=regionDef(AS.type) }
  renderOver();
 }
 function setRegion(r){
  if(AS.reg===r) return;
- AS.reg=r; AS.z={}; AS.zt={}; AS.prix=null;   /* les zones d'une région ne valent pas dans l'autre */
+ AS.reg=r; AS.z={}; AS.zt={}; AS.zs={}; AS.prix=null;   /* les zones d'une région ne valent pas dans l'autre */
  renderOver(); toast('Région : '+(REGIONS.find(x=>x.id===r)||{}).n);
 }
 function majSoin(i,k,v){ const x=(AS.soins||[])[i]; if(!x) return; x[k]=v }
@@ -5329,7 +5428,7 @@ function ajouterZoneSoin(i){
  const id=zoneCle(e.value);
  if(!id){toast('Écrivez la zone traitée');return}
  if(Object.prototype.hasOwnProperty.call(AS.z,id)){toast('Cette zone figure déjà dans la séance');e.value='';return}
- e.value=''; AS.zt[id]=x.t; AS.z[id]=1; AS.prix=null; renderOver();
+ e.value=''; AS.zs=AS.zs||{}; AS.zt[id]=x.t; AS.zs[id]=x.sid; AS.z[id]=1; AS.prix=null; renderOver();
 }
 /* l'ajout : l'acte, ses zones et son commentaire entrent ensemble dans la séance */
 function ajouterSoinCompose(){
@@ -5338,16 +5437,17 @@ function ajouterSoinCompose(){
  const t=D.t, z={...D.z}, com=D.com||'';
  AS.draft={t:null,z:{},com:''};
  ajouterSoin(t);
- const i=(AS.soins||[]).findIndex(x=>x.t===t);
- if(i>=0) AS.soins[i].com=com;
- Object.entries(z).forEach(([k,q])=>{ AS.zt[k]=t; AS.z[k]=q });
+ const nouv=(AS.soins||[])[AS.openSoin];
+ if(nouv) nouv.com=com;
+ AS.zs=AS.zs||{};
+ Object.entries(z).forEach(([k,q])=>{ AS.zt[k]=t; if(nouv) AS.zs[k]=nouv.sid; AS.z[k]=q });
  AS.prix=null; renderOver();
 }
 function ajouterLibreCompose(){
  const D=AS.draft||{}, com=D.com||'';
  AS.draft={t:null,z:{},com:''};
  AS.soins=AS.soins||[];
- AS.soins.push({libre:'', prix:null, q:1, com}); AS.openSoin=AS.soins.length-1;
+ AS.soins.push({libre:'', prix:null, q:1, com, sid:nouveauSid()}); AS.openSoin=AS.soins.length-1;
  AS.prix=null; renderOver();
 }
 /* en lecture seule, la séance est reconstituée depuis l'acte enregistré */
@@ -5367,13 +5467,15 @@ function realiserDevis(id){
    if(a){toast(`Ce devis est déjà réalisé — acte du ${DF(a.date)}`); openActe(a.patient,a.id); return}}
  openActe(d.patient);
  AS.but='acte'; AS.devis=d.id; AS.date=TODAYS;
- AS.soins=[]; AS.z={}; AS.zt={};
+ AS.soins=[]; AS.z={}; AS.zt={}; AS.zs={};
  (d.prest||[]).forEach(x=>{
   const q=x.seances||1, com=x.com||'', rem=+x.remise||0, remT=x.remiseType||'€';
   const pu=Math.round((x.brut!=null?x.brut:x.montant)/q);
-  if(x.type){ AS.soins.push({t:x.type, q, com, rem, remT, pu, auto:false});
-    Object.entries(x.z||{}).forEach(([z,v])=>{ AS.zt[z]=x.type; AS.z[z]=v }) }
-  else AS.soins.push({libre:(x.libre||'Prestation'), q, com, rem, remT,
+  if(x.type){ const sd=nouveauSid();
+    AS.soins.push({t:x.type, q, com, rem, remT, pu, auto:false, sid:sd});
+    AS.zs=AS.zs||{};
+    Object.entries(x.z||{}).forEach(([z,v])=>{ AS.zt[z]=x.type; AS.zs[z]=sd; AS.z[z]=v }) }
+  else AS.soins.push({libre:(x.libre||'Prestation'), q, com, rem, remT, sid:nouveauSid(),
     prix:Math.round((x.brut!=null?x.brut:x.montant)/q)});
  });
  if(!AS.soins.length){toast('Ce devis ne porte aucune prestation reprenable');return}
@@ -5412,8 +5514,9 @@ function setSeances(d,v){
  AS.seances=n; AS.prix=null; renderOver();
 }
 function toggleZ(id,on){
- if(on){ if(!AS.zt[id]) AS.zt[id]=AS.type; inscrireSoin(AS.zt[id],1); AS.z[id]=1 }
- else { delete AS.z[id]; delete AS.zt[id]; elaguerSoins() }
+ AS.zs=AS.zs||{};
+ if(on){ if(!AS.zt[id]) AS.zt[id]=AS.type; AS.zs[id]=soinPour(AS.zt[id],1).sid; AS.z[id]=1 }
+ else { delete AS.z[id]; delete AS.zt[id]; delete AS.zs[id]; elaguerSoins() }
  AS.prix=null; renderOver();
 }
 function setZLive(id,v){
@@ -5430,11 +5533,11 @@ function majActe(){
    const t=el.querySelector('.sc-tot');
    if(t) t.textContent=EUROS?EUR(prixUnSoin(x)):'';
    const d=el.querySelector('.sc-dose');
-   if(d&&x.t){ const Z2=sel.filter(z=>zActe(z)===x.t);
+   if(d&&x.t){ const Z2=zonesDuSoin(x);
      const q=Z2.reduce((s2,z)=>s2+(+AS.z[z]||0),0);
      const U=[...new Set(Z2.map(z=>uniteDose(x.t,z)))];
      d.textContent=(q&&U.length===1&&U[0])?'total '+nb(q)+' '+U[0]:'' }
-   const n=el.querySelector('.sc-nz'); if(n&&x.t) n.textContent=zonesDuSoin(x.t).length||'—' });
+   const n=el.querySelector('.sc-nz'); if(n&&x.t) n.textContent=zonesDuSoin(x).length||'—' });
  const px=document.getElementById('tPrix'); if(px&&px.tagName==='INPUT') px.value=prix;
  const b=document.getElementById('btnActe');
  if(b) b.textContent=AS.but==='acte'?'✚ Enregistrer la consultation':'✚ Plutôt une consultation';
@@ -5465,7 +5568,7 @@ function applyProto(i){
  const P=PROTOS[i];
  if(AS.reg!=='visage'){toast('Les protocoles sont définis sur le visage');return}
  Object.entries(P.z).forEach(([k,v])=>{
-   const t=protoActe(P,k); AS.zt[k]=t; inscrireSoin(t,1);
+   const t=protoActe(P,k); AS.zs=AS.zs||{}; AS.zt[k]=t; AS.zs[k]=soinPour(t,1).sid;
    AS.z[k]=acteDef(t).unite?v:1;
  });
  AS.prix=null; renderOver();
@@ -5495,11 +5598,15 @@ function saveActe(){
  const zones=Object.keys(AS.z).length?{...AS.z}:null;
  const T=actesSaisis();
  const zt=zones?Object.fromEntries(Object.keys(zones).map(z=>[z,zActe(z)])):null;
- const soins=(AS.soins||[]).filter(x=>x.t||(x.libre||'').trim())
-   .map(soinRange);
+ const gardes=(AS.soins||[]).filter(x=>x.t||(x.libre||'').trim());
+ const soins=gardes.map(soinRange);
+ /* un même acte peut figurer deux fois : on garde le rang du soin qui traite chaque zone */
+ const zs=zones?Object.fromEntries(Object.keys(zones).map(z=>{
+   const x=gardes.find(y=>y.sid===sidZone(z));
+   return [z, x?gardes.indexOf(x):0]})):null;
  const LB=soins.filter(x=>!x.t);
  const C0=T.length?acteDef(T[0]):CNUL;
- ACTES.unshift({id:Date.now(),patient:AS.pid,type:C0.id,zt,soins,
+ ACTES.unshift({id:Date.now(),patient:AS.pid,type:C0.id,zt,zs,soins,
   nom:[...T.map(t=>acteDef(t).n),...LB.map(x=>x.libre)].join(' + ')||'Séance',
   cat:[...new Set(T.map(t=>acteDef(t).cat))].join(' + ')||'Divers',
   reg:AS.reg,fam:C0.fam||'esth',
@@ -5870,7 +5977,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='AU';
+const BUILD='AV';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
