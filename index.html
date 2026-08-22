@@ -624,6 +624,11 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .soin.libre{padding:4px 7px;cursor:default}
 .soin.libre .inp{padding:4px 8px;font-size:12px}
 .soins-a{display:flex;gap:6px;flex-wrap:wrap}
+/* la prestation libre : son intitulé occupe la ligne, le retour au catalogue reste discret */
+.ap-libre{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ap-libre .inp{flex:1 1 320px;min-width:0}
+.ap-libre .btn{flex:none}
+.ap-vide{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:8px;font-size:11.5px}
 .soins-a .inp{flex:1 1 100%;min-width:0}
 .soins-a .btn{flex:1 1 auto;justify-content:center}
 .idc{border:1px solid var(--line);border-radius:14px;background:var(--panel);margin-bottom:14px;overflow:hidden}
@@ -684,7 +689,7 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .rc-n{padding:7px 12px;font-size:10.8px;color:var(--ink-3);line-height:1.4;border-top:1px solid var(--line)}
 .kbx{width:15px;height:15px;flex:none;cursor:pointer;accent-color:var(--accent)}
 .zone.act-cur{fill-opacity:.32;stroke-dasharray:none;stroke-width:1.6;stroke-opacity:.92}
-.facewrap.d2{grid-template-columns:minmax(0,1fr) 340px}
+.facewrap.d2{grid-template-columns:minmax(0,352px) minmax(0,1fr)}
 .modebar{display:flex;align-items:center;gap:11px;flex-wrap:wrap;padding:9px 11px;margin-bottom:12px;
   border:1px solid var(--accent);border-radius:13px;background:var(--accent-wash)}
 .modebar .seg{flex:none}
@@ -990,7 +995,7 @@ tr.supp td{background:var(--crit-w);padding:0}
 .over .of{padding:9px 18px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px;background:var(--panel-2);flex:none}
 
 /* ============ FACE MAP ============ */
-.facewrap{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;flex:1;min-height:0}
+.facewrap{display:grid;grid-template-columns:minmax(0,352px) minmax(0,1fr);gap:14px;flex:1;min-height:0}
 .facewrap>div{min-height:0;overflow:auto;padding-right:2px}
 /* la colonne du schéma ne défile pas : le dessin prend la hauteur qui reste */
 .facewrap>div:first-child{overflow:hidden;display:flex;flex-direction:column}
@@ -998,20 +1003,41 @@ tr.supp td{background:var(--crit-w);padding:0}
 .facewrap>div:first-child .face{max-height:100%;height:100%}
 .facewrap>div::-webkit-scrollbar{width:7px}
 .facewrap>div::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
-/* composeur de devis : la colonne de droite défile d'un seul tenant — une carte
-   de prestation ne doit jamais être coupée en deux par un partage de hauteur */
-.facewrap.d2>div:last-child{display:flex;flex-direction:column;gap:11px;overflow:auto}
-.facewrap.d2>div:last-child>.recap{flex:0 0 auto;overflow:visible}
-.facewrap.d2>div:last-child>.dvp{flex:none;max-height:none}
-.facewrap.d3{grid-template-columns:minmax(0,1fr) 372px 340px}
-.facewrap.d3.ro{grid-template-columns:minmax(0,1fr) 296px 424px}
-@media(max-width:1250px){.facewrap.d3{grid-template-columns:minmax(0,1fr) 340px}.facewrap.d3>:last-child{grid-column:1/-1}}
+/* composeur de devis : schéma à gauche — volontairement étroit —, prestations au
+   centre où la place manque vraiment, totaux à droite. Chaque colonne défile pour
+   son compte : une carte de prestation n'est jamais coupée en deux. */
+.facewrap.dvw{grid-template-columns:minmax(0,330px) minmax(0,1fr) 322px}
+.facewrap.dvw.nosch{grid-template-columns:minmax(0,1fr) 322px}
+/* un barème d'épilation n'est pas un dessin mais une longue liste tarifée :
+   c'est lui qui a besoin de la largeur */
+.facewrap.dvw.bar{grid-template-columns:minmax(0,1fr) minmax(0,368px) 322px}
+.facewrap.d3.bar{grid-template-columns:minmax(0,1fr) minmax(0,372px) 336px}
+.facewrap.d3.ro.bar{grid-template-columns:minmax(0,1fr) minmax(0,332px) 424px}
+.facewrap.dvw>div{overflow:auto}
+.facewrap.dvw>div:first-child{display:flex;flex-direction:column;overflow:hidden}
+@media(max-width:1180px){.facewrap.dvw{grid-template-columns:minmax(0,300px) minmax(0,1fr)}
+  .facewrap.dvw.nosch{grid-template-columns:minmax(0,1fr)}
+  .facewrap.dvw>:last-child{grid-column:1/-1}}
+/* les prestations se rangent en cartes : plusieurs par ligne dès qu'il y a la place,
+   celle qu'on modifie prend toute la largeur pour garder ses champs lisibles */
+.rc-l{display:grid;grid-template-columns:repeat(auto-fill,minmax(238px,1fr));gap:7px;padding:8px;align-items:start}
+.rc-l .dvl{border:1px solid var(--line);border-radius:10px;background:var(--panel);overflow:hidden}
+.rc-l .dvl.on{grid-column:1/-1;border-color:var(--accent)}
+.rc-l .dvl-h{padding:7px 9px}
+.rc-l .dvl-b{padding:0 10px 9px 10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+/* le schéma sert à pointer, pas à occuper l'écran : il garde une largeur sobre et
+   laisse la place aux soins, qui s'empilent et qu'il faut lire d'un coup d'œil */
+.facewrap.d3{grid-template-columns:minmax(0,352px) minmax(0,1fr) 336px}
+.facewrap.d3.ro{grid-template-columns:minmax(0,332px) minmax(0,1fr) 424px}
+@media(max-width:1250px){.facewrap.d3{grid-template-columns:minmax(0,320px) minmax(0,1fr)}
+  .facewrap.d3.ro{grid-template-columns:minmax(0,320px) minmax(0,1fr)}
+  .facewrap.d3>:last-child{grid-column:1/-1}}
 @media(max-width:900px){.facewrap,.facewrap.d3{grid-template-columns:1fr}}
 .facebox{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r-m);padding:6px;position:relative;
   display:flex;justify-content:center}
 .face{width:auto;max-width:100%;height:auto;max-height:calc(100vh - 250px);display:block;touch-action:manipulation}
 /* schéma cumulé de la fiche patient : il tient dans l'écran, la colonne de droite défile seule */
-.facewrap.cumul{align-items:start}
+.facewrap.cumul{grid-template-columns:minmax(0,1fr) minmax(0,420px);align-items:start}
 .facewrap.cumul>div:first-child{overflow:visible;display:block}
 .facewrap.cumul>div:first-child .facebox{max-height:none}
 .facewrap.cumul>div:first-child .face{height:auto;max-height:calc(100vh - 300px)}
@@ -1054,7 +1080,8 @@ tr.supp td{background:var(--crit-w);padding:0}
 .zlead{stroke-width:1;stroke-opacity:.5;stroke-dasharray:2 2;pointer-events:none}
 .zlead.t{stroke:var(--toxine)} .zlead.a{stroke:var(--ah)}
 .zdate:not(.seul){fill:#fff;stroke:rgba(0,0,0,.3)}
-.face-legend{display:flex;gap:14px;align-items:center;justify-content:center;padding:8px 0 2px;font-size:12px;color:var(--ink-2)}
+.face-legend{display:flex;gap:5px 14px;flex-wrap:wrap;align-items:center;justify-content:center;
+  padding:8px 2px 2px;font-size:11.5px;line-height:1.35;color:var(--ink-2);text-align:center}
 .face-legend i{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:-1px}
 .face-legend i.ant{background:linear-gradient(135deg,var(--toxine),var(--ah));opacity:.32;border:1px solid var(--line-2)}
 .zrow{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:10px;background:var(--panel-2);
@@ -1072,7 +1099,12 @@ tr.supp td{background:var(--crit-w);padding:0}
 .totbox>div{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
 .totbox .k{font-size:10.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
 .totbox .v{font-size:18px;font-weight:700;letter-spacing:-.03em;margin-top:1px}
-.preset{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;flex:none}
+/* la colonne du schéma est étroite : les raccourcis s'y logent sans la faire enfler */
+.preset{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px;flex:none}
+.preset .chip{padding:3px 8px;font-size:11px}
+.schbar{row-gap:6px}
+.schbar .seg button{padding:4px 9px;font-size:11.5px}
+.schbar .chip{padding:3px 9px;font-size:11px}
 
 /* mini face used in tables */
 .minif{width:32px;height:42px;flex:none}
@@ -4701,7 +4733,7 @@ function renderOver(){
       `<button class="${AS.but===k?'on':''}" title="${esc(t)}" onclick="setBut('${k}')">${l}</button>`).join('')}</div>
    </div>`}
 
-  <div class="facewrap ${AS.ro?'d3 ro':((!AS.type||C.zoned)?'d3':'d2')}">
+  <div class="facewrap ${AS.ro?'d3 ro':((!AS.type||C.zoned)?'d3':'d2')}${estBareme(AS.reg)?' bar':''}">
    ${(!AS.type||C.zoned)?`<div>
     ${AS.ro?'':`<div class="schbar">
       <div class="seg">${(AS.type?regionsDe(AS.type):['visage','corps']).map(r=>{const R=regDef(r);
@@ -5984,7 +6016,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='AW';
+const BUILD='AX';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -6431,6 +6463,11 @@ function dvActeZone(id,t){
  if(DV.fam!==(acteDef(t).fam||'esth')){ DV.fam=acteDef(t).fam||'esth'; DV.validite=trame(DV.fam).validiteJours }
  dvZone(null,id,1);
 }
+/* une prestation peut être libre d'emblée : rien n'oblige à passer par un acte */
+function dvLibreIci(i){ const l=DV.lignes[i!=null?i:dvLigne]; if(!l) return;
+ l.type=null; l.libre=l.libre||''; l.z={}; renderDevis();
+ const e=document.getElementById('dvLibre'); if(e) e.focus();
+}
 function dvToggle(id,on){ const l=dvL(); if(on) l.z[id]=acteDef(l.type).unite?null:1; else delete l.z[id]; l.prix=null; renderDevis() }
 /* barème : une zone se coche ou se décoche, un groupe entier d'un seul clic */
 function dvBarClic(ev,id,d){ if(ev&&ev.preventDefault) ev.preventDefault();
@@ -6508,10 +6545,12 @@ function renderDevis(){
    <div class="seg" style="margin-bottom:8px">${FAMILLES.map(f=>
      `<button class="${DV.fam===f.id?'on':''}" onclick="dvSetFam('${f.id}')">${f.i} ${esc(trame(f.id).titre)}</button>`).join('')}</div>
    <div class="ap-t">2 · Prestation ${dvLigne+1} sur ${DV.lignes.length}</div>
-   ${VIDE?`<div class="mu" style="font-size:11.5px;margin-bottom:6px">Aucun acte choisi pour cette prestation — sélectionnez-le ci-dessous, ou passez en ligne libre.</div>`:''}
-   ${LIB?`<div class="soins-a"><input class="inp" id="dvLibre" placeholder="Intitulé de la prestation…" value="${esc(L.libre||'')}"
+   ${VIDE?`<div class="ap-vide"><span class="mu">Aucun acte choisi pour cette prestation.</span>
+      <button class="btn xs" onclick="dvLibreIci(${dvLigne})">✎ Écrire une prestation libre</button>
+      <span class="mu">ou choisissez un acte du catalogue :</span></div>`:''}
+   ${LIB?`<div class="ap-libre"><input class="inp" id="dvLibre" placeholder="Intitulé de la prestation — « Forfait 3 séances », « Consultation »…" value="${esc(L.libre||'')}"
       oninput="dvSetLibre(${dvLigne},this.value)" onchange="renderDevis()">
-      <button class="btn xs" onclick="dvReprendreActe(${dvLigne})">Reprendre un acte du catalogue</button></div>`
+      <button class="btn xs" onclick="dvReprendreActe(${dvLigne})">↩ Reprendre un acte du catalogue</button></div>`
     :`<div class="ap-l">${actesDe(DV.fam).map(c=>`<button class="apc ${L.type===c.id?'on':''}" onclick="dvSetActe('${c.id}')">
      <span class="dot" style="background:var(--${c.col||'accent'})"></span>${esc(c.n)}
      <small>${CAN('prix')&&c.prix?EUR(c.prix):'à l’unité'}</small></button>`).join('')}</div>`}
@@ -6525,18 +6564,19 @@ function renderDevis(){
       <button class="${DV.mode==='clavier'?'on':''}" onclick="DV.mode='clavier';renderDevis()">⌨ Liste des zones</button></div>`}
     ${Object.keys(L.z).length?`<button class="chip" style="margin-left:auto" onclick="dvL().z={};renderDevis()">Effacer les zones</button>`:''}
    </div>`:''}
-  <div class="facewrap d2">
-   <div>
-    ${C.zoned&&!LIB?(estBareme(L.reg)
+  <div class="facewrap dvw ${(C.zoned&&!LIB)?(estBareme(L.reg)?'bar':''):'nosch'}">
+   ${(C.zoned&&!LIB)?`<div>
+    ${estBareme(L.reg)
       ?baremeListe(baremeById(L.reg),L.z,{prix:CAN('prix'),clic:'dvBarClic',groupe:'dvBarGroupe'})
       :DV.mode==='clavier'?dvGrille():`<div class="facebox">${schemaSVG(L.z,{editable:true,type:L.type,region:L.reg,clic:'dvZone'})}</div>
       <div class="face-legend">${L.type?`<span><i style="background:${colActe(L.type)}"></i>${esc(C.n)}${U?' ('+U+')':''}</span>`:''}
-        <span class="mu">${L.type?'clic = ajouter · clic droit = retirer':'cliquez une zone : l’acte vous sera demandé'}</span></div>`)
-     :`<div class="tip"><span class="e">ℹ️</span><div><b>${esc(LIB?(L.libre||'Prestation libre'):C.n)}</b> ne se localise pas : indiquez la quantité et le montant.</div></div>`}
-   </div>
+        <span class="mu">${L.type?'clic = ajouter · clic droit = retirer':'cliquez une zone : l’acte vous sera demandé'}</span></div>`}
+   </div>`:''}
    <div>
+    ${(C.zoned&&!LIB)?'':`<div class="tip" style="margin-bottom:11px"><span class="e">ℹ️</span><div><b>${esc(LIB?((L.libre||'').trim()||'Prestation libre'):C.n)}</b> ne se localise pas : indiquez la quantité et le montant.</div></div>`}
     <div class="recap">
      <div class="rc-h">📄 Devis ${famById(DV.fam).n.toLowerCase()}</div>
+     <div class="rc-l">
      ${DV.lignes.map((l,i)=>{const lb=l.type===null&&l.libre!=null, vd=l.type===null&&l.libre==null;
        const c=(lb||vd)?CNUL:acteDef(l.type), zs=Object.keys(l.z||{}).length;
        return `<div class="dvl ${i===dvLigne?'on':''}" onclick="dvLigne=${i};renderDevis()">
@@ -6562,11 +6602,13 @@ function renderDevis(){
               onclick="event.stopPropagation()" oninput="dvCom(${i},this.value)"></label>
          </div>`:''}
        </div>`}).join('')}
+     </div>
      <div class="soins-a" style="padding:8px 10px"><button class="btn xs" onclick="dvAdd()">+ Prestation</button>
        <button class="btn xs" onclick="dvAddLibre()">+ Ligne libre</button></div>
     </div>
-
-    <div class="dvp" style="margin-top:11px">
+   </div>
+   <div>
+    <div class="dvp">
      <div class="dvp-g">
       <label title="Remise appliquée après celles accordées prestation par prestation">Remise globale<div style="display:flex;gap:4px">
         <input class="inp" style="width:58px;text-align:right" type="number" min="0" value="${DV.remise||0}" onchange="DV.remise=+this.value||0;renderDevis()">
