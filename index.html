@@ -323,6 +323,7 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
   color:var(--ink-3);flex:none}
 .lotl .inp{height:19px;border:none;background:transparent;padding:0;margin:0;font-size:11px;
   font-weight:600;min-width:0;width:100%}
+.preset.dvproto{display:flex;flex-wrap:wrap;gap:5px;margin:0;padding:0}
 .lotl label>span{min-width:26px}
 .lotl label.col{flex-direction:column;align-items:stretch;gap:0;padding:1px 6px 2px}
 .lotl label.col>span{min-width:0;font-size:8.5px;line-height:1.5}
@@ -1044,7 +1045,9 @@ tr.supp td{background:var(--crit-w);padding:0}
 .rc-l .dvl-b{padding:0 10px 9px 10px;gap:7px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
 /* les zones de la prestation : lisibles sans faire enfler la carte */
 .rc-l .dvl-z .sc-lb{margin:2px 0 4px}
-.rc-l .dvl-z .sc-z{max-height:148px;overflow:auto}
+/* la liste des zones s'arrête entre deux lignes, jamais au milieu de l'une :
+   un protocole en pose quatre à six d'un coup */
+.rc-l .dvl-z .sc-z{max-height:206px;overflow:auto}
 .rc-l .dvl-z .zrow{padding:4px 8px;margin-bottom:4px}
 .rc-l .dvl-z .dft-z{margin-top:4px}
 /* le schéma sert à pointer, pas à occuper l'écran : il garde une largeur sobre et
@@ -1602,6 +1605,10 @@ const acteDef=t=>catById(t)||CATALOGUE[0];
 const actesDe=f=>CATALOGUE.filter(c=>(c.fam||'esth')===f);
 const regionsDe=t=>{const c=acteDef(t);return (c.reg&&c.reg.length?c.reg:['visage'])};
 const regionDef=t=>regionsDe(t)[0];
+/* la région où l'on travaille par défaut pour une famille de devis : celle du
+   premier acte du catalogue de cette famille — barème d'épilation compris */
+const regionFam=f=>{const L=CATALOGUE.filter(c=>(c.fam||'esth')===f&&c.zoned);
+ return L.length?regionDef(L[0].id):'visage'};
 const uniteActe=t=>acteDef(t).unite;
 const colActe=t=>'var(--'+(acteDef(t).col||'accent')+')';
 const nb=q=>String(+(+q).toFixed(2));      /* 16.00 → 16 · 1.20 → 1.2 */
@@ -3661,10 +3668,11 @@ V.stats=()=>{
 /* ---------- protocoles paramétrables ---------- */
 let protoSel=null;
 const protoResume=x=>{
- const E=Object.entries(x.z).filter(([,q])=>q>0);
+ const E=Object.keys(x.z);
  if(!E.length) return 'aucune zone';
+ const sd=E.filter(z=>!(+x.z[z]>0)).length;
  const par=protoActes(x).map(t=>acteDef(t).n);
- return `${E.length} zone${E.length>1?'s':''} · ${par.join(' + ')} · ${EUR(prixSeance(protoActes(x),1))}`;
+ return `${E.length} zone${E.length>1?'s':''}${sd?` (dont ${sd} sans dose)`:''} · ${par.join(' + ')} · ${EUR(prixSeance(protoActes(x),1))}`;
 };
 function zoneOptions(exclues){
  const dispo=ZONES.filter(z=>!exclues.includes(z.id));
@@ -3773,16 +3781,23 @@ function rmZoneDef(i){
  if(D.length<2){toast('Gardez au moins une zone');return}
  D.splice(i,1); zoneSel=null; rebuildZones(); paint(); toast(`« ${z.k} » supprimée`);
 }
-function setProtoZone(i,z,q){
- if(q>0) PROTOS[i].z[z]=q;
- else { delete PROTOS[i].z[z]; if(PROTOS[i].zt) delete PROTOS[i].zt[z] }
+/* La dose est facultative : un champ vidé garde la zone dans le protocole mais
+   sans quantité — on la posera « traitée », à doser en séance. La croix, elle,
+   retire vraiment la zone. */
+function setProtoZone(i,z,v){
+ const q=(v===''||v==null)?null:+v;
+ PROTOS[i].z[z]=(q>0)?Math.round(q*100)/100:null;
  paint() }
+function rmProtoZone(i,z){
+ const Z=zoneById(z);
+ delete PROTOS[i].z[z]; if(PROTOS[i].zt) delete PROTOS[i].zt[z];
+ paint(); toast(`${(Z&&Z.k)||'Zone'} retirée du protocole`) }
 /* relier une zone à l'acte qu'on y pratique */
 function setProtoActe(i,z,t){
  PROTOS[i].zt=PROTOS[i].zt||{}; PROTOS[i].zt[z]=t;
  const C=acteDef(t);
  if(!C.unite) PROTOS[i].z[z]=1;
- else if(!(+PROTOS[i].z[z]>0)) PROTOS[i].z[z]=(zoneById(z)||{}).d||1;
+ else if(!Object.prototype.hasOwnProperty.call(PROTOS[i].z,z)) PROTOS[i].z[z]=(zoneById(z)||{}).d||1;
  paint(); toast((zoneById(z)||{}).k+' → '+C.n);
 }
 function addProtoZone(i){
@@ -3913,15 +3928,18 @@ V.params=()=>{
              <div class="zn">${esc(Z.k)}
               <select class="zsel" onchange="setProtoActe(${i},'${z}',this.value)">
                 ${AZ.map(c=>`<option value="${c.id}" ${c.id===t?'selected':''}>${esc(c.n)}</option>`).join('')}</select></div>
-             ${C.unite?`<input class="inp" style="width:66px;text-align:right" type="number" min="0" step="${C.unite==='U'?1:0.1}" value="${q}"
-               onchange="setProtoZone(${i},'${z}',+this.value)">
-             <span class="mu" style="font-size:11px;width:16px">${C.unite}</span>`:'<span class="mu" style="font-size:11px">sans dose</span>'}
-             <button class="rm" onclick="setProtoZone(${i},'${z}',0)">✕</button></div>`}).join('')
+             ${C.unite?`<input class="inp" style="width:66px;text-align:right" type="number" min="0" step="${C.unite==='U'?1:0.1}"
+               value="${q>0?q:''}" placeholder="—" title="Laissez vide pour poser la zone sans dose"
+               onchange="setProtoZone(${i},'${z}',this.value)">
+             <span class="mu" style="font-size:11px;width:16px">${q>0?C.unite:''}</span>`:'<span class="mu" style="font-size:11px">sans dose</span>'}
+             <button class="rm" title="Retirer cette zone du protocole" onclick="rmProtoZone(${i},'${z}')">✕</button></div>`}).join('')
             :'<div class="empty" style="padding:14px">Aucune zone dans ce protocole.</div>'}
           <div class="addz">
             <select class="inp" id="pz${i}" style="flex:1">${zoneOptions(Object.keys(x.z))}</select>
             <button class="btn xs p" onclick="addProtoZone(${i})">+ Ajouter</button>
-          </div></div>`:''}
+          </div>
+          <div class="mu" style="font-size:11px;padding:6px 2px 0">Videz la dose pour poser la zone sans quantité — vous la doserez en séance. La croix retire la zone du protocole.</div>
+          </div>`:''}
        </div>`).join('')}
      </div></div>
     </div>
@@ -5827,11 +5845,6 @@ function majActe(){
    const rs=remisesSoins();
    rd.innerHTML=P.join(' + ')+(EUROS?' = '+EUR(prixSaisi())+(rs?` (${EUR(rs)} de remise sur les soins)`:''):'')+'.';
    rd.style.display=(EUROS?(P.length>1||rs):(P.length>1&&P.length<=3))?'':'none' }
- document.querySelectorAll('.kbd-r').forEach(r=>{
-  const on=Object.prototype.hasOwnProperty.call(AS.z,r.dataset.z);
-  r.classList.toggle('on',on);
-  const c=r.querySelector('.kbx'); if(c) c.checked=on;
- });
  const f=document.getElementById('faceLive');
  if(f) f.innerHTML=schemaSVG(AS.z,{editable:!AS.ro,hist:zoneHist(AS.pid,AS.aid),type:AS.type,region:AS.reg});
 }
@@ -6621,10 +6634,10 @@ function openDevis(pid,fam,did){
       date:d?d.date:TODAYS, prat:d?(d.praticien||PRATICIENS[0]):PRATICIENS[0],
       remise:d?(d.remise||0):0, remiseType:d?'€':'%',   /* un devis enregistré stocke sa remise en euros */
       validite:d?(d.validite||trame(f).validiteJours):trame(f).validiteJours,
-      note:d?(d.note||''):'', infosOn:true, mode:'schema',
+      note:d?(d.note||''):'', infosOn:true,
       lignes:(d&&d.prest&&d.prest.length)?d.prest.map(x=>({...x,z:{...x.z},com:x.com||'',
               prix:(x.brut!=null?x.brut:x.prix), remise:+x.remise||0, remiseType:x.remiseType||'%'}))
-            :[{type:null, libre:null, reg:'visage', z:{}, seances:1, prix:null, remise:0, remiseType:'%'}] };
+            :[{type:null, libre:null, reg:regionFam(f), z:{}, seances:1, prix:null, remise:0, remiseType:'%'}] };
  dvLigne=0; dvPlie=false; renderDevis();
  document.getElementById('over').classList.add('on');
  document.getElementById('scrim').classList.add('on');
@@ -6738,7 +6751,6 @@ function dvLibreIci(i){ dvPlie=false; const l=DV.lignes[i!=null?i:dvLigne]; if(!
  l.type=null; l.libre=l.libre||''; l.z={}; renderDevis();
  const e=document.getElementById('dvLibre'); if(e) e.focus();
 }
-function dvToggle(id,on){ dvPlie=false; const l=dvL(); if(on) l.z[id]=(l.type!==null&&acteDef(l.type).unite)?null:1; else delete l.z[id]; dvRecalc(l); renderDevis() }
 /* barème : une zone se coche ou se décoche, un groupe entier d'un seul clic */
 function dvBarClic(ev,id,d){ dvPlie=false; if(ev&&ev.preventDefault) ev.preventDefault();
  const l=dvL(); if(!l) return;
@@ -6748,6 +6760,41 @@ function dvBarClic(ev,id,d){ dvPlie=false; if(ev&&ev.preventDefault) ev.preventD
 function dvBarGroupe(gi,poser){ dvPlie=false; const l=dvL(), B=baremeById(l&&l.reg); const g=B&&B.g[gi]; if(!g) return;
  g.z.forEach(z=>{ if(poser) l.z[z.id]=1; else delete l.z[z.id] });
  dvRecalc(l); renderDevis(); toast(poser?`${g.n} — ${g.z.length} zones cochées`:`${g.n} — zones retirées`) }
+/* Un protocole tient plusieurs actes ; dans un devis, il donne une prestation
+   par acte, chacune avec ses zones et leurs doses. La première remplace la
+   ligne en cours si elle est encore vide. */
+function dvProto(i){
+ const P=PROTOS[i]; if(!P||!DV) return;
+ const L=dvL();
+ if(DV.fam!=='esth'||(L&&estBareme(L.reg))){toast('Les protocoles sont définis sur le visage');return}
+ const T=protoActes(P);
+ if(!T.length){toast(`Le protocole « ${P.n} » ne contient aucune zone`);return}
+ let cible=dvLigne;
+ T.forEach((t,k)=>{
+  const z={};
+  Object.keys(P.z).forEach(zn=>{ if(protoActe(P,zn)===t) z[zn]=acteDef(t).unite?P.z[zn]:1 });
+  const cur=DV.lignes[cible];
+  const vide=cur&&cur.type===null&&cur.libre==null;
+  if(k===0&&vide) Object.assign(cur,{type:t, libre:null, reg:'visage', z, prix:null});
+  else { DV.lignes.push({type:t, libre:null, com:'', reg:'visage', z,
+          seances:1, prix:null, remise:0, remiseType:'%'});
+         cible=DV.lignes.length-1 }
+ });
+ dvLigne=cible; dvPlie=false; renderDevis();
+ toast(`Protocole « ${P.n} » · ${T.map(t=>acteDef(t).n).join(' + ')}`);
+}
+/* reporter à gauche ce qui est posé à droite, et l'inverse */
+function dvMirror(){
+ const l=dvL(); if(!l) return;
+ let n=0;
+ Object.keys({...l.z}).forEach(k=>{
+  const m=k.endsWith('_d')?k.slice(0,-2)+'_g':k.endsWith('_g')?k.slice(0,-2)+'_d':null;
+  if(!m||!zoneById(m)) return;
+  if(!Object.prototype.hasOwnProperty.call(l.z,m)) n++;
+  l.z[m]=l.z[k] });
+ dvRecalc(l); dvPlie=false; renderDevis();
+ toast(n?`${n} zone${n>1?'s ajoutées':' ajoutée'} par symétrie`:'Les zones sont déjà symétriques');
+}
 function dvAdd(){ DV.lignes.push({type:null,libre:null,com:'',reg:'visage',z:{},seances:1,prix:null,remise:0,remiseType:'%'});
  dvLigne=DV.lignes.length-1; dvPlie=false; renderDevis() }
 /* ✓ Confirmer : la prestation en cours est vérifiée, puis repliée dans la liste */
@@ -6847,16 +6894,18 @@ function renderDevis(){
     <div class="ap-t" style="width:100%;margin:0 0 2px">3 · Où ? <span class="mu" style="text-transform:none;letter-spacing:0;font-weight:500">— facultatif</span></div>
     ${regionsDe(L.type).length>1?`<div class="seg">${regionsDe(L.type).map(r=>{const R=regDef(r);
       return `<button class="${L.reg===r?'on':''}" onclick="dvSetReg('${r}')" title="${esc(R.n)}">${R.i} ${esc(R.court||R.n)}</button>`}).join('')}</div>`:''}
-    ${estBareme(L.reg)?'<span class="mu" style="font-size:11.5px">tarifs à la séance</span>':`<div class="seg">
-      <button class="${DV.mode!=='clavier'?'on':''}" onclick="DV.mode='schema';renderDevis()">◉ Schéma ${L.reg==='corps'?'du corps':'du visage'}</button>
-      <button class="${DV.mode==='clavier'?'on':''}" onclick="DV.mode='clavier';renderDevis()">⌨ Liste des zones</button></div>`}
+    ${estBareme(L.reg)?'<span class="mu" style="font-size:11.5px">tarifs à la séance</span>':''}
+    ${(estBareme(L.reg)||L.reg!=='visage'||DV.fam!=='esth')?'':`<div class="preset dvproto">
+      <span class="mu" style="font-size:11px;align-self:center;margin-right:2px">Protocole :</span>
+      ${PROTOS.map((x,i)=>`<button class="chip" onclick="dvProto(${i})" title="${esc(protoResume(x))}">${esc(x.n)}</button>`).join('')}
+      <button class="chip" onclick="dvMirror()">⇄ Symétriser</button></div>`}
     ${Object.keys(L.z).length?`<button class="chip" style="margin-left:auto" onclick="dvL().z={};renderDevis()">Effacer les zones</button>`:''}
    </div>`:''}
   <div class="facewrap dvw ${C.zoned?(estBareme(L.reg)?'bar':''):'nosch'}">
    ${C.zoned?`<div>
     ${estBareme(L.reg)
       ?baremeListe(baremeById(L.reg),L.z,{prix:CAN('prix'),clic:'dvBarClic',groupe:'dvBarGroupe'})
-      :DV.mode==='clavier'?dvGrille():`<div class="facebox">${schemaSVG(L.z,{editable:true,type:L.type,region:L.reg,clic:'dvZone',libre:LIB})}</div>
+      :`<div class="facebox">${schemaSVG(L.z,{editable:true,type:L.type,region:L.reg,clic:'dvZone',libre:LIB})}</div>
       <div class="face-legend">${L.type?`<span><i style="background:${colActe(L.type)}"></i>${esc(C.n)}${U?' ('+U+')':''}</span>`
           :LIB?`<span><i style="background:var(--ink-3)"></i>${esc((L.libre||'').trim()||'Prestation libre')}</span>`:''}
         <span class="mu">${(L.type||LIB)?'clic = ajouter · clic droit = retirer':'cliquez une zone : l’acte vous sera demandé'}</span></div>`}
@@ -6956,22 +7005,6 @@ function renderDevis(){
    <button class="btn" onclick="dvEnregistrer(false)">Enregistrer en brouillon</button>
    <button class="btn p" onclick="dvEnregistrer(true)">✉ ${DV.id&&(DEVIS.find(x=>x.id===DV.id)||{}).statut!=='brouillon'?'Corriger et renvoyer':'Enregistrer et envoyer'}${CAN('prix')?' · '+EUR(T.net):''}</button></div>`;
 }
-function dvGrille(){
- const l=dvL(), C=acteDef(l.type), ZL=zonesDe(l.reg), mid=Math.ceil(ZL.length/2);
- const col=A=>`<div class="kbd-c">
-   <div class="kbd-h"><span class="zd" style="background:${colActe(l.type)}"></span>${esc(C.n)}
-     <small>quantité facultative</small></div>
-   ${A.map(z=>{const on=Object.prototype.hasOwnProperty.call(l.z,z.id), q=+l.z[z.id]||0;
-    return `<div class="kbd-r ${on?'on':''}" data-z="${z.id}">
-      <input type="checkbox" class="kbx" ${on?'checked':''} onchange="dvToggle('${z.id}',this.checked)">
-      <label onclick="dvToggle('${z.id}',!${on})">${esc(z.k)}${z.post?'<small>vue postérieure</small>':''}</label>
-      <input class="inp" type="number" min="0" step="${z.s||1}" placeholder="1" value="${q||''}"
-        onchange="dvL().z['${z.id}']=this.value===''?null:+this.value;dvL().prix=null;renderDevis()">
-      ${z.u?`<span class="u">${esc(z.u)}</span>`:''}</div>`}).join('')}
-  </div>`;
- return `<div class="kbd"><div class="kbd-g">${col(ZL.slice(0,mid))}${col(ZL.slice(mid))}</div></div>`;
-}
-
 /* ==========================================================================
    Command palette / navigation
    ========================================================================== */
