@@ -324,10 +324,27 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .lotl .inp{height:19px;border:none;background:transparent;padding:0;margin:0;font-size:11px;
   font-weight:600;min-width:0;width:100%}
 .lotl label>span{min-width:26px}
+.lotl label.col{flex-direction:column;align-items:stretch;gap:0;padding:1px 6px 2px}
+.lotl label.col>span{min-width:0;font-size:8.5px;line-height:1.5}
+.lotl label.col select.lotsel{height:17px;font-size:11px}
 .lotl .inp[type=date],.lotl .inp.pdate{width:auto;flex:1}
 .lotl .inp.pdate{font-variant-numeric:tabular-nums;letter-spacing:.01em}
 .lotl .inp.per{color:var(--crit)}
 .lotl .inp.pro{color:#8a6100}
+.lotl select.lotsel.per{color:var(--crit)}
+.lotl select.lotsel.pro{color:#8a6100}
+/* choix du lot quand la référence en tient plusieurs */
+.lotl select.lotsel{appearance:none;-webkit-appearance:none;cursor:pointer;
+  padding-right:12px;text-overflow:ellipsis;
+  background:transparent url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0h8L4 5z' fill='%238b93a7'/%3E%3C/svg%3E") no-repeat right 1px center}
+.lotl select.lotsel option.ko{color:var(--crit)}
+.cpick-b .lo .lm{font-size:9px;font-weight:800;color:var(--accent-ink);background:var(--accent-wash);
+  border-radius:4px;padding:0 3px;margin-left:2px}
+td .lko{color:var(--crit);font-weight:640}
+td .lvide{color:var(--ink-3);text-decoration:line-through}
+.lotl .lotn{align-self:flex-start;font-size:9px;font-weight:800;letter-spacing:.03em;
+  text-transform:uppercase;color:var(--accent-ink);background:var(--accent-wash);
+  border-radius:5px;padding:1px 5px;margin-top:-1px}
 .prep-g.gros{font-size:12.5px;text-transform:none;letter-spacing:0;font-weight:660;color:var(--ink);
   padding:6px 2px 4px;gap:7px}
 .prep-g.gros .e{font-size:13px}
@@ -1854,17 +1871,31 @@ const ORDONNANCES=[];
  });
 })();
 
+/* Une référence ne tient pas un lot mais plusieurs : deux boîtes du même produit
+   arrivées à deux mois d'écart portent deux numéros et deux péremptions. Le stock
+   est donc une liste de lots ; `q`, `lot` et `per` de la référence en sont dérivés
+   (voir recalcStock plus bas) et valent « ce qu'il reste » et « le lot qu'on entame ». */
 const STOCK=[
- {ref:'AH-VOLB',n:'Acide hyaluronique — volumateur 1 ml',cat:'Injectable',sfam:'Acide hyaluronique',u:'seringue',q:11,s:8,lot:'L-AH2409',per:'2027-03-31',pu:78,f:'Allergan France'},
- {ref:'AH-LYFT',n:'Acide hyaluronique — comblement profond 1 ml',cat:'Injectable',sfam:'Acide hyaluronique',u:'seringue',q:4,s:6,lot:'L-RL2502',per:'2027-01-31',pu:82,f:'Galderma'},
- {ref:'BTX-100',n:'Toxine botulique 100 U',cat:'Injectable',sfam:'Toxine botulique',u:'flacon',q:3,s:5,lot:'L-BX2601',per:'2026-11-30',pu:210,f:'Allergan France'},
- {ref:'SKB-PRO',n:'Skinbooster 2 ml',cat:'Injectable',sfam:'Skinboosters',u:'seringue',q:9,s:5,lot:'L-PF2603',per:'2027-05-31',pu:96,f:'IBSA'},
- {ref:'MESO-K',n:'Cocktail mésothérapie',cat:'Injectable',sfam:'Mésothérapie',u:'flacon',q:14,s:6,lot:'L-MK2602',per:'2026-09-30',pu:34,f:'Filorga'},
- {ref:'PEEL-S',n:'Peeling — acide glycolique',cat:'Topique',sfam:'Peelings',u:'flacon',q:6,s:3,lot:'L-PE2604',per:'2027-02-28',pu:41,f:'SkinCeuticals'},
- {ref:'ANE-EML',n:'Crème anesthésiante 30 g',cat:'Topique',sfam:'Anesthésiques',u:'tube',q:5,s:4,lot:'L-EM2508',per:'2026-08-31',pu:12,f:'Cooper'},
- {ref:'AIG-30G',n:'Aiguilles 30 G',cat:'Consommable',sfam:'Aiguilles & canules',u:'boîte 100',q:9,s:4,lot:null,per:'2028-06-30',pu:14,f:'B. Braun'},
- {ref:'CAN-25G',n:'Canules 25 G × 50 mm',cat:'Consommable',sfam:'Aiguilles & canules',u:'boîte 20',q:2,s:4,lot:null,per:'2028-01-31',pu:46,f:'TSK'},
- {ref:'CMP-ST',n:'Compresses stériles',cat:'Consommable',sfam:'Pansements & compresses',u:'boîte 100',q:18,s:6,lot:null,per:'2029-04-30',pu:6,f:'Hartmann'},
+ {ref:'AH-VOLB',n:'Acide hyaluronique — volumateur 1 ml',cat:'Injectable',sfam:'Acide hyaluronique',u:'seringue',s:8,pu:78,f:'Allergan France',
+  lots:[{lot:'L-AH2409',per:'2027-03-31',q:7},{lot:'L-AH2511',per:'2027-09-30',q:4}]},
+ {ref:'AH-LYFT',n:'Acide hyaluronique — comblement profond 1 ml',cat:'Injectable',sfam:'Acide hyaluronique',u:'seringue',s:6,pu:82,f:'Galderma',
+  lots:[{lot:'L-RL2502',per:'2027-01-31',q:2},{lot:'L-RL2504',per:'2027-06-30',q:2}]},
+ {ref:'BTX-100',n:'Toxine botulique 100 U',cat:'Injectable',sfam:'Toxine botulique',u:'flacon',s:5,pu:210,f:'Allergan France',
+  lots:[{lot:'L-BX2601',per:'2026-11-30',q:2},{lot:'L-BX2512',per:'2027-02-28',q:1},{lot:'L-BX2504',per:'2026-06-30',q:1}]},
+ {ref:'SKB-PRO',n:'Skinbooster 2 ml',cat:'Injectable',sfam:'Skinboosters',u:'seringue',s:5,pu:96,f:'IBSA',
+  lots:[{lot:'L-PF2603',per:'2027-05-31',q:5},{lot:'L-PF2606',per:'2027-11-30',q:4}]},
+ {ref:'MESO-K',n:'Cocktail mésothérapie',cat:'Injectable',sfam:'Mésothérapie',u:'flacon',s:6,pu:34,f:'Filorga',
+  lots:[{lot:'L-MK2602',per:'2026-09-30',q:14}]},
+ {ref:'PEEL-S',n:'Peeling — acide glycolique',cat:'Topique',sfam:'Peelings',u:'flacon',s:3,pu:41,f:'SkinCeuticals',
+  lots:[{lot:'L-PE2604',per:'2027-02-28',q:6}]},
+ {ref:'ANE-EML',n:'Crème anesthésiante 30 g',cat:'Topique',sfam:'Anesthésiques',u:'tube',s:4,pu:12,f:'Cooper',
+  lots:[{lot:'L-EM2508',per:'2026-08-31',q:2},{lot:'L-EM2602',per:'2027-01-31',q:3}]},
+ {ref:'AIG-30G',n:'Aiguilles 30 G',cat:'Consommable',sfam:'Aiguilles & canules',u:'boîte 100',s:4,pu:14,f:'B. Braun',
+  lots:[{lot:null,per:'2028-06-30',q:9}]},
+ {ref:'CAN-25G',n:'Canules 25 G × 50 mm',cat:'Consommable',sfam:'Aiguilles & canules',u:'boîte 20',s:4,pu:46,f:'TSK',
+  lots:[{lot:null,per:'2028-01-31',q:2}]},
+ {ref:'CMP-ST',n:'Compresses stériles',cat:'Consommable',sfam:'Pansements & compresses',u:'boîte 100',s:6,pu:6,f:'Hartmann',
+  lots:[{lot:null,per:'2029-04-30',q:18}]},
 ];
 /* le catalogue produit, rangé pour s'y retrouver : famille puis sous-famille */
 const FAMS=['Injectable','Topique','Consommable'];
@@ -1902,9 +1933,71 @@ const nbRange=G=>G.reduce((n,f)=>n+f.sfams.reduce((m,g)=>m+g.items.length,0),0);
    else if(v&&typeof v==='object') parcours(v) } };
  [PATIENTS,ACTES,DEVIS,FACTURES,STOCK].forEach(A=>A.forEach(parcours));
 })();
-const sst=s=>{const p=days(TODAY,s.per);
- if(s.q===0)return{k:'rupture',l:'Rupture',c:'b-crit'};
- if(s.q<s.s)return{k:'bas',l:'Sous le seuil',c:'b-crit'};
+
+/* ==========================================================================
+   Lots : plusieurs par référence
+   ========================================================================== */
+/* Les lignes de stock d'une référence, jamais nulles */
+const lotsDe=x=>(x&&Array.isArray(x.lots))?x.lots:[];
+const lotCle=l=>String((l&&l.lot)||'');
+const lotPerime=l=>!!(l&&l.per&&l.per<TODAYS);
+const lotEpuise=l=>!(l&&(+l.q||0)>0);
+/* Le lot qu'on entame : le plus proche de la péremption parmi ceux qui restent
+   et qui ne sont pas périmés (FEFO). À défaut, le premier qui reste ; à défaut,
+   le premier tout court — un lot périmé ou vide se propose quand même, marqué. */
+function lotFEFO(x){
+ const par=A=>A.slice().sort((a,b)=>String(a.per||'9999-12-31').localeCompare(String(b.per||'9999-12-31')));
+ const L=lotsDe(x);
+ const bons=L.filter(l=>!lotEpuise(l)&&!lotPerime(l));
+ if(bons.length) return par(bons)[0];
+ const restants=L.filter(l=>!lotEpuise(l));
+ if(restants.length) return par(restants)[0];
+ return par(L)[0]||null;
+}
+/* Un lot précis d'une référence, par son numéro */
+const lotDe=(x,n)=>lotsDe(x).find(l=>lotCle(l)===String(n||''))||null;
+/* Ce qui reste, et le lot courant, se déduisent des lots — jamais l'inverse */
+function recalcStock(x){
+ if(!x) return x;
+ if(!Array.isArray(x.lots)) x.lots=[{lot:x.lot||null, per:x.per||null, q:+x.q||0}];
+ x.q=x.lots.reduce((n,l)=>n+Math.max(0,+l.q||0),0);
+ const f=lotFEFO(x);
+ x.lot=f?f.lot:null; x.per=f?f.per:null;
+ return x;
+}
+STOCK.forEach(recalcStock);
+/* Sortir une quantité d'un lot donné — c'est là, et nulle part ailleurs, que le
+   stock bouge. On ne descend jamais sous zéro : ce qui manque est simplement noté. */
+function sortirLot(x,n,q){
+ if(!x) return 0;
+ const l=lotDe(x,n)||lotFEFO(x);
+ if(!l){ x.q=Math.max(0,(x.q||0)-q); return 0 }
+ const pris=Math.min(Math.max(0,+l.q||0), Math.max(0,+q||0));
+ l.q=Math.max(0,(+l.q||0)-(+q||0));
+ recalcStock(x); return pris;
+}
+/* Rendre une quantité au lot d'où elle venait — le lot est recréé s'il a disparu */
+function rendreLot(x,n,q,per){
+ if(!x) return;
+ let l=lotDe(x,n);
+ if(!l){ l={lot:(n&&n!=='—')?n:null, per:per||x.per||null, q:0}; (x.lots=x.lots||[]).push(l) }
+ l.q=Math.max(0,(+l.q||0)+(+q||0));
+ recalcStock(x);
+}
+/* Étiquette d'un lot dans un menu : numéro, péremption, ce qu'il en reste.
+   Forme courte pour les menus étroits — c'est le numéro qui identifie, il vient
+   donc en tête et ne se fait jamais tronquer. */
+const lotAlerte=l=>lotPerime(l)?' ⚠ périmé':(lotEpuise(l)?' ⚠ épuisé':'');
+const lotLabel=(l,court)=>`${l.lot||'sans n° de lot'}${l.per?' · '+DFP(l.per):''}`
+ +(court?'':` · ${Math.max(0,+l.q||0)} en stock`)+lotAlerte(l);
+
+/* Ce qu'on peut réellement employer : un lot périmé est physiquement là, mais il
+   ne compte pas dans ce qui reste à injecter. */
+const stockUtile=s=>lotsDe(s).filter(l=>!lotPerime(l)).reduce((n,l)=>n+Math.max(0,+l.q||0),0);
+const stockPerime=s=>lotsDe(s).filter(lotPerime).reduce((n,l)=>n+Math.max(0,+l.q||0),0);
+const sst=s=>{const p=days(TODAY,s.per), u=stockUtile(s);
+ if(u===0)return{k:'rupture',l:'Rupture',c:'b-crit'};
+ if(u<s.s)return{k:'bas',l:'Sous le seuil',c:'b-crit'};
  if(p<90)return{k:'per',l:'Péremption < 3 mois',c:'b-warn'};
  if(s.q<s.s*1.4)return{k:'surv',l:'À surveiller',c:'b-warn'};
  return{k:'ok',l:'OK',c:'b-good'}};
@@ -3497,14 +3590,15 @@ let sF='tous',lotSel='';
 V.stock=()=>{
  const L=STOCK.filter(s=>sF==='tous'||(sF==='alerte'?['bas','rupture','per'].includes(sst(s).k):s.cat===sF));
  const val=STOCK.reduce((a,s)=>a+s.q*s.pu,0);
- return `<div class="head"><div><h1>Stock &amp; lots</h1><p>${STOCK.length} références · ${EUR(val)} immobilisés</p></div>
+ const nLots=STOCK.reduce((n,s)=>n+lotsDe(s).length,0);
+ return `<div class="head"><div><h1>Stock &amp; lots</h1><p>${STOCK.length} références · ${nLots} lots · ${EUR(val)} immobilisés</p></div>
   <div class="r"><button class="btn" onclick="toast('Bon de commande généré')">Bon de commande</button>
    <button class="btn p" onclick="toast('Entrée de stock')">+ Entrée</button></div></div>
  <div class="tip"><span class="e">📦</span><div><b>Le stock se décrémente tout seul.</b> Chaque zone injectée consomme la quantité correspondante et rattache le n° de lot au patient. Vous ne comptez plus les seringues : vous validez une commande quand le logiciel vous le dit.</div></div>
  <div class="grid g4" style="margin-bottom:14px">
   ${kpi('Valeur du stock',EUR(val))}
   ${kpi('Sous le seuil',STOCK.filter(s=>s.q<s.s).length,'à recommander',STOCK.filter(s=>s.q<s.s).length?'dn':'up')}
-  ${kpi('Péremption < 3 mois',STOCK.filter(s=>days(TODAY,s.per)<90).length,'à écouler')}
+  ${kpi('Péremption < 3 mois',STOCK.reduce((n,s)=>n+lotsDe(s).filter(l=>!lotEpuise(l)&&days(TODAY,l.per)<90).length,0),'lots à écouler')}
   ${kpi('Lots tracés',[...new Set(ACTES.filter(a=>a.lot).map(a=>a.lot))].length,'rappel produit possible en 1 clic')}</div>
  <div class="fbar"><div class="seg">${[['tous','Toutes'],['alerte','⚠ Alertes'],['Injectable','Injectables'],['Topique','Topiques'],['Consommable','Consommables']]
   .map(([k,l])=>`<button class="${sF===k?'on':''}" onclick="sF='${k}';paint()">${l}</button>`).join('')}</div></div>
@@ -3512,12 +3606,15 @@ V.stock=()=>{
   <thead><tr><th>Référence</th><th class="num">Stock</th><th>Niveau</th><th>Lot</th><th>Péremption</th><th class="num">À commander</th><th>Statut</th><th>Fournisseur</th></tr></thead>
   <tbody>${L.map(s=>{const st=sst(s),pct=Math.min(100,s.q/(s.s*2)*100),
    col=st.k==='ok'?'var(--good)':(st.k==='surv'||st.k==='per')?'var(--warn)':'var(--crit)',
+   pctU=Math.min(100,stockUtile(s)/(s.s*2)*100),
    per=days(TODAY,s.per),bes=Math.max(0,s.s*2-s.q);
    return `<tr><td><b>${esc(s.n)}</b><div class="mu mono" style="font-size:11px">${s.ref} · ${EUR(s.pu)}/${s.u}</div></td>
-    <td class="num"><b>${s.q}</b> <span class="mu" style="font-size:11px">/ ${s.s}</span></td>
-    <td><div class="bar"><i style="width:${pct}%;background:${col}"></i></div></td>
-    <td class="mono" style="font-size:11.5px">${s.lot||'<span class="mu">n/a</span>'}</td>
-    <td class="mono" ${per<90?'style="color:var(--warn);font-weight:620"':'class="mono mu"'}>${DFP(s.per)}</td>
+    <td class="num"><b>${s.q}</b> <span class="mu" style="font-size:11px">/ ${s.s}</span>
+      ${stockPerime(s)?`<div class="mu" style="font-size:10px;color:var(--crit);font-weight:640">dont ${stockPerime(s)} périmé${stockPerime(s)>1?'s':''}</div>`:''}</td>
+    <td><div class="bar"><i style="width:${pctU}%;background:${col}"></i></div></td>
+    <td class="mono" style="font-size:11.5px">${lotsDe(s).map(l=>`<div class="${lotPerime(l)?'lko':lotEpuise(l)?'lvide':''}">${l.lot?esc(l.lot):'<span class="mu">n/a</span>'}</div>`).join('')||'<span class="mu">n/a</span>'}</td>
+    <td class="mono" style="font-size:11.5px">${lotsDe(s).map(l=>{const d=days(TODAY,l.per);
+      return `<div class="${lotPerime(l)?'lko':lotEpuise(l)?'lvide':''}" ${(!lotPerime(l)&&d<90)?'style="color:var(--warn);font-weight:620"':''}>${DFP(l.per)} <span class="mu">· ${Math.max(0,+l.q||0)}</span></div>`}).join('')||`<span class="mu">${DFP(s.per)}</span>`}</td>
     <td class="num">${bes?`<b>${bes}</b>`:'<span class="mu">—</span>'}</td>
     <td>${bdg(st.c,st.l)}</td><td class="mu" style="font-size:11.5px">${esc(s.f)}</td></tr>`}).join('')}
   </tbody></table></div></div>
@@ -4436,7 +4533,8 @@ function syncConsoAuto(){
  T.forEach(t=>{ const c=consoDuSoin(t); if(!c||AS.consoOff.includes(c.ref)) return;
   const st=STOCK.find(x=>x.ref===c.ref)||{};
   const ex=AS.conso.find(l=>l.ref===c.ref);
-  if(!ex) AS.conso.push({ref:c.ref, q:c.q, auto:true, lot:st.lot||'', per:st.per||''});
+  if(!ex){const f=lotFEFO(st); AS.conso.push({ref:c.ref, q:c.q, auto:true,
+    lot:(f&&f.lot)||st.lot||'', per:(f&&f.per)||st.per||''})}
   else if(ex.auto) ex.q=c.q });
 }
 function ajouterProduit(ref){
@@ -4445,7 +4543,8 @@ function ajouterProduit(ref){
  AS.consoOff=(AS.consoOff||[]).filter(r=>r!==ref);
  const ex=AS.conso.find(l=>l.ref===ref);
  if(ex){ ex.q+=1; ex.auto=false }
- else AS.conso.push({ref, q:1, auto:false, lot:st.lot||'', per:st.per||''});
+ else {const f=lotFEFO(st); AS.conso.push({ref, q:1, auto:false,
+   lot:(f&&f.lot)||st.lot||'', per:(f&&f.per)||st.per||''})}
  toast(`${st.n} ajouté à la séance`); renderOver();
 }
 /* le lot et sa péremption se corrigent ligne par ligne : deux boîtes du même
@@ -4458,6 +4557,17 @@ function majLot(i,k,v,el){ const l=(AS.conso||[])[i]; if(!l) return;
    v=iso }
  l[k]=v; l.auto=false; if(k==='per') renderOver() }
 
+/* Choisir, parmi les lots réellement en stock, celui qu'on a employé : la
+   péremption suit le lot, c'est tout l'intérêt d'avoir à la choisir. */
+function choisirLot(i,n){
+ const l=(AS.conso||[])[i]; if(!l) return;
+ if(n==='__autre'){ l.lotLibre=true; l.auto=false; renderOver(); return }
+ const st=STOCK.find(x=>x.ref===l.ref), lot=lotDe(st,n);
+ l.lotLibre=false; l.auto=false;
+ l.lot=lot?(lot.lot||''):n;
+ if(lot) l.per=lot.per||'';
+ renderOver();
+}
 function majConsoSaisie(i,d,v){ const l=(AS.conso||[])[i]; if(!l) return;
  l.q=Math.max(1, v!=null?(+v||1):(l.q+d)); l.auto=false; majActe() }
 function rmConsoSaisie(i){ const l=(AS.conso||[])[i]; if(!l) return;
@@ -5117,7 +5227,7 @@ function consultPane(prix){
                 title="${esc(x.n)}${x.f?' · '+esc(x.f):''}${x.per?' · exp. '+DFP(x.per):''}">
                 <span class="pk">${dedans?'✓':'+'}</span>
                 <span class="nm">${esc(x.n)}</span>
-                <span class="lo">${x.lot?esc(x.lot):'—'}${x.per?`<i>${DFP(x.per)}</i>`:''}</span>
+                <span class="lo">${x.lot?esc(x.lot):'—'}${lotsDe(x).length>1?` <b class="lm">+${lotsDe(x).length-1}</b>`:''}${x.per?`<i>${DFP(x.per)}</i>`:''}</span>
                 <span class="st ${x.q<=x.s?'bas':''}">${x.q}</span></button>`}).join('')).join('')}`).join('')
          :`<div class="mu" style="font-size:11.5px;padding:10px 4px">Aucun produit ne correspond.</div>`}
       </div></div>`})():''}
@@ -5127,16 +5237,26 @@ function consultPane(prix){
      const perime=per&&per<TODAYS, proche=per&&!perime&&per<addD(TODAYS,90);
      return `<div class="crow c-s">
        <div class="cn"><b title="${esc(st.n||l.ref)}">${esc(st.n||l.ref)}</b>
-         <div class="lotl" onclick="event.stopPropagation()">
-           <label title="Numéro de lot"><span>Lot</span>
-             <input class="inp" value="${esc(l.lot||st.lot||'')}" placeholder="—"
-               onchange="majLot(${i},'lot',this.value)"></label>
-           <label title="Date de péremption de ce lot"><span>Exp.</span>
+         ${(()=>{const LO=lotsDe(st), cur=l.lot||st.lot||'';
+           /* plusieurs lots en stock : on choisit lequel on a réellement utilisé */
+           const menu=LO.length>1&&!l.lotLibre;
+           return `<div class="lotl" onclick="event.stopPropagation()">
+           <label class="${menu?'col':''}" title="Numéro de lot"><span>Lot${menu?` — ${LO.length} en stock`:''}</span>
+             ${menu?`<select class="inp lotsel ${perime?'per':proche?'pro':''}" onchange="choisirLot(${i},this.value)"
+                title="${esc(LO.length)} lots de ce produit en stock — ${esc(LO.map(x=>lotLabel(x)).join(' | '))}">
+                ${LO.map(x=>`<option value="${esc(lotCle(x))}" ${lotCle(x)===cur?'selected':''}
+                  ${(lotPerime(x)||lotEpuise(x))?'class="ko"':''}>${esc(lotLabel(x,1))}</option>`).join('')}
+                ${LO.some(x=>lotCle(x)===cur)?'':`<option value="${esc(cur)}" selected>${esc(cur||'—')} · saisi à la main</option>`}
+                <option value="__autre">Autre lot — saisir à la main…</option></select>`
+              :`<input class="inp" value="${esc(cur)}" placeholder="—"
+                 onchange="majLot(${i},'lot',this.value)">`}</label>
+           ${menu?''   /* le menu porte déjà la péremption : elle appartient au lot */
+            :`<label title="Date de péremption de ce lot"><span>Exp.</span>
              <input class="inp pdate ${perime?'per':proche?'pro':''}" inputmode="numeric" maxlength="10"
                value="${DFP(per)}" placeholder="jj/mm/aa"
                oninput="this.value=masquePer(this.value)"
-               onchange="majLot(${i},'per',this.value,this)"></label>
-         </div>
+               onchange="majLot(${i},'per',this.value,this)"></label>`}
+         </div>`})()}
          <small>${perime?'<span style="color:var(--crit);font-weight:700">⚠ périmé</span> · '
                  :proche?'<span style="color:var(--warn-ink,#8a6100);font-weight:600">périme bientôt</span> · ':''
          }${reste<0?'<span style="color:var(--crit);font-weight:600">stock insuffisant</span>':'reste '+reste+' après la séance'}</small></div>
@@ -5782,7 +5902,7 @@ function saveActe(){
   CONSO.push({id:'CS-'+(CONSO.length+1+9000), acte:ACTES[0].id, patient:AS.pid, ref:st.ref,
     nom:st.n, lot:(l.lot||st.lot||'—'), per:(l.per||st.per), q:l.q, u:st.u,
     ts:nowStamp(), par:ROLES[role].u});
-  st.q=Math.max(0,st.q-l.q) });
+  sortirLot(st, l.lot, l.q) });
  closeAll(); pSel=AS.pid; pTab='resume'; go('patients');
  const nCs=(AS.conso||[]).length;
  toast(`${T.map(t=>acteDef(t).n).join(' + ')||'Séance'} enregistré${nCs?` · ${nCs} consommable${nCs>1?'s':''} tracé${nCs>1?'s':''}`:''}${nDoc?` · ${nDoc} document${nDoc>1?'s':''} édité${nDoc>1?'s':''}`:''} · consentement ${AS.consent?'signé':'à faire signer'}`);
@@ -5960,19 +6080,23 @@ function secPhotos(a){
 }
 
 /* ---------------- Consommables ---------------- */
+let csRefSel=STOCK[0].ref;
 function toggleConso(){ consoAdd=!consoAdd; renderOver() }
 function addConso(aid){
  const a=ACTES.find(x=>x.id===aid); if(!a) return;
  const ref=(document.getElementById('csRef')||{}).value;
  const q=Math.max(1,+((document.getElementById('csQ')||{}).value)||1);
  const st=STOCK.find(x=>x.ref===ref); if(!st){toast('Choisissez un produit');return}
+ /* le lot vient du menu quand la référence en tient plusieurs, sinon du FEFO */
+ const nLot=(document.getElementById('csLot')||{}).value;
+ const lot=lotDe(st,nLot)||lotFEFO(st);
  CONSO.push({id:'CS-'+(CONSO.length+1+9000), acte:a.id, patient:a.patient, ref:st.ref, nom:st.n,
-   lot:st.lot||'—', per:st.per, q, u:st.u, ts:nowStamp(), par:ROLES[role].u});
- st.q=Math.max(0,st.q-q);
- consoAdd=false; toast(`${st.n} × ${q} · lot ${st.lot||'—'} — stock à ${st.q}`); renderOver();
+   lot:(lot&&lot.lot)||'—', per:lot?lot.per:st.per, q, u:st.u, ts:nowStamp(), par:ROLES[role].u});
+ sortirLot(st, lot&&lot.lot, q);
+ consoAdd=false; toast(`${st.n} × ${q} · lot ${(lot&&lot.lot)||'—'} — stock à ${st.q}`); renderOver();
 }
 function delConso(id){ const i=CONSO.findIndex(x=>x.id===id); if(i<0) return;
- const c=CONSO[i], st=STOCK.find(x=>x.ref===c.ref); if(st) st.q+=c.q;
+ const c=CONSO[i], st=STOCK.find(x=>x.ref===c.ref); if(st) rendreLot(st,c.lot,c.q,c.per);
  CONSO.splice(i,1); toast('Consommable retiré · stock recrédité'); renderOver() }
 function secConso(a){
  const L=consoActe(a);
@@ -5981,10 +6105,14 @@ function secConso(a){
    <div class="mu" style="font-size:11px">${L.length?`${L.length} ligne${L.length>1?'s':''} · traçabilité des lots`:'rien de tracé sur cet acte'}</div></div>
    <div class="r"><button class="btn xs ${consoAdd?'g':'p'}" onclick="toggleConso()">${consoAdd?'✕':'＋ Produit'}</button></div></div>
   ${consoAdd?`<div class="cadd">
-    <select class="inp" id="csRef">${STOCK.map(x=>`<option value="${x.ref}">${esc(x.n)}${x.lot?' · lot '+esc(x.lot):''} — ${x.q} en stock</option>`).join('')}</select>
+    <select class="inp" id="csRef" onchange="csRefSel=this.value;renderOver()">${STOCK.map(x=>`<option value="${x.ref}" ${csRefSel===x.ref?'selected':''}>${esc(x.n)} — ${x.q} en stock${lotsDe(x).length>1?' · '+lotsDe(x).length+' lots':''}</option>`).join('')}</select>
     <input class="inp" id="csQ" type="number" min="1" value="1" style="width:64px">
     <button class="btn xs p" onclick="addConso(${a.id})">Ajouter</button>
-    <div class="mu" style="font-size:11px;grid-column:1/-1">Le lot et la péremption sont repris du stock, et la quantité en est décomptée.</div>
+    ${(()=>{const st=STOCK.find(x=>x.ref===csRefSel)||STOCK[0], LO=lotsDe(st);
+      return `<select class="inp" id="csLot" style="grid-column:1/-1" ${LO.length>1?'':'disabled'}>
+        ${LO.map(x=>`<option value="${esc(lotCle(x))}">Lot ${esc(lotLabel(x))}</option>`).join('')
+          ||'<option value="">sans lot</option>'}</select>`})()}
+    <div class="mu" style="font-size:11px;grid-column:1/-1">La péremption suit le lot choisi, et la quantité en est décomptée. Le lot proposé est celui qui périme le plus tôt.</div>
    </div>`:''}
   ${L.length?`<div class="ctab">${L.map(c=>`<div class="crow">
      <div class="cn"><b>${esc(c.nom)}</b><small>${esc(c.par)} · ${DTS(c.ts)}</small></div>
