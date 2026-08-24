@@ -219,7 +219,8 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .npbar input{height:34px;border:1px solid var(--line);background:var(--panel);border-radius:var(--r-s);padding:0 10px;outline:none;color:var(--ink)}
 .npbar input:focus{border-color:var(--accent)}
 @media(max-width:900px){.npbar{grid-template-columns:1fr 1fr}}
-.perbar{align-items:center}
+.perbar{align-items:center;flex-wrap:wrap}
+.perbar .perms{width:auto;min-width:104px;flex:none}
 .drange{display:flex;align-items:center;gap:6px;padding:3px 4px;border-radius:10px;border:1px solid transparent}
 .drange.on{border-color:var(--accent);background:var(--accent-wash)}
 .drange span{color:var(--ink-3);font-size:12px}
@@ -312,9 +313,18 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .prep-g.on{color:var(--ink)}
 .prep-g .ch{width:10px;font-size:11px}
 .prep-g .mu{text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
-.crow.c-s{align-items:flex-start}
-.crow.c-s .cn b{font-size:12px;display:block}
-.crow.c-s .step{flex:none;margin-top:2px}
+/* la carte d'un consommable : le nom sur toute la largeur, puis le lot, la
+   quantité et le retrait sur une seule ligne, l'état en pied */
+.crow.c-s{display:grid;grid-template-columns:1fr auto auto;align-items:center;
+  row-gap:5px;column-gap:8px}
+.crow.c-s .cn{grid-column:1/-1}
+.crow.c-s .cn b{font-size:12px;display:block;white-space:normal;overflow:visible;
+  text-overflow:clip;line-height:1.3}
+.crow.c-s .lotl{grid-column:1;margin:0}
+.crow.c-s .step{grid-column:2;flex:none;margin-top:0}
+.crow.c-s .rm{grid-column:3}
+.crow.c-s .cetat{grid-column:1/-1;display:block;font-size:10.5px;color:var(--ink-3);
+  line-height:1.35;margin-top:-2px}
 .lotl{display:flex;flex-direction:column;gap:3px;margin:4px 0 3px}
 .lotl label{display:flex;align-items:center;gap:5px;background:var(--panel);border:1px solid var(--line);
   border-radius:7px;padding:2px 6px;min-width:0;width:100%}
@@ -2018,8 +2028,13 @@ let RULES=[
  {id:3,j:21,c:'E-mail',l:'Dernière relance + proposition de rappel téléphonique',on:true},
  {id:4,j:30,c:'Tâche', l:'Devis marqué expiré → tâche pour le secrétariat',on:true},
 ];
+/* L'administrateur est le titulaire du cabinet : il voit tout, y compris les
+   volumes de produit injectés, et lui seul peut effacer une séance qui a
+   consommé du stock. Le médecin soigne et pilote son activité, sans accès aux
+   volumes ni à la traçabilité destructive. */
 const ROLES={
- praticien:{l:'Praticien',u:'Dr O. Baroudi',i:'OB',v:['dash','stats','patients','actes','devis','encaiss','relances','stock','equipe','params'],med:true,prix:true,compta:true},
+ admin:{l:'Administrateur',u:'Dr O. Baroudi',i:'OB',v:['dash','stats','patients','actes','devis','encaiss','relances','stock','equipe','params'],med:true,prix:true,compta:true,volumes:true,suppTrace:true},
+ praticien:{l:'Médecin',u:'Dr A. Merlin',i:'AM',v:['dash','stats','patients','actes','devis','encaiss','relances','stock','equipe','params'],med:true,prix:true,compta:true},
  assistante:{l:'Assistante',u:'L. Roche',i:'LR',v:['dash','patients','actes','devis','encaiss','stock','relances'],med:true,prix:true,compta:false},
  secretariat:{l:'Secrétariat',u:'N. Faure',i:'NF',v:['dash','patients','devis','encaiss','relances','stock'],med:false,prix:true,compta:false},
 };
@@ -2027,8 +2042,9 @@ const ROLES={
    compta = suivi comptable : CA global, ventilation HT/TVA, rétrocession centre/praticien,
             statistiques et périodes au-delà de la journée. Réservé au praticien par défaut. */
 const CAN=k=>!!ROLES[role][k];
+const EST_ADMIN=()=>role==='admin';
 const HORIZON_SANS_COMPTA=31;   /* jours consultables sans droit comptable */
-let role='praticien';
+let role='admin';
 
 /* ---------- Agrégats ---------- */
 const mk=d=>String(d).slice(0,7);
@@ -2059,11 +2075,17 @@ function fileRelances(){
 }
 /* ---------- Périodes personnalisables ---------- */
 const DATE_MIN=[...FACTURES.map(f=>f.date),...ACTES.map(a=>a.date)].sort()[0];
-const PRESET_L={jour:'Journée','7j':'7 jours','30j':'30 jours','90j':'90 jours',mois:'Mois en cours',annee:'Année',tout:'Tout',perso:'Personnalisée'};
+const PRESET_L={jour:'Journée','7j':'7 jours','30j':'30 jours','90j':'90 jours',mois:'Mois en cours',annee:'Année',tout:'Tout',perso:'Personnalisée',moisSel:'Mois choisi',anneeSel:'Année choisie'};
 const PRESETS=[['7j','7 jours'],['30j','30 jours'],['90j','90 jours'],['mois','Mois en cours'],['annee','Année'],['tout','Tout']];
 const PRESETS_FACTU=['jour','annee','perso'];
+/* dernier jour du mois « AAAA-MM » */
+const finMois=m=>{const [y,n]=m.split('-').map(Number);
+ return new Date(Date.UTC(y, n, 0)).toISOString().slice(0,10)};
 function perRange(per){
  if(per.k==='perso') return [per.from||DATE_MIN, per.to||TODAYS];
+ /* un mois ou une année choisis dans les listes : la période entière, passée comprise */
+ if(per.k==='moisSel'){const m=per.m||TODAYS.slice(0,7); return [m+'-01', finMois(m)]}
+ if(per.k==='anneeSel'){const y=per.y||TODAYS.slice(0,4); return [y+'-01-01', y+'-12-31']}
  if(per.k==='jour')  return [TODAYS, TODAYS];
  if(per.k==='tout')  return [DATE_MIN, TODAYS];
  if(per.k==='mois')  return [TODAYS.slice(0,7)+'-01', TODAYS];
@@ -2083,12 +2105,29 @@ function perBuckets(per){
      out.push({label:ml(k),from:k+'-01',to:k+'-31'}); m++; if(m>12){m=1;y++} } }
  return out;
 }
-/* barre de filtre période réutilisable */
-function periodBar(per,setter,info,presets){
+/* les mois et les années effectivement couverts par les données, du plus récent
+   au plus ancien : on ne propose pas des périodes vides */
+function moisConnus(){
+ const S=new Set(ACTES.map(a=>a.date.slice(0,7)));
+ S.add(TODAYS.slice(0,7));
+ return [...S].sort().reverse();
+}
+const anneesConnues=()=>[...new Set(moisConnus().map(m=>m.slice(0,4)))].sort().reverse();
+/* barre de filtre période réutilisable ; `mois` ajoute le choix d'un mois et
+   d'une année précis, comme sur la page des statistiques d'Amesla */
+function periodBar(per,setter,info,presets,mois){
  const keys=presets||PRESETS.map(x=>x[0]);
  const [ra,rb]=perRange(per);
  return `<div class="fbar perbar">
   <div class="seg">${keys.map(k=>`<button class="${per.k===k?'on':''}" onclick="${setter}({k:'${k}',from:'${ra}',to:'${rb}'})">${PRESET_L[k]}</button>`).join('')}</div>
+  ${mois?`<select class="inp perms" title="Un mois en particulier"
+      onchange="this.value?${setter}({k:'moisSel',m:this.value}):${setter}({k:'tout'})">
+      <option value="">Mois…</option>
+      ${moisConnus().map(m=>`<option value="${m}" ${(per.k==='moisSel'&&per.m===m)?'selected':''}>${esc(ml(m))}</option>`).join('')}</select>
+    <select class="inp perms" title="Une année entière"
+      onchange="this.value?${setter}({k:'anneeSel',y:this.value}):${setter}({k:'tout'})">
+      <option value="">Année…</option>
+      ${anneesConnues().map(y=>`<option value="${y}" ${(per.k==='anneeSel'&&per.y===y)?'selected':''}>${y}</option>`).join('')}</select>`:''}
   <div class="drange ${per.k==='perso'?'on':''}">
     <input class="inp" type="date" value="${ra}" max="${TODAYS}"
       onchange="${setter}({k:'perso',from:this.value,to:document.querySelector('.drange input:last-of-type').value||'${TODAYS}'})">
@@ -3301,15 +3340,19 @@ function pDetail(p){
 }
 
 /* ---------------- Actes ---------------- */
-let aq='',aCat='',aPrat='';
+let aq='',aCat='',aPrat='',perA={k:'tout',from:'',to:''};
+function setPerA(p){ perA={...perA,...p}; paint() }
 V.actes=()=>{
  const L=ACTES.filter(a=>{const q=aq.toLowerCase();
-  return (!aCat||a.cat===aCat)&&(!aPrat||a.praticien===aPrat)&&
+  return (!aCat||a.cat===aCat)&&(!aPrat||a.praticien===aPrat)&&inPer(a.date,perA)&&
    (!q||[a.nom,a.lot||'',fn(pById(a.patient)),...(a.zones?Object.keys(a.zones).map(z=>zoneById(z).n):[])].join(' ').toLowerCase().includes(q))
  }).sort((a,b)=>b.date.localeCompare(a.date));
  const tox=L.reduce((s,a)=>s+zonesOf(a).filter(([z])=>zoneById(z).p==='tox').reduce((x,[,q])=>x+q,0),0);
  const ah=L.reduce((s,a)=>s+zonesOf(a).filter(([z])=>zoneById(z).p==='ah').reduce((x,[,q])=>x+q,0),0);
- return `<div class="head"><div><h1>Actes &amp; schémas</h1><p>${L.length} actes · ${tox} U de toxine · ${ah.toFixed(1)} ml d'AH</p></div>
+ /* les volumes de produit sont une donnée de pilotage : ils ne s'affichent
+    qu'aux rôles à qui ce droit a été accordé */
+ const vol=CAN('volumes')?` · ${tox} U de toxine · ${ah.toFixed(1)} ml d'AH`:'';
+ return `<div class="head"><div><h1>Actes &amp; schémas</h1><p>${L.length} acte${L.length>1?'s':''}${vol} · ${perA.k==='tout'?'toutes périodes':perLabel(perA)}</p></div>
   <div class="r"><button class="btn" onclick="toast('Export CSV généré')">Exporter</button>
    <button class="btn p" onclick="openActe()">✚ Saisir un acte</button></div></div>
  <div class="fbar">
@@ -3320,10 +3363,11 @@ V.actes=()=>{
   <select class="inp" onchange="aPrat=this.value;paint()"><option value="">Tous praticiens</option>
    ${PRATICIENS.map(x=>`<option ${aPrat===x?'selected':''}>${x}</option>`).join('')}</select>
  </div>
+ ${periodBar(perA,'setPerA',`${L.length} acte${L.length>1?'s':''}`,['mois','90j','annee','tout'],1)}
  <div class="card"><div class="tw"><table>
-  <thead><tr><th>Schéma</th><th>Date</th><th>Patient</th><th>Acte</th><th>Zones &amp; quantités</th><th>Lot</th>${ROLES[role].prix?'<th class="num">Montant</th>':''}<th style="width:74px"></th></tr></thead>
+  <thead><tr><th>Date</th><th>Patient</th><th>Acte</th><th>Zones &amp; quantités</th><th>Lot</th>${ROLES[role].prix?'<th class="num">Montant</th>':''}<th style="width:74px"></th></tr></thead>
   <tbody>${L.map(a=>`<tr class="c" onclick="openActe(${a.patient},${a.id})">
-   <td>${miniFace(a.zones)}</td><td class="mono">${DF(a.date)}</td>
+   <td class="mono">${DF(a.date)}</td>
    <td class="nm">${esc(fn(pById(a.patient)))}</td>
    <td>${esc(a.nom)}<div class="mu" style="font-size:11px">${esc(a.praticien)}${a.operateur?' · '+esc(a.operateur):''}</div></td>
    <td style="max-width:300px">${a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneById(z);
@@ -3331,8 +3375,8 @@ V.actes=()=>{
    <td class="mono mu" style="font-size:11.5px">${a.lot||'—'}</td>
    ${ROLES[role].prix?`<td class="num">${montantTxt(a)}</td>`:''}
    ${tdActions(a)}</tr>
-   ${trConfirm(a,ROLES[role].prix?8:7)}`).join('')}</tbody></table>
-  ${L.length?'':'<div class="empty">Aucun acte.</div>'}</div></div>`;
+   ${trConfirm(a,ROLES[role].prix?7:6)}`).join('')}</tbody></table>
+  ${L.length?'':'<div class="empty">Aucun acte sur cette période.</div>'}</div></div>`;
 };
 
 /* ---------------- Devis ---------------- */
@@ -3646,30 +3690,55 @@ V.stock=()=>{
 };
 
 /* ---------------- Statistiques ---------------- */
+/* Deux lectures cohabitent ici : l'activité — combien d'actes, sur quelles zones,
+   par qui — et l'argent. La première relève du soin et s'ouvre au médecin ; la
+   seconde relève du suivi comptable. Chacune a son droit. */
+let perS={k:'annee',from:'',to:''};
+function setPerS(p){ perS={...perS,...p}; paint() }
 V.stats=()=>{
- if(!CAN('compta')) return `<div class="head"><div><h1>Statistiques</h1></div></div><div class="empty">🔒 Le suivi comptable est réservé au praticien. Le rôle « ${ROLES[role].l} » a accès à la facturation et aux encaissements.</div>`;
+ const acte=ROLES[role].v.includes('stats'), sous=CAN('compta');
+ if(!acte&&!sous) return `<div class="head"><div><h1>Statistiques</h1></div></div><div class="empty">🔒 Les statistiques ne sont pas ouvertes au rôle « ${ROLES[role].l} ». Ce droit se règle dans Équipe &amp; droits.</div>`;
+ const A=ACTES.filter(a=>inPer(a.date,perS));
+ const F=FACTURES.filter(f=>inPer(f.date,perS));
  const mAct=a=>montantActe(a)||0;
- const pc=CATS.map(c=>({label:c,v:ACTES.filter(a=>a.cat===c).reduce((s,a)=>s+mAct(a),0)})).filter(x=>x.v).sort((a,b)=>b.v-a.v);
- const pp=PRATICIENS.map(p=>({label:p,v:ACTES.filter(a=>a.praticien===p).reduce((s,a)=>s+mAct(a),0)}));
- const zc={}; ACTES.forEach(a=>zonesOf(a).forEach(([z])=>{const Z=zoneById(z); if(!Z) return;
+ const nz=v=>v.filter(x=>x.v).sort((a,b)=>b.v-a.v);
+ const pc=nz(CATS.map(c=>({label:c,v:A.filter(a=>a.cat===c).reduce((s,a)=>s+mAct(a),0)})));
+ const pp=nz(PRATICIENS.map(p=>({label:p,v:A.filter(a=>a.praticien===p).reduce((s,a)=>s+mAct(a),0)})));
+ const nc=nz(CATS.map(c=>({label:c,v:A.filter(a=>a.cat===c).length})));
+ const np=nz(PRATICIENS.map(p=>({label:p,v:A.filter(a=>a.praticien===p).length})));
+ const zc={}; A.forEach(a=>zonesOf(a).forEach(([z])=>{const Z=zoneById(z); if(!Z) return;
    const n=(Z.r==='corps'?'Corps · ':'')+Z.k.replace(/ [DG]$/,''); zc[n]=(zc[n]||0)+1}));
  const pz=Object.entries(zc).map(([label,v])=>({label,v})).sort((a,b)=>b.v-a.v).slice(0,8);
- const fid=PATIENTS.filter(p=>ACTES.filter(a=>a.patient===p.id).length>=2).length;
- return `<div class="head"><div><h1>Statistiques</h1><p>Sur l'ensemble des données du prototype</p></div>
-  <div class="r"><div class="seg"><button class="on">6 mois</button><button>12 mois</button><button>Année</button></div></div></div>
+ const pat=[...new Set(A.map(a=>a.patient))];
+ const fid=pat.filter(id=>A.filter(a=>a.patient===id).length>=2).length;
+ const tox=A.reduce((s,a)=>s+zonesOf(a).filter(([z])=>zoneById(z).p==='tox').reduce((x,[,q])=>x+q,0),0);
+ const ah =A.reduce((s,a)=>s+zonesOf(a).filter(([z])=>zoneById(z).p==='ah' ).reduce((x,[,q])=>x+q,0),0);
+ /* la série mensuelle suit la période retenue, pas les six derniers mois */
+ const B=perBuckets(perS).slice(-14);
+ const serA=B.map(b=>({k:b.from,label:b.label,v:A.filter(a=>a.date>=b.from&&a.date<=b.to).length}));
+ const serC=B.map(b=>({k:b.from,label:b.label,v:F.filter(f=>f.date>=b.from&&f.date<=b.to).reduce((s,f)=>s+f.paye,0)}));
+ return `<div class="head"><div><h1>Statistiques</h1>
+   <p>${acte?'Activité':'Suivi comptable'}${acte&&sous?' et suivi comptable':''} · ${perLabel(perS)}</p></div></div>
+ ${periodBar(perS,'setPerS',`${A.length} acte${A.length>1?'s':''}`,['mois','90j','annee','tout'],1)}
+ ${acte?'':`<div class="tip"><span class="e">🔒</span><div>Les <b>statistiques des actes</b> ne sont pas ouvertes à votre rôle : seuls les montants s'affichent. Ce droit se règle dans Équipe &amp; droits.</div></div>`}
+ ${sous?'':`<div class="tip"><span class="e">🔒</span><div>Les montants relèvent du <b>suivi comptable</b>, qui n'est pas ouvert à votre rôle. L'activité, elle, s'affiche entièrement.</div></div>`}
  <div class="grid g4" style="margin-bottom:14px">
-  ${kpi('Panier moyen',(()=>{const F=ACTES.filter(a=>montantActe(a)!=null);
-     return F.length?EUR(Math.round(F.reduce((s,a)=>s+montantActe(a),0)/F.length)):'—'})())}
-  ${kpi('Patients fidélisés',fid+' / '+PATIENTS.length,Math.round(fid/PATIENTS.length*100)+' % ont ≥ 2 actes','up')}
-  ${kpi('Actes par patient',(ACTES.length/PATIENTS.length).toFixed(1))}
-  ${kpi('CA total',EUR(FACTURES.reduce((s,f)=>s+f.paye,0)))}</div>
+  ${acte?kpi('Actes sur la période',NUM(A.length),`${pat.length} patient${pat.length>1?'s':''}`):''}
+  ${sous?kpi('Panier moyen',(()=>{const P=A.filter(a=>montantActe(a)!=null);
+     return P.length?EUR(Math.round(P.reduce((s,a)=>s+montantActe(a),0)/P.length)):'—'})()):''}
+  ${acte?kpi('Patients fidélisés',fid+' / '+(pat.length||1),pat.length?Math.round(fid/pat.length*100)+' % ont ≥ 2 actes':'—','up'):''}
+  ${acte?kpi('Actes par patient',pat.length?(A.length/pat.length).toFixed(1):'—'):''}
+  ${sous?kpi('CA encaissé',EUR(F.reduce((s,f)=>s+f.paye,0))):''}
+  ${(acte&&CAN('volumes'))?kpi('Produit injecté',`${NUM(tox)} U`,`et ${ah.toFixed(1)} ml d'acide hyaluronique`):''}</div>
  <div class="grid g2" style="margin-bottom:13px">
-  <div class="card"><div class="h"><h2>CA encaissé</h2><span class="s">par mois</span></div><div class="b">${bars(caMois)}</div></div>
-  <div class="card"><div class="h"><h2>Nombre d'actes</h2><span class="s">par mois</span></div><div class="b">${bars(acMois,{fmt:NUM})}</div></div></div>
+  ${sous?`<div class="card"><div class="h"><h2>CA encaissé</h2><span class="s">sur la période</span></div><div class="b">${bars(serC)}</div></div>`:''}
+  ${acte?`<div class="card"><div class="h"><h2>Nombre d'actes</h2><span class="s">sur la période</span></div><div class="b">${bars(serA,{fmt:NUM})}</div></div>`:''}</div>
  <div class="grid g3">
-  <div class="card"><div class="h"><h2>CA par catégorie</h2></div><div class="b">${hbars(pc)}</div></div>
-  <div class="card"><div class="h"><h2>CA par praticien</h2></div><div class="b">${hbars(pp)}</div></div>
-  <div class="card"><div class="h"><h2>Zones les plus traitées</h2><span class="s">inédit vs Gemelia</span></div><div class="b">${hbars(pz,{fmt:NUM})}</div></div></div>`;
+  ${acte?`<div class="card"><div class="h"><h2>Actes par catégorie</h2></div><div class="b">${hbars(nc,{fmt:NUM})}</div></div>`:''}
+  ${acte?`<div class="card"><div class="h"><h2>Actes par praticien</h2></div><div class="b">${hbars(np,{fmt:NUM})}</div></div>`:''}
+  ${acte?`<div class="card"><div class="h"><h2>Zones les plus traitées</h2></div><div class="b">${hbars(pz,{fmt:NUM})}</div></div>`:''}
+  ${sous?`<div class="card"><div class="h"><h2>CA par catégorie</h2></div><div class="b">${hbars(pc)}</div></div>`:''}
+  ${sous?`<div class="card"><div class="h"><h2>CA par praticien</h2></div><div class="b">${hbars(pp)}</div></div>`:''}</div>`;
 };
 
 /* ---------- protocoles paramétrables ---------- */
@@ -4461,19 +4530,22 @@ const DROITS=[
  {l:'Gérer le stock',               vu:'stock'},
  {l:'Paramétrer le logiciel',       vu:'params'},
  {l:'Gérer les utilisateurs',       vu:'equipe'},
+ {l:'<b>Statistiques des actes</b>', vu:'stats', h:'volumes par acte, par zone, par praticien — sans les montants, qui relèvent du suivi comptable'},
+ {l:'Volumes de produits injectés', f:'volumes', h:'unités de toxine et millilitres d’acide hyaluronique cumulés, en tête de la liste des actes'},
+ {l:'Supprimer une séance tracée',  f:'suppTrace', h:'une séance qui a consommé du produit engage la traçabilité des lots'},
 ];
-const RK=['praticien','assistante','secretariat'];
+const RK=['admin','praticien','assistante','secretariat'];
 function droitOn(r,d){ return d.f?!!ROLES[r][d.f]:ROLES[r].v.includes(d.vu) }
 function toggleDroit(r,i){
- const d=DROITS[i]; if(d.fixe||r==='praticien') return;
+ const d=DROITS[i]; if(d.fixe||r==='admin') return;   /* l'administrateur garde tout */
  if(d.f) ROLES[r][d.f]=!ROLES[r][d.f];
  else { const v=ROLES[r].v, k=v.indexOf(d.vu); k<0?v.push(d.vu):v.splice(k,1) }
  paint(); toast(`${ROLES[r].l} : ${d.l.replace(/<[^>]+>/g,'')} ${droitOn(r,d)?'autorisé':'retiré'}`);
 }
 V.equipe=()=>{
- const U=[['Dr O. Baroudi','Praticien — admin','OB',TODAYS,1],['Dr A. Merlin','Praticien','AM',addD(TODAYS,-2),1],
+ const U=[['Dr O. Baroudi','Administrateur','OB',TODAYS,1],['Dr A. Merlin','Médecin','AM',addD(TODAYS,-2),1],
   ['L. Roche','Assistante','LR',TODAYS,1],['S. Vidal','Assistante','SV',addD(TODAYS,-3),0],['N. Faure','Secrétariat','NF',TODAYS,0]];
- return `<div class="head"><div><h1>Équipe &amp; droits</h1><p>5 utilisateurs · 3 rôles</p></div>
+ return `<div class="head"><div><h1>Équipe &amp; droits</h1><p>${U.length} utilisateurs · ${RK.length} rôles</p></div>
   <div class="r"><button class="btn p" onclick="toast('Invitation envoyée')">+ Inviter</button></div></div>
  <div class="tip"><span class="e">👥</span><div>Cliquez sur <b>⇄</b> en bas de la barre latérale pour voir l'application telle que la voit chaque membre : menu, tarifs et notes médicales s'adaptent au rôle.</div></div>
  <div class="grid g2">
@@ -4484,11 +4556,11 @@ V.equipe=()=>{
   <div class="card"><div class="h"><h2>Matrice des droits</h2><span class="s">cliquez pour autoriser ou retirer</span></div><div class="tw"><table>
    <thead><tr><th>Action</th>${RK.map(r=>`<th style="text-align:center">${ROLES[r].l}</th>`).join('')}</tr></thead>
    <tbody>${DROITS.map((d,i)=>`<tr><td>${d.l}${d.h?`<div class="mu" style="font-size:11px;font-weight:400">${d.h}</div>`:''}</td>
-    ${RK.map(r=>{const on=droitOn(r,d), lock=d.fixe||r==='praticien';
+    ${RK.map(r=>{const on=droitOn(r,d), lock=d.fixe||r==='admin';
      return `<td style="text-align:center"><button class="dtog ${on?'on':''} ${lock?'lock':''}"
        ${lock?`title="non modifiable"`:`onclick="toggleDroit('${r}',${i})"`}>${on?'✓':'—'}</button></td>`}).join('')}
     </tr>`).join('')}</tbody></table></div>
-   <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">Le <b>suivi comptable</b> est la ligne qui sépare « facturer » de « piloter » : sans ce droit, un utilisateur émet les factures, encaisse et relance les impayés, mais ne voit ni le chiffre d'affaires cumulé, ni la TVA, ni la rétrocession.<br>Chaque accès à une donnée de santé est journalisé (utilisateur, patient, horodatage). Obligation de l'agrément HDS et de l'article 9 du RGPD.</div></div></div>
+   <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">La colonne <b>Administrateur</b> n'est pas modifiable : le titulaire du cabinet répond de la traçabilité, il garde donc l'accès aux volumes de produit et le droit d'effacer un acte déjà tracé.<br>Le <b>suivi comptable</b> est la ligne qui sépare « facturer » de « piloter » : sans ce droit, un utilisateur émet les factures, encaisse et relance les impayés, mais ne voit ni le chiffre d'affaires cumulé, ni la TVA, ni la rétrocession.<br>Chaque accès à une donnée de santé est journalisé (utilisateur, patient, horodatage). Obligation de l'agrément HDS et de l'article 9 du RGPD.</div></div></div>
  </div>`;
 };
 
@@ -4652,21 +4724,25 @@ let suppCand=null;
 const tdActions=a=>`<td class="acts">
   <button class="ib" title="Dupliquer cette séance — mêmes soins, mêmes réglages"
     onclick="event.stopPropagation();dupliquerActe(${a.id})">⧉</button>
-  ${CAN('med')?(()=>{const f=factureBloquante(a);
+  ${CAN('med')?(()=>{const f=factureBloquante(a), c=consoBloquant(a);
     return f?`<button class="ib d" disabled title="Facture ${f.id} rattachée — une séance facturée ne se supprime pas">✕</button>`
+      :c?`<button class="ib d" disabled title="${c} consommable${c>1?'s tracés':' tracé'} — seul l’administrateur peut supprimer une séance qui a consommé du produit">✕</button>`
       :`<button class="ib d" title="Supprimer cette séance"
          onclick="event.stopPropagation();suppCand=${a.id};paint()">✕</button>`})():''}</td>`;
 /* et le même bloc de confirmation, sur la ligne suivante */
 const trConfirm=(a,cols)=>suppCand!==a.id?'':`<tr class="supp"><td colspan="${cols}">
   <div class="suppb"><span class="e">⚠</span>
     <div style="flex:1;min-width:0"><b>Supprimer la séance du ${DF(a.date)} — ${esc(a.nom)} ?</b>
-      <div class="mu">${(()=>{const L=contenuActe(a), f=factureBloquante(a);
+      <div class="mu">${(()=>{const L=contenuActe(a), f=factureBloquante(a), c=consoBloquant(a);
         if(f) return `Impossible : la facture ${f.id} de ${EUR(fTTC(f))} y est rattachée. Une séance facturée ne se supprime pas — passez par la facturation pour l'annuler ou émettre un avoir.`;
+        if(c) return `Impossible : ${c} consommable${c>1?'s ont été tracés':' a été tracé'} sur cette séance, avec son numéro de lot. Effacer la séance romprait le lien lot → patient. Seul l'administrateur peut le faire.`;
         return (L.length?`Partiront avec elle : ${L.join(', ')}.`:'Elle ne porte aucune pièce.')
           +' Le stock consommé sera recrédité et la séance restera rattrapable.'})()}</div></div>
     ${factureBloquante(a)
       ? `<button class="btn xs" onclick="event.stopPropagation();annulerSupp();closeAll();go('encaiss')">Ouvrir la facturation</button>
          <button class="btn xs g" onclick="event.stopPropagation();annulerSupp()">Fermer</button>`
+      : consoBloquant(a)
+      ? `<button class="btn xs g" onclick="event.stopPropagation();annulerSupp()">Fermer</button>`
       : `<button class="btn xs g" onclick="event.stopPropagation();annulerSupp()">Annuler</button>
          <button class="btn xs crit" onclick="event.stopPropagation();supprimerActe(${a.id})">Supprimer</button>`}
   </div></td></tr>`;
@@ -4682,6 +4758,11 @@ function contenuActe(a){
  return L;
 }
 const factureBloquante=a=>FACTURES.find(f=>f.acte===a.id&&f.statut!=='annulee');
+/* Une séance qui a consommé du produit porte la traçabilité d'un lot : l'effacer
+   fait disparaître le lien lot → patient qu'on nous réclamera en cas de rappel.
+   Seul un rôle disposant du droit « supprimer une séance tracée » peut le faire. */
+const consoBloquant=a=>{const n=consoActe(a).length;
+ return (n&&!CAN('suppTrace'))?n:0};
 /* Une séance facturée ne se supprime pas : la facture est une pièce comptable,
    elle s'annule ou se solde par un avoir depuis la facturation, jamais par
    effacement de l'acte qui la porte. */
@@ -4692,6 +4773,10 @@ function supprimerActe(id){
  if(f){ suppCand=null;
    toast(`Facture ${f.id} rattachée — annulez-la avant de supprimer la séance`);
    paint&&paint(); return }
+ const c=consoBloquant(a);
+ if(c){ suppCand=null;
+   toast(`${c} consommable${c>1?'s tracés':' tracé'} — suppression réservée à l’administrateur`);
+   paint&&paint(); return }
  const pris=x=>{const out=[]; for(let i=x.length-1;i>=0;i--) if(x[i].acte===id) out.unshift(...x.splice(i,1)); return out};
  const sac={acte:a, i:ACTES.indexOf(a),
    conso:pris(CONSO), effets:pris(EFFETS), fichiers:pris(FICHIERS),
@@ -4701,7 +4786,7 @@ function supprimerActe(id){
    ts:nowStamp(), par:ROLES[role].u,
    quoi:`${a.nom} du ${DF(a.date)} — ${esc(fn(pById(a.patient)))}`};
  /* le stock consommé revient */
- sac.conso.forEach(c=>{const st=STOCK.find(x=>x.ref===c.ref); if(st) st.q+=c.q});
+ sac.conso.forEach(c=>{const st=STOCK.find(x=>x.ref===c.ref); if(st) rendreLot(st,c.lot,c.q,c.per)});
  sac.devis.forEach(o=>{ if(o.d.acte===id) o.d.acte=null;
    if(o.d.realise===id){ o.d.realise=null; if(o.d.statut==='accepte') o.d.statut='envoye' } });
  ACTES.splice(sac.i,1);
@@ -5162,19 +5247,21 @@ function renderOver(){
 
  document.getElementById('overf').innerHTML=AS.ro?
   `${suppCand===AS.aid?(()=>{const ac=ACTES.find(x=>x.id===AS.aid); if(!ac) return '';
-     const L=contenuActe(ac), f=factureBloquante(ac);
+     const L=contenuActe(ac), f=factureBloquante(ac), c=consoBloquant(ac);
      return `<div class="suppb" style="flex:1"><span class="e">⚠</span>
        <div style="flex:1;min-width:0"><b>Supprimer cette séance ?</b>
          <div class="mu">${f?`Impossible : la facture ${f.id} de ${EUR(fTTC(f))} y est rattachée. Une séance facturée ne se supprime pas.`
+           :c?`Impossible : ${c} consommable${c>1?'s tracés':' tracé'} avec son numéro de lot. Seul l’administrateur peut supprimer une séance qui a consommé du produit.`
            :(L.length?`Partiront avec elle : ${L.join(', ')}.`:'Elle ne porte aucune pièce.')+' Rattrapable ensuite.'}</div></div>
-       ${f?`<button class="btn xs g" onclick="annulerSupp()">Fermer</button>`
+       ${(f||c)?`<button class="btn xs g" onclick="annulerSupp()">Fermer</button>`
           :`<button class="btn xs g" onclick="annulerSupp()">Annuler</button>
             <button class="btn xs crit" onclick="supprimerActe(${AS.aid})">Supprimer</button>`}</div>`})()
    :`<div class="mu" style="font-size:12px">Acte clôturé · chaque envoi est horodaté et tracé</div>
    <div style="margin-left:auto;display:flex;gap:8px">
     <button class="btn" onclick="dupliquerActe(${AS.aid})" title="Refaire la même séance aujourd'hui, réglages compris">⧉ Dupliquer</button>
-    ${CAN('med')?(()=>{const ac=ACTES.find(x=>x.id===AS.aid), fb=ac?factureBloquante(ac):null;
+    ${CAN('med')?(()=>{const ac=ACTES.find(x=>x.id===AS.aid), fb=ac?factureBloquante(ac):null, cb=ac?consoBloquant(ac):0;
       return fb?`<button class="btn g" disabled title="Facture ${fb.id} rattachée — une séance facturée ne se supprime pas">✕ Supprimer</button>`
+        :cb?`<button class="btn g" disabled title="${cb} consommable${cb>1?'s tracés':' tracé'} — suppression réservée à l’administrateur">✕ Supprimer</button>`
         :`<button class="btn g" onclick="suppCand=${AS.aid};renderOver()">✕ Supprimer</button>`})():''}
     ${(()=>{const ac=ACTES.find(x=>x.id===AS.aid);const n=ac?docsActe(ac).filter(d=>d.env).length:0;
       return n?`<button class="btn p" onclick="sendAllDocs(${AS.aid})">✉ Envoyer ${n>1?`les ${n} documents`:'le document'} en attente</button>`:''})()}
@@ -5260,8 +5347,11 @@ function consultPane(prix){
      const st=STOCK.find(x=>x.ref===l.ref)||{};
      const reste=(st.q||0)-l.q, per=l.per||st.per||'';
      const perime=per&&per<TODAYS, proche=per&&!perime&&per<addD(TODAYS,90);
+     /* Le nom du produit tient sa propre ligne, sur toute la largeur : tronqué,
+        « Acide hyaluronique — volumateur » et « — comblement profond » se
+        ressemblent trop pour qu'on les distingue. */
      return `<div class="crow c-s">
-       <div class="cn"><b title="${esc(st.n||l.ref)}">${esc(st.n||l.ref)}</b>
+       <div class="cn"><b title="${esc(st.n||l.ref)}">${esc(st.n||l.ref)}</b></div>
          ${(()=>{const LO=lotsDe(st), cur=l.lot||st.lot||'';
            /* plusieurs lots en stock : on choisit lequel on a réellement utilisé */
            const menu=LO.length>1&&!l.lotLibre;
@@ -5282,14 +5372,14 @@ function consultPane(prix){
                oninput="this.value=masquePer(this.value)"
                onchange="majLot(${i},'per',this.value,this)"></label>`}
          </div>`})()}
-         <small>${perime?'<span style="color:var(--crit);font-weight:700">⚠ périmé</span> · '
-                 :proche?'<span style="color:var(--warn-ink,#8a6100);font-weight:600">périme bientôt</span> · ':''
-         }${reste<0?'<span style="color:var(--crit);font-weight:600">stock insuffisant</span>':'reste '+reste+' après la séance'}</small></div>
        <div class="step" onclick="event.stopPropagation()">
          <button onclick="majConsoSaisie(${i},-1)">−</button>
          <input class="qin" type="number" min="1" value="${l.q}" onchange="majConsoSaisie(${i},0,this.value)">
          <button onclick="majConsoSaisie(${i},1)">+</button></div>
-       <button class="rm" title="Retirer" onclick="rmConsoSaisie(${i})">✕</button></div>`}).join('')}</div>
+       <button class="rm" title="Retirer" onclick="rmConsoSaisie(${i})">✕</button>
+       <small class="cetat">${perime?'<span style="color:var(--crit);font-weight:700">⚠ périmé</span> · '
+               :proche?'<span style="color:var(--warn-ink,#8a6100);font-weight:600">périme bientôt</span> · ':''
+       }${reste<0?'<span style="color:var(--crit);font-weight:600">stock insuffisant</span>':'reste '+reste+' après la séance'}</small></div>`}).join('')}</div>
      <div class="mu" style="font-size:11px;padding:0 2px 4px">Le stock sera décompté à l'enregistrement, lot et péremption compris.</div>`
     :`<div class="mu" style="font-size:11px;padding:2px 2px 6px">Les produits appelés par les soins s'ajoutent d'eux-mêmes. Vous pouvez en ajouter d'autres.</div>`)}
 
