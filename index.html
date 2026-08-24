@@ -707,7 +707,7 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
 .rc-r{display:flex;align-items:center;gap:9px;padding:7px 12px;font-size:12.3px;border-bottom:1px solid var(--line)}
 .rc-r:last-child{border-bottom:none}
 .rc-r span{color:var(--ink-2)}
-.rc-r span small{color:var(--ink-3);font-size:10.5px}
+.rc-r span small{color:var(--ink-3);font-size:10.5px;display:block;line-height:1.3;margin-top:1px}
 .rc-r b,.rc-r .step,.rc-r .pxin{margin-left:auto}
 .rc-r.prix{background:var(--accent-wash)}
 .rc-r.prix b{font-size:16px;letter-spacing:-.02em}
@@ -1838,18 +1838,39 @@ let FACTU={
 const tauxTVA=t=>FACTU.tvaParActe[t]!==undefined?FACTU.tvaParActe[t]:FACTU.tvaDefaut;
 const tauxRetro=pr=>FACTU.retro[pr]!==undefined?FACTU.retro[pr]:70;
 
-const MOYENS=['CB','Espèces','Chèque','Virement'];
+/* Comment le patient a réglé : l'instrument d'un côté, l'étalement de l'autre.
+   « CB en 3 fois » n'est pas un cinquième moyen de paiement, c'est une carte
+   bancaire et un plan — les garder séparés permet de compter la caisse par
+   instrument sans perdre l'information du fractionnement. */
+const MOYENS=['CB','Espèces','Chèque','Virement','Lien de paiement'];
+const FRACTIONS=[2,3,4];
+/* libellé lisible d'un règlement, plan compris */
+function moyenTxt(f){
+ if(!f||f.statut==='annulee') return '';
+ if(!f.moyen) return '';
+ const P=f.plan;
+ if(!P||!(P.n>1)) return f.moyen;
+ return `${f.moyen} — ${P.n} fois (${Math.min(P.faites||0,P.n)}/${P.n})`;
+}
+/* montant d'une échéance */
+const echeance=f=>(f&&f.plan&&f.plan.n>1)?Math.round(fTTC(f)/f.plan.n):0;
 /* Toutes les séances ne sont pas facturées : retouche offerte, geste inclus
    dans un forfait, séance du jour pas encore passée en caisse. Ce sont celles
    qu'on peut encore corriger ou supprimer — une séance facturée est figée. */
 ACTES.forEach((a,i)=>{ if(i%9===4) a.prix=null });
 const FACTURES=ACTES.map((a,i)=>{
  if(a.prix==null) return null;
- const paye=a.date<'2026-07-20'?a.prix:(i%4===0?0:(i%5===0?Math.round(a.prix*.5):a.prix));
  const statut=i%37===0?'annulee':'ok';
+ /* un patient sur cinq étale son règlement : le plan explique le partiel */
+ const frac=(statut==='ok'&&a.date>='2026-07-20'&&i%5===0)?FRACTIONS[(i/5|0)%3]:0;
+ const paye=statut==='annulee'?0
+   :a.date<'2026-07-20'?a.prix
+   :frac?Math.round(a.prix/frac)
+   :(i%4===0?0:a.prix);
  return {id:'F-'+(2600+i),patient:a.patient,acte:a.id,date:a.date,montant:a.prix,
-         paye:statut==='annulee'?0:paye,
+         paye,
          moyen:(statut==='annulee'||paye===0)?null:MOYENS[i%4],
+         plan:frac?{n:frac,faites:1}:null,
          praticien:a.praticien, cat:a.cat, type:a.type, statut,
          avoir:(i%29===0&&statut==='ok')?Math.round(a.prix*0.2/5)*5:0};
 }).filter(Boolean);
@@ -3321,7 +3342,7 @@ function pDetail(p){
       ${cpt?`<td class="num">${EUR(fHT(f))}</td><td class="num mu">${EUR(fTVA(f))}</td>`:''}
       <td class="num"><b>${EUR(fTTC(f))}</b></td>
       <td class="num ${f.avoir?'':'mu'}" ${f.avoir?'style="color:var(--warn)"':''}>${f.avoir?'− '+EUR(f.avoir):'—'}</td>
-      <td class="num">${EUR(f.paye)}</td><td class="mu">${f.moyen||'—'}</td>
+      <td class="num">${EUR(f.paye)}</td><td class="mu">${moyenTxt(f)||'—'}</td>
       <td class="num">${rdu(f)>0?`<span style="color:var(--crit);font-weight:650">${EUR(rdu(f))}</span>`:'<span class="mu">—</span>'}</td>
       <td>${an?bdg('b-crit','⊘ Annulée'):f.avoir?bdg('b-warn','Avoir'):rdu(f)>0?bdg('b-warn','Partielle'):bdg('b-good','Soldée')}</td>
       <td class="num"><button class="btn xs" onclick="toast('PDF Factur-X de ${f.id}')">PDF</button></td></tr>`}).join('')}
@@ -3532,7 +3553,7 @@ function eDetail(){
     ${cpt?`<td class="num">${EUR(fHT(f))}</td><td class="num mu">${EUR(fTVA(f))}</td>`:''}
     <td class="num"><b>${EUR(fTTC(f))}</b></td>
     ${dbl?`<td class="num mu">${EUR(partCentre(f))}</td><td class="num" style="color:var(--accent-ink);font-weight:620">${EUR(partPrat(f))}</td>`:''}
-    <td class="num">${EUR(f.paye)}</td><td class="mu">${f.moyen||'—'}</td>
+    <td class="num">${EUR(f.paye)}</td><td class="mu">${moyenTxt(f)||'—'}</td>
     <td class="num">${rdu(f)>0?`<span style="color:var(--crit);font-weight:650">${EUR(rdu(f))}</span>`:'<span class="mu">—</span>'}</td>
     <td>${an?bdg('b-crit','⊘ Annulée'):f.avoir?bdg('b-warn','Avoir'):rdu(f)>0?bdg('b-warn','Partielle'):bdg('b-good','Soldée')}</td></tr>`}).join('')}
   </tbody></table>${L.length?'':'<div class="empty">Aucune facturation avec ces filtres.</div>'}</div></div>
@@ -5227,8 +5248,16 @@ function renderOver(){
       ${EUROS?`<div class="rc-r prix"><span>Montant du devis <small>modifiable</small></span>
         <div class="pxin"><input class="inp" id="tPrix" type="number" min="0" step="5"
            value="${prix}" onchange="AS.prix=this.value===''?null:+this.value;renderOver()"><span>€</span></div></div>`
-       :(AS.ro&&CAN('prix')?(()=>{const m=montantActe(ACTES.find(x=>x.id===AS.aid));
-          return `<div class="rc-r prix"><span>Facturé</span><b>${m==null?'<span class="mu" style="font-size:13px;font-weight:500">non facturé</span>':EUR(m)}</b></div>`})():'')}
+       :(AS.ro&&CAN('prix')?(()=>{const ac=ACTES.find(x=>x.id===AS.aid), m=montantActe(ac);
+          /* la ligne de montant dit aussi comment le patient a réglé */
+          const F=FACTURES.filter(x=>x.acte===AS.aid&&x.statut!=='annulee');
+          const reg=F.map(f=>moyenTxt(f)).filter(Boolean).join(' · ');
+          const du=F.reduce((n,f)=>n+rdu(f),0);
+          return `<div class="rc-r prix"><span>Facturé${reg?`<small>${esc(reg)}</small>`
+            :(F.length?'<small>non encaissée</small>':'')}</span>
+            <b>${m==null?'<span class="mu" style="font-size:13px;font-weight:500">non facturé</span>':EUR(m)}</b></div>`
+           +(du>0?`<div class="rc-r"><span class="mu" style="font-size:11.5px">Reste à encaisser</span>
+             <b style="color:var(--crit);font-size:13px">${EUR(du)}</b></div>`:'')})():'')}
       ${(()=>{ if(AS.ro) return '';
         const P=(AS.soins||[]).filter(x=>x.t||(x.libre||'').trim()).map(x=>{const q=soinQ(x);
           const n=x.t?acteDef(x.t).n:x.libre, u=puSoin(x), r=remUnSoin(x);
@@ -6080,10 +6109,18 @@ function docsActe(a){
  });
  FACTURES.filter(f=>f.acte===a.id).forEach(f=>{
   const st=f.statut==='annulee'?'annulee':rdu(f)>0?(f.paye?'partielle':'emise'):'soldee';
-  out.push({id:f.id, k:'facture', ic:'€', nom:'Facture '+f.id, sous:CAN('prix')?`${EUR(fTTC(f))}${f.paye?' · encaissé '+EUR(f.paye):''}`:'',
+  const mt=moyenTxt(f);
+  out.push({id:f.id, k:'facture', ic:'€', nom:'Facture '+f.id,
+    sous:CAN('prix')?`${EUR(fTTC(f))}${f.paye?' · encaissé '+EUR(f.paye):''}${mt?' · '+mt:(f.statut!=='annulee'&&!f.paye?' · non encaissée':'')}`:'',
     st, ts:hStamp(f.date,f.id),
     seed:[{t:hStamp(f.date,f.id),ev:'Émise',par:f.praticien}].concat(
-      f.paye?[{t:hStamp(f.date,f.id,1),ev:`Encaissée${f.moyen?' — '+f.moyen:''}`,par:'Secrétariat'}]:[]),
+      /* un règlement fractionné laisse une trace par échéance réglée */
+      f.paye?(f.plan&&f.plan.n>1
+        ? Array.from({length:Math.min(f.plan.faites||0,f.plan.n)},(_,k)=>({
+            t:hStamp(f.date,f.id,1+k),
+            ev:`Échéance ${k+1}/${f.plan.n} encaissée — ${EUR(echeance(f))} par ${f.moyen}`,
+            par:'Secrétariat'}))
+        : [{t:hStamp(f.date,f.id,1),ev:`Encaissée${f.moyen?' — '+f.moyen:''}`,par:'Secrétariat'}]):[]),
     env:(DOCH[f.id]||[]).every(h=>!/Envoy/.test(h.ev))});
  });
  DOCADD.filter(d=>d.acte===a.id).forEach(d=>{
@@ -6301,17 +6338,37 @@ function secFichiers(a){
 }
 
 /* ---------------- Facturer l'acte ---------------- */
-function toggleFact(){ factAdd=!factAdd; renderOver() }
+let fcMoyen='', fcFrac=1, fcMontant=null;
+function toggleFact(){ factAdd=!factAdd; fcMoyen=''; fcFrac=1; fcMontant=null; renderOver() }
 function facturerActe(aid){
  const a=ACTES.find(x=>x.id===aid); if(!a) return;
  const m=Math.max(0,+((document.getElementById('fcM')||{}).value)||0);
  if(!m){toast('Indiquez un montant');return}
  const moyen=(document.getElementById('fcP')||{}).value||null;
+ const n=Math.max(1,+((document.getElementById('fcN')||{}).value)||1);
+ /* un règlement fractionné n'encaisse que la première échéance : le reste
+    reste dû, et se solde échéance par échéance depuis la caisse */
+ const frac=(moyen&&n>1)?n:0;
  const id='F-'+(2600+FACTURES.length);
  FACTURES.unshift({id,patient:a.patient,acte:a.id,date:TODAYS,montant:m,
-   paye:moyen?m:0,moyen:moyen||null,praticien:a.praticien,cat:a.cat,type:a.type,statut:'ok',avoir:0});
- logDoc(id,`Facture émise — ${EUR(m)}${moyen?' · encaissée par '+moyen:''}`);
- factAdd=false; toast(`Facture ${id} · ${EUR(m)}${moyen?' encaissée':' à encaisser'}`); renderOver();
+   paye:moyen?(frac?Math.round(m/frac):m):0, moyen:moyen||null,
+   plan:frac?{n:frac,faites:1}:null,
+   praticien:a.praticien,cat:a.cat,type:a.type,statut:'ok',avoir:0});
+ const F=FACTURES[0];
+ logDoc(id,`Facture émise — ${EUR(m)}${moyen?' · '+moyenTxt(F):''}`);
+ factAdd=false; fcMoyen=''; fcFrac=1; fcMontant=null;
+ toast(`Facture ${id} · ${EUR(m)}${moyen?(frac?` · 1ʳᵉ échéance de ${EUR(F.paye)} encaissée`:' encaissée'):' à encaisser'}`);
+ renderOver();
+}
+/* on retient ce qui est saisi : le formulaire se redessine à chaque choix pour
+   chiffrer les échéances, il ne doit rien perdre au passage */
+function fcMaj(){
+ const v=(document.getElementById('fcM')||{}).value;
+ fcMontant=(v===''||v==null)?null:+v;
+ fcMoyen=(document.getElementById('fcP')||{}).value||'';
+ fcFrac=+((document.getElementById('fcN')||{}).value)||1;
+ if(!fcMoyen) fcFrac=1;
+ renderOver();
 }
 
 function secDocuments(a){
@@ -6326,17 +6383,22 @@ function secDocuments(a){
     <button class="btn xs" onclick="toggleDocAdd()">${docAdd?'✕':'+ Doc.'}</button>
     ${nEnv?`<button class="btn xs p" onclick="sendAllDocs(${a.id})">✉ Tout envoyer · ${nEnv}</button>`:''}</div></div>
   ${(factAdd&&CAN('prix'))?(()=>{const m=montantActe(a);
+    /* un devis réalisé engage son prix : c'est lui qu'on propose en premier */
+    const prop=(()=>{ if(m!=null) return m;
+      const dv=DEVIS.find(x=>x.realise===a.id)||(a.devis?DEVIS.find(x=>x.id===a.devis):null);
+      if(dv) return dv.montant;
+      return (a.soins||[]).reduce((s2,x)=>s2+(x.t?(x.pu!=null?+x.pu:(acteDef(x.t).prix||0)):(+x.prix||0))*(x.q||1),0)||'' })();
     return `<div class="cadd">
      <input class="inp" id="fcM" type="number" min="0" step="10" placeholder="montant TTC"
-       value="${(()=>{ if(m!=null) return m;
-         /* un devis réalisé engage son prix : c'est lui qu'on propose en premier */
-         const dv=DEVIS.find(x=>x.realise===a.id)||(a.devis?DEVIS.find(x=>x.id===a.devis):null);
-         if(dv) return dv.montant;
-         return (a.soins||[]).reduce((s2,x)=>s2+(x.t?(x.pu!=null?+x.pu:(acteDef(x.t).prix||0)):(+x.prix||0))*(x.q||1),0)||'' })()}">
-     <select class="inp" id="fcP"><option value="">à encaisser plus tard</option>${MOYENS.map(x=>`<option>${x}</option>`).join('')}</select>
+       value="${fcMontant!=null?fcMontant:prop}" onchange="fcMaj()">
+     <select class="inp" id="fcP" onchange="fcMaj()"><option value="">à encaisser plus tard</option>${MOYENS.map(x=>`<option ${fcMoyen===x?'selected':''}>${x}</option>`).join('')}</select>
      <button class="btn xs p" onclick="facturerActe(${a.id})">Émettre</button>
+     <select class="inp" id="fcN" style="grid-column:1/-1" onchange="fcMaj()" ${fcMoyen?'':'disabled'}>
+       <option value="1">Réglé en une fois</option>
+       ${(()=>{const base=+(fcMontant!=null?fcMontant:prop)||0;
+         return FRACTIONS.map(n=>`<option value="${n}" ${fcFrac==n?'selected':''}>Paiement en ${n} fois${base?` — ${EUR(Math.round(base/n))} par échéance`:''}</option>`).join('')})()}</select>
      <div class="mu" style="font-size:11px;grid-column:1/-1">${
-       (DEVIS.some(x=>x.realise===a.id)||a.devis)?'Le montant du devis réalisé est proposé.':'Le tarif du catalogue est proposé.'} Rien ne vous y oblige — un acte peut rester non facturé.</div>
+       (DEVIS.some(x=>x.realise===a.id)||a.devis)?'Le montant du devis réalisé est proposé.':'Le tarif du catalogue est proposé.'} Rien ne vous y oblige — un acte peut rester non facturé. Un règlement fractionné n'encaisse que la première échéance.</div>
     </div>`})():''}
   ${docAdd?`<div class="dmod">${['Ordonnance','Consentement','Information','Devis'].map(c=>{
      const M=DOCMOD.filter(x=>x.cat===c); if(!M.length) return '';
@@ -6602,9 +6664,10 @@ function corpsDoc(a,d){
    <div class="l"><span>Total HT</span><span>${E2(ht)}</span></div>
    <div class="l"><span>TVA ${t} %</span><span>${E2(tva)}</span></div>
    <div class="l net"><span>Total TTC</span><span>${E2(ttc)}</span></div>
-   ${f.paye?`<div class="l"><span>Encaissé${f.moyen?' — '+esc(f.moyen):''}</span><span>${E2(f.paye)}</span></div>`:''}
+   ${f.paye?`<div class="l"><span>Encaissé${moyenTxt(f)?' — '+esc(moyenTxt(f)):''}</span><span>${E2(f.paye)}</span></div>`:''}
+   ${(f.plan&&f.plan.n>1&&rdu(f)>0)?`<div class="l"><span>Reste à échoir · ${f.plan.n-(f.plan.faites||0)} échéance${f.plan.n-(f.plan.faites||0)>1?'s':''} de ${E2(echeance(f))}</span><span>${E2(rdu(f))}</span></div>`:''}
    ${rdu(f)?`<div class="l"><span>Reste dû</span><span>${E2(rdu(f))}</span></div>`:''}</div>
-  <div class="dv-men">Facture acquittée le ${DF(f.date)}${f.moyen?` par ${esc(f.moyen)}`:''}.
+  <div class="dv-men">Facture acquittée le ${DF(f.date)}${f.moyen?` par ${esc(moyenTxt(f))}`:''}.
    Actes à visée esthétique non pris en charge par l’Assurance Maladie, soumis à TVA au taux de ${t} %.</div>`;
  }
 
