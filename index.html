@@ -219,6 +219,9 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .npbar input{height:34px;border:1px solid var(--line);background:var(--panel);border-radius:var(--r-s);padding:0 10px;outline:none;color:var(--ink)}
 .npbar input:focus{border-color:var(--accent)}
 @media(max-width:900px){.npbar{grid-template-columns:1fr 1fr}}
+/* horodatage d'une signature, sous le statut de la pièce */
+.horo{font-size:10.5px;color:var(--ink-3);font-variant-numeric:tabular-nums;margin-top:3px;
+  white-space:nowrap;letter-spacing:.01em}
 .perbar{align-items:center;flex-wrap:wrap}
 .perbar .perms{width:auto;min-width:104px;flex:none}
 .drange{display:flex;align-items:center;gap:6px;padding:3px 4px;border-radius:10px;border:1px solid transparent}
@@ -2151,14 +2154,15 @@ function perRange(per){
  if(per.k==='moisSel'){const m=per.m||TODAYS.slice(0,7); return [m+'-01', finMois(m)]}
  if(per.k==='anneeSel'){const y=per.y||TODAYS.slice(0,4); return [y+'-01-01', y+'-12-31']}
  if(per.k==='jour')  return [TODAYS, TODAYS];
- if(per.k==='tout')  return [DATE_MIN, TODAYS];
+ if(per.k==='tout')  return ['1900-01-01', TODAYS];   /* aucune borne basse */
  if(per.k==='mois')  return [TODAYS.slice(0,7)+'-01', TODAYS];
  if(per.k==='annee') return [TODAYS.slice(0,4)+'-01-01', TODAYS];
  const n={'7j':7,'30j':30,'90j':90}[per.k]||30;
  return [new Date(TODAY.getTime()-(n-1)*864e5).toISOString().slice(0,10), TODAYS];
 }
 const inPer=(d,per)=>{const [a,b]=perRange(per);return d>=a&&d<=b};
-const perLabel=per=>{const [a,b]=perRange(per);return `du ${DF(a)} au ${DF(b)}`};
+const perLabel=per=>{ if(per&&per.k==='tout') return 'toutes périodes';
+ const [a,b]=perRange(per); return `du ${DF(a)} au ${DF(b)}`};
 const addD=(d,n)=>new Date(new Date(d).getTime()+n*864e5).toISOString().slice(0,10);
 function perBuckets(per){
  const [a,b]=perRange(per), span=days(a,b)+1, out=[];
@@ -2839,7 +2843,10 @@ function heroKey(e){
 function heroNew(nom,prenom){openActe(null,null,{nom,prenom})}
 
 /* ---------------- Patients (maître-détail) ---------------- */
-let pq='',pPrat='',pSel=null,pTab='resume',docF='tous',docQ='';
+let pq='',pPrat='',pSel=null,pTab='resume',docF='tous',docQ='',docTri='recent';
+/* la liste des documents se filtre par période et se classe par date */
+let perD2={k:'tout',from:'',to:''};
+function setPerD2(x){ perD2={...perD2,...x}; paint() }
 /* suivi chronologique des actes d'un patient */
 let actTri='desc', actCat='', actPrat='', actQ='';
 let schemaReg='visage';
@@ -3129,6 +3136,10 @@ function pDetail(p){
 
  /* ---- documents : ordonnances, devis, factures, consentements ---- */
  const pdfBtn=(aid,id)=>`<button class="btn xs" onclick="event.stopPropagation();apercuDoc(${aid},'${id}')">◫ PDF</button>`;
+ /* une pièce signée dit quand : la date seule ne suffit pas à un consentement.
+    À défaut d'horodatage réel, la même heure plausible que partout ailleurs. */
+ const horoBdg=(id,jour,off)=>{const t=signeLe(id, jour?hStamp(jour,id,off==null?1:off):null);
+   return t?`<div class="horo" title="Horodatage de la signature">🕘 ${DTS(t)}</div>`:''};
  const DOCS=[
   ...O.map(o=>({k:'ordonnance',id:o.id,date:o.date,
     t:`Ordonnance — ${o.lignes.length} ligne${o.lignes.length>1?'s':''}`,
@@ -3136,7 +3147,7 @@ function pDetail(p){
     st:bdg('b-neu','Éditée'), a:pdfBtn(o.acte,o.id)})),
   ...D.map(d=>({k:'devis',id:d.id,date:d.date,t:nomDevis(d),
     s:`${d.id} · ${d.lignes.length} prestation${d.lignes.length>1?'s':''}${CAN('prix')?' · '+EUR(d.montant):''}${d.infos?' · fiche d’information jointe':''}`,
-    st:bdgDevis(d),
+    st:bdgDevis(d)+(d.statut==='accepte'?horoBdg(d.id,d.derniere||d.date,2):''),
     a:`<button class="btn xs" onclick="event.stopPropagation();apercuDevis('${d.id}')">◫ PDF</button>
         ${d.realise?'':`<button class="btn xs p" title="Reprendre ces soins pour la consultation d’aujourd’hui"
           onclick="event.stopPropagation();realiserDevis('${d.id}')">✚ Réaliser</button>`}
@@ -3145,15 +3156,22 @@ function pDetail(p){
         <button class="btn xs" onclick="event.stopPropagation();go('devis','${d.id}')">Ouvrir</button>
         ${btnSuppDevis(d)}`,
     cf:confirmSuppDevis(d,5)})),
-  ...C.map(a=>{const rep=a.consent?null:consentAnterieur(a);
+  /* Un seul consentement par soin : ceux qu'une signature antérieure couvre
+     feraient doublon dans la liste — l'acte, lui, porte la mention « reconduit ». */
+  ...C.filter(a=>!CONS_SUPP.has(a.id)&&(a.consent||!consentAnterieur(a))).map(a=>{
    return {k:'consentement',id:'CONS-'+a.id,date:a.date,
     t:`Consentement — ${esc(a.nom)}`,
-    s:rep?`acte du ${DF(a.date)} · couvert par celui du ${DF(rep.date)}`:`acte du ${DF(a.date)}`,
-    st:a.consent?bdg('b-good','Signé'):rep?bdg('b-good','Reconduit'):bdg('b-crit','⚠ Non signé'),
-    a:pdfBtn(a.id,'CONS-'+a.id)+((a.consent||rep)?'':`<button class="btn xs p" onclick="event.stopPropagation();sendDoc(${a.id},'CONS-${a.id}')">Faire signer</button>`)}}),
+    s:`acte du ${DF(a.date)}`+(a.consent?(()=>{const c=[...ACTES].filter(x=>x.patient===a.patient&&x.id!==a.id
+        &&typesActe(x).some(t=>typesActe(a).includes(t))&&x.date>=a.date).length;
+      return c?` · couvre ${c} séance${c>1?'s':''} suivante${c>1?'s':''}`:''})():''),
+    st:a.consent?bdg('b-good','Signé')+horoBdg('CONS-'+a.id,a.date):bdg('b-crit','⚠ Non signé'),
+    a:pdfBtn(a.id,'CONS-'+a.id)
+      +(a.consent?'':`<button class="btn xs p" onclick="event.stopPropagation();signDoc(${a.id},'CONS-${a.id}')">✎ Faire signer</button>`)
+      +btnSuppCons(a),
+    cf:confirmSuppCons(a,5)}}),
   ...AG.map(x=>({k:x.cat==='Courrier'?'courrier':x.cat.toLowerCase(),id:x.id,date:x.ts.slice(0,10),
     t:esc(x.nom), s:`${esc(x.cat)} · généré le ${DTS(x.ts)}`,
-    st:x.signe?bdg('b-good','Signé'):x.envoye?bdg('b-info','Envoyé'):bdg('b-neu','Généré'),
+    st:x.signe?bdg('b-good','Signé')+horoBdg(x.id,x.signe):x.envoye?bdg('b-info','Envoyé'):bdg('b-neu','Généré'),
     a:pdfBtn(x.acte,x.id)})),
   ...AD.map(x=>({k:x.cat==='Courrier'?'courrier':'information',id:x.id,date:x.date,
     t:esc(x.nom), s:esc(x.sous), st:bdg('b-neu','Archivé'),
@@ -3161,7 +3179,8 @@ function pDetail(p){
  ].sort((a,b)=>b.date.localeCompare(a.date));
  const KIND={devis:['Devis','◫','Devis'],ordonnance:['Ordonnances','℞','Ordonnance'],consentement:['Consentements','✎','Consentement'],
              information:['Informations','ⓘ','Information'],courrier:['Courriers','✉','Courrier']};
- const cnt=k=>DOCS.filter(d=>d.k===k).length;
+ const DOCP=()=>DOCS.filter(d=>inPer(d.date,perD2));
+ const cnt=k=>DOCP().filter(d=>d.k===k).length;
 
  const body={
   resume:()=>`
@@ -3321,11 +3340,13 @@ function pDetail(p){
   docs:()=>{
    const dq=docQ.toLowerCase();
    const L=DOCS.filter(d=>docF==='tous'||d.k===docF)
-               .filter(d=>!dq||(d.t+' '+d.s+' '+d.id).toLowerCase().includes(dq));
+               .filter(d=>inPer(d.date,perD2))
+               .filter(d=>!dq||(d.t+' '+d.s+' '+d.id).toLowerCase().includes(dq))
+               .sort((a,b)=>docTri==='vieux'?a.date.localeCompare(b.date):b.date.localeCompare(a.date));
    return `<div class="fbar">
      <span class="mu" style="font-size:11.5px;font-weight:600;align-self:center">Catégorie</span>
      <div class="seg">
-       <button class="${docF==='tous'?'on':''}" onclick="docF='tous';paint()">Toutes · ${DOCS.length}</button>
+       <button class="${docF==='tous'?'on':''}" onclick="docF='tous';paint()">Toutes · ${DOCP().length}</button>
        ${Object.keys(KIND).filter(k=>cnt(k)>0||docF===k).map(k=>`<button class="${docF===k?'on':''}" onclick="docF='${k}';paint()">${KIND[k][1]} ${KIND[k][0]} · ${cnt(k)}</button>`).join('')}
      </div>
      <input class="inp" id="dqi" style="min-width:180px" placeholder="Rechercher…" value="${esc(docQ)}"
@@ -3335,7 +3356,17 @@ function pDetail(p){
        <button class="btn s" onclick="toast('Ordonnance créée')">℞ Ordonnance</button>
        <button class="btn s" onclick="toast('Document téléversé')">↑ Téléverser</button>
      </div></div>
-    ${(CORBEILLE.length&&CORBEILLE[CORBEILLE.length-1].kind==='devis')?`<div class="undo"><span class="e">🗑</span>
+    ${periodBar(perD2,'setPerD2',`${L.length} document${L.length>1?'s':''}`,['mois','90j','annee','tout'],1)}
+    <div class="fbar" style="margin-top:-4px">
+      <span class="mu" style="font-size:11.5px;font-weight:600;align-self:center">Classer</span>
+      <div class="seg">
+        <button class="${docTri==='recent'?'on':''}" onclick="docTri='recent';paint()">Du plus récent</button>
+        <button class="${docTri==='vieux'?'on':''}" onclick="docTri='vieux';paint()">Du plus ancien</button>
+      </div>
+      ${(perD2.k!=='tout'||docF!=='tous'||docQ)?`<button class="chip" style="margin-left:auto"
+        onclick="docF='tous';docQ='';setPerD2({k:'tout'})">Tout afficher</button>`:''}
+    </div>
+    ${(CORBEILLE.length&&['devis','consent'].includes(CORBEILLE[CORBEILLE.length-1].kind))?`<div class="undo"><span class="e">🗑</span>
       <div style="flex:1;min-width:0"><b>${esc(CORBEILLE[CORBEILLE.length-1].quoi)}</b> — supprimé
         <span class="mu">${DTS(CORBEILLE[CORBEILLE.length-1].ts)} par ${esc(CORBEILLE[CORBEILLE.length-1].par)}</span></div>
       <button class="btn xs" onclick="retablirActe()">↺ Rétablir</button></div>`:''}
@@ -3426,7 +3457,7 @@ V.actes=()=>{
  /* les volumes de produit sont une donnée de pilotage : ils ne s'affichent
     qu'aux rôles à qui ce droit a été accordé */
  const vol=CAN('volumes')?` · ${tox} U de toxine · ${ah.toFixed(1)} ml d'AH`:'';
- return `<div class="head"><div><h1>Actes &amp; schémas</h1><p>${L.length} acte${L.length>1?'s':''}${vol} · ${perA.k==='tout'?'toutes périodes':perLabel(perA)}</p></div>
+ return `<div class="head"><div><h1>Actes &amp; schémas</h1><p>${L.length} acte${L.length>1?'s':''}${vol} · ${perLabel(perA)}</p></div>
   <div class="r"><button class="btn" onclick="toast('Export CSV généré')">Exporter</button>
    <button class="btn p" onclick="openActe()">✚ Saisir un acte</button></div></div>
  <div class="fbar">
@@ -4893,6 +4924,44 @@ function supprimerDevis(id){
  toast(`Devis ${id} supprimé · rattrapable`);
  paint&&paint();
 }
+/* --------------------------------------------------------------------------
+   Consentement : signé une seule fois, supprimable tant qu'il ne l'est pas
+   Un consentement produit par erreur se retire — c'est un document préparé, pas
+   encore un engagement. Signé, il devient une pièce probante : seul
+   l'administrateur peut alors l'effacer, et jamais en silence.
+   -------------------------------------------------------------------------- */
+const CONS_SUPP=new Set();          /* consentements retirés de la liste */
+let suppCons=null;
+const consSigne=a=>!!(a&&a.consent);
+const consBloquant=a=>(consSigne(a)&&!EST_ADMIN())?'déjà signé par le patient':null;
+function supprimerConsent(aid){
+ const a=ACTES.find(x=>x.id===aid); if(!a) return;
+ const b=consBloquant(a);
+ if(b){ suppCons=null; toast(`Consentement ${b} — sa suppression est réservée à l’administrateur`); paint&&paint(); return }
+ const id='CONS-'+aid;
+ CORBEILLE.push({kind:'consent', aid, signe:a.consent, sign:SIGNS[id]||null,
+   hist:(DOCH[id]||[]).slice(), ts:nowStamp(), par:ROLES[role].u,
+   quoi:`Consentement — ${a.nom} du ${DF(a.date)}`});
+ CONS_SUPP.add(aid); a.consent=false; delete SIGNS[id]; delete DOCH[id];
+ if(AS&&AS.aid===aid) AS.consent=false;
+ suppCons=null;
+ toast('Consentement supprimé · rattrapable'); paint&&paint(); if(AS) renderOver();
+}
+const btnSuppCons=a=>{
+ const b=consBloquant(a);
+ return b?`<button class="ib d" disabled title="Consentement ${b} — seul l’administrateur peut l’effacer">✕</button>`
+   :`<button class="ib d" title="Supprimer ce consentement"
+      onclick="event.stopPropagation();suppCons=${a.id};paint()">✕</button>` };
+const confirmSuppCons=(a,cols)=>suppCons!==a.id?'':`<tr class="supp"><td colspan="${cols}">
+  <div class="suppb"><span class="e">⚠</span>
+    <div style="flex:1;min-width:0"><b>Supprimer le consentement de l’acte du ${DF(a.date)} ?</b>
+      <div class="mu">${a.consent
+        ?'Il a été signé par le patient : l’effacer retire une pièce probante du dossier. Le geste est journalisé et reste rattrapable.'
+        :'Il n’a pas été signé — c’est un document préparé, rien n’est engagé. L’acte redemandera un consentement.'}</div></div>
+    <button class="btn xs g" onclick="event.stopPropagation();suppCons=null;paint()">Annuler</button>
+    <button class="btn xs crit" onclick="event.stopPropagation();supprimerConsent(${a.id})">Supprimer</button>
+  </div></td></tr>`;
+
 /* la même paire de boutons au bout d'une ligne de devis, partout où on la voit */
 /* tout rôle qui tient la liste des devis peut retirer celui qu'il vient de créer
    par erreur : le geste est réversible et se refuse dès que le devis engage */
@@ -4917,6 +4986,14 @@ function retablirActe(){
    DEVIS.splice(Math.min(sac.i,DEVIS.length),0,sac.devis);
    if(sac.hist&&sac.hist.length) DOCH[sac.devis.id]=sac.hist;
    toast(`Devis ${sac.devis.id} rétabli`); paint&&paint(); return }
+ if(sac.kind==='consent'){
+   const a=ACTES.find(x=>x.id===sac.aid);
+   CONS_SUPP.delete(sac.aid);
+   if(a) a.consent=!!sac.signe;
+   if(sac.sign) SIGNS['CONS-'+sac.aid]=sac.sign;
+   if(sac.hist&&sac.hist.length) DOCH['CONS-'+sac.aid]=sac.hist;
+   if(AS&&a&&AS.aid===sac.aid) AS.consent=a.consent;
+   toast('Consentement rétabli'); paint&&paint(); if(AS) renderOver(); return }
  ACTES.splice(Math.min(sac.i,ACTES.length),0,sac.acte);
  sac.conso.forEach(c=>{const st=STOCK.find(x=>x.ref===c.ref); if(st) st.q=Math.max(0,st.q-c.q); CONSO.push(c)});
  sac.effets.forEach(x=>EFFETS.push(x)); sac.fichiers.forEach(x=>FICHIERS.push(x));
@@ -6199,6 +6276,14 @@ function sendDoc(aid,id){
 }
 function signDoc(aid,id){
  const a=ACTES.find(x=>x.id===aid); if(!a) return;
+ /* Un consentement ne se signe qu'une fois : c'est ce qui fait sa valeur. Une
+    seconde signature n'ajouterait rien et laisserait deux pièces contradictoires
+    dans le dossier. */
+ if(id==='CONS-'+aid){
+  if(a.consent){ toast(`Ce consentement est déjà signé — ${signTxt(signOf(id))||'signature au dossier'}. Il ne se signe pas deux fois.`); return }
+  const rep=consentAnterieur(a);
+  if(rep){ toast(`Consentement déjà couvert par celui du ${DF(rep.date)} — inutile de le faire signer à nouveau.`); return }
+ }
  const p=pById(a.patient), d=docsActe(a).find(x=>x.id===id);
  ouvrirSign(id, (d&&d.nom)||'Signature', `${fn(p)} · ${DF(a.date)}`, fn(p), mode=>{
   if(id==='CONS-'+aid){ a.consent=true; if(AS&&AS.aid===aid) AS.consent=true }
@@ -6870,6 +6955,12 @@ function majEnc(id){
    ========================================================================== */
 let SIGNS={};                      /* id de la pièce → {img, t, par, mode} */
 const signOf=id=>SIGNS[id]||null;
+/* quand la pièce a-t-elle été signée : le pavé fait foi, sinon son journal */
+function signeLe(id,repli){
+ const g=SIGNS[id]; if(g) return g.t;
+ const h=(DOCH[id]||[]).filter(x=>/[Ss]igné/.test(x.ev)).pop();
+ return h?h.t:(repli||null);
+}
 const signTxt=g=>!g?'':(g.mode==='papier'
   ? `Signé à la main sur papier le ${DTS(g.t)}`
   : `Signé à l’écran le ${DTS(g.t)}`);
