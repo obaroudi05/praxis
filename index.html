@@ -2208,6 +2208,7 @@ function periodBar(per,setter,info,presets,mois){
 }
 const RELS=fileRelances();
 const RDUE=RELS.filter(r=>r.du);
+const CONS_SUPP=new Set();          /* consentements retirés de la liste */
 /* Un consentement éclairé signé pour un soin donné couvre les séances suivantes
    du même soin : on ne le redemande pas à chaque fois. La règle se coupe dans
    Paramètres → Cabinet pour les praticiens qui font signer à chaque séance. */
@@ -2215,23 +2216,56 @@ const typesActe=a=>{ if(!a) return [];
  if(a.soins&&a.soins.length) return [...new Set(a.soins.filter(x=>x.t).map(x=>x.t))];
  if(a.zt) return [...new Set(Object.values(a.zt))];
  return a.type?[a.type]:[] };
+/* Les soins de la séance qui exigent un consentement — la catégorie de l'acte
+   comprise, puisque c'est sur elle que la liste des documents s'appuie. */
+const consTypes=a=>{ if(!a) return [];
+ const T=typesActe(a).filter(t=>{const c=catById(t); return c&&c.cons});
+ const c=catById(a.type); if(c&&c.cons&&!T.includes(a.type)) T.push(a.type);
+ return T };
+/* Deux séances du même jour ne peuvent pas se couvrir l'une l'autre : il faut un
+   ordre total strict, sinon le consentement s'annule des deux côtés et disparaît. */
+const avantStrict=(x,y)=>x.date<y.date||(x.date===y.date&&x.id<y.id);
 /* Chaque soin de la séance qui exige un consentement doit l'avoir obtenu : on
    cherche, pour chacun, la séance signée la plus récente qui le portait. S'il
    en manque un seul, le consentement reste à faire signer. */
 function consentAnterieur(a){
  if(!a||!CABINET.consentReconduit) return null;
- const T=typesActe(a).filter(t=>{const c=catById(t); return c&&c.cons});
+ const T=consTypes(a);
  if(!T.length) return null;
- const ant=ACTES.filter(x=>x.patient===a.patient&&x.id!==a.id&&x.consent&&x.date<=a.date)
-   .sort((x,y)=>y.date.localeCompare(x.date));
- const src=T.map(t=>ant.find(x=>typesActe(x).includes(t)));
+ /* un consentement mis à la corbeille ne couvre plus rien : la séance suivante
+    redevient celle qui doit le faire signer */
+ const ant=ACTES.filter(x=>x.patient===a.patient&&x.id!==a.id&&x.consent
+     &&!CONS_SUPP.has(x.id)&&avantStrict(x,a))
+   .sort((x,y)=>y.date.localeCompare(x.date)||y.id-x.id);
+ const src=T.map(t=>ant.find(x=>consTypes(x).includes(t)));
  if(src.some(x=>!x)) return null;
- return src.slice().sort((x,y)=>y.date.localeCompare(x.date))[0] };
+ return src.slice().sort((x,y)=>y.date.localeCompare(x.date)||y.id-x.id)[0] };
+/* Le consentement de ce soin, quel que soit l'ordre des séances : sert de
+   verrou, pour qu'aucun second document ne puisse être établi pour un soin
+   déjà consenti — même en repassant sur une séance antérieure. */
+function consentSoin(a){
+ /* le cabinet qui fait signer à chaque séance a désactivé la reconduction :
+    le verrou tombe avec elle */
+ if(!a||!CABINET.consentReconduit) return null;
+ const T=consTypes(a); if(!T.length) return null;
+ const sig=ACTES.filter(x=>x.patient===a.patient&&x.id!==a.id&&x.consent&&!CONS_SUPP.has(x.id))
+   .sort((x,y)=>x.date.localeCompare(y.date)||x.id-y.id);
+ const src=T.map(t=>sig.find(x=>consTypes(x).includes(t)));
+ if(src.some(x=>!x)) return null;
+ return src.slice().sort((x,y)=>x.date.localeCompare(y.date)||x.id-y.id)[0] };
+/* La séance qui porte le consentement de celle-ci, s'il ne lui appartient pas.
+   Une séance signée ne s'efface que devant une séance signée antérieure — sans
+   quoi deux signatures du même jour se neutraliseraient. Une séance non signée
+   s'efface devant la signature du soin, d'où qu'elle vienne. */
+const consentPorteur=a=>!a?null:(consentAnterieur(a)||(a.consent?null:consentSoin(a)));
+/* le nombre de séances qui s'adossent à ce consentement-ci */
+const consentCouvre=a=>ACTES.filter(x=>x.patient===a.patient&&x.id!==a.id
+  &&(consentPorteur(x)||{}).id===a.id).length;
 /* pendant la saisie : la séance en cours est-elle déjà couverte ? */
 const consentDejaSigne=()=>AS?consentAnterieur({patient:AS.pid, id:AS.aid, date:AS.date,
   soins:(AS.soins||[]).filter(x=>x.t).map(x=>({t:x.t}))}):null;
 /* le consentement est en règle : signé pour cette séance, ou repris d'une précédente */
-const consentOK=a=>!!(a&&(a.consent||consentAnterieur(a)));
+const consentOK=a=>!!(a&&(a.consent||consentPorteur(a)));
 /* évalué à la demande : CABINET est déclaré plus bas, et le réglage
    « consentement reconduit » peut changer en cours de session */
 const consentKO=()=>ACTES.filter(a=>catById(a.type).cons&&!consentOK(a));
@@ -2431,6 +2465,36 @@ let CABINET={
  /* un consentement signé vaut pour les séances suivantes du même soin */
  consentReconduit:true
 };
+/* --------------------------------------------------------------------------
+   Un consentement, un soin. Le dossier ne doit jamais porter deux signatures
+   pour le même soin chez le même patient : la première séance le fait signer,
+   les suivantes s'y adossent. On assainit ici le jeu de démonstration à la
+   source — plutôt que de masquer les doublons à l'affichage.
+   -------------------------------------------------------------------------- */
+(function unConsentementParSoin(){
+ const ordre=(x,y)=>x.date.localeCompare(y.date)||x.id-y.id;
+ const A=[...ACTES].sort(ordre);
+ /* 1. la signature remonte à la première séance du soin : c'est elle qui fait
+       foi, les suivantes s'y adossent — jamais l'inverse. */
+ const parSoin={};
+ A.forEach(a=>consTypes(a).forEach(t=>{(parSoin[a.patient+'|'+t]=parSoin[a.patient+'|'+t]||[]).push(a)}));
+ Object.values(parSoin).forEach(L=>{ if(L.some(x=>x.consent)) L[0].consent=true });
+ /* 2. toute séance dont chaque soin est déjà consenti perd son drapeau : un seul
+       document, un seul horodatage, une seule signature. */
+ const vus={};
+ A.forEach(a=>{
+  if(!a.consent) return;
+  const T=consTypes(a); if(!T.length) return;
+  if(T.every(t=>vus[a.patient+'|'+t])){ a.consent=false; return }
+  T.forEach(t=>vus[a.patient+'|'+t]=a.id);
+ });
+ /* 3. le cabinet de démonstration garde un consentement en attente — mais sur un
+       soin que ce patient n'a fait qu'une fois, pour qu'il se règle d'un clic
+       sans jamais rouvrir un document déjà signé. */
+ const seul=A.filter(a=>{const T=consTypes(a);
+   return a.consent&&T.length===1&&(parSoin[a.patient+'|'+T[0]]||[]).length===1});
+ if(seul.length) seul[seul.length-1].consent=false;
+})();
 let PRATS=[
  {nom:'Dr O. Baroudi', specialite:'Médecine esthétique', rpps:'10101234567', adeli:'751234567',
   ordre:'75/12345', siret:'812 456 789 00021', tva:'FR32812456789',
@@ -3158,12 +3222,11 @@ function pDetail(p){
     cf:confirmSuppDevis(d,5)})),
   /* Un seul consentement par soin : ceux qu'une signature antérieure couvre
      feraient doublon dans la liste — l'acte, lui, porte la mention « reconduit ». */
-  ...C.filter(a=>!CONS_SUPP.has(a.id)&&(a.consent||!consentAnterieur(a))).map(a=>{
+  ...C.filter(a=>!CONS_SUPP.has(a.id)&&!consentPorteur(a)).map(a=>{
+   const suiv=a.consent?consentCouvre(a):0;
    return {k:'consentement',id:'CONS-'+a.id,date:a.date,
     t:`Consentement — ${esc(a.nom)}`,
-    s:`acte du ${DF(a.date)}`+(a.consent?(()=>{const c=[...ACTES].filter(x=>x.patient===a.patient&&x.id!==a.id
-        &&typesActe(x).some(t=>typesActe(a).includes(t))&&x.date>=a.date).length;
-      return c?` · couvre ${c} séance${c>1?'s':''} suivante${c>1?'s':''}`:''})():''),
+    s:`acte du ${DF(a.date)}`+(suiv?` · couvre ${suiv} séance${suiv>1?'s':''} suivante${suiv>1?'s':''}`:''),
     st:a.consent?bdg('b-good','Signé')+horoBdg('CONS-'+a.id,a.date):bdg('b-crit','⚠ Non signé'),
     a:pdfBtn(a.id,'CONS-'+a.id)
       +(a.consent?'':`<button class="btn xs p" onclick="event.stopPropagation();signDoc(${a.id},'CONS-${a.id}')">✎ Faire signer</button>`)
@@ -4930,8 +4993,7 @@ function supprimerDevis(id){
    encore un engagement. Signé, il devient une pièce probante : seul
    l'administrateur peut alors l'effacer, et jamais en silence.
    -------------------------------------------------------------------------- */
-const CONS_SUPP=new Set();          /* consentements retirés de la liste */
-let suppCons=null;
+let suppCons=null;                  /* CONS_SUPP est déclaré plus haut, avec consentAnterieur */
 const consSigne=a=>!!(a&&a.consent);
 const consBloquant=a=>(consSigne(a)&&!EST_ADMIN())?'déjà signé par le patient':null;
 function supprimerConsent(aid){
@@ -6213,12 +6275,18 @@ const DST={
 function docsActe(a){
  const out=[], p=pById(a.patient), c=catById(a.type);
  if(c&&c.cons){
-  const id='CONS-'+a.id, rep=a.consent?null:consentAnterieur(a);
+  /* la reprise prime : une séance couverte n'établit pas un second consentement,
+     même si elle a jadis porté un drapeau « signé » */
+  const id='CONS-'+a.id, rep=consentPorteur(a);
   const st=(a.consent||rep)?'signe':(DOCH[id]||[]).some(h=>/Lien/.test(h.ev))?'lien':'attente';
-  out.push({id, k:'consentement', ic:'✎', nom:'Consentement — '+a.nom, st, ts:hStamp(a.date,id),
-    seed:[{t:hStamp(a.date,id),ev:'Généré depuis le modèle',par:a.praticien}].concat(
-      a.consent?[{t:hStamp(a.date,id,1),ev:'Signé électroniquement par le patient',par:fn(p)}]
-      :rep?[{t:hStamp(a.date,id,1),ev:`Couvert par le consentement signé le ${DF(rep.date)} pour « ${rep.nom} »`,par:a.praticien}]:[]),
+  /* Reconduit : la pièce affichée est celle qui a été signée — même document,
+     même horodatage. Rien n'est réédité, on rappelle seulement d'où elle vient. */
+  const rid=rep?'CONS-'+rep.id:id, rdt=rep?rep.date:a.date;
+  out.push({id, k:'consentement', ic:'✎', nom:'Consentement — '+a.nom, st,
+    sous:rep?`Reconduit de la séance du ${DF(rep.date)}`:'',
+    ts:hStamp(rdt,rid),
+    seed:[{t:hStamp(rdt,rid),ev:'Généré depuis le modèle',par:(rep||a).praticien}].concat(
+      (rep||a.consent)?[{t:hStamp(rdt,rid,1),ev:'Signé électroniquement par le patient',par:fn(p)}]:[]),
     env:!(a.consent||rep), sign:!(a.consent||rep)});
  }
  ORDONNANCES.filter(o=>o.acte===a.id).forEach(o=>{
@@ -6279,10 +6347,12 @@ function signDoc(aid,id){
  /* Un consentement ne se signe qu'une fois : c'est ce qui fait sa valeur. Une
     seconde signature n'ajouterait rien et laisserait deux pièces contradictoires
     dans le dossier. */
- if(id==='CONS-'+aid){
+ if(/^CONS-/.test(id)){
   if(a.consent){ toast(`Ce consentement est déjà signé — ${signTxt(signOf(id))||'signature au dossier'}. Il ne se signe pas deux fois.`); return }
-  const rep=consentAnterieur(a);
-  if(rep){ toast(`Consentement déjà couvert par celui du ${DF(rep.date)} — inutile de le faire signer à nouveau.`); return }
+  /* le verrou vaut dans les deux sens : un soin consenti ne redonne jamais lieu
+     à un second document, même en revenant sur une séance antérieure */
+  const rep=consentPorteur(a);
+  if(rep){ toast(`Ce soin a déjà un consentement signé le ${DF(rep.date)} — il ne s’établit pas une seconde fois.`); return }
  }
  const p=pById(a.patient), d=docsActe(a).find(x=>x.id===id);
  ouvrirSign(id, (d&&d.nom)||'Signature', `${fn(p)} · ${DF(a.date)}`, fn(p), mode=>{
