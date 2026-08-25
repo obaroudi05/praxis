@@ -34,6 +34,7 @@
   --sh-1:0 1px 2px rgba(13,14,20,.05);
   --sh-2:0 1px 3px rgba(13,14,20,.05), 0 8px 24px -8px rgba(13,14,20,.10);
   --sh-3:0 20px 60px -12px rgba(13,14,20,.28), 0 4px 12px rgba(13,14,20,.08);
+  --side-bg:#0f1117;--side-edge:rgba(255,255,255,.07);
   --r-s:9px;--r-m:13px;--r-l:18px;
   --sans:-apple-system,BlinkMacSystemFont,"Inter","SF Pro Display","Segoe UI",system-ui,sans-serif;
 }
@@ -62,6 +63,9 @@
   --skb:#199e70;--meso:#9085e9;--peel:#c98500;--las:#d55181;--rf:#e66767;--epil:#008300;
   --sh-2:0 1px 3px rgba(0,0,0,.5), 0 8px 24px -8px rgba(0,0,0,.6);
   --sh-3:0 24px 70px -12px rgba(0,0,0,.75);
+  /* en thème sombre la colonne reste un cran au-dessus du fond, sans quoi la
+     séparation disparaît */
+  --side-bg:#111420;--side-edge:rgba(255,255,255,.09);
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
@@ -76,14 +80,31 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 
 /* ============ SHELL ============ */
 .app{display:grid;grid-template-columns:238px 1fr;height:100vh;overflow:hidden}
-.side{display:flex;flex-direction:column;padding:14px 12px;gap:2px;overflow-y:auto}
+.side{display:flex;flex-direction:column;padding:14px 12px;gap:2px;overflow-y:auto;
+  /* Colonne de navigation en noir : elle se distingue du plan de travail au
+     lieu de s'y fondre, et l'œil retrouve les rubriques sans les chercher.
+     Les variables sont redéfinies ici, si bien que toutes les règles écrites
+     pour la barre latérale suivent sans être touchées. */
+  background:var(--side-bg);border-right:1px solid var(--side-edge);
+  --panel:rgba(255,255,255,.075);
+  --panel-2:rgba(255,255,255,.05);
+  --panel-3:rgba(255,255,255,.11);
+  --ink:#f5f6fa;
+  --ink-2:#aeb3c4;
+  --ink-3:#828899;
+  --line:rgba(255,255,255,.10);
+  --line-2:rgba(255,255,255,.19);
+  --crit:#e5484d;
+  --sh-1:none;
+  color:var(--ink)}
 .logo{display:flex;align-items:center;gap:10px;padding:6px 8px 16px}
 .logo .m{width:32px;height:32px;border-radius:10px;background:linear-gradient(140deg,var(--accent),var(--accent-2));
   display:grid;place-items:center;color:#fff;font-weight:750;font-size:13px;letter-spacing:-.02em;box-shadow:0 4px 12px -2px rgba(42,120,214,.45)}
 .logo b{display:block;font-size:14px;font-weight:680;letter-spacing:.02em}
 .logo span{display:block;font-size:11px;color:var(--ink-3);margin-top:-2px}
 
-.cmdk{display:flex;align-items:center;gap:8px;width:100%;height:36px;padding:0 10px;margin-bottom:14px;
+.cmdk{display:flex;align-items:center;gap:7px;width:100%;height:36px;padding:0 9px;margin-bottom:14px;
+  font-size:12.6px;white-space:nowrap;overflow:hidden;
   border-radius:var(--r-s);background:var(--panel);border:1px solid var(--line);color:var(--ink-3);
   box-shadow:var(--sh-1);transition:.15s}
 .cmdk:hover{border-color:var(--line-2);color:var(--ink-2)}
@@ -99,7 +120,7 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .side nav a .i{width:16px;text-align:center;opacity:.8;font-size:13px}
 .side nav a .n{margin-left:auto;min-width:19px;height:18px;padding:0 5px;border-radius:6px;background:var(--crit);color:#fff;
   font-size:10.5px;font-weight:750;display:grid;place-items:center}
-.side nav a.soon{opacity:.45;pointer-events:none}
+.side nav a.soon{opacity:.58;pointer-events:none}
 .side nav a.soon .n{background:var(--panel-3);color:var(--ink-3);font-weight:600;font-size:9.5px}
 .side-foot{margin-top:auto;padding-top:14px;display:flex;align-items:center;gap:9px;border-top:1px solid var(--line)}
 .side-foot .av{width:30px;height:30px;border-radius:9px;background:linear-gradient(140deg,#e87ba4,#4a3aa7);color:#fff;
@@ -6605,7 +6626,7 @@ function secDocuments(a){
  return `<div class="dpane">
   <div class="dpane-h">
    <div style="min-width:0"><h3>Documents</h3>
-     <div class="mu" style="font-size:11px">${L.length} pièce${L.length>1?'s':''} · envoi par ${ca}</div></div>
+     <div class="mu" style="font-size:11px">${L.length} pièce${L.length>1?'s':''}</div></div>
    <div class="r">
     ${CAN('prix')?`<button class="btn xs ${factAdd?'g':''}" onclick="toggleFact()">${factAdd?'✕':'€ Facturer'}</button>`:''}
     <button class="btn xs" onclick="toggleDocAdd()">${docAdd?'✕':'+ Doc.'}</button>
