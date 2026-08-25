@@ -403,6 +403,38 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
 .fc-x{margin-top:2px;padding:9px;border:none;background:transparent;color:#fff;opacity:.75;cursor:pointer;font-size:12.5px}
 .fc-x:hover{opacity:1}
 /* ---------- aperçu PDF : feuille A4 réelle ---------- */
+/* ---------- pavé de signature ---------- */
+#sigv{position:fixed;inset:0;z-index:700;background:rgba(24,24,27,.66);backdrop-filter:blur(3px);
+  display:none;align-items:center;justify-content:center;padding:20px;opacity:0;transition:.18s}
+#sigv.on{display:flex;opacity:1}
+.sig-box{background:var(--panel);border-radius:18px;box-shadow:0 26px 70px rgba(0,0,0,.34);
+  width:min(660px,100%);padding:16px;display:flex;flex-direction:column;gap:12px}
+.sig-h{display:flex;align-items:flex-start;gap:10px}
+.sig-h b{font-size:14.5px;font-weight:680;display:block;letter-spacing:-.01em}
+.sig-h small{display:block;font-size:11.5px;color:var(--ink-3);margin-top:2px}
+.sig-h .btn{margin-left:auto}
+.sig-pad{position:relative;border:1.5px dashed var(--line);border-radius:12px;background:var(--panel-2);
+  height:210px;overflow:hidden}
+.sig-pad canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair;
+  display:block}
+.sig-ph{position:absolute;inset:0;display:grid;place-items:center;font-size:12.5px;color:var(--ink-3);
+  pointer-events:none;transition:.15s}
+.sig-pad.ecrit .sig-ph{opacity:0}
+.sig-line{position:absolute;left:8%;right:8%;bottom:34px;border-bottom:1px solid var(--line);pointer-events:none}
+/* correction d'un encaissement */
+.encf{background:var(--accent-wash);border:1px solid var(--accent);border-radius:12px;padding:10px;
+  display:flex;flex-direction:column;gap:9px;text-align:left}
+.encf-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.encf label{display:flex;flex-direction:column;gap:3px;font-size:10.5px;font-weight:640;
+  color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em}
+.encf .inp{height:31px;background:var(--panel);font-size:12.5px;text-transform:none;letter-spacing:0}
+.encf .pxin .inp{text-align:right}
+.encf-a{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.sig-f{display:flex;gap:8px;align-items:center}
+.sig-f .btn.p{margin-left:auto}
+/* la signature recueillie, telle qu'elle s'imprime sur la pièce */
+.sg-img{display:block;max-width:100%;max-height:13mm;margin:1mm 0 .5mm;mix-blend-mode:multiply}
+.sg-mn{font-size:8.5px;color:#52525b;line-height:1.5}
 #pdfv{position:fixed;inset:0;z-index:600;background:rgba(24,24,27,.74);backdrop-filter:blur(4px);
   display:none;flex-direction:column;opacity:0;transition:.18s}
 #pdfv.on{display:flex;opacity:1}
@@ -1264,6 +1296,17 @@ tr.supp td{background:var(--crit-w);padding:0}
 </div>
 <div class="over" id="over"><div class="oh" id="overh"></div><div class="ob" id="overb"></div><div class="of" id="overf"></div></div>
 <div id="pdfv"><div class="pv-bar" id="pvbar"></div><div class="pv-sc" id="pvsc"></div></div>
+<div id="sigv"><div class="sig-box">
+  <div class="sig-h"><div><b id="sigT">Signature</b><small id="sigS"></small></div>
+    <button class="btn g s" onclick="fermerSign()">✕</button></div>
+  <div class="sig-pad"><canvas id="sigC"></canvas>
+    <span class="sig-ph" id="sigPh">Signez ici — au doigt, à la souris ou au stylet</span>
+    <span class="sig-line"></span></div>
+  <div class="sig-f">
+    <button class="btn s" onclick="effacerSign()">↺ Effacer</button>
+    <button class="btn s" onclick="signPapier()" title="Le document a été imprimé et signé à la main">✎ Signé sur papier</button>
+    <button class="btn p" id="sigOk" onclick="validerSign()" disabled>✓ Valider la signature</button></div>
+</div></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -3097,6 +3140,8 @@ function pDetail(p){
     a:`<button class="btn xs" onclick="event.stopPropagation();apercuDevis('${d.id}')">◫ PDF</button>
         ${d.realise?'':`<button class="btn xs p" title="Reprendre ces soins pour la consultation d’aujourd’hui"
           onclick="event.stopPropagation();realiserDevis('${d.id}')">✚ Réaliser</button>`}
+        ${d.statut==='accepte'?'':`<button class="btn xs" title="Le patient signe dans l’encadré"
+          onclick="event.stopPropagation();signerDevis('${d.id}')">✎ Faire signer</button>`}
         <button class="btn xs" onclick="event.stopPropagation();go('devis','${d.id}')">Ouvrir</button>
         ${btnSuppDevis(d)}`,
     cf:confirmSuppDevis(d,5)})),
@@ -3328,7 +3373,11 @@ function pDetail(p){
       <td>${d.lignes.map(l=>esc(l[1])).join(' · ')}</td>
       <td class="num">${EUR(d.montant)}</td><td>${bdgDevis(d)}</td>
       <td class="mono mu">${d.relances||'—'}</td>
-      <td class="num"><button class="btn xs" onclick="event.stopPropagation();toast('PDF du devis ${d.id}')">PDF</button></td></tr>`).join('')}
+      <td class="num" style="white-space:nowrap">
+        ${d.statut==='accepte'?(signOf(d.id)?`<span class="bdg b-good">✎ Signé</span>`:'')
+          :`<button class="btn xs" title="Le patient signe dans l’encadré"
+             onclick="event.stopPropagation();signerDevis('${d.id}')">✎ Faire signer</button>`}
+        <button class="btn xs" onclick="event.stopPropagation();apercuDevis('${d.id}')">PDF</button></td></tr>`).join('')}
     </tbody></table>${D.length?'':'<div class="empty">Aucun devis.</div>'}</div>
 
    <div class="subh"><h3>Factures &amp; avoirs<span>${F.length}</span></h3>
@@ -3345,7 +3394,11 @@ function pDetail(p){
       <td class="num">${EUR(f.paye)}</td><td class="mu">${moyenTxt(f)||'—'}</td>
       <td class="num">${rdu(f)>0?`<span style="color:var(--crit);font-weight:650">${EUR(rdu(f))}</span>`:'<span class="mu">—</span>'}</td>
       <td>${an?bdg('b-crit','⊘ Annulée'):f.avoir?bdg('b-warn','Avoir'):rdu(f)>0?bdg('b-warn','Partielle'):bdg('b-good','Soldée')}</td>
-      <td class="num"><button class="btn xs" onclick="toast('PDF Factur-X de ${f.id}')">PDF</button></td></tr>`}).join('')}
+      <td class="num" style="white-space:nowrap">
+        ${(an||!peutEncaisser())?'':`<button class="btn xs ${encSel===f.id?'g':''}" title="Corriger l’encaissement, même sur une facture soldée"
+          onclick="event.stopPropagation();ouvrirEnc('${f.id}')">${encSel===f.id?'✕':'€ Encaissement'}</button>`}
+        <button class="btn xs" onclick="toast('PDF Factur-X de ${f.id}')">PDF</button></td></tr>
+      ${encSel===f.id?`<tr class="supp"><td colspan="${cpt?12:10}">${encForm(f)}</td></tr>`:''}`}).join('')}
     </tbody></table>${F.length?'':'<div class="empty">Aucune facture.</div>'}</div>
 
    ${Object.keys(modes).length?`<div class="subh"><h3>Encaissements par moyen de paiement</h3></div>
@@ -6145,11 +6198,31 @@ function sendDoc(aid,id){
  renderOver();
 }
 function signDoc(aid,id){
- const a=ACTES.find(x=>x.id===aid), p=pById(a.patient);
- if(id==='CONS-'+aid){ a.consent=true; if(AS&&AS.aid===aid) AS.consent=true }
- const ad=DOCADD.find(x=>x.id===id); if(ad) ad.signe=nowStamp();
- logDoc(id,'Signé électroniquement par le patient',fn(p));
- toast('Consentement signé et horodaté'); renderOver(); 
+ const a=ACTES.find(x=>x.id===aid); if(!a) return;
+ const p=pById(a.patient), d=docsActe(a).find(x=>x.id===id);
+ ouvrirSign(id, (d&&d.nom)||'Signature', `${fn(p)} · ${DF(a.date)}`, fn(p), mode=>{
+  if(id==='CONS-'+aid){ a.consent=true; if(AS&&AS.aid===aid) AS.consent=true }
+  const ad=DOCADD.find(x=>x.id===id); if(ad) ad.signe=nowStamp();
+  logDoc(id, mode==='papier'
+    ? 'Signé à la main sur un exemplaire papier, versé au dossier'
+    : 'Signé dans l’encadré — tracé manuscrit conservé', fn(p));
+  toast(mode==='papier'?'Signature manuscrite consignée':'Signature recueillie et horodatée');
+  paint&&paint(); if(AS) renderOver();
+ });
+}
+/* un devis se signe aussi : c'est ce qui l'engage */
+function signerDevis(id){
+ const d=DEVIS.find(x=>x.id===id); if(!d){toast('Devis introuvable');return}
+ if(d.statut==='accepte'&&signOf(id)){toast('Ce devis est déjà signé');return}
+ const p=pById(d.patient);
+ ouvrirSign(id, nomDevis(d), `${d.id} · ${fn(p)}${CAN('prix')?' · '+EUR(d.montant):''}`, fn(p), mode=>{
+  d.statut='accepte'; d.derniere=TODAYS;
+  logDoc(id, mode==='papier'
+    ? 'Devis accepté — signé à la main sur un exemplaire papier'
+    : 'Devis accepté — signé dans l’encadré par le patient', fn(p));
+  toast(`Devis ${id} accepté et signé`);
+  paint&&paint(); if(AS) renderOver();
+ });
 }
 function sendAllDocs(aid){
  const a=ACTES.find(x=>x.id===aid), L=docsActe(a).filter(d=>d.env);
@@ -6416,10 +6489,15 @@ function secDocuments(a){
     </div>
     <div class="drow-a">
       ${d.env?`<button class="btn xs p" onclick="sendDoc(${a.id},'${d.id}')" title="Envoi par ${ca} à ${esc(p.mail!=='—'?p.mail:p.tel)}">✉ Envoyer</button>`:''}
-      ${d.sign?`<button class="btn xs" onclick="signDoc(${a.id},'${d.id}')">✓ Marquer signé</button>`:''}
+      ${d.sign?`<button class="btn xs" onclick="signDoc(${a.id},'${d.id}')">✎ Faire signer</button>`:''}
+      ${(d.k==='facture'&&peutEncaisser()&&(FACTURES.find(x=>x.id===d.id)||{}).statut!=='annulee')
+        ?`<button class="btn xs ${encSel===d.id?'g':''}" onclick="ouvrirEnc('${d.id}')">${encSel===d.id?'✕ Fermer':'€ Encaissement'}</button>`:''}
+      ${(d.k==='devis'&&DEVIS.find(x=>x.id===d.id)&&DEVIS.find(x=>x.id===d.id).statut!=='accepte')
+        ?`<button class="btn xs" onclick="signerDevis('${d.id}')">✎ Faire signer</button>`:''}
       <button class="btn xs" onclick="apercuDoc(${a.id},'${d.id}')">◫ Aperçu PDF</button>
       ${d.k==='devis'?`<button class="btn xs" onclick="closeAll();go('devis','${d.id}')">Ouvrir</button>`:''}
     </div>
+    ${encSel===d.id?`<div style="padding:0 10px 10px">${encForm(FACTURES.find(x=>x.id===d.id))}</div>`:''}
     ${docOpen===d.id?`<div class="dhist">${H.map(h=>`<div class="dh">
       <div class="dt">${DTS(h.t)} <span class="dp">· ${esc(h.par)}</span></div>
       <div class="de">${esc(h.ev)}</div></div>`).join('')}</div>`:''}
@@ -6592,7 +6670,7 @@ function devisDoc(d){
    <div class="c"><div class="lb">${esc(T.sigPrat||'Le praticien')}</div>
     <div class="hint">${esc(prn)} — signature</div></div>
    <div class="c"><div class="lb">${esc(T.sigPat||'Le patient')}</div>
-    <div class="hint">Date${T.manuscrite?', mention manuscrite ci-dessus':''}, puis signature</div></div></div>`:''}
+    ${signBox(d.id,`Date${T.manuscrite?', mention manuscrite ci-dessus':''}, puis signature`)}</div></div>`:''}
   </div>
   ${CABINET.piedOn?`<div class="dv-ft">${hfDevis(CABINET.pied,p,prn)}</div>`:''}
  </div>`;
@@ -6621,7 +6699,7 @@ function corpsDoc(a,d){
  const H=histo(d.id,d.seed||[]);
  const bloc=(t,c)=>`<div class="dv-s">${esc(t)}</div><div class="dv-p">${c}</div>`;
  const sign=(g,dr,hg,hd)=>`<div class="dv-sg"><div class="c"><div class="lb">${esc(g)}</div><div class="hint">${esc(hg)}</div></div>
-   <div class="c"><div class="lb">${esc(dr)}</div><div class="hint">${esc(hd)}</div></div></div>`;
+   <div class="c"><div class="lb">${esc(dr)}</div>${dr?signBox(d.id,hd):`<div class="hint">${esc(hd)}</div>`}</div></div>`;
 
  if(d.k==='consentement'){
   const ct=consentTxt(a.type);
@@ -6718,6 +6796,143 @@ function docAutre(x){
 }
 
 /* ---------- visionneuse commune à tous les documents ---------- */
+/* ==========================================================================
+   Encaissement : corrigeable, même sur une facture soldée
+   Un encaissement se corrige — le patient revient payer le reste, le chèque
+   revient impayé, on s'est trompé de moyen. Rien n'est effacé : chaque
+   correction est journalisée sur la pièce, avec l'avant et l'après.
+   ========================================================================== */
+let encSel=null;
+const peutEncaisser=()=>ROLES[role].v.includes('encaiss');
+function ouvrirEnc(id){ encSel=(encSel===id)?null:id; paint&&paint(); if(AS) renderOver() }
+function fermerEnc(){ encSel=null; paint&&paint(); if(AS) renderOver() }
+/* le formulaire, réutilisé dans la fiche patient comme dans un acte */
+function encForm(f){
+ const n=(f.plan&&f.plan.n)||1;
+ return `<div class="encf" onclick="event.stopPropagation()">
+  <div class="encf-g">
+   <label>Encaissé
+     <div class="pxin"><input class="inp" id="enM" type="number" min="0" step="5" value="${f.paye}"><span>€</span></div></label>
+   <label>Moyen de paiement
+     <select class="inp" id="enP"><option value="">non encaissé</option>
+       ${MOYENS.map(m=>`<option ${f.moyen===m?'selected':''}>${m}</option>`).join('')}</select></label>
+   <label>Étalement
+     <select class="inp" id="enN" onchange="encMaj('${f.id}')">
+       <option value="1" ${n===1?'selected':''}>Réglé en une fois</option>
+       ${FRACTIONS.map(k=>`<option value="${k}" ${n===k?'selected':''}>En ${k} fois — ${EUR(Math.round(fTTC(f)/k))} par échéance</option>`).join('')}</select></label>
+   <label>Échéances réglées
+     <select class="inp" id="enF" ${n>1?'':'disabled'}>
+       ${Array.from({length:Math.max(n,1)},(_,k)=>`<option value="${k+1}" ${((f.plan&&f.plan.faites)||1)===k+1?'selected':''}>${k+1} sur ${n}</option>`).join('')}</select></label>
+  </div>
+  <div class="encf-a">
+   <span class="mu" style="font-size:11px;flex:1">Facture ${esc(f.id)} · ${EUR(fTTC(f))} TTC${f.avoir?` · avoir ${EUR(f.avoir)}`:''}. Toute correction est horodatée dans le journal de la pièce.</span>
+   <button class="btn xs g" onclick="fermerEnc()">Annuler</button>
+   <button class="btn xs p" onclick="majEnc('${f.id}')">Enregistrer</button>
+  </div></div>`;
+}
+/* changer l'étalement recalcule l'encaissement proposé */
+function encMaj(id){
+ const f=FACTURES.find(x=>x.id===id); if(!f) return;
+ const n=+((document.getElementById('enN')||{}).value)||1;
+ const F=document.getElementById('enF'), M=document.getElementById('enM');
+ if(F){ F.disabled=n<2;
+   F.innerHTML=Array.from({length:Math.max(n,1)},(_,k)=>`<option value="${k+1}">${k+1} sur ${n}</option>`).join('');
+   F.value='1' }
+ if(M) M.value=n>1?Math.round(fTTC(f)/n):fTTC(f);
+}
+function majEnc(id){
+ const f=FACTURES.find(x=>x.id===id); if(!f) return;
+ if(!peutEncaisser()){toast('Encaissement réservé aux rôles qui tiennent la caisse');return}
+ const av={paye:f.paye, moyen:f.moyen, plan:f.plan?{...f.plan}:null};
+ const m=Math.max(0,+((document.getElementById('enM')||{}).value)||0);
+ const moyen=(document.getElementById('enP')||{}).value||null;
+ const n=Math.max(1,+((document.getElementById('enN')||{}).value)||1);
+ const faites=Math.min(n,Math.max(1,+((document.getElementById('enF')||{}).value)||1));
+ if(m>fTTC(f)){toast(`Un encaissement ne peut pas dépasser le montant dû (${EUR(fTTC(f))})`);return}
+ if(m>0&&!moyen){toast('Indiquez par quel moyen le patient a réglé');return}
+ f.paye=moyen?m:0;
+ f.moyen=moyen||null;
+ f.plan=(moyen&&n>1)?{n,faites}:null;
+ /* on garde trace de l'avant et de l'après : c'est une pièce comptable */
+ const dit=x=>`${EUR(x.paye)}${x.moyen?' · '+x.moyen:' · non encaissé'}${(x.plan&&x.plan.n>1)?` · ${x.plan.n} fois (${x.plan.faites}/${x.plan.n})`:''}`;
+ const apres={paye:f.paye, moyen:f.moyen, plan:f.plan};
+ if(dit(av)!==dit(apres)) logDoc(f.id,`Encaissement corrigé : ${dit(av)} → ${dit(apres)}`);
+ encSel=null;
+ toast(`${f.id} · ${rdu(f)>0?`${EUR(rdu(f))} restent dus`:'soldée'}`);
+ paint&&paint(); if(AS) renderOver();
+}
+
+/* ==========================================================================
+   Signature manuscrite du patient
+   Le patient signe à l'écran — au doigt, à la souris ou au stylet d'un iPad —
+   dans un encadré, et le tracé s'imprime sur la pièce. À défaut, on peut
+   consigner qu'elle a été signée à la main sur un exemplaire papier.
+   ========================================================================== */
+let SIGNS={};                      /* id de la pièce → {img, t, par, mode} */
+const signOf=id=>SIGNS[id]||null;
+const signTxt=g=>!g?'':(g.mode==='papier'
+  ? `Signé à la main sur papier le ${DTS(g.t)}`
+  : `Signé à l’écran le ${DTS(g.t)}`);
+/* le contenu de l'encadré « patient » d'une pièce, une fois signée */
+function signBox(id,defaut){
+ const g=signOf(id);
+ if(!g) return `<div class="hint">${esc(defaut)}</div>`;
+ return (g.img?`<img class="sg-img" src="${g.img}" alt="signature">`:'')
+   +`<div class="sg-mn">${esc(g.par||'')}${g.par?' — ':''}${esc(signTxt(g))}</div>`;
+}
+
+let SIG=null;                      /* saisie en cours */
+function ouvrirSign(id,titre,sous,par,apres){
+ SIG={id, par:par||'', apres:apres||null, trace:false};
+ document.getElementById('sigT').textContent=titre;
+ document.getElementById('sigS').textContent=sous;
+ document.getElementById('sigv').classList.add('on');
+ /* le rectangle est mesurable dès que la boîte est affichée : getBoundingClientRect
+    force le calcul de mise en page, inutile d'attendre une frame */
+ padInit();
+}
+function fermerSign(){ document.getElementById('sigv').classList.remove('on'); SIG=null }
+function padInit(){
+ const c=document.getElementById('sigC'); if(!c) return;
+ const r=c.parentNode.getBoundingClientRect();
+ const dpr=Math.min(3,window.devicePixelRatio||1);
+ c.width=Math.max(1,Math.round(r.width*dpr));
+ c.height=Math.max(1,Math.round(r.height*dpr));
+ const x=c.getContext('2d');
+ x.scale(dpr,dpr); x.lineCap='round'; x.lineJoin='round'; x.strokeStyle='#18181b';
+ c.parentNode.classList.remove('ecrit');
+ document.getElementById('sigOk').disabled=true;
+ if(SIG) SIG.trace=false;
+ let bas=false, px=0, py=0;
+ const pos=e=>{const b=c.getBoundingClientRect(); return [e.clientX-b.left, e.clientY-b.top]};
+ /* la largeur du trait suit la pression du stylet quand elle est transmise */
+ const trait=e=>{const p=(e.pressure&&e.pressure>0&&e.pressure<1)?e.pressure:.5;
+   return 1.1+p*2.6};
+ c.onpointerdown=e=>{ e.preventDefault(); c.setPointerCapture(e.pointerId);
+   bas=true; [px,py]=pos(e);
+   x.lineWidth=trait(e); x.beginPath(); x.moveTo(px,py); x.lineTo(px+.01,py); x.stroke();
+   c.parentNode.classList.add('ecrit');
+   if(SIG) SIG.trace=true; document.getElementById('sigOk').disabled=false };
+ c.onpointermove=e=>{ if(!bas) return; e.preventDefault();
+   const [nx,ny]=pos(e);
+   x.lineWidth=trait(e); x.beginPath(); x.moveTo(px,py); x.lineTo(nx,ny); x.stroke();
+   px=nx; py=ny };
+ c.onpointerup=c.onpointercancel=c.onpointerleave=()=>{ bas=false };
+}
+function effacerSign(){ padInit() }
+function validerSign(){
+ if(!SIG) return;
+ const c=document.getElementById('sigC');
+ if(!SIG.trace){ toast('Faites signer le patient dans l’encadré'); return }
+ SIGNS[SIG.id]={img:c.toDataURL('image/png'), t:nowStamp(), par:SIG.par, mode:'ecran'};
+ const f=SIG.apres; fermerSign(); f&&f('ecran');
+}
+function signPapier(){
+ if(!SIG) return;
+ SIGNS[SIG.id]={img:null, t:nowStamp(), par:SIG.par, mode:'papier'};
+ const f=SIG.apres; fermerSign(); f&&f('papier');
+}
+
 let PV=null;
 function pdfView(titre,sous,html,actions){
  PV=titre;
@@ -6735,7 +6950,8 @@ function apercuDevis(id){
  const p=pById(d.patient), {net}=totauxDoc(d);
  pdfView(nomDevis(d), `${d.id||'projet non enregistré'} · ${fn(p)} · ${DF(d.date)}${CAN('prix')?' · '+E2(net):''}`,
    devisDoc(d),
-   d.id&&d.statut==='brouillon'?`<button class="pv-b" onclick="fermerPdf();sendRel('${d.id}')">✉ Envoyer au patient</button>`:'');
+   [d.id&&d.statut==='brouillon'?`<button class="pv-b" onclick="fermerPdf();sendRel('${d.id}')">✉ Envoyer au patient</button>`:'',
+    (d.id&&d.statut!=='accepte')?`<button class="pv-b" onclick="fermerPdf();signerDevis('${d.id}')">✎ Faire signer</button>`:''].join(''));
 }
 function apercuAutre(id){
  const x=AUTRES_DOCS.find(y=>y.id===id); if(!x) return;
@@ -6749,7 +6965,7 @@ function apercuDoc(aid,id){
  const p=pById(a.patient), st=(DST[d.st]||[d.st])[0];
  pdfView(d.nom, `${d.id} · ${fn(p)} · ${st}`, docDoc(a,d),
    [d.env?`<button class="pv-b" onclick="fermerPdf();sendDoc(${aid},'${d.id}')">✉ Envoyer</button>`:'',
-    d.sign?`<button class="pv-b" onclick="fermerPdf();signDoc(${aid},'${d.id}')">✓ Marquer signé</button>`:''].join(''));
+    d.sign?`<button class="pv-b" onclick="fermerPdf();signDoc(${aid},'${d.id}')">✎ Faire signer</button>`:''].join(''));
 }
 /* aperçu d'un devis en cours de saisie, avant tout enregistrement */
 function apercuBrouillon(){
