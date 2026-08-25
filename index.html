@@ -2657,7 +2657,7 @@ V.dash=()=>{
    a:`<button class="btn s" onclick="toast('Bon de commande préparé pour ${esc(s.f)}')">Commander</button>`}));
  consentKO().forEach(a=>todo.push({i:'✎',b:'var(--accent-wash)',c:'var(--accent-ink)',
    t:`Consentement manquant — ${fn(pById(a.patient))}`,d:`${a.nom} du ${DF(a.date)}`,
-   a:`<button class="btn s" onclick="toast('Lien de signature envoyé par SMS')">Faire signer</button>`}));
+   a:`<button class="btn s" onclick="signDoc(${a.id},'CONS-${a.id}')">✎ Faire signer</button>`}));
 
  return `<div class="head">
    <div><h1>Bonjour ${esc(ROLES[role].u.replace(/^Dr /,'Dr '))}</h1><p>${DFL(TODAYS)}${todo.length?` · ${todo.length} chose${todo.length>1?'s':''} à traiter`:' · rien à traiter'}</p></div>
