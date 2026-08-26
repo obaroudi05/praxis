@@ -622,6 +622,10 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
 .zed{cursor:crosshair}
 .zed-n{width:100%;font-size:12px;padding:4px 7px;margin-bottom:4px}
 .zed-r{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+/* acte associé à une zone : décalé, plus discret que l'acte principal */
+.zrow.zsup{margin-left:18px;border-left:2px solid var(--line-2);padding-left:8px;opacity:.92}
+.zrow.zsup .zn{font-size:12px}
+.addz.zsup{margin-left:18px;padding-left:8px;border-left:2px solid var(--accent)}
 .zed-l{display:flex;align-items:center;gap:4px;font-size:10.5px;color:var(--ink-3);font-weight:500}
 .zed-l .inp{padding:3px 6px;font-size:11.5px}
 .zrow.on{border-color:var(--accent);background:var(--accent-wash)}
@@ -1715,7 +1719,15 @@ let PROTOS=[
   zt:{front:'BTX', glab:'BTX', pomm_d:'AH', pomm_g:'AH', levres:'AH', menton:'AH'}},
 ];
 const protoActe=(P,z)=>(P.zt&&P.zt[z])||'AH';
-const protoActes=P=>[...new Set(Object.keys(P.z).map(z=>protoActe(P,z)))];
+/* Actes associés à une zone. Le schéma ne sait poser qu'un acte par zone : la
+   zone garde son acte principal — celui qui la colore — et les actes associés
+   rejoignent la séance comme soins à part entière, sans zone propre. C'est le
+   compromis assumé tant que la séance elle-même n'accepte pas plusieurs actes
+   sur une même zone. */
+const protoSup=(P,z)=>((P&&P.zx&&P.zx[z])||[]);
+const protoTousSup=P=>Object.keys((P&&P.z)||{}).flatMap(z=>protoSup(P,z).map(x=>({...x, z})));
+const protoActes=P=>[...new Set(Object.keys(P.z).map(z=>protoActe(P,z))
+  .concat(protoTousSup(P).map(x=>x.t)))];
 
 /* ---------- Référentiels ---------- */
 const PRATICIENS=['Dr O. Baroudi','Dr A. Merlin'];
@@ -5071,7 +5083,8 @@ const protoResume=x=>{
  if(!E.length) return 'aucune zone';
  const sd=E.filter(z=>!(+x.z[z]>0)).length;
  const par=protoActes(x).map(t=>acteDef(t).n);
- return `${E.length} zone${E.length>1?'s':''}${sd?` (dont ${sd} sans dose)`:''} · ${par.join(' + ')} · ${EUR(prixSeance(protoActes(x),1))}`;
+ const ns=protoTousSup(x).length;
+ return `${E.length} zone${E.length>1?'s':''}${sd?` (dont ${sd} sans dose)`:''}${ns?` · ${ns} acte${ns>1?'s':''} associé${ns>1?'s':''}`:''} · ${par.join(' + ')} · ${EUR(prixSeance(protoActes(x),1))}`;
 };
 function zoneOptions(exclues){
  const dispo=ZONES.filter(z=>!exclues.includes(z.id));
@@ -5190,7 +5203,7 @@ function rmZoneDef(i,ok){
     côté avant que la zone ne quitte le schéma */
  ZONES.filter(x=>zoneIds(z).includes(x.id))
    .forEach(x=>{ ZRETIRE[x.id]={...x, le:TODAYS, par:ROLES[role].u} });
- P.forEach(Q=>zoneIds(z).forEach(k=>{ delete Q.z[k]; if(Q.zt) delete Q.zt[k] }));
+ P.forEach(Q=>zoneIds(z).forEach(k=>{ delete Q.z[k]; if(Q.zt) delete Q.zt[k]; if(Q.zx) delete Q.zx[k] }));
  D.splice(i,1); zoneSel=null; zoneSupp=null; rebuildZones(); paint();
  toast(A.length
    ? `« ${z.k} » retirée du schéma — ${A.length} acte${A.length>1?'s':''} la montre${A.length>1?'nt':''} en « zone incertaine »`
@@ -5218,6 +5231,7 @@ function setProtoZone(i,z,v){
  PROTOS[i].z[z]=(q>0)?Math.round(q*100)/100:null;
  paint() }
 function rmProtoZone(i,z){
+ if(PROTOS[i].zx) delete PROTOS[i].zx[z];
  const Z=zoneDef(z);
  delete PROTOS[i].z[z]; if(PROTOS[i].zt) delete PROTOS[i].zt[z];
  paint(); toast(`${(Z&&Z.k)||'Zone'} retirée du protocole`) }
@@ -5228,6 +5242,34 @@ function setProtoActe(i,z,t){
  if(!C.unite) PROTOS[i].z[z]=1;
  else if(!Object.prototype.hasOwnProperty.call(PROTOS[i].z,z)) PROTOS[i].z[z]=(zoneDef(z)||{}).d||1;
  paint(); toast((zoneDef(z)||{}).k+' → '+C.n);
+}
+let protoZS=null;   /* zone dont on ouvre l'ajout d'un acte associé */
+function ouvrirProtoSup(i,z){ protoZS=(protoZS===i+'|'+z)?null:i+'|'+z; paint() }
+function addProtoSup(i){
+ if(!protoZS) return;
+ const [ii,z]=protoZS.split('|');
+ const e=document.getElementById('psup'); if(!e||!e.value){ toast('Choisissez un acte'); return }
+ const t=e.value, P=PROTOS[i];
+ if(protoActe(P,z)===t){ toast('C’est déjà l’acte principal de cette zone'); return }
+ P.zx=P.zx||{}; P.zx[z]=P.zx[z]||[];
+ if(P.zx[z].some(x=>x.t===t)){ toast('Cet acte est déjà associé à cette zone'); return }
+ const C=acteDef(t);
+ /* pas de dose héritée : celle de la zone est réglée pour son produit principal,
+    elle n'a aucun sens pour un autre acte. On la laisse vide, à doser en séance. */
+ P.zx[z].push({t, q:C.unite?null:1});
+ protoZS=null; paint();
+ toast(`${C.n} associé à ${zoneNom(z)} — il rejoindra la séance comme soin`);
+}
+function setProtoSup(i,z,k,v){
+ const L=(PROTOS[i].zx||{})[z]; if(!L||!L[k]) return;
+ const q=(v===''||v==null)?null:+v;
+ L[k].q=(q>0)?Math.round(q*100)/100:null; paint();
+}
+function rmProtoSup(i,z,k){
+ const L=(PROTOS[i].zx||{})[z]; if(!L||!L[k]) return;
+ const t=L[k].t; L.splice(k,1);
+ if(!L.length) delete PROTOS[i].zx[z];
+ protoZS=null; paint(); toast(`${acteDef(t).n} retiré de ${zoneNom(z)}`);
 }
 function addProtoZone(i){
  const e=document.getElementById('pz'+i); if(!e||!e.value){toast('Aucune zone disponible');return}
@@ -5363,13 +5405,31 @@ V.params=()=>{
                value="${q>0?q:''}" placeholder="—" title="Laissez vide pour poser la zone sans dose"
                onchange="setProtoZone(${i},'${z}',this.value)">
              <span class="mu" style="font-size:11px;width:16px">${q>0?C.unite:''}</span>`:'<span class="mu" style="font-size:11px">sans dose</span>'}
-             <button class="rm" title="Retirer cette zone du protocole" onclick="rmProtoZone(${i},'${z}')">✕</button></div>`}).join('')
+             <button class="ib" title="Associer un second acte à cette zone"
+               onclick="ouvrirProtoSup(${i},'${z}')">＋</button>
+             <button class="rm" title="Retirer cette zone du protocole" onclick="rmProtoZone(${i},'${z}')">✕</button></div>
+             ${protoSup(x,z).map((sp,k)=>{const SC=acteDef(sp.t);
+               return `<div class="zrow zsup"><span class="zd" style="background:${colActe(sp.t)}"></span>
+                <div class="zn"><span class="mu">＋ aussi</span> ${esc(SC.n)}</div>
+                ${SC.unite?`<input class="inp" style="width:66px;text-align:right" type="number" min="0" step="${SC.unite==='U'?1:0.1}"
+                  value="${sp.q>0?sp.q:''}" placeholder="—" title="Dose indicative — l’acte rejoindra la séance sans zone propre"
+                  onchange="setProtoSup(${i},'${z}',${k},this.value)">
+                <span class="mu" style="font-size:11px;width:16px">${sp.q>0?SC.unite:''}</span>`
+                 :'<span class="mu" style="font-size:11px">sans dose</span>'}
+                <button class="rm" title="Retirer cet acte associé" onclick="rmProtoSup(${i},'${z}',${k})">✕</button></div>`}).join('')}
+             ${protoZS===i+'|'+z?`<div class="addz zsup">
+                <select class="inp" id="psup" style="flex:1">
+                  ${CATALOGUE.filter(c=>c.id!==protoActe(x,z)&&!protoSup(x,z).some(y=>y.t===c.id))
+                    .map(c=>`<option value="${c.id}">${esc(c.n)}</option>`).join('')}</select>
+                <button class="btn xs g" onclick="protoZS=null;paint()">Annuler</button>
+                <button class="btn xs p" onclick="addProtoSup(${i})">＋ Associer</button></div>`:''}`}).join('')
             :'<div class="empty" style="padding:14px">Aucune zone dans ce protocole.</div>'}
           <div class="addz">
             <select class="inp" id="pz${i}" style="flex:1">${zoneOptions(Object.keys(x.z))}</select>
             <button class="btn xs p" onclick="addProtoZone(${i})">+ Ajouter</button>
           </div>
-          <div class="mu" style="font-size:11px;padding:6px 2px 0">Videz la dose pour poser la zone sans quantité — vous la doserez en séance. La croix retire la zone du protocole.</div>
+          <div class="mu" style="font-size:11px;padding:6px 2px 0">Videz la dose pour poser la zone sans quantité — vous la doserez en séance. La croix retire la zone du protocole.
+            <b>＋</b> associe un second acte à la zone : le schéma garde l’acte principal, l’acte associé rejoint la séance comme soin à part entière.</div>
           </div>`:''}
        </div>`).join('')}
      </div></div>
@@ -7515,8 +7575,20 @@ function applyProto(i){
    const t=protoActe(P,k); AS.zs=AS.zs||{}; AS.zt[k]=t; AS.zs[k]=soinPour(t,1).sid;
    AS.z[k]=acteDef(t).unite?v:1;
  });
+ /* les actes associés rejoignent la séance sans zone propre : le commentaire dit
+    d'où ils viennent, pour qu'on sache quoi doser et où */
+ const parT={};
+ protoTousSup(P).forEach(x=>{ (parT[x.t]=parT[x.t]||[]).push(
+   zoneNom(x.z)+(x.q>0&&acteDef(x.t).unite?` ${fmtDose(x.q,x.t,x.z)}`:'')) });
+ const sup=Object.keys(parT);
+ sup.forEach(t=>{
+   const sn=soinPour(t,1);
+   const m=`protocole « ${P.n} » — ${parT[t].join(', ')}`;
+   sn.com=sn.com?(sn.com.includes(m)?sn.com:sn.com+' · '+m):m;
+ });
  AS.prix=null; renderOver();
- toast(`Protocole « ${P.n} » appliqué · ${protoActes(P).map(t=>acteDef(t).n).join(' + ')}`);
+ toast(`Protocole « ${P.n} » appliqué · ${protoActes(P).map(t=>acteDef(t).n).join(' + ')}`
+   +(sup.length?` · ${sup.length} acte${sup.length>1?'s':''} associé${sup.length>1?'s':''} à la séance`:''));
 }
 function mirrorZ(){
  Object.keys({...AS.z}).forEach(k=>{
@@ -8642,13 +8714,17 @@ function dvProto(i){
  const T=protoActes(P);
  if(!T.length){toast(`Le protocole « ${P.n} » ne contient aucune zone`);return}
  let cible=dvLigne;
+ const SUP={};
+ protoTousSup(P).forEach(x=>{ (SUP[x.t]=SUP[x.t]||[]).push(zoneNom(x.z)) });
  T.forEach((t,k)=>{
   const z={};
   Object.keys(P.z).forEach(zn=>{ if(protoActe(P,zn)===t) z[zn]=acteDef(t).unite?P.z[zn]:1 });
+  /* un acte seulement associé n'a pas de zone à lui : on note où il était prévu */
+  const com=(!Object.keys(z).length&&SUP[t])?`associé à ${SUP[t].join(', ')}`:'';
   const cur=DV.lignes[cible];
   const vide=cur&&cur.type===null&&cur.libre==null;
-  if(k===0&&vide) Object.assign(cur,{type:t, libre:null, reg:'visage', z, prix:null});
-  else { DV.lignes.push({type:t, libre:null, com:'', reg:'visage', z,
+  if(k===0&&vide) Object.assign(cur,{type:t, libre:null, reg:'visage', z, com, prix:null});
+  else { DV.lignes.push({type:t, libre:null, com, reg:'visage', z,
           seances:1, prix:null, remise:0, remiseType:'%'});
          cible=DV.lignes.length-1 }
  });
