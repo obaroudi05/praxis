@@ -1621,7 +1621,7 @@ const estBareme=r=>!!baremeById(r);
    (historique, soins, documents) la traite sans rien savoir de son origine */
 const deplierBareme=()=>BAREMES.forEach(b=>b.g.forEach(g=>g.z.forEach(z=>
   ZONES.push({id:z.id,n:z.n,k:z.n,p:'epil',d:1,s:1,r:b.id,side:'',bar:1,grp:g.n,pu:+z.pu||0}))));
-const zoneTarif=id=>{const z=zoneById(id); return z&&z.bar?(+z.pu||0):0};
+const zoneTarif=id=>{const z=zoneDef(id); return z&&z.bar?(+z.pu||0):0};
 
 let ZONES=[];
 /* le tracé d'une zone : une suite d'anneaux [x,y,x,y…] relevés sur l'illustration */
@@ -1640,10 +1640,19 @@ const deplier=(L,reg)=>L.forEach(z=>{
 function rebuildZones(){ ZONES.length=0; deplier(ZDEF,'visage'); deplier(BDEF,'corps'); deplierBareme() }
 rebuildZones();
 const zoneById=id=>ZONES.find(z=>z.id===id);
+/* Une zone retirée du schéma n'emporte pas les actes qui la portaient : on garde
+   sa définition de côté — doses, unités, tarifs restent calculables — et on
+   l'affiche sous un libellé générique, l'ancien nom passant en infobulle. */
+const ZRETIRE={};
+const zoneDef=id=>zoneById(id)||ZRETIRE[id]||null;
+const zoneRetiree=id=>!zoneById(id)&&!!ZRETIRE[id];
+const zoneNom=id=>zoneRetiree(id)?'Zone incertaine':zoneLabel(id);
+const zoneTitre=id=>zoneRetiree(id)
+  ?`Anciennement « ${ZRETIRE[id].k} » — zone retirée du schéma le ${DF(ZRETIRE[id].le)}`:'';
 /* une zone peut être saisie librement : sa clé commence par « ~ » */
 const zoneLibre=id=>String(id).startsWith('~');
-const zoneLabel=id=>zoneLibre(id)?String(id).slice(1):((zoneById(id)||{}).k||String(id));
-const zonePas=id=>{const z=zoneById(id); return z?z.s:1};
+const zoneLabel=id=>zoneLibre(id)?String(id).slice(1):((zoneDef(id)||{}).k||String(id));
+const zonePas=id=>{const z=zoneDef(id); return z?z.s:1};
 /* la clé d'une zone saisie au clavier : celle du schéma si le nom correspond, sinon libre */
 function zoneCle(txt){
  const t=String(txt||'').trim(); if(!t) return null;
@@ -1660,7 +1669,7 @@ const PLABEL={tox:'Toxine botulique', ah:'Acide hyaluronique'};
 const ZDUREE={front:'4 à 6 mois',glab:'4 à 6 mois',cou:'4 à 6 mois',
  levres:'6 à 9 mois',perib:'6 à 9 mois',sslev:'6 à 9 mois',cerne:'9 à 12 mois',sillon:'9 à 12 mois',amert:'9 à 12 mois',
  tempe:'12 à 18 mois',pomm:'12 à 18 mois',mand:'12 à 18 mois',menton:'12 à 18 mois',nez:'12 à 18 mois'};
-const zDuree=id=>{const z=zoneById(id);
+const zDuree=id=>{const z=zoneDef(id);
  if(z&&z.bar) return z.r==='electro'?'séances rapprochées, 2 à 4 semaines':'4 à 8 semaines';
  return ZDUREE[String(id).replace(/_[dg]$/,'')]||'variable'};
 const INFOS={
@@ -1685,8 +1694,8 @@ const INFOS={
 };
 function infosPatient(z){
  const K=Object.keys(z||{});
- const fams=[...new Set(K.map(k=>zoneById(k)?.p).filter(f=>f&&INFOS[f]))];
- const dur={}; K.forEach(k=>{const Z=zoneById(k); if(!Z)return; const d=zDuree(k);(dur[d]=dur[d]||[]).push(Z.k)});
+ const fams=[...new Set(K.map(k=>zoneDef(k)?.p).filter(f=>f&&INFOS[f]))];
+ const dur={}; K.forEach(k=>{const Z=zoneDef(k); if(!Z)return; const d=zDuree(k);(dur[d]=dur[d]||[]).push(Z.k)});
  return {fams, dur};
 }
 const fmtQ=(q,p)=>p==='tox'?`${nb(q)} U`:`${nb(q)} ml`;
@@ -1805,7 +1814,7 @@ const regionFam=f=>{const L=CATALOGUE.filter(c=>(c.fam||'esth')===f&&c.zoned);
 const uniteActe=t=>acteDef(t).unite;
 const colActe=t=>'var(--'+(acteDef(t).col||'accent')+')';
 const nb=q=>String(+(+q).toFixed(2));      /* 16.00 → 16 · 1.20 → 1.2 */
-const uniteZone=id=>{const z=zoneById(id); return (z&&z.u)||null};
+const uniteZone=id=>{const z=zoneDef(id); return (z&&z.u)||null};
 /* l'unité d'une quantité de zone : celle réglée sur la zone, sinon aucune */
 const uniteDose=(t,id)=>uniteZone(id);
 const fmtDose=(q,t,id)=>{if(q==null||q==='') return '';
@@ -1813,12 +1822,12 @@ const fmtDose=(q,t,id)=>{if(q==null||q==='') return '';
 /* montant proposé : le tarif de l'acte, multiplié par la quantité */
 function prixActe(type,z,seances){
  /* une prestation d'épilation se chiffre sur les zones cochées, chacune à son tarif */
- const b=Object.keys(z||{}).reduce((t,k)=>{const Z=zoneById(k); return t+((Z&&Z.bar)?(+Z.pu||0):0)},0);
+ const b=Object.keys(z||{}).reduce((t,k)=>{const Z=zoneDef(k); return t+((Z&&Z.bar)?(+Z.pu||0):0)},0);
  return (b>0?b:(acteDef(type).prix||0))*(seances||1) }
 /* l'acte porté par une zone : chaque zone peut avoir le sien */
 const acteZone=(a,z)=>(a&&a.zt&&a.zt[z])||(a?a.type:'AH');
 const actesDeLActe=a=>[...new Set(a&&a.zones?Object.keys(a.zones).map(z=>acteZone(a,z)):[a?a.type:'AH'])];
-const ztDepuisZones=z=>z?Object.fromEntries(Object.keys(z).map(k=>[k,(zoneById(k)||{}).p==='tox'?'BTX':'AH'])):null;
+const ztDepuisZones=z=>z?Object.fromEntries(Object.keys(z).map(k=>[k,(zoneDef(k)||{}).p==='tox'?'BTX':'AH'])):null;
 /* une séance peut porter plusieurs actes — un par zone : le tarif est la somme des actes présents */
 function prixSeance(types,seances){
  const T=[...new Set((types||[]).filter(Boolean))];
@@ -1939,7 +1948,7 @@ let ACTES=[];
     if(rnd()<.18){ type='SKB'; }
     else { zones=PZ[Math.floor(rnd()*PZ.length)];
       /* le type découle du produit dominant des zones sélectionnées */
-      type=Object.keys(zones).every(z=>zoneById(z).p==='tox')?'BTX':'AH'; }
+      type=Object.keys(zones).every(z=>zoneDef(z).p==='tox')?'BTX':'AH'; }
    } else type=['MESO','PEEL','LAS1','LAS2','RF'][Math.floor(rnd()*5)];
    const zt=(type==='AH'||type==='BTX')?ztDepuisZones(zones):null;
    const T=zt?[...new Set(Object.values(zt))]:[type];
@@ -1965,9 +1974,9 @@ function zoneHist(pid,exclure){
 const DFT=d=>new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'2-digit'});
 const zoneSummary=a=>{
   if(!a.zones) return '—';
-  const e=zonesOf(a).filter(([z])=>zoneById(z));
-  const tox=e.filter(([z])=>zoneById(z).p==='tox').reduce((s,[,q])=>s+q,0);
-  const ah=e.filter(([z])=>zoneById(z).p==='ah').reduce((s,[,q])=>s+q,0);
+  const e=zonesOf(a).filter(([z])=>zoneDef(z));
+  const tox=e.filter(([z])=>zoneDef(z).p==='tox').reduce((s,[,q])=>s+q,0);
+  const ah=e.filter(([z])=>zoneDef(z).p==='ah').reduce((s,[,q])=>s+q,0);
   return [tox?`${tox} U`:null, ah?`${ah.toFixed(2).replace(/0$/,'').replace(/\.$/,'')} ml`:null].filter(Boolean).join(' · ');
 };
 
@@ -1999,7 +2008,7 @@ const DEVIS=[
    (l'acte le plus proche en date chez le même patient, à 10 jours près) */
 DEVIS.forEach(d=>{ d.fam=d.fam||((d.lignes[0]&&acteDef(d.lignes[0][0]).fam)||'esth');
  if(!d.prest) d.prest=d.lignes.map((l,i)=>{ const z={...((d.zs&&d.zs[i])||{})};
-   const z0=zoneById(Object.keys(z)[0]);
+   const z0=zoneDef(Object.keys(z)[0]);
    return {type:l[0], libre:null, com:(d.cs&&d.cs[i])||'', reg:z0?z0.r:'visage', z,
            seances:l[2], prix:l[2]*l[3], montant:l[2]*l[3]} });
  d.zones=d.zones||{...(d.prest[0].z||{})};
@@ -2932,8 +2941,8 @@ function toggleHero(){heroOpen=!heroOpen;refreshHero()}
 function zoneBadges(a,max){
  if(!a.zones) return `<span class="mu" style="font-size:11.5px">${noZoneTxt(a)}</span>`;
  const e=zonesOf(a), sh=e.slice(0,max||4);
- return sh.map(([z,q])=>{const Z=zoneById(z);
-   return `<span class="bdg ${Z.p==='tox'?'b-info':'b-warn'}">${esc(Z.k)} ${fmtQ(q,Z.p)}</span>`}).join('')
+ return sh.map(([z,q])=>{const Z=zoneDef(z);
+   return `<span class="bdg ${Z.p==='tox'?'b-info':'b-warn'}">${esc(zoneNom(z))} ${fmtQ(q,Z.p)}</span>`}).join('')
    +(e.length>sh.length?`<span class="bdg b-neu">+${e.length-sh.length}</span>`:'');
 }
 function heroRows(q){
@@ -4058,7 +4067,7 @@ function pPhotos(){
       <img src="${ph2(x)}" alt="photo simulée">
       <span class="phk ${x.kind}">${x.kind==='avant'?'AVANT':'APRÈS'}</span>
       <div class="phi"><div class="nm">${esc(p.nom)} ${esc(p.prenom)}</div>
-       <div class="mu">${a?esc(a.nom):''}${x.zone&&zoneById(x.zone)?' · '+esc(zoneById(x.zone).k):''}</div></div></div>`}).join('')}</div>
+       <div class="mu">${a?esc(a.nom):''}${x.zone&&zoneDef(x.zone)?' · '+esc(zoneDef(x.zone).k):''}</div></div></div>`}).join('')}</div>
   </div>`).join(''):'<div class="card"><div class="empty">Aucune photo sur cette période.</div></div>'}`;
 }
 function ph2(x){return ph((x.kind==='avant'?'AVANT — ':'APRÈS — ')+DF(x.date), x.h, x.kind==='avant'?0:8)}
@@ -4306,9 +4315,9 @@ function pDetail(p){
    <tbody>${A.map(a=>`<tr class="c" onclick="openActe(${a.patient},${a.id})">
      <td>${miniFace(a.zones,a.zt)}</td><td class="mono">${DF(a.date)}</td>
      <td><b>${esc(a.nom)}</b></td>
-     <td style="max-width:230px">${a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneById(z); if(!Z) return '';
+     <td style="max-width:230px">${a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneDef(z); if(!Z) return '';
         const t=acteZone(a,z), C=acteDef(t);
-        return `<span class="bdg ${C.col==='toxine'?'b-info':'b-warn'}" style="margin:0 3px 3px 0" title="${esc(C.n)}">${esc(Z.k)}${q&&uniteDose(t,z)?' '+fmtDose(q,t,z):''}</span>`}).join(''):`<span class="mu">${noZoneTxt(a)}</span>`}</td>
+        return `<span class="bdg ${zoneRetiree(z)?'b-neu':C.col==='toxine'?'b-info':'b-warn'}" style="margin:0 3px 3px 0" title="${esc(zoneTitre(z)||C.n)}">${esc(zoneNom(z))}${q&&uniteDose(t,z)?' '+fmtDose(q,t,z):''}</span>`}).join(''):`<span class="mu">${noZoneTxt(a)}</span>`}</td>
      <td>${colDocs(a)}</td>
      <td class="mu" style="white-space:nowrap">${esc(a.praticien)}${a.operateur?`<div style="font-size:11px">op. ${esc(a.operateur)}</div>`:''}</td>
      <td class="mono mu" style="font-size:11.5px">${a.lot||'—'}</td>
@@ -4436,9 +4445,9 @@ function pDetail(p){
         <td><b>${esc(a.nom)}</b></td>
         <td class="mu">${esc(a.cat||'—')}</td>
         <td class="mu" style="white-space:nowrap">${esc(a.praticien)}${a.operateur?`<div style="font-size:11px">op. ${esc(a.operateur)}</div>`:''}</td>
-        <td style="max-width:190px">${a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneById(z); if(!Z) return '';
+        <td style="max-width:190px">${a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneDef(z); if(!Z) return '';
            const t=acteZone(a,z), C=acteDef(t);
-           return `<span class="bdg ${C.col==='toxine'?'b-info':'b-warn'}" style="margin:0 3px 3px 0">${esc(Z.k)}${q&&uniteDose(t,z)?' '+fmtDose(q,t,z):''}</span>`}).join(''):`<span class="mu">${noZoneTxt(a)}</span>`}</td>
+           return `<span class="bdg ${C.col==='toxine'?'b-info':'b-warn'}" style="margin:0 3px 3px 0">${esc(zoneNom(z))}${q&&uniteDose(t,z)?' '+fmtDose(q,t,z):''}</span>`}).join(''):`<span class="mu">${noZoneTxt(a)}</span>`}</td>
         <td style="font-size:11.5px">${(()=>{const M=matsActe(a);
            if(!M.length) return '<span class="mu">—</span>';
            return M.map(x=>{const mm=matById(x.mat); if(!mm) return '';
@@ -4461,7 +4470,7 @@ function pDetail(p){
   },
 
   schema:()=>{const ZH=zoneHist(p.id);
-   const parReg=r=>Object.fromEntries(Object.entries(cumul).filter(([z])=>zoneById(z)?.r===r));
+   const parReg=r=>Object.fromEntries(Object.entries(cumul).filter(([z])=>zoneDef(z)?.r===r));
    /* les barèmes d'épilation prennent place à côté du visage et du corps,
       dès lors que ce patient y a déjà été traité */
    const ONGLETS=[...REGIONS, ...BAREMES.filter(x=>Object.keys(parReg(x.id)).length).map(x=>({id:x.id,n:x.court||x.n,i:x.i}))];
@@ -4480,12 +4489,12 @@ function pDetail(p){
      <div class="tip" style="margin-bottom:10px"><span class="e">🗺️</span><div>${BAR
        ?`<b>Cure d'épilation.</b> Les zones déjà traitées de ce barème sont cochées ; à droite de chacune, la date de la dernière séance et le nombre de passages.`
        :`<b>Cumul historique.</b> Toutes les injections de ce patient sur un seul schéma. Sous chaque quantité, la date de la dernière séance sur cette zone — et le nombre de fois qu'elle a été traitée.`}</div></div>
-     ${Object.keys(cur).length?Object.entries(cur).sort((a,b)=>b[1]-a[1]).map(([z,q])=>{const Z=zoneById(z), L=ZH[z]||[];
+     ${Object.keys(cur).length?Object.entries(cur).sort((a,b)=>b[1]-a[1]).map(([z,q])=>{const Z=zoneDef(z), L=ZH[z]||[];
        const t=cumulT[z]||(Z.p==='tox'?'BTX':'AH'), CZ=acteDef(t);
        return `<div class="zrow" style="display:block">
         <div style="display:flex;align-items:center;gap:8px">
          <span class="zd" style="background:${colActe(t)}"></span>
-         <div class="zn">${esc(Z.k)}<small>${esc(CZ.n)} · traitée ${L.length} fois</small></div>
+         <div class="zn">${esc(zoneNom(z))}<small>${esc(CZ.n)} · traitée ${L.length} fois</small></div>
          <b class="mono" style="font-size:12.5px">${q&&CZ.unite?fmtDose(q,t):'—'}</b></div>
         ${L.length?`<div class="zchr">${L.map(x=>`<button class="zc" onclick="openActe(${p.id},${x.aid})" title="Ouvrir l’acte du ${DF(x.d)}">${DFT(x.d)}${x.q&&CZ.unite?' <b>'+fmtDose(x.q,t)+'</b>':''}</button>`).join('')}</div>`:''}
        </div>`}).join(''):'<div class="empty">Aucune injection enregistrée.</div>'}
@@ -4659,10 +4668,10 @@ function setPerA(p){ perA={...perA,...p}; paint() }
 V.actes=()=>{
  const L=ACTES.filter(a=>{const q=aq.toLowerCase();
   return (!aCat||a.cat===aCat)&&(!aPrat||a.praticien===aPrat)&&inPer(a.date,perA)&&
-   (!q||[a.nom,a.lot||'',fn(pById(a.patient)),...(a.zones?Object.keys(a.zones).map(z=>zoneById(z).n):[])].join(' ').toLowerCase().includes(q))
+   (!q||[a.nom,a.lot||'',fn(pById(a.patient)),...(a.zones?Object.keys(a.zones).map(z=>zoneDef(z).n):[])].join(' ').toLowerCase().includes(q))
  }).sort((a,b)=>b.date.localeCompare(a.date));
- const tox=L.reduce((s,a)=>s+zonesOf(a).filter(([z])=>zoneById(z).p==='tox').reduce((x,[,q])=>x+q,0),0);
- const ah=L.reduce((s,a)=>s+zonesOf(a).filter(([z])=>zoneById(z).p==='ah').reduce((x,[,q])=>x+q,0),0);
+ const tox=L.reduce((s,a)=>s+zonesOf(a).filter(([z])=>zoneDef(z).p==='tox').reduce((x,[,q])=>x+q,0),0);
+ const ah=L.reduce((s,a)=>s+zonesOf(a).filter(([z])=>zoneDef(z).p==='ah').reduce((x,[,q])=>x+q,0),0);
  /* les volumes de produit sont une donnée de pilotage : ils ne s'affichent
     qu'aux rôles à qui ce droit a été accordé */
  const vol=CAN('volumes')?` · ${tox} U de toxine · ${ah.toFixed(1)} ml d'AH`:'';
@@ -4684,8 +4693,8 @@ V.actes=()=>{
    <td class="mono">${DF(a.date)}</td>
    <td class="nm">${esc(fn(pById(a.patient)))}</td>
    <td>${esc(a.nom)}<div class="mu" style="font-size:11px">${esc(a.praticien)}${a.operateur?' · '+esc(a.operateur):''}</div></td>
-   <td style="max-width:300px">${a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneById(z);
-     return `<span class="bdg ${Z.p==='tox'?'b-info':'b-warn'}" style="margin:0 3px 3px 0">${esc(Z.k)} · ${fmtQ(q,Z.p)}</span>`}).join(''):`<span class="mu">${noZoneTxt(a)}</span>`}</td>
+   <td style="max-width:300px">${a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneDef(z);
+     return `<span class="bdg ${Z.p==='tox'?'b-info':'b-warn'}" style="margin:0 3px 3px 0">${esc(zoneNom(z))} · ${fmtQ(q,Z.p)}</span>`}).join(''):`<span class="mu">${noZoneTxt(a)}</span>`}</td>
    <td class="mono mu" style="font-size:11.5px">${a.lot||'—'}</td>
    ${ROLES[role].prix?`<td class="num">${montantTxt(a)}</td>`:''}
    ${tdActions(a)}</tr>
@@ -5020,13 +5029,13 @@ V.stats=()=>{
  const pp=nz(PRATICIENS.map(p=>({label:p,v:A.filter(a=>a.praticien===p).reduce((s,a)=>s+mAct(a),0)})));
  const nc=nz(CATS.map(c=>({label:c,v:A.filter(a=>a.cat===c).length})));
  const np=nz(PRATICIENS.map(p=>({label:p,v:A.filter(a=>a.praticien===p).length})));
- const zc={}; A.forEach(a=>zonesOf(a).forEach(([z])=>{const Z=zoneById(z); if(!Z) return;
+ const zc={}; A.forEach(a=>zonesOf(a).forEach(([z])=>{const Z=zoneDef(z); if(!Z) return;
    const n=(Z.r==='corps'?'Corps · ':'')+Z.k.replace(/ [DG]$/,''); zc[n]=(zc[n]||0)+1}));
  const pz=Object.entries(zc).map(([label,v])=>({label,v})).sort((a,b)=>b.v-a.v).slice(0,8);
  const pat=[...new Set(A.map(a=>a.patient))];
  const fid=pat.filter(id=>A.filter(a=>a.patient===id).length>=2).length;
- const tox=A.reduce((s,a)=>s+zonesOf(a).filter(([z])=>zoneById(z).p==='tox').reduce((x,[,q])=>x+q,0),0);
- const ah =A.reduce((s,a)=>s+zonesOf(a).filter(([z])=>zoneById(z).p==='ah' ).reduce((x,[,q])=>x+q,0),0);
+ const tox=A.reduce((s,a)=>s+zonesOf(a).filter(([z])=>zoneDef(z).p==='tox').reduce((x,[,q])=>x+q,0),0);
+ const ah =A.reduce((s,a)=>s+zonesOf(a).filter(([z])=>zoneDef(z).p==='ah' ).reduce((x,[,q])=>x+q,0),0);
  /* la série mensuelle suit la période retenue, pas les six derniers mois */
  const B=perBuckets(perS).slice(-14);
  const serA=B.map(b=>({k:b.from,label:b.label,v:A.filter(a=>a.date>=b.from&&a.date<=b.to).length}));
@@ -5164,13 +5173,43 @@ function addZoneDef(){
  zoneSel=D.length-1; rebuildZones(); paint();
  toast('Zone ajoutée — cliquez sur le schéma pour la placer');
 }
-function rmZoneDef(i){
+/* Retirer une zone du schéma ne doit pas bloquer sur les actes passés : on la
+   retire, on garde sa définition de côté, et les séances qui la portaient
+   l'affichent en « Zone incertaine » — la dose reste, l'ancien nom passe en
+   infobulle. Rien n'est perdu, la zone n'est simplement plus proposée. */
+let zoneSupp=null;
+const zoneIds=z=>[z.id, z.id+'_d', z.id+'_g'];
+const actesDeZone=z=>ACTES.filter(a=>a.zones&&Object.keys(a.zones).some(k=>zoneIds(z).includes(k)));
+const protosDeZone=z=>PROTOS.filter(P=>Object.keys(P.z||{}).some(k=>zoneIds(z).includes(k)));
+function rmZoneDef(i,ok){
  const D=zoneDefs(), z=D[i]; if(!z) return;
- const used=ACTES.filter(a=>a.zones&&Object.keys(a.zones).some(k=>k===z.id||k===z.id+'_d'||k===z.id+'_g')).length;
- if(used){toast(`« ${z.k} » figure dans ${used} acte${used>1?'s':''} — suppression refusée`);return}
  if(D.length<2){toast('Gardez au moins une zone');return}
- D.splice(i,1); zoneSel=null; rebuildZones(); paint(); toast(`« ${z.k} » supprimée`);
+ const A=actesDeZone(z), P=protosDeZone(z);
+ if((A.length||P.length)&&!ok){ zoneSupp=i; paint(); return }
+ /* la définition déployée — libellé, produit, unité, pas, tarif — est mise de
+    côté avant que la zone ne quitte le schéma */
+ ZONES.filter(x=>zoneIds(z).includes(x.id))
+   .forEach(x=>{ ZRETIRE[x.id]={...x, le:TODAYS, par:ROLES[role].u} });
+ P.forEach(Q=>zoneIds(z).forEach(k=>{ delete Q.z[k]; if(Q.zt) delete Q.zt[k] }));
+ D.splice(i,1); zoneSel=null; zoneSupp=null; rebuildZones(); paint();
+ toast(A.length
+   ? `« ${z.k} » retirée du schéma — ${A.length} acte${A.length>1?'s':''} la montre${A.length>1?'nt':''} en « zone incertaine »`
+   : `« ${z.k} » supprimée`);
 }
+const confirmZone=(z,i)=>{
+ if(zoneSupp!==i) return '';
+ const A=actesDeZone(z), P=protosDeZone(z);
+ return `<div class="suppb" style="margin:6px 0 10px" onclick="event.stopPropagation()">
+   <span class="e">⚠</span>
+   <div style="flex:1;min-width:0"><b>Retirer « ${esc(z.k)} » du schéma ?</b>
+     <div class="mu">${A.length?`${A.length} séance${A.length>1?'s':''} l’${A.length>1?'ont':'a'} déjà traitée : elle${A.length>1?'s':''} continuer${A.length>1?'ont':'a'}
+       d’en porter la dose, sous le libellé <b>« Zone incertaine »</b>, l’ancien nom restant en infobulle.`
+      :'Aucune séance ne la porte.'}${P.length?` Elle sera retirée de ${P.length} protocole${P.length>1?'s':''}.`:''}
+       La zone ne sera plus proposée à la saisie.</div></div>
+   <button class="btn xs g" onclick="zoneSupp=null;paint()">Annuler</button>
+   <button class="btn xs crit" onclick="rmZoneDef(${i},1)">Retirer la zone</button>
+ </div>`;
+};
 /* La dose est facultative : un champ vidé garde la zone dans le protocole mais
    sans quantité — on la posera « traitée », à doser en séance. La croix, elle,
    retire vraiment la zone. */
@@ -5179,7 +5218,7 @@ function setProtoZone(i,z,v){
  PROTOS[i].z[z]=(q>0)?Math.round(q*100)/100:null;
  paint() }
 function rmProtoZone(i,z){
- const Z=zoneById(z);
+ const Z=zoneDef(z);
  delete PROTOS[i].z[z]; if(PROTOS[i].zt) delete PROTOS[i].zt[z];
  paint(); toast(`${(Z&&Z.k)||'Zone'} retirée du protocole`) }
 /* relier une zone à l'acte qu'on y pratique */
@@ -5187,12 +5226,12 @@ function setProtoActe(i,z,t){
  PROTOS[i].zt=PROTOS[i].zt||{}; PROTOS[i].zt[z]=t;
  const C=acteDef(t);
  if(!C.unite) PROTOS[i].z[z]=1;
- else if(!Object.prototype.hasOwnProperty.call(PROTOS[i].z,z)) PROTOS[i].z[z]=(zoneById(z)||{}).d||1;
- paint(); toast((zoneById(z)||{}).k+' → '+C.n);
+ else if(!Object.prototype.hasOwnProperty.call(PROTOS[i].z,z)) PROTOS[i].z[z]=(zoneDef(z)||{}).d||1;
+ paint(); toast((zoneDef(z)||{}).k+' → '+C.n);
 }
 function addProtoZone(i){
  const e=document.getElementById('pz'+i); if(!e||!e.value){toast('Aucune zone disponible');return}
- const z=zoneById(e.value);
+ const z=zoneDef(e.value);
  PROTOS[i].zt=PROTOS[i].zt||{};
  PROTOS[i].zt[e.value]=PROTOS[i].zt[e.value]||(z.p==='tox'?'BTX':'AH');
  PROTOS[i].z[e.value]=z.d; paint(); toast(z.k+' ajoutée au protocole');
@@ -5314,10 +5353,10 @@ V.params=()=>{
         ${protoSel===i?`<div class="prot-b">
           <div class="fld"><label>Nom du protocole</label>
             <input class="inp" style="width:100%" value="${esc(x.n)}" onchange="PROTOS[${i}].n=this.value;paint()"></div>
-          ${Object.entries(x.z).length?Object.entries(x.z).map(([z,q])=>{const Z=zoneById(z); if(!Z) return '';
+          ${Object.entries(x.z).length?Object.entries(x.z).map(([z,q])=>{const Z=zoneDef(z); if(!Z) return '';
             const t=protoActe(x,z), C=acteDef(t), AZ=CATALOGUE.filter(c=>c.zoned&&(c.reg||['visage']).includes('visage'));
             return `<div class="zrow"><span class="zd" style="background:${colActe(t)}"></span>
-             <div class="zn">${esc(Z.k)}
+             <div class="zn">${esc(zoneNom(z))}
               <select class="zsel" onchange="setProtoActe(${i},'${z}',this.value)">
                 ${AZ.map(c=>`<option value="${c.id}" ${c.id===t?'selected':''}>${esc(c.n)}</option>`).join('')}</select></div>
              ${C.unite?`<input class="inp" style="width:66px;text-align:right" type="number" min="0" step="${C.unite==='U'?1:0.1}"
@@ -5408,8 +5447,8 @@ V.params=()=>{
                    <input class="inp" style="width:52px" type="number" min="4" value="${z.ry}" onchange="setZoneChamp(${i},'ry',this.value)"></label>
                   <span class="mu" style="font-size:10.5px">x ${z.cx} · y ${z.cy}</span>`}
             </div></div>
-          <button class="rm" onclick="event.stopPropagation();rmZoneDef(${i})">✕</button>
-         </div>`).join('')}
+          <button class="rm" title="Retirer cette zone du schéma" onclick="event.stopPropagation();rmZoneDef(${i})">✕</button>
+         </div>${confirmZone(z,i)}`).join('')}
        </div></div>
      </div></div>
 
@@ -6587,7 +6626,7 @@ function renderOver(){
         ${CD.zoned?`<div class="sc-lb">Zones traitées <span class="n">${DZ.length||'—'}</span>
           <span class="mu">clic sur le schéma</span></div>
          ${DZ.length?`<div class="sc-z">${DZ.map(z=>{
-            const qz=D.z[z], ZB=zoneById(z), bar=!!(ZB&&ZB.bar);
+            const qz=D.z[z], ZB=zoneDef(z), bar=!!(ZB&&ZB.bar);
             return `<div class="zrow"><span class="zd" style="background:${colActe(D.t)}"></span>
              <div class="zn">${esc(zoneLabel(z))}<small>${bar?(ZB.grp||''):(qz>0?((qz!==1||uniteDose(D.t,z))?fmtDose(qz,D.t,z):''):'traitée')}</small></div>
              ${bar?`${(CAN('prix')&&AS.but==='devis')?`<b class="mono">${EUR(ZB.pu)}</b>`:''}`
@@ -6662,7 +6701,7 @@ function renderOver(){
             <span class="mu sc-dose">${(()=>{const U=[...new Set(Z.map(z=>uniteDose(x.t,z)))];
               return (dose&&U.length===1&&U[0])?'total '+nb(dose)+' '+U[0]:''})()}</span></div>
           ${Z.length?`<div class="sc-z">${Z.map(z=>{
-            const qz=AS.z[z], UZ=uniteDose(x.t,z), ZB=zoneById(z), bar=!!(ZB&&ZB.bar);
+            const qz=AS.z[z], UZ=uniteDose(x.t,z), ZB=zoneDef(z), bar=!!(ZB&&ZB.bar);
             const tar=(bar&&CAN('prix')&&AS.but==='devis')?EUR(ZB.pu):'';
             return `<div class="zrow"><span class="zd" style="background:${colActe(x.t)}"></span>
              <div class="zn">${esc(zoneLabel(z))}
@@ -7031,7 +7070,7 @@ const actesZone=()=>{const T=actesSaisis();
    .sort((a,b)=>(T.includes(b.id)-T.includes(a.id)))};
 const choixActePossible=()=>actesZone().length>1;
 function zPose(id,d,t,muet){
- const z=zoneById(id);
+ const z=zoneDef(id);
  AS.zs=AS.zs||{};
  if(t){ AS.zt[id]=t; AS.zs[id]=soinPour(t,1).sid }
  else if(AS.zs[id]==null&&AS.zt[id]){ const s0=premierDuType(AS.zt[id]); if(s0) AS.zs[id]=s0.sid }
@@ -7066,7 +7105,7 @@ function baremeGroupe(gi,poser){
 /* le choix de l'acte pour une zone donnée */
 function choixActeZone(id,move){
  const o=document.getElementById('famchoix'); if(o) o.remove();
- const z=zoneById(id), L=actesZone();
+ const z=zoneDef(id), L=actesZone();
  const d=document.createElement('div');
  d.id='famchoix'; d.className='famchoix';
  /* quand un acte figure deux fois dans la séance, on choisit lequel des deux soins */
@@ -7183,7 +7222,7 @@ const montantTxt=a=>{const m=montantActe(a); return m==null?'<span class="mu">�
 /* le tarif d'un soin d'épilation est la somme des zones cochées à son barème ;
    un prix saisi à la main reprend toujours le dessus */
 const tarifBareme=x=>{ if(!AS||!AS.z||!x) return 0;
- return zonesDuSoin(x).reduce((s,z)=>{const Z=zoneById(z);
+ return zonesDuSoin(x).reduce((s,z)=>{const Z=zoneDef(z);
    return s+((Z&&Z.bar)?(+Z.pu||0):0)},0)};
 const puSoin=x=>{ if(!x.t) return +x.prix||0;
  if(x.pu!=null) return +x.pu;
@@ -8155,7 +8194,7 @@ function corpsDoc(a,d){
  if(d.k==='consentement'){
   const ct=consentTxt(a.type);
   return `${bloc('Acte proposé',
-    `<b>${esc(a.nom)}</b>${a.zones?` — ${zonesOf(a).map(([z])=>esc(zoneById(z)?.k||z)).join(', ')}`:''}<br>
+    `<b>${esc(a.nom)}</b>${a.zones?` — ${zonesOf(a).map(([z])=>esc(zoneDef(z)?.k||z)).join(', ')}`:''}<br>
      Produit utilisé : ${esc(ct.prod)}${a.lot?` · lot ${esc(a.lot)}`:''}<br>
      Praticien : ${esc(prn)} · séance du ${DF(a.date)}`)}
   ${bloc('Information délivrée',
@@ -8187,7 +8226,7 @@ function corpsDoc(a,d){
   return `${bloc('Patient',`<b>${esc(fn(p))}</b> — dossier n° ${p.id}<br>${esc(p.adr||'')}`)}
   <div class="dv-s">Prestation</div>
   <table class="dv-tb"><thead><tr><th style="width:64%">Désignation</th><th class="n">Date</th><th class="n">Total TTC</th></tr></thead>
-   <tbody><tr><td><b>${esc(a.nom)}</b>${a.zones?`<div class="dz">${zonesOf(a).map(([z])=>esc(zoneById(z)?.k||z)).join(', ')}</div>`:''}</td>
+   <tbody><tr><td><b>${esc(a.nom)}</b>${a.zones?`<div class="dz">${zonesOf(a).map(([z])=>esc(zoneDef(z)?.k||z)).join(', ')}</div>`:''}</td>
     <td class="n">${DF(a.date)}</td><td class="n">${E2(ttc)}</td></tr></tbody></table>
   <div class="dv-tot">
    <div class="l"><span>Total HT</span><span>${E2(ht)}</span></div>
@@ -8521,7 +8560,7 @@ function dvZone(ev,id,dir){ dvPlie=false;
  ev&&ev.preventDefault&&ev.preventDefault();
  const l=dvL(); if(!l) return;
  if(l.type===null&&l.libre==null){ if(dir>0||!dir) dvChoixActeZone(id); return }
- const U=l.type===null?null:acteDef(l.type).unite, z=zoneById(id);   /* une ligne libre n'a pas d'unité */
+ const U=l.type===null?null:acteDef(l.type).unite, z=zoneDef(id);   /* une ligne libre n'a pas d'unité */
  const on=Object.prototype.hasOwnProperty.call(l.z,id), cur=+l.z[id]||0;
  const d=dir||((ev&&(ev.shiftKey||ev.altKey))?-1:1);
  dvRecalc(l);
@@ -8534,7 +8573,7 @@ function dvZone(ev,id,dir){ dvPlie=false;
    exactement le geste de l'écran d'acte */
 function dvChoixActeZone(id){
  const o=document.getElementById('famchoix'); if(o) o.remove();
- const z=zoneById(id);
+ const z=zoneDef(id);
  const L=CATALOGUE.filter(c=>c.zoned&&(c.reg||['visage']).includes(dvL().reg));
  if(!L.length){toast('Aucun acte ne se pose sur cette région');return}
  const d=document.createElement('div');
@@ -8622,7 +8661,7 @@ function dvMirror(){
  let n=0;
  Object.keys({...l.z}).forEach(k=>{
   const m=k.endsWith('_d')?k.slice(0,-2)+'_g':k.endsWith('_g')?k.slice(0,-2)+'_d':null;
-  if(!m||!zoneById(m)) return;
+  if(!m||!zoneDef(m)) return;
   if(!Object.prototype.hasOwnProperty.call(l.z,m)) n++;
   l.z[m]=l.z[k] });
  dvRecalc(l); dvPlie=false; renderDevis();
@@ -8775,7 +8814,7 @@ function renderDevis(){
               const U=[...new Set(Object.keys(l.z).map(z=>uniteDose(l.type,z)))];
               return (D&&U.length===1&&U[0])?`<span class="mu sc-dose">total ${nb(D)} ${U[0]}</span>`:''})()}</div>`}
             ${zs?`<div class="sc-z">${Object.keys(l.z).map(z=>{
-              const q=l.z[z], Z=zoneById(z), bar=!!(Z&&Z.bar), UZ=uniteDose(l.type,z);
+              const q=l.z[z], Z=zoneDef(z), bar=!!(Z&&Z.bar), UZ=uniteDose(l.type,z);
               return `<div class="zrow"><span class="zd" style="background:${colActe(l.type)}"></span>
                 <div class="zn">${esc(zoneLabel(z))}<small>${bar?esc((Z&&Z.grp)||'')
                   :(q>0?((q!==1||UZ)?fmtDose(q,l.type,z):''):'quantité non renseignée')}</small></div>
