@@ -3206,7 +3206,9 @@ function carteIdentite(x,A,ca,rd){
    ========================================================================== */
 let IMP=null;                 /* import en cours : null quand le modal est fermé */
 const IMP_JOURNAL=[];         /* ce qui a déjà été repris, et quand */
-const peutImporter=()=>!!ROLES[role].med;
+/* La passerelle reste entre les mains de l'administrateur : reprendre une base
+   entière n'est pas un geste de consultation, et le reste est à développer. */
+const peutImporter=()=>EST_ADMIN();
 
 const sansAcc=s=>String(s==null?'':s).normalize('NFD').replace(/[\u0300-\u036f]/g,'')
   .toLowerCase().replace(/[^a-z0-9]/g,'');
@@ -3319,7 +3321,7 @@ const capNom=x=>String(x||'').trim().replace(/\s+/g,' ');
 
 /* ---- ouverture, chargement, correspondance des colonnes ---- */
 function ouvrirImport(){
- if(!peutImporter()){ toast('La reprise d’une base patients demande l’accès au dossier médical'); return }
+ if(!peutImporter()){ toast('La passerelle Doctolib est réservée à l’administrateur'); return }
  IMP={etape:'fichier', nom:'', lignes:[], cols:[], map:{}, res:null, err:''};
  document.getElementById('impv').classList.add('on');
  renderImport();
@@ -4694,7 +4696,7 @@ function devisExemple(f){
 }
 V.params=()=>{
  const TB=[['cabinet','Cabinet & praticiens'],['actes',`Actes & tarifs · ${CATALOGUE.length}`],
-          ['doctolib','Passerelle Doctolib'],
+          ...(EST_ADMIN()?[['doctolib','Passerelle Doctolib']]:[]),
           ['materiels',`Matériels & paramètres · ${MATERIELS.length}`],
           ['facturation','Facturation & rétrocession'],['fidelite','Fidélité & réactivation'],
           ['messages',`Modèles de message · ${MODELES.length}`],
@@ -5188,7 +5190,7 @@ V.params=()=>{
  };
  return `<div class="head"><div><h1>Paramètres</h1><p>Critères, messages et documents — tout ce qui pilote les automatismes</p></div></div>
  <div class="fbar"><div class="seg">${TB.map(([k,l])=>`<button class="${paramTab===k?'on':''}" onclick="paramTab='${k}';paint()">${l}</button>`).join('')}</div></div>
- ${(body[paramTab]||body.fidelite)()}`;
+ ${(TB.some(([k])=>k===paramTab)&&body[paramTab]?body[paramTab]:body.fidelite)()}`;
 };
 /* ---------- éditeur de trame, dans Modèles de document ---------- */
 function trameEditeur(){
