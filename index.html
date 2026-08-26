@@ -467,8 +467,6 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
 .envprev{white-space:pre-wrap;font-size:12.5px;line-height:1.6;background:var(--panel-2);
   border:1px solid var(--line);border-radius:var(--r-s);padding:11px 12px;max-height:210px;overflow:auto}
 /* --- actions réalisées, empilées sous chaque pièce --- */
-.acts{font-size:11px;line-height:1.55;color:var(--ink-2)}
-.acts .d{color:var(--ink-3);font-variant-numeric:tabular-nums}
 /* --- registre des envois --- */
 .envd td{background:var(--panel-2)}
 .envtl{display:flex;flex-direction:column;gap:5px;padding:3px 0 2px}
@@ -3686,18 +3684,9 @@ function envoyerDevis(id,o){
  paint(); toast(`Devis ${id} envoyé par ${e.canal} à ${fn(p)} · ${e.ref}`);
 }
 
-/* ---- les événements horodatés d'une pièce, façon « actions réalisées » ---- */
-function actionsDoc(id,seed){
- const H=histo(id,seed||[]).slice();
- envDoc(id).forEach(e=>e.evts.forEach(x=>H.push({t:x.t,
-   ev:x.ev+(x.det?' — '+x.det:'')+(x.ev==='Mis en file d’envoi'?` (${e.canal})`:''), par:e.par})));
- return H.sort((a,b)=>a.t.localeCompare(b.t));
-}
-const actionsTxt=(id,seed)=>{
- const H=actionsDoc(id,seed);
- return H.length?`<div class="acts">${H.map(h=>`<div>${esc(h.ev)} <span class="d">(${DTS(h.t)})</span></div>`).join('')}</div>`
-   :'<span class="mu">—</span>';
-};
+/* La chronologie détaillée d'un envoi vit dans l'onglet Envois, pas dans la
+   liste des documents : empilée sous chaque pièce, elle noyait la lecture.
+   Ici, la pièce garde son statut ; l'onglet Envois porte le suivi. */
 
 /* ---- jeu de démonstration : les envois déjà partis ---- */
 (function envoisDemo(){
@@ -4137,7 +4126,7 @@ function pDetail(p){
           onclick="event.stopPropagation();signerDevis('${d.id}')">✎ Faire signer</button>`}
         <button class="btn xs" onclick="event.stopPropagation();go('devis','${d.id}')">Ouvrir</button>
         ${btnSuppDevis(d)}`,
-    cf:confirmSuppDevis(d,6)})),
+    cf:confirmSuppDevis(d,5)})),
   /* Un seul consentement par soin : ceux qu'une signature antérieure couvre
      feraient doublon dans la liste — l'acte, lui, porte la mention « reconduit ». */
   ...C.filter(a=>!CONS_SUPP.has(a.id)&&!consentPorteur(a)).map(a=>{
@@ -4149,7 +4138,7 @@ function pDetail(p){
     a:pdfBtn(a.id,'CONS-'+a.id)
       +(a.consent?'':`<button class="btn xs p" onclick="event.stopPropagation();signDoc(${a.id},'CONS-${a.id}')">✎ Faire signer</button>`)
       +btnSuppCons(a),
-    cf:confirmSuppCons(a,6)}}),
+    cf:confirmSuppCons(a,5)}}),
   ...AG.map(x=>({k:x.cat==='Courrier'?'courrier':x.cat.toLowerCase(),id:x.id,date:x.ts.slice(0,10),
     t:esc(x.nom), s:`${esc(x.cat)} · généré le ${DTS(x.ts)}`,
     st:x.signe?bdg('b-good','Signé')+horoBdg(x.id,x.signe):x.envoye?bdg('b-info','Envoyé'):bdg('b-neu','Généré'),
@@ -4337,14 +4326,12 @@ function pDetail(p){
       <button class="btn xs" onclick="retablirActe()">↺ Rétablir</button></div>`:''}
     ${C.some(a=>!consentOK(a))?`<div class="tip" style="background:var(--crit-w);border-color:rgba(208,59,59,.25)"><span class="e">⚠</span><div><b>${C.filter(a=>!consentOK(a)).length} consentement${C.filter(a=>!consentOK(a)).length>1?'s non signés':' non signé'}.</b> Un acte injectable sans consentement signé n'est pas défendable en cas de litige — le lien de signature part par SMS en un clic.</div></div>`:''}
     <div class="tw"><table>
-     <thead><tr><th style="width:124px">Type</th><th>Document</th><th style="width:92px">Date</th>
-       <th style="width:126px">Statut</th><th style="min-width:230px">Actions réalisées</th><th style="width:96px"></th></tr></thead>
+     <thead><tr><th style="width:130px">Type</th><th>Document</th><th style="width:96px">Date</th><th style="width:130px">Statut</th><th style="width:96px"></th></tr></thead>
      <tbody>${L.map(d=>`<tr>
        <td><span class="bdg b-neu">${KIND[d.k][1]} ${KIND[d.k][2]}</span></td>
        <td><b>${d.t}</b><div class="mu" style="font-size:11.5px">${esc(d.s)}</div></td>
        <td class="mono" style="white-space:nowrap">${DF(d.date)}</td>
        <td>${d.st}</td>
-       <td>${actionsTxt(d.id, d.seed)}</td>
        <td class="num" style="white-space:nowrap">${d.a}</td></tr>${d.cf||''}`).join('')}
      </tbody></table>${L.length?'':'<div class="empty">Aucun document de ce type.</div>'}</div>
     <div class="mu" style="font-size:11.5px;margin-top:10px">Tout document produit ici est archivé à valeur probante et horodaté. Les factures et avoirs, qui relèvent du suivi financier, sont dans l'onglet <a onclick="pTab='factu';paint()">Facturation</a>.</div>`;
