@@ -453,6 +453,39 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
 .sig-h b{font-size:14.5px;font-weight:680;display:block;letter-spacing:-.01em}
 .sig-h small{display:block;font-size:11.5px;color:var(--ink-3);margin-top:2px}
 .sig-h .btn{margin-left:auto}
+/* --- passerelle Doctolib : reprise d'un export --- */
+#impv{position:fixed;inset:0;z-index:700;background:rgba(24,24,27,.66);backdrop-filter:blur(3px);
+  display:none;align-items:center;justify-content:center;padding:20px;opacity:0;transition:.18s}
+#impv.on{display:flex;opacity:1}
+.imp-box{background:var(--panel);border-radius:18px;box-shadow:0 26px 70px rgba(0,0,0,.34);
+  width:min(1080px,100%);max-height:min(880px,92vh);display:flex;flex-direction:column}
+.imp-h{display:flex;align-items:flex-start;gap:10px;padding:15px 17px 12px;border-bottom:1px solid var(--line)}
+.imp-h b{font-size:14.5px;font-weight:680;display:block;letter-spacing:-.01em}
+.imp-h small{display:block;font-size:11.5px;color:var(--ink-3);margin-top:2px}
+.imp-h .btn{margin-left:auto}
+.imp-b{padding:15px 17px;overflow:auto;flex:1;min-height:0}
+.imp-f{padding:12px 17px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.imp-f .r{margin-left:auto;display:flex;gap:8px}
+.dz{border:1.6px dashed var(--line-2);border-radius:14px;background:var(--panel-2);padding:26px 18px;
+  text-align:center;transition:.15s;cursor:pointer}
+.dz:hover,.dz.sur{border-color:var(--accent);background:var(--accent-wash)}
+.dz .g{font-size:26px;line-height:1;margin-bottom:8px;opacity:.6}
+.dz b{display:block;font-size:13.5px;font-weight:660;margin-bottom:3px}
+.dz .mu{font-size:12px}
+.impmap{display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:9px 12px;margin:2px 0 12px}
+.impmap label{display:block;font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--ink-3);margin-bottom:3px}
+.impmap .inp{width:100%;height:30px;font-size:12.5px;text-transform:none;letter-spacing:0}
+.impmap .req{color:var(--crit)}
+.impsum{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.imptab{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.imptab table{width:100%;border-collapse:collapse;font-size:12px}
+.imptab thead th{padding:7px 10px;font-size:9.5px}
+.imptab tbody td{padding:6px 10px;font-size:12px}
+.imptab .df{font-size:10.5px;color:var(--ink-3);line-height:1.4}
+.imptab .df s{opacity:.75}
+.impj{font-size:11.5px;color:var(--ink-3)}
+.impj li{padding:4px 0;border-top:1px dashed var(--line);list-style:none}
 .sig-pad{position:relative;border:1.5px dashed var(--line);border-radius:12px;background:var(--panel-2);
   height:210px;overflow:hidden}
 .sig-pad canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair;
@@ -1367,6 +1400,12 @@ tr.supp td{background:var(--crit-w);padding:0}
     <button class="btn s" onclick="effacerSign()">↺ Effacer</button>
     <button class="btn s" onclick="signPapier()" title="Le document a été imprimé et signé à la main">✎ Signé sur papier</button>
     <button class="btn p" id="sigOk" onclick="validerSign()" disabled>✓ Valider la signature</button></div>
+</div></div>
+<div id="impv"><div class="imp-box">
+  <div class="imp-h"><div><b id="impT">Passerelle Doctolib</b><small id="impS"></small></div>
+    <button class="btn g s" onclick="fermerImport()">✕</button></div>
+  <div class="imp-b" id="impB"></div>
+  <div class="imp-f" id="impF"></div>
 </div></div>
 <div class="toast" id="toast"></div>
 
@@ -3157,6 +3196,307 @@ function carteIdentite(x,A,ca,rd){
   </div>`;
 }
 
+/* ==========================================================================
+   Passerelle Doctolib — reprise des identités
+   Doctolib n'ouvre pas d'API publique : une liaison directe suppose un accord
+   partenaire et un serveur qui porte la clé. Ce qui fonctionne aujourd'hui,
+   sans rien contourner, c'est le fichier que Doctolib remet au praticien — sa
+   propre base, exportée depuis son compte. On le lit ici, dans le navigateur :
+   le fichier ne quitte pas le poste, rien n'est envoyé nulle part.
+   ========================================================================== */
+let IMP=null;                 /* import en cours : null quand le modal est fermé */
+const IMP_JOURNAL=[];         /* ce qui a déjà été repris, et quand */
+const peutImporter=()=>!!ROLES[role].med;
+
+const sansAcc=s=>String(s==null?'':s).normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+  .toLowerCase().replace(/[^a-z0-9]/g,'');
+
+/* Les colonnes qu'on sait reconnaître. L'ordre compte : « prénom » contient
+   « nom », il doit donc être testé le premier. */
+/* ordre d'affichage, différent de l'ordre de détection */
+const IMP_ORDRE=['nom','prenom','ddn','tel','mail','adr','cp','ville'];
+const IMP_CHAMPS=[
+ ['prenom','Prénom',       1, /^(prenom|firstname|first|givenname|patientprenom)/],
+ ['nom',   'Nom',          1, /^(nom|lastname|last|familyname|surname|patientnom|nomdefamille|nomdenaissance|nomusuel)/],
+ ['ddn',   'Naissance',    0, /(datedenaissance|naissance|birth|dob|neele|nele)/],
+ ['tel',   'Téléphone',    0, /(telephone|^tel$|mobile|portable|phone|gsm)/],
+ ['mail',  'E-mail',       0, /(mail|courriel)/],
+ ['adr',   'Adresse',      0, /^(adresse|address|rue|voie|ligne1|adresse1)/],
+ ['cp',    'Code postal',  0, /(codepostal|^cp$|zip|postalcode)/],
+ ['ville', 'Ville',        0, /^(ville|city|commune|localite)/],
+];
+
+/* ---- lecture d'un CSV : séparateur deviné, guillemets respectés ---- */
+function lireCSV(txt){
+ txt=String(txt).replace(/^﻿/,'');
+ const i1=txt.indexOf('\n'), l1=txt.slice(0,i1<0?txt.length:i1);
+ const sep=[';','\t',','].map(c=>[c,l1.split(c).length]).sort((a,b)=>b[1]-a[1])[0][0];
+ const out=[]; let cur=[], val='', q=false;
+ for(let i=0;i<txt.length;i++){ const c=txt[i];
+  if(q){ if(c==='"'){ if(txt[i+1]==='"'){val+='"';i++} else q=false } else val+=c }
+  else if(c==='"') q=true;
+  else if(c===sep){ cur.push(val); val='' }
+  else if(c==='\n'){ cur.push(val); out.push(cur); cur=[]; val='' }
+  else if(c!=='\r') val+=c }
+ if(val!==''||cur.length){ cur.push(val); out.push(cur) }
+ return out.filter(r=>r.some(x=>String(x).trim()));
+}
+
+/* ---- lecture d'un .xlsx : c'est un zip de XML, le navigateur sait dézipper ----
+   On lit l'annuaire du zip, on décompresse les deux seules pièces utiles —
+   la table des chaînes et la première feuille — et on reconstruit les lignes. */
+async function lireXLSX(buf){
+ const dv=new DataView(buf), u8=new Uint8Array(buf), td=new TextDecoder();
+ let e=-1;
+ for(let i=u8.length-22;i>=0&&i>u8.length-66000;i--) if(dv.getUint32(i,true)===0x06054b50){e=i;break}
+ if(e<0) throw new Error('ce fichier n’est pas un classeur .xlsx lisible');
+ const nb=dv.getUint16(e+10,true), cd=dv.getUint32(e+16,true), ent={};
+ let q=cd;
+ for(let k=0;k<nb;k++){
+  if(dv.getUint32(q,true)!==0x02014b50) break;
+  const meth=dv.getUint16(q+10,true), csz=dv.getUint32(q+20,true);
+  const nl=dv.getUint16(q+28,true), el=dv.getUint16(q+30,true), cl=dv.getUint16(q+32,true);
+  ent[td.decode(u8.subarray(q+46,q+46+nl))]={meth,csz,off:dv.getUint32(q+42,true)};
+  q+=46+nl+el+cl;
+ }
+ const lire=async k=>{ const f=ent[k]; if(!f) return null;
+  const nl=dv.getUint16(f.off+26,true), el=dv.getUint16(f.off+28,true), d0=f.off+30+nl+el;
+  const d=u8.subarray(d0,d0+f.csz);
+  if(f.meth===0) return td.decode(d);
+  if(f.meth!==8) throw new Error('compression du classeur non prise en charge');
+  if(typeof DecompressionStream!=='function')
+    throw new Error('ce navigateur ne sait pas ouvrir un .xlsx — exportez en CSV');
+  const st=new Blob([d]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return td.decode(await new Response(st).arrayBuffer());
+ };
+ const ss=[], sx=await lire('xl/sharedStrings.xml');
+ if(sx) [...new DOMParser().parseFromString(sx,'application/xml').getElementsByTagName('si')]
+   .forEach(si=>{ [...si.getElementsByTagName('rPh')].forEach(x=>x.remove());
+     ss.push([...si.getElementsByTagName('t')].map(t=>t.textContent).join('')) });
+ const nomF=Object.keys(ent).filter(k=>/^xl\/worksheets\/sheet\d+\.xml$/.test(k))
+   .sort((a,b)=>(+a.match(/\d+/)[0])-(+b.match(/\d+/)[0]))[0];
+ if(!nomF) throw new Error('aucune feuille dans ce classeur');
+ const doc=new DOMParser().parseFromString(await lire(nomF),'application/xml');
+ const idxCol=r=>{ let n=0; for(const c of String(r).replace(/[^A-Z]/g,'')) n=n*26+(c.charCodeAt(0)-64); return n-1 };
+ const out=[];
+ [...doc.getElementsByTagName('row')].forEach(row=>{
+  const L=[];
+  [...row.getElementsByTagName('c')].forEach(c=>{
+   const i=idxCol(c.getAttribute('r')||''), t=c.getAttribute('t');
+   let v='';
+   if(t==='inlineStr') v=[...c.getElementsByTagName('t')].map(x=>x.textContent).join('');
+   else { const vn=c.getElementsByTagName('v')[0]; v=vn?vn.textContent:'';
+     if(t==='s') v=ss[+v]===undefined?'':ss[+v] }
+   if(i>=0) L[i]=v;
+  });
+  out.push(Array.from({length:L.length},(_,i)=>L[i]===undefined?'':L[i]));
+ });
+ return out.filter(r=>r.some(x=>String(x).trim()));
+}
+
+/* ---- remise en forme : dates, téléphones ---- */
+/* Excel compte les jours depuis le 30/12/1899 ; une date exportée en nombre
+   n'a pas d'autre sens ici. */
+const serieDate=n=>{ n=Math.round(+n); if(!(n>0&&n<80000)) return '';
+ return new Date(Date.UTC(1899,11,30)+n*864e5).toISOString().slice(0,10) };
+function normDate(v){
+ v=String(v==null?'':v).trim(); if(!v) return '';
+ if(/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0,10);
+ const m=v.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/);
+ if(m){ let a=+m[3]; if(a<100) a+=a>30?1900:2000;
+   return `${a}-${String(+m[2]).padStart(2,'0')}-${String(+m[1]).padStart(2,'0')}` }
+ if(/^\d+([.,]\d+)?$/.test(v)) return serieDate(v.replace(',','.'));
+ const d=new Date(v); return isNaN(d)?'':d.toISOString().slice(0,10);
+}
+function normTel(t){
+ const s=String(t==null?'':t).trim().replace(/[^\d+]/g,'');
+ const esp=x=>x.replace(/(\d{2})(?=\d)/g,'$1 ');
+ if(/^0\d{9}$/.test(s)) return esp(s);
+ if(/^\+33\d{9}$/.test(s)) return esp('0'+s.slice(3));
+ return String(t==null?'':t).trim();
+}
+const capNom=x=>String(x||'').trim().replace(/\s+/g,' ');
+
+/* ---- ouverture, chargement, correspondance des colonnes ---- */
+function ouvrirImport(){
+ if(!peutImporter()){ toast('La reprise d’une base patients demande l’accès au dossier médical'); return }
+ IMP={etape:'fichier', nom:'', lignes:[], cols:[], map:{}, res:null, err:''};
+ document.getElementById('impv').classList.add('on');
+ renderImport();
+}
+function fermerImport(){ IMP=null; document.getElementById('impv').classList.remove('on') }
+
+async function chargerFichier(f){
+ if(!f||!IMP) return;
+ IMP.err=''; IMP.nom=f.name; IMP.taille=f.size;
+ try{
+  const xl=/\.xlsx?$/i.test(f.name);
+  const L=xl?await lireXLSX(await f.arrayBuffer()):lireCSV(await f.text());
+  if(L.length<2) throw new Error('ce fichier ne contient aucune ligne exploitable');
+  IMP.cols=L[0].map(x=>String(x==null?'':x).trim());
+  IMP.lignes=L.slice(1);
+  IMP.map=deviner(IMP.cols);
+  /* Aucune colonne reconnue : ce n'est pas un export de patients. Mieux vaut
+     le dire tout de suite que d'afficher un tableau de lignes vides. Dès qu'une
+     seule colonne est reconnue, on passe à l'aperçu — la correspondance des
+     autres se corrige à la main. */
+  if(!['nom','prenom','ddn','tel','mail'].some(k=>IMP.map[k]!=null))
+    throw new Error('aucune colonne d’identité reconnue dans l’en-tête — est-ce bien un export de patients ?');
+  IMP.etape='apercu';
+  calculerImport();
+ }catch(e){ IMP.err=e.message||String(e); IMP.etape='fichier' }
+ renderImport();
+}
+function deviner(cols){
+ const m={}, pris=new Set();
+ IMP_CHAMPS.forEach(([k,,,re])=>{
+  const i=cols.findIndex((c,j)=>!pris.has(j)&&re.test(sansAcc(c)));
+  if(i>=0){ m[k]=i; pris.add(i) }
+ });
+ return m;
+}
+function majMap(k,v){ if(!IMP) return;
+ if(v==='') delete IMP.map[k]; else IMP.map[k]=+v;
+ calculerImport(); renderImport();
+}
+
+/* ---- rapprochement avec les dossiers déjà ouverts ---- */
+const cleIdent=p=>sansAcc(p.nom)+'|'+sansAcc(p.prenom)+'|'+(p.ddn||'');
+const chiffres=t=>String(t==null?'':t).replace(/\D/g,'');
+function trouverDossier(x){
+ if(x.ddn){ const k=cleIdent(x), m=PATIENTS.find(p=>cleIdent(p)===k); if(m) return m }
+ if(x.mail){ const m=PATIENTS.find(p=>(p.mail||'').toLowerCase()===x.mail.toLowerCase()); if(m) return m }
+ if(x.tel){ const d=chiffres(x.tel); const m=PATIENTS.find(p=>chiffres(p.tel)&&chiffres(p.tel)===d); if(m) return m }
+ /* sans date de naissance, le seul nom ne suffirait pas à conclure — mais s'il
+    n'existe qu'un dossier à ce nom, c'est bien celui-là */
+ const h=PATIENTS.filter(p=>sansAcc(p.nom)===sansAcc(x.nom)&&sansAcc(p.prenom)===sansAcc(x.prenom));
+ return h.length===1?h[0]:null;
+}
+const IMP_L={nom:'Nom',prenom:'Prénom',ddn:'Date de naissance',tel:'Téléphone',mail:'E-mail',adr:'Adresse'};
+function calculerImport(){
+ if(!IMP) return;
+ const g=(r,k)=>IMP.map[k]==null?'':String(r[IMP.map[k]]==null?'':r[IMP.map[k]]).trim();
+ const res=IMP.lignes.map((r,i)=>{
+  const adr=[g(r,'adr'), [g(r,'cp'),g(r,'ville')].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+  const x={nom:capNom(g(r,'nom')).toUpperCase(), prenom:capNom(g(r,'prenom')),
+   ddn:normDate(g(r,'ddn')), tel:normTel(g(r,'tel')), mail:g(r,'mail').trim().toLowerCase(), adr};
+  if(!x.nom||!x.prenom) return {i, x, etat:'rejet', motif:'nom ou prénom absent'};
+  const p=trouverDossier(x);
+  if(!p) return {i, x, etat:'neuf'};
+  /* Doctolib fait foi : on relève ce qui change, et on l'appliquera */
+  const diff=[];
+  ['ddn','tel','mail','adr'].forEach(k=>{
+   const ap=x[k]; if(!ap) return;                     /* une case vide n'efface rien */
+   const av=(p[k]&&p[k]!=='—')?String(p[k]):'';
+   if(av!==ap) diff.push({k, l:IMP_L[k], av, ap});
+  });
+  return {i, x, etat:diff.length?'maj':'idem', pid:p.id, diff};
+ });
+ IMP.res=res;
+ IMP.cpt={neuf:res.filter(r=>r.etat==='neuf').length, maj:res.filter(r=>r.etat==='maj').length,
+   idem:res.filter(r=>r.etat==='idem').length, rejet:res.filter(r=>r.etat==='rejet').length};
+}
+
+/* ---- application ---- */
+function appliquerImport(){
+ if(!IMP||!IMP.res) return;
+ if(IMP.map.nom==null||IMP.map.prenom==null){ toast('Indiquez au moins les colonnes du nom et du prénom'); return }
+ let neufs=0, majs=0;
+ IMP.res.forEach(r=>{
+  if(r.etat==='neuf'){
+   const id=Math.max(...PATIENTS.map(p=>p.id))+1;
+   PATIENTS.push({id, nom:r.x.nom, prenom:r.x.prenom, ddn:r.x.ddn||null,
+     tel:r.x.tel||'—', mail:r.x.mail||'—', adr:r.x.adr||'', origine:'',
+     prat:PRATICIENS[0], depuis:TODAYS, notes:'', ant:[]});
+   (PMAJ[id]=PMAJ[id]||[]).push({t:nowStamp(), par:'Import Doctolib',
+     ch:[{l:'Dossier créé', av:'', ap:'reprise de l’export Doctolib'}]});
+   neufs++;
+  } else if(r.etat==='maj'){
+   const p=pById(r.pid); if(!p) return;
+   r.diff.forEach(d=>{ p[d.k]=d.ap });
+   (PMAJ[p.id]=PMAJ[p.id]||[]).push({t:nowStamp(), par:'Import Doctolib',
+     ch:r.diff.map(d=>({l:d.l, av:d.av, ap:d.ap}))});
+   majs++;
+  }
+ });
+ IMP_JOURNAL.push({t:nowStamp(), par:ROLES[role].u, fichier:IMP.nom,
+   neufs, majs, idem:IMP.cpt.idem, rejets:IMP.cpt.rejet});
+ fermerImport(); paint();
+ toast(`Reprise Doctolib — ${neufs} dossier${neufs>1?'s':''} créé${neufs>1?'s':''}, ${majs} mis à jour`);
+}
+
+/* ---- une fiche reprise peut être incomplète : on le dit, sans bloquer ---- */
+const ficheIncomplete=p=>!p||!p.ddn||!p.tel||p.tel==='—'||!p.mail||p.mail==='—';
+
+/* ---- rendu du modal ---- */
+const IMP_BDG={neuf:['b-good','Nouveau'], maj:['b-warn','Mis à jour'],
+  idem:['b-neu','Identique'], rejet:['b-crit','Ignorée']};
+function renderImport(){
+ if(!IMP) return;
+ const B=document.getElementById('impB'), F=document.getElementById('impF');
+ document.getElementById('impS').textContent=IMP.etape==='fichier'
+   ? 'Reprise des identités depuis votre export' : `${IMP.nom} · ${IMP.lignes.length} ligne${IMP.lignes.length>1?'s':''}`;
+ if(IMP.etape==='fichier'){
+  B.innerHTML=`
+   <div class="tip" style="margin-bottom:12px"><span class="e">🔐</span><div>
+     Doctolib n’ouvre pas d’API publique : une liaison automatique suppose un accord partenaire.
+     En attendant, la voie officielle est votre propre export — <b>Gestion des patients → Filtres avancés → télécharger</b>
+     (classeur .xlsx), ou <b>Paramètres avancés → Données → Exports</b> pour l’export complet (fichier <code>patients.csv</code>).
+     Le fichier déposé ici est lu <b>dans votre navigateur</b> : il ne part sur aucun serveur.</div></div>
+   ${IMP.err?`<div class="tip" style="margin-bottom:12px;background:var(--crit-w);border-color:rgba(208,59,59,.25)">
+     <span class="e">⚠</span><div><b>Fichier non repris.</b> ${esc(IMP.err)}</div></div>`:''}
+   <div class="dz" id="impDZ" onclick="document.getElementById('impFile').click()">
+     <div class="g">↧</div>
+     <b>Déposez l’export Doctolib ici</b>
+     <div class="mu">ou cliquez pour choisir un fichier · .xlsx, .csv</div>
+   </div>
+   <input type="file" id="impFile" accept=".csv,.xlsx,.xls,.txt" style="display:none"
+     onchange="chargerFichier(this.files[0])">
+   <div class="mu" style="font-size:11.5px;margin-top:11px">
+     Sont repris : nom, prénom, date de naissance, téléphone, e-mail et adresse. Rien d’autre —
+     ni antécédents, ni rendez-vous, ni documents.</div>`;
+  const dz=document.getElementById('impDZ');
+  dz.ondragover=e=>{e.preventDefault();dz.classList.add('sur')};
+  dz.ondragleave=()=>dz.classList.remove('sur');
+  dz.ondrop=e=>{e.preventDefault();dz.classList.remove('sur');
+    const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) chargerFichier(f)};
+  F.innerHTML=`<span class="mu" style="font-size:11.5px">Aucune donnée n’est transmise à Doctolib ni à personne d’autre.</span>
+    <div class="r"><button class="btn g" onclick="fermerImport()">Fermer</button></div>`;
+  return;
+ }
+ const opts=k=>`<option value="">— aucune —</option>`+IMP.cols.map((c,i)=>
+   `<option value="${i}" ${IMP.map[k]===i?'selected':''}>${esc(c||('colonne '+(i+1)))}</option>`).join('');
+ const c=IMP.cpt||{neuf:0,maj:0,idem:0,rejet:0};
+ const APER=IMP.res.slice(0,60);
+ B.innerHTML=`
+  <div class="impmap">${IMP_ORDRE.map(k=>IMP_CHAMPS.find(c=>c[0]===k)).map(([k,l,req])=>`<div>
+    <label>${l}${req?' <span class="req">*</span>':''}</label>
+    <select class="inp" onchange="majMap('${k}',this.value)">${opts(k)}</select></div>`).join('')}</div>
+  <div class="impsum">
+    ${bdg('b-good',c.neuf+' nouveau'+(c.neuf>1?'x':''))}
+    ${bdg('b-warn',c.maj+' à mettre à jour')}
+    ${bdg('b-neu',c.idem+' déjà identique'+(c.idem>1?'s':''))}
+    ${c.rejet?bdg('b-crit',c.rejet+' ignorée'+(c.rejet>1?'s':'')):''}
+    <span class="mu" style="font-size:11.5px">Doctolib fait foi : les coordonnées divergentes seront remplacées, et le changement journalisé dans la fiche.</span>
+  </div>
+  <div class="imptab"><table>
+   <thead><tr><th>Patient</th><th>Naissance</th><th>Contact</th><th>État</th><th>Ce qui change</th></tr></thead>
+   <tbody>${APER.map(r=>`<tr>
+     <td><b>${esc(r.x.nom)}</b> ${esc(r.x.prenom)}</td>
+     <td class="mono mu">${r.x.ddn?DF(r.x.ddn):'—'}</td>
+     <td class="mu">${esc(r.x.tel||'—')}<div style="font-size:11px">${esc(r.x.mail||'—')}</div></td>
+     <td>${bdg(IMP_BDG[r.etat][0],IMP_BDG[r.etat][1])}</td>
+     <td class="df">${r.etat==='rejet'?esc(r.motif)
+        :r.etat==='maj'?r.diff.map(d=>`${esc(d.l)} : ${d.av?`<s>${esc(d.av)}</s> → `:''}${esc(d.ap)}`).join('<br>')
+        :r.etat==='neuf'?'dossier à ouvrir':'rien à reprendre'}</td></tr>`).join('')}
+   </tbody></table></div>
+  ${IMP.res.length>APER.length?`<div class="mu" style="font-size:11.5px;margin-top:8px">
+    Aperçu des ${APER.length} premières lignes — l’import portera sur les ${IMP.res.length}.</div>`:''}`;
+ F.innerHTML=`<span class="mu" style="font-size:11.5px">Vérifiez la correspondance des colonnes avant d’importer.</span>
+   <div class="r"><button class="btn g" onclick="IMP.etape='fichier';IMP.err='';renderImport()">← Autre fichier</button>
+   <button class="btn p" ${(c.neuf+c.maj)?'':'disabled'} onclick="appliquerImport()">↧ Importer ${c.neuf+c.maj} fiche${(c.neuf+c.maj)>1?'s':''}</button></div>`;
+}
+
 V.patients=()=>{
  const nFid=PATIENTS.filter(p=>fidLevel(p)).length;
  const nAnn=PATIENTS.filter(p=>annivDate(p,annivF)).length;
@@ -3223,7 +3563,9 @@ function pListe(){
  if(pSel) return pFiche();
  const L=patientsTries();
  return `<div class="head" style="margin-bottom:12px"><div><h1>Patients</h1><p>${L.length} sur ${PATIENTS.length} · classés par ${triTxt()} · un clic sur un nom ouvre le dossier</p></div>
-  <div class="r"><button class="btn" onclick="toast('Recherche de doublons : 0 doublon détecté')">Doublons</button>
+  <div class="r">${peutImporter()?`<button class="btn" onclick="ouvrirImport()"
+     title="Reprendre les identités depuis un export Doctolib">↧ Doctolib</button>`:''}
+   <button class="btn" onclick="toast('Recherche de doublons : 0 doublon détecté')">Doublons</button>
    <button class="btn p" onclick="openActe(null,null,true)">+ Patient</button></div></div>
  <div class="md" style="grid-template-columns:1fr">
   <div class="card">
@@ -3242,7 +3584,8 @@ function pListe(){
         <div class="mu" style="font-size:11.5px">${ageTxt(p)}${p.ddn?` · ${DF(p.ddn)}`:' · naissance non renseignée'}</div></div>
        <div style="display:flex;gap:4px;margin-left:8px">
         ${f?`<span class="bdg ${f.c}">${f.n}</span>`:''}
-        ${p.ant.length?`<span class="bdg b-warn">⚠ ${p.ant.length}</span>`:''}</div></div></td>
+        ${p.ant.length?`<span class="bdg b-warn">⚠ ${p.ant.length}</span>`:''}
+        ${ficheIncomplete(p)?`<span class="bdg b-crit" title="Naissance, téléphone ou e-mail manquant — à compléter">à compléter</span>`:''}</div></div></td>
       <td class="num">${na}</td>
       <td class="mono mu" style="white-space:nowrap">${d?DF(d):'jamais'}</td>
       <td class="mu" style="white-space:nowrap">${esc(p.prat)}</td>
@@ -4351,6 +4694,7 @@ function devisExemple(f){
 }
 V.params=()=>{
  const TB=[['cabinet','Cabinet & praticiens'],['actes',`Actes & tarifs · ${CATALOGUE.length}`],
+          ['doctolib','Passerelle Doctolib'],
           ['materiels',`Matériels & paramètres · ${MATERIELS.length}`],
           ['facturation','Facturation & rétrocession'],['fidelite','Fidélité & réactivation'],
           ['messages',`Modèles de message · ${MODELES.length}`],
@@ -4563,6 +4907,65 @@ V.params=()=>{
    </div>`;
   },
 
+  /* --- La passerelle Doctolib : ce qui marche aujourd'hui, et ce qu'il
+         faudrait pour aller plus loin. Rien n'est simulé ni connecté. --- */
+  doctolib:()=>{
+   const J=IMP_JOURNAL.slice().reverse();
+   const inc=PATIENTS.filter(ficheIncomplete).length;
+   const PRE=[
+    ['Contrat de partenariat signé avec Doctolib','L’accès aux données d’un cabinet passe par leur programme partenaire : dossier, revue de sécurité, contrat. Il n’existe pas d’API publique en libre accès.'],
+    ['Serveur intermédiaire agréé HDS','Les identifiants d’une liaison ne vivent jamais dans le navigateur. Il faut un service hébergé chez un hébergeur de données de santé, qui porte la clé et journalise les appels.'],
+    ['Base légale et information des patients','Traitement de données de santé : registre, analyse d’impact si nécessaire, mention d’information et contrat de sous-traitance entre le cabinet et l’éditeur.'],
+    ['Portée limitée à ce qui sert','Ici, l’identité seule — nom, prénom, naissance, téléphone, e-mail, adresse. Ni antécédents, ni rendez-vous, ni documents.'],
+   ];
+   const F=(l,v,ph)=>`<div class="fld"><label>${l}</label>
+     <input class="inp" style="width:100%" value="${esc(v||'')}" placeholder="${esc(ph||'')}" disabled></div>`;
+   return `<div class="tip"><span class="e">🔗</span><div><b>État de la liaison : non connectée.</b>
+     Doctolib n’ouvre pas d’API publique — une liaison automatique suppose un accord partenaire et un
+     serveur qui porte la clé. La reprise se fait donc par votre propre export, lu dans le navigateur.
+     Aucune donnée ne sort de ce poste, et rien n’est envoyé à Doctolib.</div></div>
+   <div class="grid g2">
+    <div class="card"><div class="h"><h2>Reprendre un export</h2><span class="s">la voie qui fonctionne</span></div><div class="b">
+      <div class="fld"><label>Où trouver le fichier dans Doctolib</label>
+        <div class="v" style="line-height:1.65">
+          <b>1.</b> Gestion des patients → Filtres avancés → <b>Télécharger</b> : un classeur <code>.xlsx</code> des patients filtrés.<br>
+          <b>2.</b> Ou Paramètres avancés → Données → <b>Exports</b> : l’export complet, dont <code>patients.csv</code>.
+          <span class="mu">Ce module est souvent désactivé par défaut ; Doctolib l’ouvre sur demande à leur support professionnel.</span></div></div>
+      <div class="fld"><label>Ce qui est repris</label>
+        <div class="chips">${['Nom','Prénom','Date de naissance','Téléphone','E-mail','Adresse']
+          .map(x=>`<span class="bdg b-info">${x}</span>`).join('')}</div>
+        <div class="mu" style="font-size:11.5px;margin-top:5px">Les colonnes sont reconnues automatiquement et restent corrigeables à la main avant l’import.</div></div>
+      <div class="fld"><label>En cas de dossier déjà connu</label>
+        <div class="v">Doctolib fait foi : les coordonnées divergentes sont remplacées, et le changement
+          est inscrit au journal de la fiche — ancienne valeur, nouvelle valeur, date et auteur.</div></div>
+      <div class="r" style="gap:8px;margin-top:4px">
+        <button class="btn p" ${peutImporter()?'':'disabled'} onclick="ouvrirImport()">↧ Importer un export Doctolib</button>
+        ${inc?`<button class="btn s" onclick="pView='liste';pSel=null;go('patients')">${inc} fiche${inc>1?'s':''} à compléter</button>`:''}</div>
+    </div></div>
+    <div class="card"><div class="h"><h2>Liaison automatique</h2><span class="s">le jour où l’accès partenaire est accordé</span></div><div class="b">
+      <div class="fld"><label>Ce qu’elle réclamerait</label>
+        <ul class="pmajl" style="padding:0">${PRE.map(([t,d])=>`<li><b>${esc(t)}</b>
+          <div class="mu" style="font-size:11.5px">${esc(d)}</div></li>`).join('')}</ul></div>
+      <div class="grid g2" style="gap:10px">
+        ${F('Identifiant du cabinet','','attribué par Doctolib')}
+        ${F('Clé partenaire','','détenue par le serveur, jamais par le navigateur')}
+      </div>
+      <div class="grid g2" style="gap:10px">
+        ${F('Portée','Identité du patient (lecture seule)')}
+        ${F('Fréquence','À la demande')}
+      </div>
+      <div class="mu" style="font-size:11.5px">Ces champs sont inactifs : ce prototype ne stocke aucune clé et n’ouvre aucune
+        connexion. Ils décrivent ce qu’il faudra renseigner, côté serveur, le jour venu.</div>
+    </div></div>
+   </div>
+   <div class="card" style="margin-top:13px"><div class="h"><h2>Journal des reprises</h2><span class="s">${J.length} import${J.length>1?'s':''} dans cette session</span></div>
+    ${J.length?`<div class="tw"><table>
+      <thead><tr><th>Date</th><th>Fichier</th><th>Par</th><th class="num">Créés</th><th class="num">Mis à jour</th><th class="num">Identiques</th><th class="num">Ignorées</th></tr></thead>
+      <tbody>${J.map(x=>`<tr><td class="mono mu">${DTS(x.t)}</td><td>${esc(x.fichier)}</td>
+        <td class="mu">${esc(x.par)}</td><td class="num">${x.neufs}</td><td class="num">${x.majs}</td>
+        <td class="num mu">${x.idem}</td><td class="num mu">${x.rejets}</td></tr>`).join('')}</tbody></table></div>`
+     :'<div class="empty">Aucune reprise pour l’instant.</div>'}</div>`;
+  },
   fidelite:()=>{
    const all=PATIENTS.map(p=>({p,f:fidLevel(p)})).filter(x=>x.f);
    return `<div class="tip"><span class="e">⭐</span><div>Ces critères pilotent la liste <b>Patients → Fidèles</b>. Chaque modification est répercutée immédiatement : le compteur ci-dessous se met à jour à chaque changement.</div></div>
