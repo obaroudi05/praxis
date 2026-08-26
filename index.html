@@ -153,6 +153,9 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .seg{display:inline-flex;background:var(--panel-3);border-radius:10px;padding:3px;gap:2px}
 .seg button{padding:5px 11px;border-radius:7px;font-size:12.5px;font-weight:560;color:var(--ink-2);transition:.13s}
 .seg button.on{background:var(--panel);color:var(--ink);font-weight:650;box-shadow:var(--sh-1)}
+/* la barre d'onglets des paramètres compte désormais neuf entrées : elle se
+   replie plutôt que d'élargir la page */
+.seg.wrap{flex-wrap:wrap;max-width:100%}
 
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-l);box-shadow:var(--sh-2);overflow:hidden}
 .card>.h{padding:13px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)}
@@ -166,6 +169,11 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .g4{grid-template-columns:repeat(4,1fr)}.g5{grid-template-columns:repeat(5,1fr)}
 @media(max-width:1400px){.g5{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:1150px){.g4,.g3{grid-template-columns:repeat(2,1fr)}.g2{grid-template-columns:1fr}}
+/* réglage des actes : une colonne étroite pour les protocoles, le reste au large.
+   minmax(0,…) laisse les tableaux se replier au lieu d'élargir la page. */
+.gcat{grid-template-columns:minmax(0,380px) minmax(0,1fr)}
+.gcat>*{min-width:0}
+@media(max-width:1250px){.gcat{grid-template-columns:minmax(0,1fr)}}
 
 .kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-m);padding:13px 15px;box-shadow:var(--sh-2);position:relative;overflow:hidden}
 .kpi .k{font-size:11.5px;color:var(--ink-3);font-weight:520;display:flex;align-items:center;gap:6px}
@@ -4056,6 +4064,210 @@ function pPhotos(){
 function ph2(x){return ph((x.kind==='avant'?'AVANT — ':'APRÈS — ')+DF(x.date), x.h, x.kind==='avant'?0:8)}
 function openPatientPhotos(id){pSel=id;pTab='photos';pView='liste';go('patients')}
 
+/* ==========================================================================
+   Établir une facture, établir un avoir — depuis la fiche du patient
+   Une facture ne suit pas toujours un acte : produit vendu, consultation non
+   tracée, régularisation. Et un avoir n'est pas un simple retrait de montant :
+   c'est une pièce numérotée qui référence la facture, porte son motif et se
+   transmet comme elle. On la garde donc à part ; le champ « avoir » de la
+   facture n'en est que la somme, pour que tous les cumuls existants tiennent.
+   ========================================================================== */
+let AVOIRS=[];
+let factNew=null;    /* saisie d'une facture */
+let avoirNew=null;   /* saisie d'un avoir */
+
+const numFact=()=>'F-'+(Math.max(2599,...FACTURES.map(f=>+String(f.id).replace(/\D/g,'')||0))+1);
+const numAvoir=()=>'AV-'+String(Math.max(0,...AVOIRS.map(a=>+String(a.id).replace(/\D/g,'')||0))+1).padStart(4,'0');
+/* encaissé au-delà de ce qui reste dû : il y a un remboursement à faire */
+const trop=f=>f.statut==='annulee'?0:Math.round(Math.max(0,f.paye-(f.montant-f.avoir))*100)/100;
+const avoirsDe=fid=>AVOIRS.filter(a=>a.facture===fid);
+const creditable=f=>Math.round(Math.max(0,f.montant-f.avoir)*100)/100;
+const libFact=f=>{const a=ACTES.find(x=>x.id===f.acte); return a?a.nom:(f.libelle||'—')};
+
+/* --- le jeu de démonstration porte déjà des avoirs : on leur donne leur pièce --- */
+(function avoirsDemo(){
+ const M=['Geste commercial','Séance non réalisée','Erreur de facturation','Remise accordée après coup'];
+ let i=0;
+ FACTURES.filter(f=>f.avoir>0).sort((a,b)=>a.date.localeCompare(b.date)).forEach(f=>{
+  AVOIRS.push({id:'AV-'+String(++i).padStart(4,'0'), facture:f.id, patient:f.patient,
+    date:f.date, montant:f.avoir, motif:M[i%M.length], praticien:f.praticien,
+    par:'Secrétariat', ts:f.date+'T11:'+String((i*7)%60).padStart(2,'0')});
+ });
+})();
+
+/* ---------------- facture ---------------- */
+function ouvrirFactNew(pid){
+ if(!ROLES[role].prix){ toast('Les montants ne sont pas accessibles à ce rôle'); return }
+ avoirNew=null;
+ factNew={pid, acte:'', libelle:'', date:TODAYS, montant:'', type:'', prat:PRATICIENS[0], moyen:'', frac:1};
+ paint();
+ const e=document.getElementById('fnM'); if(e) e.focus();
+}
+const fermerFactNew=()=>{ factNew=null; paint() };
+function fnMaj(k,v){ if(!factNew) return; factNew[k]=v;
+ if(k==='moyen'&&!v) factNew.frac=1;
+ paint() }
+function creerFacture(){
+ if(!factNew) return;
+ const p=pById(factNew.pid); if(!p) return;
+ const m=Math.round((+factNew.montant||0)*100)/100;
+ if(!(m>0)){ toast('Indiquez le montant de la facture'); return }
+ const a=factNew.acte?ACTES.find(x=>String(x.id)===String(factNew.acte)):null;
+ const lib=factNew.libelle.trim();
+ if(!a&&!lib){ toast('Indiquez ce qui est facturé'); return }
+ if(factNew.date>TODAYS){ toast('Une facture ne s’établit pas dans le futur'); return }
+ const type=a?a.type:(factNew.type||null);
+ const n=Math.max(1,+factNew.frac||1);
+ const frac=(factNew.moyen&&n>1)?n:0;
+ const id=numFact();
+ FACTURES.unshift({id, patient:p.id, acte:a?a.id:null, libelle:a?'':lib,
+   date:factNew.date, montant:m,
+   paye:factNew.moyen?(frac?Math.round(m/frac):m):0, moyen:factNew.moyen||null,
+   plan:frac?{n:frac,faites:1}:null,
+   praticien:a?a.praticien:factNew.prat, cat:a?a.cat:'Facturation libre',
+   type, statut:'ok', avoir:0});
+ const F=FACTURES[0];
+ logDoc(id, `Facture émise — ${EUR(m)}${factNew.moyen?' · '+moyenTxt(F):''}`);
+ factNew=null; paint();
+ toast(`Facture ${id} · ${EUR(m)}${F.moyen?(frac?` · 1ʳᵉ échéance de ${EUR(F.paye)} encaissée`:' encaissée'):' à encaisser'}`);
+}
+function factForm(p){
+ const A=ACTES.filter(x=>x.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
+ const a=factNew.acte?ACTES.find(x=>String(x.id)===String(factNew.acte)):null;
+ const m=+factNew.montant||0, n=Math.max(1,+factNew.frac||1);
+ const t=a?tauxTVA(a.type):tauxTVA(factNew.type||null);
+ return `<div class="encf" style="margin-bottom:12px">
+  <div class="encf-g">
+   <label>Rattacher à un acte
+     <select class="inp" onchange="fnMaj('acte',this.value)">
+       <option value="">— sans acte —</option>
+       ${A.map(x=>`<option value="${x.id}" ${String(factNew.acte)===String(x.id)?'selected':''}>${DF(x.date)} — ${esc(x.nom)}</option>`).join('')}</select></label>
+   ${a?`<label>Prestation<div class="v" style="font-size:12.5px;padding-top:6px">${esc(a.nom)}</div></label>`
+      :`<label>Ce qui est facturé
+        <input class="inp" id="fnL" placeholder="Produit, consultation, régularisation…"
+          value="${esc(factNew.libelle)}" oninput="factNew.libelle=this.value"></label>`}
+   <label>Date
+     <input class="inp" type="date" max="${TODAYS}" value="${factNew.date}" onchange="fnMaj('date',this.value)"></label>
+   <label>Montant TTC
+     <div class="pxin"><input class="inp" id="fnM" type="number" min="0" step="5"
+       value="${factNew.montant}" oninput="factNew.montant=this.value" onchange="fnMaj('montant',this.value)"><span>€</span></div></label>
+   ${a?'':`<label>Nature — pour la TVA
+     <select class="inp" onchange="fnMaj('type',this.value)">
+       <option value="">Autre — TVA ${FACTU.tvaDefaut} %</option>
+       ${CATALOGUE.map(c=>`<option value="${c.id}" ${factNew.type===c.id?'selected':''}>${esc(c.n)} — TVA ${tauxTVA(c.id)} %</option>`).join('')}</select></label>
+   <label>Praticien
+     <select class="inp" onchange="fnMaj('prat',this.value)">
+       ${PRATICIENS.map(x=>`<option ${factNew.prat===x?'selected':''}>${esc(x)}</option>`).join('')}</select></label>`}
+   <label>Encaissement
+     <select class="inp" onchange="fnMaj('moyen',this.value)">
+       <option value="">à encaisser plus tard</option>
+       ${MOYENS.map(x=>`<option ${factNew.moyen===x?'selected':''}>${esc(x)}</option>`).join('')}</select></label>
+   <label>Étalement
+     <select class="inp" ${factNew.moyen?'':'disabled'} onchange="fnMaj('frac',this.value)">
+       <option value="1" ${n===1?'selected':''}>Réglé en une fois</option>
+       ${FRACTIONS.map(k=>`<option value="${k}" ${n===k?'selected':''}>En ${k} fois${m?` — ${EUR(Math.round(m/k))} par échéance`:''}</option>`).join('')}</select></label>
+  </div>
+  <div class="encf-a">
+   <span class="mu" style="font-size:11px;flex:1">${m?`${EUR(m)} TTC · dont ${EUR(Math.round(m-m/(1+t/100)))} de TVA à ${t} %`:'Le montant se saisit TTC ; la TVA en est déduite au taux de la nature choisie.'}</span>
+   <button class="btn xs g" onclick="fermerFactNew()">Annuler</button>
+   <button class="btn xs p" onclick="creerFacture()">Établir la facture</button>
+  </div></div>`;
+}
+
+/* ---------------- avoir ---------------- */
+function ouvrirAvoirNew(pid){
+ if(!ROLES[role].prix){ toast('Les montants ne sont pas accessibles à ce rôle'); return }
+ const L=FACTURES.filter(f=>f.patient===pid&&f.statut!=='annulee'&&creditable(f)>0);
+ if(!L.length){ toast('Aucune facture de ce patient ne peut recevoir un avoir'); return }
+ factNew=null;
+ avoirNew={pid, fid:L[0].id, montant:'', motif:'', date:TODAYS};
+ paint();
+ const e=document.getElementById('avM'); if(e) e.focus();
+}
+const fermerAvoirNew=()=>{ avoirNew=null; paint() };
+function avMaj(k,v){ if(!avoirNew) return; avoirNew[k]=v; paint() }
+function creerAvoir(){
+ if(!avoirNew) return;
+ const f=FACTURES.find(x=>x.id===avoirNew.fid); if(!f){ toast('Facture introuvable'); return }
+ const max=creditable(f);
+ const m=Math.round((+avoirNew.montant||0)*100)/100;
+ if(!(m>0)){ toast('Indiquez le montant de l’avoir'); return }
+ if(m>max){ toast(`L’avoir ne peut pas dépasser ${EUR(max)} — c’est ce qui reste à créditer sur ${f.id}`); return }
+ if(!avoirNew.motif.trim()){ toast('Un avoir doit porter son motif'); return }
+ if(avoirNew.date>TODAYS){ toast('Un avoir ne s’établit pas dans le futur'); return }
+ const id=numAvoir();
+ AVOIRS.unshift({id, facture:f.id, patient:f.patient, date:avoirNew.date, montant:m,
+   motif:avoirNew.motif.trim(), praticien:f.praticien, par:ROLES[role].u, ts:nowStamp()});
+ f.avoir=Math.round((f.avoir+m)*100)/100;
+ logDoc(f.id, `Avoir ${id} établi — ${EUR(m)} · ${avoirNew.motif.trim()}`);
+ logDoc(id, `Avoir sur la facture ${f.id} — ${EUR(m)}`);
+ const reste=trop(f);
+ avoirNew=null; paint();
+ toast(`Avoir ${id} · ${EUR(m)} sur ${f.id}${reste?` · ${EUR(reste)} à rembourser`:''}`);
+}
+function avoirForm(p){
+ const L=FACTURES.filter(f=>f.patient===p.id&&f.statut!=='annulee'&&creditable(f)>0);
+ const f=L.find(x=>x.id===avoirNew.fid)||L[0];
+ if(f&&avoirNew.fid!==f.id) avoirNew.fid=f.id;
+ const max=f?creditable(f):0;
+ const m=Math.round((+avoirNew.montant||0)*100)/100;
+ return `<div class="encf" style="margin-bottom:12px;background:var(--warn-w);border-color:rgba(250,178,25,.5)">
+  <div class="encf-g">
+   <label>Facture concernée
+     <select class="inp" onchange="avMaj('fid',this.value)">
+       ${L.map(x=>`<option value="${x.id}" ${avoirNew.fid===x.id?'selected':''}>${x.id} — ${DF(x.date)} · ${esc(libFact(x))} · ${EUR(creditable(x))}</option>`).join('')}</select></label>
+   <label>Date de l’avoir
+     <input class="inp" type="date" max="${TODAYS}" value="${avoirNew.date}" onchange="avMaj('date',this.value)"></label>
+   <label>Montant
+     <div class="pxin"><input class="inp" id="avM" type="number" min="0" max="${max}" step="5"
+       value="${avoirNew.montant}" oninput="avoirNew.montant=this.value" onchange="avMaj('montant',this.value)"><span>€</span></div></label>
+   <label>Motif
+     <input class="inp" placeholder="Séance non réalisée, geste commercial…"
+       value="${esc(avoirNew.motif)}" oninput="avoirNew.motif=this.value"></label>
+  </div>
+  <div class="encf-a">
+   <span class="mu" style="font-size:11px;flex:1">${f?`Créditable au maximum : ${EUR(max)}${m>0&&m<max?` · avoir partiel, il restera ${EUR(max-m)}`:m>=max&&max>0?' · avoir total, la facture sera intégralement créditée':''}${f.paye&&m>0&&f.paye>max-m?` · ${EUR(Math.round((f.paye-(max-m))*100)/100)} à rembourser au patient`:''}`:'Aucune facture créditable.'}</span>
+   <button class="btn xs g" onclick="fermerAvoirNew()">Annuler</button>
+   <button class="btn xs p" ${f?'':'disabled'} onclick="creerAvoir()">Établir l’avoir</button>
+  </div></div>`;
+}
+
+/* ---------------- l'avoir, en document ---------------- */
+function docAvoir(av){
+ const p=pById(av.patient), f=FACTURES.find(x=>x.id===av.facture), prn=av.praticien;
+ const t=f?tauxTVA(f.type):FACTU.tvaDefaut;
+ const ht=Math.round(av.montant/(1+t/100)*100)/100;
+ return `<div class="a4">
+  ${CABINET.enteteOn?`<div class="dv-hd">${hfDevis(CABINET.entete,p,prn)}</div>`:''}
+  <div class="gr">
+   <div class="dv-ti"><h1>Avoir</h1>
+    <div class="n"><b>${esc(av.id)}</b><br>Établi le ${DF(av.date)}</div></div>
+   <div class="dv-s">Patient</div>
+   <div class="dv-p"><b>${esc(fn(p))}</b> — né(e) le ${p.ddn?DF(p.ddn):'—'} · dossier n° ${p.id}<br>${esc(p.adr||'')}</div>
+   <div class="dv-s">Facture concernée</div>
+   <div class="dv-p">Facture <b>${esc(av.facture)}</b>${f?` du ${DF(f.date)} — ${esc(libFact(f))} — ${E2(f.montant)}`:''}</div>
+   <div class="dv-s">Motif</div>
+   <div class="dv-p">${esc(av.motif)}</div>
+   <table class="dv-tb"><thead><tr><th style="width:64%">Désignation</th><th class="n">Date</th><th class="n">Montant</th></tr></thead>
+    <tbody><tr><td>Avoir sur la facture ${esc(av.facture)}</td><td class="n">${DF(av.date)}</td>
+      <td class="n">− ${E2(av.montant)}</td></tr></tbody></table>
+   <div class="dv-tot">
+    <div class="l"><span>Total HT</span><span>− ${E2(ht)}</span></div>
+    <div class="l"><span>TVA ${t} %</span><span>− ${E2(Math.round((av.montant-ht)*100)/100)}</span></div>
+    <div class="l net"><span>Total TTC</span><span>− ${E2(av.montant)}</span></div>
+   </div>
+   <div class="dv-men">Le présent avoir annule et remplace la fraction correspondante de la facture ${esc(av.facture)}.
+    Il vient en déduction des sommes dues ; s’il excède le solde restant, la différence est remboursée au patient.</div>
+   <div class="dv-hist"><span>${DTS(av.ts||av.date+'T11:00')} — Avoir établi <i>(${esc(av.par||prn)})</i></span></div>
+  </div>
+  ${CABINET.piedOn?`<div class="dv-ft">${hfDevis(CABINET.pied,p,prn)}</div>`:''}
+ </div>`;
+}
+function apercuAvoir(id){
+ const av=AVOIRS.find(x=>x.id===id); if(!av) return;
+ pdfView('Avoir '+av.id, `${av.id} · ${fn(pById(av.patient))} · ${DF(av.date)}`, docAvoir(av), '');
+}
+
 function pDetail(p){
  const A=ACTES.filter(a=>a.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
  const F=FACTURES.filter(f=>f.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
@@ -4368,7 +4580,9 @@ function pDetail(p){
      ${kpi('Total facturé',EUR(ca),`${F.filter(x=>x.statut==='ok').length} facture(s)`)}
      ${kpi('Reste dû',EUR(rd),rd?F.filter(f=>rdu(f)>0).length+' facture(s)':'tout est soldé',rd?'dn':'up')}
      ${kpi('Devis en attente',EUR(enAttente.reduce((s,d)=>s+d.montant,0)),`${enAttente.length} devis`)}
-     ${kpi('Avoirs',avoirs.length?EUR(avoirs.reduce((s,f)=>s+f.avoir,0)):'—',avoirs.length+' avoir(s)')}</div>
+     ${(()=>{const AV=AVOIRS.filter(a=>a.patient===p.id);
+       return kpi('Avoirs',AV.length?EUR(AV.reduce((s2,a)=>s2+a.montant,0)):'—',
+         AV.length?`${AV.length} pièce${AV.length>1?'s':''} sur ${avoirs.length} facture${avoirs.length>1?'s':''}`:'aucun')})()}</div>
    <div class="subh" style="border-top:none;padding-top:0"><h3>Devis<span>${D.length}</span></h3>
      <div class="r"><button class="btn xs" onclick="openDevis(${p.id},'epil')">+ Devis épilation</button>
      <button class="btn xs p" onclick="openDevis(${p.id},'esth')">+ Devis esthétique</button></div></div>
@@ -4385,19 +4599,27 @@ function pDetail(p){
         <button class="btn xs" onclick="event.stopPropagation();apercuDevis('${d.id}')">PDF</button></td></tr>`).join('')}
     </tbody></table>${D.length?'':'<div class="empty">Aucun devis.</div>'}</div>
 
-   <div class="subh"><h3>Factures &amp; avoirs<span>${F.length}</span></h3>
-     <div class="r"><button class="btn xs" onclick="toast('Avoir créé')">Créer un avoir</button>
-      <button class="btn xs p" onclick="toast('Nouvelle facture')">+ Facture</button></div></div>
+   <div class="subh"><h3>Factures<span>${F.length}</span></h3>
+     <div class="r"><button class="btn xs ${avoirNew&&avoirNew.pid===p.id?'g':''}"
+        onclick="${avoirNew&&avoirNew.pid===p.id?'fermerAvoirNew()':`ouvrirAvoirNew(${p.id})`}">↩ Établir un avoir</button>
+      <button class="btn xs ${factNew&&factNew.pid===p.id?'g':'p'}"
+        onclick="${factNew&&factNew.pid===p.id?'fermerFactNew()':`ouvrirFactNew(${p.id})`}">+ Facture</button></div></div>
+   ${factNew&&factNew.pid===p.id?factForm(p):''}
+   ${avoirNew&&avoirNew.pid===p.id?avoirForm(p):''}
    <div class="tw"><table><thead><tr><th>N°</th><th>Date</th><th>Acte</th>${cpt?'<th class="num">HT</th><th class="num">TVA</th>':''}<th class="num">TTC</th><th class="num">Avoir</th><th class="num">Encaissé</th><th>Mode</th><th class="num">Reste</th><th>Statut</th><th></th></tr></thead>
     <tbody>${F.map(f=>{const act=ACTES.find(x=>x.id===f.acte), an=f.statut==='annulee';
       return `<tr class="${an?'annul':''}">
       <td class="mono" style="white-space:nowrap">${f.id}</td><td class="mono" style="white-space:nowrap">${DF(f.date)}</td>
-      <td style="white-space:nowrap">${act?esc(act.nom):'—'}</td>
+      <td style="white-space:nowrap">${act?esc(act.nom):esc(f.libelle||'—')}${act?'':'<div class="mu" style="font-size:11px">sans acte</div>'}</td>
       ${cpt?`<td class="num">${EUR(fHT(f))}</td><td class="num mu">${EUR(fTVA(f))}</td>`:''}
       <td class="num"><b>${EUR(fTTC(f))}</b></td>
-      <td class="num ${f.avoir?'':'mu'}" ${f.avoir?'style="color:var(--warn)"':''}>${f.avoir?'− '+EUR(f.avoir):'—'}</td>
+      <td class="num ${f.avoir?'':'mu'}" style="white-space:nowrap${f.avoir?';color:var(--warn)':''}">${f.avoir
+        ?`− ${EUR(f.avoir)}${avoirsDe(f.id).length>1?`<div class="mu" style="font-size:10.5px">${avoirsDe(f.id).length} avoirs</div>`:''}`
+        :'—'}</td>
       <td class="num">${EUR(f.paye)}</td><td class="mu">${moyenTxt(f)||'—'}</td>
-      <td class="num">${rdu(f)>0?`<span style="color:var(--crit);font-weight:650">${EUR(rdu(f))}</span>`:'<span class="mu">—</span>'}</td>
+      <td class="num">${rdu(f)>0?`<span style="color:var(--crit);font-weight:650">${EUR(rdu(f))}</span>`
+        :trop(f)?`<span style="color:var(--warn);font-weight:650" title="Encaissé au-delà du dû après avoir">↩ ${EUR(trop(f))}</span>`
+        :'<span class="mu">—</span>'}</td>
       <td>${an?bdg('b-crit','⊘ Annulée'):f.avoir?bdg('b-warn','Avoir'):rdu(f)>0?bdg('b-warn','Partielle'):bdg('b-good','Soldée')}</td>
       <td class="num" style="white-space:nowrap">
         ${(an||!peutEncaisser())?'':`<button class="btn xs ${encSel===f.id?'g':''}" title="Corriger l’encaissement, même sur une facture soldée"
@@ -4406,6 +4628,19 @@ function pDetail(p){
       ${encSel===f.id?`<tr class="supp"><td colspan="${cpt?12:10}">${encForm(f)}</td></tr>`:''}`}).join('')}
     </tbody></table>${F.length?'':'<div class="empty">Aucune facture.</div>'}</div>
 
+   ${(()=>{const AV=AVOIRS.filter(a=>a.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
+     return AV.length?`<div class="subh"><h3>Avoirs<span>${AV.length}</span></h3></div>
+     <div class="tw"><table><thead><tr><th>N°</th><th>Date</th><th>Facture</th><th>Motif</th>
+       <th class="num">Montant</th><th>Établi par</th><th></th></tr></thead>
+      <tbody>${AV.map(a=>`<tr>
+        <td class="mono" style="white-space:nowrap">${esc(a.id)}</td>
+        <td class="mono" style="white-space:nowrap">${DF(a.date)}</td>
+        <td class="mono">${esc(a.facture)}</td>
+        <td>${esc(a.motif)}</td>
+        <td class="num" style="color:var(--warn);font-weight:650">− ${EUR(a.montant)}</td>
+        <td class="mu" style="white-space:nowrap">${esc(a.par||a.praticien)}</td>
+        <td class="num"><button class="btn xs" onclick="apercuAvoir('${a.id}')">◫ PDF</button></td></tr>`).join('')}
+      </tbody></table></div>`:''})()}
    ${Object.keys(modes).length?`<div class="subh"><h3>Encaissements par moyen de paiement</h3></div>
     <div style="display:flex;gap:7px;flex-wrap:wrap">${Object.entries(modes).map(([m,v])=>
       `<span class="bdg b-neu" style="font-size:12.5px;padding:5px 11px">${m} · ${EUR(v)}</span>`).join('')}</div>`:''}
@@ -4605,7 +4840,7 @@ function eDetail(){
    return `<tr class="c ${an?'annul':''}" onclick="openPatient(${f.patient})">
     <td class="mono" style="white-space:nowrap">${f.id}</td><td class="mono" style="white-space:nowrap">${DF(f.date)}</td>
     <td style="white-space:nowrap"><span class="nm">${esc(fn(p))}</span><div class="mu" style="font-size:11px">n° ${p.id}</div></td>
-    <td style="white-space:nowrap">${a?esc(a.nom):'—'}${f.avoir?`<div class="mu" style="font-size:11px">avoir ${EUR(f.avoir)}</div>`:''}</td>
+    <td style="white-space:nowrap">${a?esc(a.nom):esc(f.libelle||'—')}${f.avoir?`<div class="mu" style="font-size:11px">avoir ${EUR(f.avoir)}</div>`:''}</td>
     <td class="mu">${esc(f.cat)}</td><td class="mu" style="white-space:nowrap">${esc(f.praticien)}</td>
     ${dbl?`<td><span class="bdg b-neu">${FACTU.modele==='split'?'Centre + Praticien':esc(FACTU.centre.nom)}</span></td>`:''}
     ${cpt?`<td class="num">${EUR(fHT(f))}</td><td class="num mu">${EUR(fTVA(f))}</td>`:''}
@@ -5063,7 +5298,7 @@ V.params=()=>{
    const vol=id=>ACTES.filter(a=>a.type===id).length;
    const ca=id=>FACTURES.filter(f=>f.type===id&&f.statut==='ok').reduce((s,f)=>s+fTTC(f),0);
    return `<div class="tip"><span class="e">💶</span><div>Chaque acte du catalogue porte son tarif — y compris la toxine et l'acide hyaluronique, facturés au forfait quelle que soit la dose injectée. Une séance qui mélange deux actes additionne leurs tarifs, chacun multiplié par sa quantité.</div></div>
-   <div class="grid g2" style="grid-template-columns:380px 1fr;align-items:start">
+   <div class="grid g2 gcat" style="align-items:start">
     <div>
     <div class="card"><div class="h"><h2>Protocoles en 1 clic</h2><span class="s">${PROTOS.length}</span>
       <div class="r"><button class="btn xs p" onclick="PROTOS.push({n:'Nouveau protocole',z:{},zt:{}});protoSel=PROTOS.length-1;paint()">+ Protocole</button></div></div>
@@ -5122,7 +5357,7 @@ V.params=()=>{
         <button class="btn xs" onclick="CATS.push(${JSON.stringify(k)});paint()">Reprendre</button></div>`).join('')}
      </div></div>
 
-    <div class="card" style="margin-top:13px"><div class="h"><h2>Catalogue des actes</h2><span class="s">${CATALOGUE.length} actes</span>
+    <div class="card" style="margin-top:13px;grid-column:1/-1"><div class="h"><h2>Catalogue des actes</h2><span class="s">${CATALOGUE.length} actes</span>
       <div class="r"><button class="btn xs p" onclick="CATALOGUE.push({id:'X'+Date.now(),n:'Nouvel acte',cat:'Injections',conso:null,cons:false,zoned:false,prix:0});paint()">+ Acte</button></div></div>
      <div class="tw"><table>
       <thead><tr><th>Acte</th><th>Catégorie</th><th class="num">Tarif</th><th class="num">TVA</th><th>Consommable</th><th>Consent.</th><th class="num">Réalisés</th><th class="num">CA</th></tr></thead>
@@ -5563,7 +5798,7 @@ V.params=()=>{
   }
  };
  return `<div class="head"><div><h1>Paramètres</h1><p>Critères, messages et documents — tout ce qui pilote les automatismes</p></div></div>
- <div class="fbar"><div class="seg">${TB.map(([k,l])=>`<button class="${paramTab===k?'on':''}" onclick="paramTab='${k}';paint()">${l}</button>`).join('')}</div></div>
+ <div class="fbar"><div class="seg wrap">${TB.map(([k,l])=>`<button class="${paramTab===k?'on':''}" onclick="paramTab='${k}';paint()">${l}</button>`).join('')}</div></div>
  ${(TB.some(([k])=>k===paramTab)&&body[paramTab]?body[paramTab]:body.fidelite)()}`;
 };
 /* ---------- éditeur de trame, dans Modèles de document ---------- */
