@@ -184,6 +184,12 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 table{width:100%;border-collapse:collapse;font-size:12.8px}
 thead th{text-align:left;font-weight:600;color:var(--ink-3);font-size:10.5px;letter-spacing:.055em;text-transform:uppercase;
   padding:9px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+/* colonne triable : la flèche dit le sens, et qu'on peut cliquer */
+thead th.tri{cursor:pointer;user-select:none;transition:color .12s}
+thead th.tri:hover{color:var(--ink)}
+thead th .fl{display:inline-block;margin-left:5px;font-size:9px;opacity:.4;vertical-align:1px}
+thead th.tri:hover .fl{opacity:.75}
+thead th .fl.on{opacity:1;color:var(--accent);font-size:8.5px}
 tbody td{padding:9.5px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
 tbody tr:last-child td{border-bottom:none}
 tbody tr.c{cursor:pointer;transition:.1s}
@@ -237,9 +243,19 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .npbar{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:12px;border:1px solid var(--accent);
   background:var(--accent-wash);border-radius:var(--r-m);margin-bottom:10px}
 .npbar .full{grid-column:1/-1;display:flex;align-items:center;gap:9px;font-size:12.5px;font-weight:650}
-.npbar input{height:34px;border:1px solid var(--line);background:var(--panel);border-radius:var(--r-s);padding:0 10px;outline:none;color:var(--ink)}
-.npbar input:focus{border-color:var(--accent)}
-@media(max-width:900px){.npbar{grid-template-columns:1fr 1fr}}
+.npbar .npf{display:flex;flex-direction:column;gap:3px;min-width:0}
+.npbar label{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
+.npbar label i,.npbar .req{color:var(--crit);font-style:normal;font-weight:800}
+.npbar input,.npbar select{height:34px;width:100%;border:1px solid var(--line);background:var(--panel);
+  border-radius:var(--r-s);padding:0 10px;outline:none;color:var(--ink)}
+.npbar select{-webkit-appearance:none;appearance:none;padding-right:26px;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M1 1l4 4 4-4' fill='none' stroke='%238b8f9e' stroke-width='1.6' stroke-linecap='round'/></svg>");
+  background-repeat:no-repeat;background-position:right 10px center}
+.npbar input:focus,.npbar select:focus{border-color:var(--accent)}
+/* un champ nécessaire resté vide se signale là où il est, pas seulement en message */
+.npbar input.ko{border-color:var(--crit);background:var(--crit-w)}
+@media(max-width:900px){.npbar{grid-template-columns:1fr 1fr}
+  .npbar .npf{grid-column:span 1 !important}}
 /* horodatage d'une signature, sous le statut de la pièce */
 .horo{font-size:10.5px;color:var(--ink-3);font-variant-numeric:tabular-nums;margin-top:3px;
   white-space:nowrap;letter-spacing:.01em}
@@ -1623,6 +1639,11 @@ const protoActes=P=>[...new Set(Object.keys(P.z).map(z=>protoActe(P,z)))];
 
 /* ---------- Référentiels ---------- */
 const PRATICIENS=['Dr O. Baroudi','Dr A. Merlin'];
+/* D'où vient le patient : ce qu'on demande une fois, à l'ouverture du dossier,
+   et qui dit ensuite ce qui fait vraiment venir les gens au cabinet. */
+const ORIGINES=['Bouche à oreille','Réseaux sociaux','Recherche Google','Doctolib',
+ 'Site du cabinet','Parrainage','Médecin correspondant','Presse / média',
+ 'Passage devant le cabinet','Autre'];
 const OPERATEURS=['L. Roche','S. Vidal'];
 let CATS=['Injections','Laser','Peeling','Mésothérapie','Radiofréquence','Épilation'];
 /* les catégories du catalogue, celles des paramètres d'abord, puis les orphelines */
@@ -1741,6 +1762,11 @@ const ADRS=['14 rue des Acacias, 75017 Paris','8 boulevard Malesherbes, 75008 Pa
  '19 rue Chardon-Lagache, 75016 Paris','6 place Victor Hugo, 75116 Paris','41 rue de Longchamp, 75116 Paris',
  '12 rue Cortambert, 75116 Paris','75 avenue Niel, 75017 Paris','2 rue Guichard, 75116 Paris',
  '33 rue de l’Assomption, 75016 Paris'];
+/* répartition plausible : le bouche à oreille domine, le reste suit */
+const ORIG_DEMO=['Bouche à oreille','Bouche à oreille','Réseaux sociaux','Bouche à oreille',
+ 'Recherche Google','Parrainage','Réseaux sociaux','Doctolib','Bouche à oreille','Parrainage',
+ 'Recherche Google','Réseaux sociaux','Bouche à oreille','Site du cabinet','Médecin correspondant',
+ 'Bouche à oreille','Recherche Google','Réseaux sociaux'];
 const PATIENTS=[
  [1041,'MARTIN','Claire','1984-08-03','06 12 34 56 78','claire.martin@example.fr','Dr O. Baroudi','2022-09-14','Souhaite un résultat naturel, redoute les lèvres trop volumineuses.',[]],
  [1042,'DUBOIS','Sophie','1991-08-06','06 22 88 41 09','s.dubois@example.fr','Dr O. Baroudi','2023-02-03','Peau réactive : test 48 h avant tout peeling.',['Eczéma de contact','Allergie nickel']],
@@ -1761,7 +1787,7 @@ const PATIENTS=[
  [1057,'MERCIER','Anne','1973-07-19','06 84 03 77 21','anne.mercier@example.fr','Dr O. Baroudi','2020-09-03','Trois séances de laser puis plus de nouvelles.',[]],
  [1058,'ROY','Vanessa','1992-12-02','07 39 55 14 60','v.roy@example.fr','Dr O. Baroudi','2023-04-17','',['Grossesse en 2025']],
 ].map((r,i)=>({id:r[0],nom:r[1],prenom:r[2],ddn:r[3],tel:r[4],mail:r[5],prat:r[6],depuis:r[7],notes:r[8],ant:r[9],
-               adr:ADRS[i%ADRS.length]}));
+               adr:ADRS[i%ADRS.length], origine:ORIG_DEMO[i%ORIG_DEMO.length]}));
 const PERDUS=[1055,1056,1057,1058];   /* jeu de démonstration : patients volontairement perdus de vue */
 const pById=id=>PATIENTS.find(p=>p.id===id);
 const fn=p=>`${p.nom} ${p.prenom}`;
@@ -2986,13 +3012,16 @@ const antSugg=()=>[...new Set(ANT_COURANTS.concat(PATIENTS.flatMap(x=>x.ant||[])
 const ANT_BLOQ=/allaitement|anticoagulant/i;
 const antBloquants=x=>((x&&x.ant)||[]).filter(a=>ANT_BLOQ.test(a));
 
+/* les mêmes contrôles à l'ouverture d'un dossier et à sa modification */
+const telOK=t=>/^[0-9+\s().-]{6,}$/.test(String(t||''));
+const mailOK=m=>/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(String(m||''));
 const peOuvert=id=>!!(PE&&PE.id===id);
 const peuxEditerMed=()=>!!ROLES[role].med;   /* notes et antécédents : droit médical */
 function editerFiche(id){
  const x=pById(id); if(!x){toast('Patient introuvable');return}
  PE={id, nom:x.nom||'', prenom:x.prenom||'', ddn:x.ddn||'',
      tel:(x.tel&&x.tel!=='—')?x.tel:'', mail:(x.mail&&x.mail!=='—')?x.mail:'',
-     adr:x.adr||'', prat:x.prat||PRATICIENS[0],
+     adr:x.adr||'', prat:x.prat||PRATICIENS[0], origine:x.origine||'',
      notes:x.notes||'', ant:(x.ant||[]).slice(), neuf:''};
  pHist=null; paint();
  const e=document.getElementById('peNom'); if(e){ e.focus(); e.select() }
@@ -3012,20 +3041,23 @@ function peRetirerAnt(i){ if(!PE) return;
  const e=document.getElementById('peAnt'); if(e) e.focus() }
 
 const PCHAMPS=[['nom','Nom'],['prenom','Prénom'],['ddn','Date de naissance'],['tel','Téléphone'],
- ['mail','E-mail'],['adr','Adresse'],['prat','Praticien référent'],['notes','Notes']];
+ ['mail','E-mail'],['adr','Adresse'],['prat','Praticien référent'],['origine','Origine'],['notes','Notes']];
 function majFiche(){
  if(!PE) return;
  const x=pById(PE.id); if(!x) return;
- const nom=PE.nom.trim(), prenom=PE.prenom.trim();
+ const nom=PE.nom.trim(), prenom=PE.prenom.trim(), mail=PE.mail.trim(), tel=PE.tel.trim();
+ /* mêmes exigences qu'à l'ouverture du dossier : on ne vide pas une fiche par
+    la modification ce qu'on refuse de créer incomplet */
  if(!nom||!prenom){ toast('Le nom et le prénom sont nécessaires'); return }
- if(PE.ddn&&PE.ddn>TODAYS){ toast('La date de naissance ne peut pas être postérieure à aujourd’hui'); return }
- const mail=PE.mail.trim();
- if(mail&&!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(mail)){ toast('Cette adresse e-mail ne semble pas valide'); return }
- const tel=PE.tel.trim();
- if(tel&&!/^[0-9+\s().-]{6,}$/.test(tel)){ toast('Ce numéro de téléphone ne semble pas valide'); return }
+ if(!PE.ddn){ toast('La date de naissance est nécessaire'); return }
+ if(PE.ddn>TODAYS||PE.ddn<'1900-01-01'){ toast('Cette date de naissance n’est pas plausible'); return }
+ if(!tel){ toast('Le téléphone est nécessaire'); return }
+ if(!telOK(tel)){ toast('Ce numéro de téléphone ne semble pas valide'); return }
+ if(!mail){ toast('L’e-mail est nécessaire'); return }
+ if(!mailOK(mail)){ toast('Cette adresse e-mail ne semble pas valide'); return }
  const med=peuxEditerMed();
- const nouv={nom:nom.toUpperCase(), prenom, ddn:PE.ddn||null, tel:tel||'—', mail:mail||'—',
-   adr:PE.adr.trim(), prat:PE.prat,
+ const nouv={nom:nom.toUpperCase(), prenom, ddn:PE.ddn, tel, mail,
+   adr:PE.adr.trim(), prat:PE.prat, origine:PE.origine||'',
    notes: med?PE.notes.trim():x.notes, ant: med?PE.ant.slice():(x.ant||[])};
  /* le journal ne retient que ce qui a bougé : rouvrir une fiche sans rien
     changer ne laisse aucune trace */
@@ -3067,6 +3099,7 @@ function carteIdentite(x,A,ca,rd){
       <div><label>E-mail</label><div>${esc(x.mail)}</div></div>
       <div><label>Adresse</label><div>${esc(x.adr||'—')}</div></div>
       <div><label>Praticien référent</label><div>${esc(x.prat)}</div></div>
+      <div><label>Origine</label><div>${x.origine?esc(x.origine):'<span class="mu">non renseignée</span>'}</div></div>
       <div><label>Patient depuis</label><div>${DF(x.depuis)}</div></div>
       <div><label>Actes réalisés</label><div>${A.length}${A.length?` <span class="mu">· dernier le ${DF(A[0].date)}</span>`:''}</div></div>
       ${CAN('prix')?`<div><label>Encaissé</label><div>${EUR(ca)}${rd?` <span style="color:var(--crit);font-weight:600">· reste ${EUR(rd)}</span>`:''}</div></div>`:''}
@@ -3080,7 +3113,7 @@ function carteIdentite(x,A,ca,rd){
  return `<div class="idc">
    <div class="idc-h"><div class="pav" style="width:34px;height:34px;font-size:12.5px">${esc(ini(x))}</div>
      <div style="min-width:0"><b>Modifier la fiche</b>
-       <small>dossier n° ${x.id} · le nom et le prénom sont nécessaires</small></div>
+       <small>dossier n° ${x.id} · nom, prénom, naissance, téléphone et e-mail sont nécessaires</small></div>
      <div class="r">
        <button class="btn xs g" onclick="fermerEditFiche()">Annuler</button>
        <button class="btn xs p" onclick="majFiche()">Enregistrer</button></div></div>
@@ -3097,7 +3130,11 @@ function carteIdentite(x,A,ca,rd){
        placeholder="12 avenue Victor Hugo, 75116 Paris" oninput="PE.adr=this.value"></div>
      <div style="grid-column:span 2"><label>Praticien référent</label>
        <select class="inp" onchange="PE.prat=this.value">${PRATICIENS.map(n=>`<option ${PE.prat===n?'selected':''}>${esc(n)}</option>`).join('')}</select></div>
-     <div style="grid-column:span 2"><label>Patient depuis</label><div style="font-size:12.5px;padding-top:6px">${DF(x.depuis)} <span class="mu">· non modifiable</span></div></div>
+     <div style="grid-column:span 2"><label>Origine du patient</label>
+       <select class="inp" onchange="PE.origine=this.value">
+         <option value="">— non renseignée —</option>
+         ${ORIGINES.map(o=>`<option ${PE.origine===o?'selected':''}>${esc(o)}</option>`).join('')}</select></div>
+     <div style="grid-column:span 4"><label>Patient depuis</label><div style="font-size:12.5px;padding-top:6px">${DF(x.depuis)} <span class="mu">· non modifiable</span></div></div>
    </div>
    <div class="idc-e">
      <div class="fld"><label>Antécédents &amp; contre-indications</label>
@@ -3131,11 +3168,35 @@ V.patients=()=>{
 };
 
 /* ---------- Tous les patients (maître-détail) ---------- */
+/* Chaque colonne a son sens naturel : les noms de A à Z, les compteurs et les
+   dates du plus fourni au plus ancien. Un second clic renverse le classement. */
+const PCOL={
+ nom:    {l:'Patient',            sens: 1, v:p=>p.nom+' '+p.prenom},
+ actes:  {l:'Actes',              sens:-1, v:p=>ACTES.filter(a=>a.patient===p.id).length},
+ dernier:{l:'Dernier acte',       sens:-1, v:p=>lastActe(p)||''},
+ prat:   {l:'Praticien référent', sens: 1, v:p=>p.prat||''},
+};
+let pTri='nom', pSens=1;      /* par défaut : ordre alphabétique */
+function trierPatients(k){
+ if(!PCOL[k]) return;
+ if(pTri===k) pSens=-pSens; else { pTri=k; pSens=PCOL[k].sens }
+ paint();
+}
+const flechePat=k=>pTri===k?`<span class="fl on">${pSens>0?'▲':'▼'}</span>`:'<span class="fl">↕</span>';
+const thPat=(k,cls)=>`<th class="tri${cls?' '+cls:''}" onclick="trierPatients('${k}')"
+  title="Classer par ${PCOL[k].l.toLowerCase()}">${PCOL[k].l}${flechePat(k)}</th>`;
+const triTxt=()=>`${PCOL[pTri].l.toLowerCase()} ${pSens>0?'croissant':'décroissant'}`;
 function patientsTries(){
- let L=PATIENTS.filter(p=>{const q=pq.toLowerCase();
+ const L=PATIENTS.filter(p=>{const q=pq.toLowerCase();
   return (!q||[p.nom,p.prenom,p.mail,p.tel,String(p.id)].join(' ').toLowerCase().includes(q))&&(!pPrat||p.prat===pPrat)});
- const last=p=>ACTES.filter(a=>a.patient===p.id).map(a=>a.date).sort().pop();
- return L.sort((a,b)=>(last(b)||'').localeCompare(last(a)||''));
+ const c=PCOL[pTri]||PCOL.nom;
+ const alpha=(a,b)=>(a.nom+' '+a.prenom).localeCompare(b.nom+' '+b.prenom,'fr',{sensitivity:'base'});
+ return L.sort((a,b)=>{
+  const x=c.v(a), y=c.v(b);
+  const d=typeof x==='number'?x-y:String(x).localeCompare(String(y),'fr',{sensitivity:'base'});
+  /* à égalité on retombe toujours sur l'ordre alphabétique : la liste ne bouge
+     pas d'un rendu à l'autre */
+  return d?d*pSens:alpha(a,b) });
 }
 /* la fiche prend toute la fenêtre ; on revient à la liste d'un clic */
 function pFiche(){
@@ -3161,7 +3222,7 @@ function pFiche(){
 function pListe(){
  if(pSel) return pFiche();
  const L=patientsTries();
- return `<div class="head" style="margin-bottom:12px"><div><h1>Patients</h1><p>${L.length} sur ${PATIENTS.length} · un clic sur un nom ouvre le dossier en pleine page</p></div>
+ return `<div class="head" style="margin-bottom:12px"><div><h1>Patients</h1><p>${L.length} sur ${PATIENTS.length} · classés par ${triTxt()} · un clic sur un nom ouvre le dossier</p></div>
   <div class="r"><button class="btn" onclick="toast('Recherche de doublons : 0 doublon détecté')">Doublons</button>
    <button class="btn p" onclick="openActe(null,null,true)">+ Patient</button></div></div>
  <div class="md" style="grid-template-columns:1fr">
@@ -3173,12 +3234,12 @@ function pListe(){
        <option value="">Tous</option>${PRATICIENS.map(x=>`<option ${pPrat===x?'selected':''}>${x}</option>`).join('')}</select>
    </div>
    <div class="tw"><table>
-    <thead><tr><th>Patient</th><th class="num">Actes</th><th>Dernier acte</th><th>Praticien référent</th><th>Contact</th><th></th></tr></thead>
+    <thead><tr>${thPat('nom')}${thPat('actes','num')}${thPat('dernier')}${thPat('prat')}<th>Contact</th><th></th></tr></thead>
     <tbody>${L.map(p=>{const f=fidLevel(p), na=ACTES.filter(a=>a.patient===p.id).length, d=lastActe(p);
      return `<tr class="c" onclick="openPatient(${p.id})">
       <td><div class="rowline"><div class="pav">${esc(ini(p))}</div>
        <div style="min-width:0"><div class="nm">${esc(p.nom)} ${esc(p.prenom)}</div>
-        <div class="mu" style="font-size:11.5px">${ageTxt(p)} · dossier ${p.id}</div></div>
+        <div class="mu" style="font-size:11.5px">${ageTxt(p)}${p.ddn?` · ${DF(p.ddn)}`:' · naissance non renseignée'}</div></div>
        <div style="display:flex;gap:4px;margin-left:8px">
         ${f?`<span class="bdg ${f.c}">${f.n}</span>`:''}
         ${p.ant.length?`<span class="bdg b-warn">⚠ ${p.ant.length}</span>`:''}</div></div></td>
@@ -4932,7 +4993,7 @@ function openActe(pid,aid,np){
  const t0=a?a.type:null;
  AS={pid:pid||(a?a.patient:(np?null:PATIENTS[0].id)), aid:aid||null, ro:!!a, mode:acteMode, prix:a?a.prix:null, note:a?(a.note||''):'',
      fam:a?(acteDef(t0).fam||'esth'):'esth', reg:a&&a.reg?a.reg:'visage',
-     np: np?{nom:(np.nom||'').toUpperCase(),prenom:np.prenom||'',ddn:'',tel:'',mail:''}:null,
+     np: np?{nom:(np.nom||'').toUpperCase(),prenom:np.prenom||'',ddn:'',tel:'',mail:'',adr:'',origine:''}:null, npKO:[],
      seances:a?(a.seances||1):1, zonesNote:a?(a.zonesNote||''):'',
      remise:0, remiseType:'%', validite:30, notePat:'', infosOn:true,
      type:a?a.type:null, date:a?a.date:TODAYS, prat:a?a.praticien:PRATICIENS[0],
@@ -5422,17 +5483,34 @@ function renderOver(){
       <button class="btn xs g" style="margin-left:8px" onclick="AS.devis=null;renderOver()">détacher</button></div></div>`})()}
   ${AS.ro||!AS.np?'':`<div class="npbar">
     <div class="full">✚ Nouveau patient
-      <span class="mu" style="font-weight:500">nom et prénom suffisent, le reste peut être complété plus tard</span>
-      <button class="btn xs g" style="margin-left:auto" onclick="AS.np=null;AS.pid=PATIENTS[0].id;renderOver()">choisir un patient existant</button></div>
-    <input placeholder="NOM *" value="${esc(AS.np.nom)}" oninput="AS.np.nom=this.value.toUpperCase();this.value=AS.np.nom">
-    <input placeholder="Prénom *" value="${esc(AS.np.prenom)}" oninput="AS.np.prenom=this.value">
-    <input type="date" title="Date de naissance" value="${AS.np.ddn}" oninput="AS.np.ddn=this.value">
-    <input placeholder="Téléphone" value="${esc(AS.np.tel)}" oninput="AS.np.tel=this.value">
-    <input placeholder="E-mail" value="${esc(AS.np.mail)}" oninput="AS.np.mail=this.value">
+      <span class="mu" style="font-weight:500">les champs marqués <span class="req">*</span> ouvrent le dossier ; l’adresse et l’origine peuvent attendre</span>
+      <button class="btn xs g" style="margin-left:auto" onclick="AS.np=null;AS.npKO=[];AS.pid=PATIENTS[0].id;renderOver()">choisir un patient existant</button></div>
+    <div class="npf"><label>Nom <i>*</i></label>
+      <input class="${npKO('nom')}" placeholder="NOM" value="${esc(AS.np.nom)}"
+        oninput="this.classList.remove('ko');AS.np.nom=this.value.toUpperCase();this.value=AS.np.nom"></div>
+    <div class="npf"><label>Prénom <i>*</i></label>
+      <input class="${npKO('prenom')}" placeholder="Prénom" value="${esc(AS.np.prenom)}"
+        oninput="this.classList.remove('ko');AS.np.prenom=this.value"></div>
+    <div class="npf"><label>Naissance <i>*</i></label>
+      <input class="${npKO('ddn')}" type="date" max="${TODAYS}" title="Date de naissance" value="${AS.np.ddn}"
+        oninput="this.classList.remove('ko');AS.np.ddn=this.value"></div>
+    <div class="npf"><label>Téléphone <i>*</i></label>
+      <input class="${npKO('tel')}" placeholder="06 12 34 56 78" value="${esc(AS.np.tel)}"
+        oninput="this.classList.remove('ko');AS.np.tel=this.value"></div>
+    <div class="npf"><label>E-mail <i>*</i></label>
+      <input class="${npKO('mail')}" type="email" placeholder="prenom.nom@exemple.fr" value="${esc(AS.np.mail)}"
+        oninput="this.classList.remove('ko');AS.np.mail=this.value"></div>
+    <div class="npf" style="grid-column:span 3"><label>Adresse</label>
+      <input placeholder="12 avenue Victor Hugo, 75116 Paris — facultative" value="${esc(AS.np.adr||'')}"
+        oninput="AS.np.adr=this.value"></div>
+    <div class="npf" style="grid-column:span 2"><label>Comment nous a-t-il connus ?</label>
+      <select onchange="AS.np.origine=this.value">
+        <option value="">— à préciser —</option>
+        ${ORIGINES.map(o=>`<option ${AS.np.origine===o?'selected':''}>${esc(o)}</option>`).join('')}</select></div>
    </div>`}
   ${AS.ro?'':`<div class="fbar" style="margin-bottom:12px">
     ${AS.np?'':`<select class="inp" onchange="AS.pid=+this.value;renderOver()">${PATIENTS.map(x=>`<option value="${x.id}" ${x.id===AS.pid?'selected':''}>${esc(fn(x))}</option>`).join('')}</select>
-    <button class="btn s" onclick="AS.np={nom:'',prenom:'',ddn:'',tel:'',mail:''};renderOver()">+ Nouveau patient</button>`}
+    <button class="btn s" onclick="AS.np={nom:'',prenom:'',ddn:'',tel:'',mail:'',adr:'',origine:''};AS.npKO=[];renderOver()">+ Nouveau patient</button>`}
     <input class="inp" type="date" value="${AS.date}" onchange="AS.date=this.value">
     <select class="inp" onchange="AS.prat=this.value">${PRATICIENS.map(x=>`<option ${AS.prat===x?'selected':''}>${x}</option>`).join('')}</select>
     <select class="inp" onchange="AS.oper=this.value"><option value="">Sans opérateur</option>${OPERATEURS.map(x=>`<option ${AS.oper===x?'selected':''}>${x}</option>`).join('')}</select>
@@ -5847,14 +5925,37 @@ function devisPane(sel,total,prix){
    </div>`:'<div class="mu" style="font-size:11.5px">La fiche d\'information ne sera pas jointe au devis.</div>'}
  </div>`;
 }
+/* ---- ouverture d'un dossier : ce qui ne peut pas manquer ----------------
+   Un dossier à moitié rempli se paie plus tard — on ne peut ni rappeler, ni
+   envoyer un devis, ni calculer un âge. Identité, naissance et un moyen de
+   joindre le patient sont donc nécessaires ; l'adresse et l'origine, non. */
+const npKO=k=>((AS&&AS.npKO)||[]).includes(k)?'ko':'';
+const NP_L={nom:'le nom',prenom:'le prénom',ddn:'la date de naissance',
+  tel:'le téléphone',mail:'l’e-mail'};
+function validerNP(){
+ if(!AS||!AS.np) return null;
+ const n=AS.np, ko=[];
+ if(!(n.nom||'').trim()) ko.push('nom');
+ if(!(n.prenom||'').trim()) ko.push('prenom');
+ if(!n.ddn||n.ddn>TODAYS||n.ddn<'1900-01-01') ko.push('ddn');
+ if(!telOK((n.tel||'').trim())) ko.push('tel');
+ if(!mailOK((n.mail||'').trim())) ko.push('mail');
+ AS.npKO=ko;
+ return ko.length?ko.map(k=>NP_L[k]).join(', '):null;
+}
+function creerPatientNP(){
+ if(!AS.np) return true;
+ const err=validerNP();
+ if(err){ renderOver(); toast(`Dossier incomplet — il manque ${err}`); return false }
+ const n=AS.np, id=Math.max(...PATIENTS.map(p=>p.id))+1;
+ PATIENTS.push({id, nom:n.nom.trim().toUpperCase(), prenom:n.prenom.trim(), ddn:n.ddn,
+   tel:n.tel.trim(), mail:n.mail.trim(), adr:(n.adr||'').trim(), origine:n.origine||'',
+   prat:AS.prat, depuis:TODAYS, notes:'', ant:[]});
+ AS.pid=id; AS.np=null; AS.npKO=[];
+ return true;
+}
 function saveDevis(){
- if(AS.np){
-  if(!AS.np.nom.trim()||!AS.np.prenom.trim()){toast('Nom et prénom du patient sont requis');return}
-  const id=Math.max(...PATIENTS.map(p=>p.id))+1;
-  PATIENTS.push({id,nom:AS.np.nom.trim(),prenom:AS.np.prenom.trim(),ddn:AS.np.ddn||null,
-   tel:AS.np.tel||'—',mail:AS.np.mail||'—',prat:AS.prat,depuis:TODAYS,notes:'',ant:[]});
-  AS.pid=id; AS.np=null;
- }
+ if(!creerPatientNP()) return;
  const S=(AS.soins||[]).filter(x=>x.t||(x.libre||'').trim()||+x.prix>0);
  if(!S.length){toast('Ajoutez au moins un soin avant de générer le devis');return}
  /* une prestation par soin : chacune garde ses zones, sa quantité et son tarif */
@@ -6374,13 +6475,7 @@ function mirrorZ(){
 }
 function saveActe(){
  const C=acteCourant()||CNUL;
- if(AS.np){
-  if(!AS.np.nom.trim()||!AS.np.prenom.trim()){toast('Nom et prénom du patient sont requis');return}
-  const id=Math.max(...PATIENTS.map(p=>p.id))+1;
-  PATIENTS.push({id,nom:AS.np.nom.trim(),prenom:AS.np.prenom.trim(),ddn:AS.np.ddn||null,
-   tel:AS.np.tel||'—',mail:AS.np.mail||'—',prat:AS.prat,depuis:TODAYS,notes:'',ant:[]});
-  AS.pid=id; AS.np=null;
- }
+ if(!creerPatientNP()) return;
  const prix=(AS.prix!=null&&AS.prix!=='')?+AS.prix:prixSaisi();
  /* le montant peut être nul — geste offert, retouche, consultation non facturée */
  if(!actesSaisis().length && !lignesLibres().some(x=>(x.libre||'').trim()) && !Object.keys(AS.z).length){
