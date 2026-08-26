@@ -727,6 +727,27 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
 .idc-g>div>div{font-size:12.5px;font-weight:560;overflow:hidden;text-overflow:ellipsis}
 .idc-a{padding:9px 14px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .idc-a label{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);margin-right:4px}
+/* --- fiche patient en édition : mêmes cases, on écrit dedans --- */
+.idc-g.ed>div{padding:7px 12px}
+.idc-g.ed .inp{width:100%;height:30px;font-size:12.5px;padding:0 9px;text-transform:none;letter-spacing:0}
+.idc-e{padding:11px 14px;border-top:1px solid var(--line);
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(272px,1fr));gap:0 18px}
+.idc-e .note{min-height:82px;font-size:12.5px}
+.idc-e .fld{margin-bottom:4px}
+.antadd{display:flex;gap:6px;margin-top:2px}
+.antadd .inp{flex:1;min-width:0;height:30px;font-size:12.5px;text-transform:none;letter-spacing:0}
+.antt{display:inline-flex;align-items:center;gap:6px;margin:0 5px 5px 0}
+.antt .x{width:16px;height:16px;border-radius:5px;display:grid;place-items:center;font-size:10px;
+  line-height:1;background:rgba(13,14,20,.10);color:inherit;flex:none}
+.antt .x:hover{background:rgba(208,59,59,.28)}
+:root[data-theme="dark"] .antt .x{background:rgba(255,255,255,.14)}
+.aide{font-size:11px;color:var(--ink-3);margin-top:5px;line-height:1.45}
+.pmaj{padding:7px 14px;border-top:1px solid var(--line);font-size:11.5px;color:var(--ink-3);
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pmajl{padding:0 14px 10px;margin:0;font-size:11.5px;list-style:none}
+.pmajl li{padding:4px 0;border-top:1px dashed var(--line)}
+.pmajl b{font-weight:640;color:var(--ink-2)}
+.pmajl .d{color:var(--ink-3)}
 @media(max-width:1100px){.idc-g{grid-template-columns:repeat(2,minmax(0,1fr))}.idc-g>div:nth-child(2n){border-right:none}}
 .zt-r{display:flex;align-items:center;gap:7px;margin-left:auto}
 .zt-i{width:104px;padding:4px 8px;font-size:11.5px;text-align:right}
@@ -2939,6 +2960,166 @@ let pView='liste', fidF='tous', annivF='mois', perP={k:'90j',from:'',to:''}, pho
 function setPerP(x){perP=x;paint()}
 const PVIEWS=[['liste','Tous les patients'],['fideles','Fidèles'],['reactiver','À réactiver'],['anniv','Anniversaires'],['photos','Photothèque']];
 
+/* ==========================================================================
+   Fiche patient — édition (phase 2)
+   La fiche d'identité s'ouvre en place : mêmes cases, mêmes libellés, on écrit
+   dedans. Les coordonnées relèvent de l'accueil ; les notes et les antécédents
+   sont médicaux et suivent le droit « lire les notes médicales ».
+   ========================================================================== */
+let PE=null;                 /* tampon d'édition ; null = la fiche est en lecture */
+const PMAJ={};               /* journal des modifications, par patient */
+let pHist=null;              /* fiche dont l'historique est déroulé */
+
+/* Quelques antécédents classiques en médecine esthétique : la saisie les
+   propose, elle ne les impose pas — le texte reste libre. */
+const ANT_COURANTS=['Allaitement','Anticoagulant','Antiagrégant plaquettaire','Grossesse en cours',
+ 'Herpès labial récidivant','Maladie auto-immune','Traitement immunosuppresseur','Isotrétinoïne en cours',
+ 'Diabète','Hypertension traitée','Tabagisme actif','Cicatrisation chéloïde','Allergie à la lidocaïne',
+ 'Allergie au latex','Comblement permanent antérieur','Implant du visage','Épilepsie',
+ 'Trouble de la coagulation','Soins dentaires récents'];
+/* on y ajoute ce que le cabinet a déjà saisi : la liste s'enrichit d'elle-même */
+const antSugg=()=>[...new Set(ANT_COURANTS.concat(PATIENTS.flatMap(x=>x.ant||[])))]
+  .sort((x,y)=>x.localeCompare(y,'fr'));
+
+/* Antécédent bloquant : la liste de mots-clés reste volontairement courte, pour
+   ne signaler que ce qui contre-indique vraiment une injection. */
+const ANT_BLOQ=/allaitement|anticoagulant/i;
+const antBloquants=x=>((x&&x.ant)||[]).filter(a=>ANT_BLOQ.test(a));
+
+const peOuvert=id=>!!(PE&&PE.id===id);
+const peuxEditerMed=()=>!!ROLES[role].med;   /* notes et antécédents : droit médical */
+function editerFiche(id){
+ const x=pById(id); if(!x){toast('Patient introuvable');return}
+ PE={id, nom:x.nom||'', prenom:x.prenom||'', ddn:x.ddn||'',
+     tel:(x.tel&&x.tel!=='—')?x.tel:'', mail:(x.mail&&x.mail!=='—')?x.mail:'',
+     adr:x.adr||'', prat:x.prat||PRATICIENS[0],
+     notes:x.notes||'', ant:(x.ant||[]).slice(), neuf:''};
+ pHist=null; paint();
+ const e=document.getElementById('peNom'); if(e){ e.focus(); e.select() }
+}
+function fermerEditFiche(){ PE=null; paint() }
+function peAjoutAnt(v){
+ if(!PE) return;
+ const t=String(v==null?PE.neuf:v).trim().replace(/\s+/g,' ');
+ if(!t){ const e0=document.getElementById('peAnt'); if(e0) e0.focus(); return }
+ if(PE.ant.some(a=>a.localeCompare(t,'fr',{sensitivity:'base'})===0)){
+   toast('Cet antécédent figure déjà dans la fiche'); return }
+ PE.ant.push(t); PE.neuf=''; paint();
+ const e=document.getElementById('peAnt'); if(e){ e.value=''; e.focus() }
+}
+function peRetirerAnt(i){ if(!PE) return;
+ PE.ant.splice(i,1); paint();
+ const e=document.getElementById('peAnt'); if(e) e.focus() }
+
+const PCHAMPS=[['nom','Nom'],['prenom','Prénom'],['ddn','Date de naissance'],['tel','Téléphone'],
+ ['mail','E-mail'],['adr','Adresse'],['prat','Praticien référent'],['notes','Notes']];
+function majFiche(){
+ if(!PE) return;
+ const x=pById(PE.id); if(!x) return;
+ const nom=PE.nom.trim(), prenom=PE.prenom.trim();
+ if(!nom||!prenom){ toast('Le nom et le prénom sont nécessaires'); return }
+ if(PE.ddn&&PE.ddn>TODAYS){ toast('La date de naissance ne peut pas être postérieure à aujourd’hui'); return }
+ const mail=PE.mail.trim();
+ if(mail&&!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(mail)){ toast('Cette adresse e-mail ne semble pas valide'); return }
+ const tel=PE.tel.trim();
+ if(tel&&!/^[0-9+\s().-]{6,}$/.test(tel)){ toast('Ce numéro de téléphone ne semble pas valide'); return }
+ const med=peuxEditerMed();
+ const nouv={nom:nom.toUpperCase(), prenom, ddn:PE.ddn||null, tel:tel||'—', mail:mail||'—',
+   adr:PE.adr.trim(), prat:PE.prat,
+   notes: med?PE.notes.trim():x.notes, ant: med?PE.ant.slice():(x.ant||[])};
+ /* le journal ne retient que ce qui a bougé : rouvrir une fiche sans rien
+    changer ne laisse aucune trace */
+ const ch=[];
+ PCHAMPS.forEach(([k,l])=>{ const av=x[k]==null?'':String(x[k]), ap=nouv[k]==null?'':String(nouv[k]);
+   if(av!==ap) ch.push({l, av, ap}) });
+ const avA=x.ant||[], apA=nouv.ant;
+ apA.filter(a=>!avA.includes(a)).forEach(a=>ch.push({l:'Antécédent ajouté', av:'', ap:a}));
+ avA.filter(a=>!apA.includes(a)).forEach(a=>ch.push({l:'Antécédent retiré', av:a, ap:''}));
+ if(!ch.length){ PE=null; paint(); toast('Aucune modification à enregistrer'); return }
+ Object.assign(x, nouv);
+ (PMAJ[x.id]=PMAJ[x.id]||[]).push({t:nowStamp(), par:ROLES[role].u, ch});
+ PE=null; paint();
+ toast(`Fiche mise à jour — ${ch.length} modification${ch.length>1?'s':''}`);
+}
+const majTxt=m=>m.ch.map(c=>c.l.toLowerCase()).join(', ');
+/* une note longue ne doit pas déborder de la ligne d'historique */
+const court=(t,n)=>{t=String(t==null?'':t); n=n||64; return t.length>n?t.slice(0,n-1).trimEnd()+'…':t};
+
+/* --- la carte d'identité, en lecture puis en saisie --- */
+function carteIdentite(x,A,ca,rd){
+ const H=PMAJ[x.id]||[], der=H[H.length-1];
+ const pied=der?`<div class="pmaj">Fiche modifiée le ${DTS(der.t)} par ${esc(der.par)} — ${esc(majTxt(der))}
+   <button class="btn xs" onclick="pHist=(pHist===${x.id}?null:${x.id});paint()">${pHist===x.id?'Masquer':'Historique · '+H.length}</button></div>
+   ${pHist===x.id?`<ul class="pmajl">${H.slice().reverse().map(m=>`<li><b>${DTS(m.t)}</b> · ${esc(m.par)}
+     ${m.ch.map(c=>`<div class="d">${esc(c.l)} : ${c.av&&c.ap
+        ? `<s>${esc(court(c.av))}</s> → ${esc(court(c.ap))}`
+        : c.ap ? esc(court(c.ap)) : `<s>${esc(court(c.av))}</s>`}</div>`).join('')}</li>`).join('')}</ul>`:''}`:'';
+
+ if(!peOuvert(x.id)) return `<div class="idc">
+    <div class="idc-h"><div class="pav" style="width:34px;height:34px;font-size:12.5px">${esc(ini(x))}</div>
+      <div style="min-width:0"><b>${esc(x.nom)} ${esc(x.prenom)}</b>
+        <small>Fiche d’identité · dossier n° ${x.id}</small></div>
+      <div class="r">${x.ant.length?`<span class="bdg b-warn">⚠ ${x.ant.length} antécédent${x.ant.length>1?'s':''}</span>`:'<span class="bdg b-good">aucun antécédent</span>'}
+        <button class="btn xs" onclick="editerFiche(${x.id})">Modifier</button></div></div>
+    <div class="idc-g">
+      <div><label>Né(e) le</label><div>${x.ddn?DF(x.ddn):'—'} <span class="mu">${ageTxt(x)}</span></div></div>
+      <div><label>Téléphone</label><div>${esc(x.tel)}</div></div>
+      <div><label>E-mail</label><div>${esc(x.mail)}</div></div>
+      <div><label>Adresse</label><div>${esc(x.adr||'—')}</div></div>
+      <div><label>Praticien référent</label><div>${esc(x.prat)}</div></div>
+      <div><label>Patient depuis</label><div>${DF(x.depuis)}</div></div>
+      <div><label>Actes réalisés</label><div>${A.length}${A.length?` <span class="mu">· dernier le ${DF(A[0].date)}</span>`:''}</div></div>
+      ${CAN('prix')?`<div><label>Encaissé</label><div>${EUR(ca)}${rd?` <span style="color:var(--crit);font-weight:600">· reste ${EUR(rd)}</span>`:''}</div></div>`:''}
+    </div>
+    ${x.ant.length?`<div class="idc-a"><label>Antécédents &amp; contre-indications</label>
+      ${x.ant.map(a=>`<span class="bdg ${ANT_BLOQ.test(a)?'b-crit':'b-warn'}">⚠ ${esc(a)}</span>`).join('')}</div>`:''}
+    ${pied}
+   </div>`;
+
+ const med=peuxEditerMed();
+ return `<div class="idc">
+   <div class="idc-h"><div class="pav" style="width:34px;height:34px;font-size:12.5px">${esc(ini(x))}</div>
+     <div style="min-width:0"><b>Modifier la fiche</b>
+       <small>dossier n° ${x.id} · le nom et le prénom sont nécessaires</small></div>
+     <div class="r">
+       <button class="btn xs g" onclick="fermerEditFiche()">Annuler</button>
+       <button class="btn xs p" onclick="majFiche()">Enregistrer</button></div></div>
+   <div class="idc-g ed">
+     <div><label>Nom</label><input class="inp" id="peNom" value="${esc(PE.nom)}" oninput="PE.nom=this.value"
+       onkeydown="if(event.key==='Enter'){event.preventDefault();majFiche()}"></div>
+     <div><label>Prénom</label><input class="inp" value="${esc(PE.prenom)}" oninput="PE.prenom=this.value"
+       onkeydown="if(event.key==='Enter'){event.preventDefault();majFiche()}"></div>
+     <div><label>Né(e) le</label><input class="inp" type="date" max="${TODAYS}" value="${esc(PE.ddn)}" oninput="PE.ddn=this.value"></div>
+     <div><label>Téléphone</label><input class="inp" value="${esc(PE.tel)}" placeholder="06 12 34 56 78" oninput="PE.tel=this.value"></div>
+     <div style="grid-column:span 2"><label>E-mail</label><input class="inp" type="email" value="${esc(PE.mail)}"
+       placeholder="prenom.nom@exemple.fr" oninput="PE.mail=this.value"></div>
+     <div style="grid-column:span 2"><label>Adresse</label><input class="inp" value="${esc(PE.adr)}"
+       placeholder="12 avenue Victor Hugo, 75116 Paris" oninput="PE.adr=this.value"></div>
+     <div style="grid-column:span 2"><label>Praticien référent</label>
+       <select class="inp" onchange="PE.prat=this.value">${PRATICIENS.map(n=>`<option ${PE.prat===n?'selected':''}>${esc(n)}</option>`).join('')}</select></div>
+     <div style="grid-column:span 2"><label>Patient depuis</label><div style="font-size:12.5px;padding-top:6px">${DF(x.depuis)} <span class="mu">· non modifiable</span></div></div>
+   </div>
+   <div class="idc-e">
+     <div class="fld"><label>Antécédents &amp; contre-indications</label>
+      ${med?`<div class="chips" style="margin-bottom:6px">${PE.ant.length?PE.ant.map((a,i)=>
+         `<span class="bdg ${ANT_BLOQ.test(a)?'b-crit':'b-warn'} antt">⚠ ${esc(a)}
+            <button class="x" title="Retirer cet antécédent" onclick="peRetirerAnt(${i})">✕</button></span>`).join('')
+        :'<span class="mu" style="font-size:12.5px">Aucun antécédent noté</span>'}</div>
+       <div class="antadd">
+         <input class="inp" id="peAnt" list="peAntL" placeholder="Allergie, traitement, terrain…"
+           value="${esc(PE.neuf)}" oninput="PE.neuf=this.value"
+           onkeydown="if(event.key==='Enter'){event.preventDefault();peAjoutAnt()}">
+         <datalist id="peAntL">${antSugg().map(a=>`<option value="${esc(a)}"></option>`).join('')}</datalist>
+         <button class="btn xs" onclick="peAjoutAnt()">＋ Ajouter</button></div>
+       <div class="aide">Entrée ajoute l’antécédent. Un allaitement ou un anticoagulant déclenche l’alerte avant tout acte injectable.</div>`
+      :'<div class="v mu">🔒 les antécédents relèvent du dossier médical</div>'}</div>
+     <div class="fld"><label>Notes du praticien</label>
+      ${med?`<textarea class="note" placeholder="Objectifs, préférences, précautions…" oninput="PE.notes=this.value">${esc(PE.notes)}</textarea>`
+       :'<div class="v mu">🔒 non accessible à ce rôle</div>'}</div>
+   </div>
+  </div>`;
+}
+
 V.patients=()=>{
  const nFid=PATIENTS.filter(p=>fidLevel(p)).length;
  const nAnn=PATIENTS.filter(p=>annivDate(p,annivF)).length;
@@ -3268,34 +3449,18 @@ function pDetail(p){
 
  const body={
   resume:()=>`
-   <div class="idc">
-    <div class="idc-h"><div class="pav" style="width:34px;height:34px;font-size:12.5px">${esc(ini(p))}</div>
-      <div style="min-width:0"><b>${esc(p.nom)} ${esc(p.prenom)}</b>
-        <small>Fiche d’identité · dossier n° ${p.id}</small></div>
-      <div class="r">${p.ant.length?`<span class="bdg b-warn">⚠ ${p.ant.length} antécédent${p.ant.length>1?'s':''}</span>`:'<span class="bdg b-good">aucun antécédent</span>'}
-        <button class="btn xs" onclick="toast('Modification de la fiche — phase 2')">Modifier</button></div></div>
-    <div class="idc-g">
-      <div><label>Né(e) le</label><div>${p.ddn?DF(p.ddn):'—'} <span class="mu">${ageTxt(p)}</span></div></div>
-      <div><label>Téléphone</label><div>${esc(p.tel)}</div></div>
-      <div><label>E-mail</label><div>${esc(p.mail)}</div></div>
-      <div><label>Adresse</label><div>${esc(p.adr||'—')}</div></div>
-      <div><label>Praticien référent</label><div>${esc(p.prat)}</div></div>
-      <div><label>Patient depuis</label><div>${DF(p.depuis)}</div></div>
-      <div><label>Actes réalisés</label><div>${A.length}${A.length?` <span class="mu">· dernier le ${DF(A[0].date)}</span>`:''}</div></div>
-      ${CAN('prix')?`<div><label>Encaissé</label><div>${EUR(ca)}${rd?` <span style="color:var(--crit);font-weight:600">· reste ${EUR(rd)}</span>`:''}</div></div>`:''}
-    </div>
-    ${p.ant.length?`<div class="idc-a"><label>Antécédents &amp; contre-indications</label>
-      ${p.ant.map(x=>`<span class="bdg b-warn">⚠ ${esc(x)}</span>`).join('')}</div>`:''}
-   </div>
+   ${carteIdentite(p,A,ca,rd)}
+   ${peOuvert(p.id)?'':`
    <div class="grid g2" style="gap:13px;margin-bottom:6px">
-    <div class="fld"><label>Notes</label>${ROLES[role].med?`<textarea class="note">${esc(p.notes||'')}</textarea>`:'<div class="v mu">🔒 non accessible à ce rôle</div>'}</div>
-    <div>
-     <div class="fld"><label>Antécédents &amp; contre-indications</label>
-      ${p.ant.length?p.ant.map(a=>`<span class="bdg b-warn" style="margin:0 5px 5px 0">⚠ ${esc(a)}</span>`).join(''):'<div class="v mu">Aucun</div>'}</div>
-     <div class="fld"><label>Objectifs et préférences</label>
-      <div class="v mu">${esc(p.notes||'Rien de particulier noté.')}</div></div>
-    </div></div>
-   ${p.ant.some(a=>/Allaitement|Anticoagulant/.test(a))?`<div class="tip" style="margin:0 0 14px;background:var(--warn-w)"><span class="e">⚠</span><div><b>Blocage automatique.</b> Un antécédent bloquant est présent : un avertissement s'affiche avant toute saisie d'acte injectable.</div></div>`:''}
+    <div class="fld"><label>Notes du praticien</label>
+     ${ROLES[role].med
+       ?`<div class="v${p.notes?'':' mu'}" style="white-space:pre-wrap">${esc(p.notes||'Rien de particulier noté.')}</div>`
+       :'<div class="v mu">🔒 non accessible à ce rôle</div>'}</div>
+    <div class="fld"><label>Antécédents &amp; contre-indications</label>
+     ${p.ant.length?`<div class="chips">${p.ant.map(a=>`<span class="bdg ${ANT_BLOQ.test(a)?'b-crit':'b-warn'}">⚠ ${esc(a)}</span>`).join('')}</div>`
+       :'<div class="v mu">Aucun</div>'}</div>
+   </div>`}
+   ${antBloquants(p).length?`<div class="tip" style="margin:0 0 14px;background:var(--warn-w)"><span class="e">⚠</span><div><b>Antécédent bloquant.</b> ${antBloquants(p).map(a=>esc(a)).join(' · ')} — un avertissement s'affiche avant toute saisie d'acte injectable.</div></div>`:''}
    <div class="subh"><h3>Actes réalisés<span>${A.length}</span></h3>
      <div class="r">${A.length?`<button class="btn xs" onclick="pTab='schema';paint()">Voir le schéma cumulé</button>`:''}
      <button class="btn xs" onclick="dvChoix(${p.id})">📄 Devis sans acte</button>
@@ -5231,7 +5396,7 @@ function renderOver(){
  document.getElementById('overh').innerHTML=`
   <button class="btn g s" onclick="closeAll()">✕</button>
   <div><h2>${AS.ro?'Acte du '+DF(AS.date):(AS.but==='devis'?'Nouveau devis':'Nouvelle consultation')} — ${p?esc(fn(p)):'nouveau patient'}</h2>
-   <div class="mu" style="font-size:11.5px">${p?`${ageTxt(p)} · dossier ${p.id}${p.ant.length?' · <span style="color:var(--warn);font-weight:600">⚠ '+esc(p.ant[0])+'</span>':''}`:'le dossier sera créé à l’enregistrement'}</div></div>
+   <div class="mu" style="font-size:11.5px">${p?`${ageTxt(p)} · dossier ${p.id}${p.ant.length?` · <span style="color:var(--${antBloquants(p).length?'crit':'warn'});font-weight:600" title="${esc(p.ant.join(' · '))}">⚠ ${esc(p.ant[0])}${p.ant.length>1?` +${p.ant.length-1}`:''}</span>`:''}`:'le dossier sera créé à l’enregistrement'}</div></div>
   <div style="margin-left:auto;display:flex;gap:7px;align-items:center">
    ${(AS.ro&&p)?(()=>{const L=actesPatient(p.id), i=L.findIndex(x=>x.id===AS.aid);
      return L.length<2?'':`<div class="anav">
@@ -7646,7 +7811,7 @@ function allRel(){const n=RDUE.length; if(!n){toast('Aucune relance échue');ret
  RELS.length=0; fileRelances().forEach(r=>RELS.push(r));
  RDUE.length=0; RELS.filter(r=>r.du).forEach(r=>RDUE.push(r));
  paint(); toast(n+' relance'+(n>1?'s envoyées':' envoyée'));}
-function openPatient(id){pSel=id;pTab='resume';closeAll();go('patients')}
+function openPatient(id){pSel=id;pTab='resume';PE=null;pHist=null;closeAll();go('patients')}
 function ph(l,h,s){const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480">
  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="hsl(${h},30%,${86-s}%)"/>
  <stop offset="1" stop-color="hsl(${h+18},26%,${70-s}%)"/></linearGradient></defs>
@@ -7666,7 +7831,9 @@ function bindBA(){const b=document.getElementById('ba');if(!b)return;let d=false
  b.onmousedown=e=>{d=true;m(e)};b.ontouchstart=e=>{d=true;m(e)};
  window.addEventListener('mousemove',m);window.addEventListener('touchmove',m,{passive:true});
  window.onmouseup=()=>d=false;window.ontouchend=()=>d=false}
-function cycleRole(){const k=Object.keys(ROLES);role=k[(k.indexOf(role)+1)%k.length];paint();toast('Vue « '+ROLES[role].l+' »')}
+function cycleRole(){const k=Object.keys(ROLES);role=k[(k.indexOf(role)+1)%k.length];
+ PE=null;                       /* changer de rôle referme une saisie en cours */
+ paint();toast('Vue « '+ROLES[role].l+' »')}
 function setPerD(p){perD=p;paint()}
 function presetsFactu(){ return CAN('compta')?PRESETS_FACTU:['jour','perso'] }
 function bandeauCompta(){ return `<div class="tip" style="margin-bottom:13px"><span class="e">🔒</span><div>Vue <b>facturation</b> : vous voyez les facturations, les encaissements et les restes dus. Le <b>suivi comptable</b> — chiffre d'affaires cumulé, ventilation HT/TVA et rétrocession centre/praticien — est réservé au praticien. Période consultable limitée à ${HORIZON_SANS_COMPTA} jours.</div></div>` }
@@ -7682,7 +7849,9 @@ function setPerE(p){
 }
 function perPrev(per){const [a,b]=perRange(per),n=days(a,b)+1;return {k:'perso',from:addD(a,-n),to:addD(a,-1)}}
 function toggleTheme(){const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark';paint()}
-function go(v,arg){ if(v==='devis') dSel=arg||null; view=v; document.getElementById('main').scrollTop=0; paint(); }
+function go(v,arg){ if(v==='devis') dSel=arg||null;
+ if(v!=='patients') PE=null;    /* on ne garde pas une fiche ouverte en saisie hors de sa vue */
+ view=v; document.getElementById('main').scrollTop=0; paint(); }
 function paint(){
  const al=ROLES[role].v; if(!al.includes(view))view='dash';
  document.querySelectorAll('#nav a[data-v]').forEach(a=>{a.classList.toggle('on',a.dataset.v===view);
