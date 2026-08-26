@@ -454,9 +454,28 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
 .sig-h small{display:block;font-size:11.5px;color:var(--ink-3);margin-top:2px}
 .sig-h .btn{margin-left:auto}
 /* --- passerelle Doctolib : reprise d'un export --- */
-#impv{position:fixed;inset:0;z-index:700;background:rgba(24,24,27,.66);backdrop-filter:blur(3px);
+#impv,#envv{position:fixed;inset:0;z-index:700;background:rgba(24,24,27,.66);backdrop-filter:blur(3px);
   display:none;align-items:center;justify-content:center;padding:20px;opacity:0;transition:.18s}
-#impv.on{display:flex;opacity:1}
+#impv.on,#envv.on{display:flex;opacity:1}
+/* --- composeur d'envoi --- */
+.envg{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:11px 14px;margin-bottom:12px}
+.envg label{display:block;font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--ink-3);margin-bottom:4px}
+.envg .v{font-size:13px}
+.envg .seg{max-width:100%}
+.envg .seg button{white-space:nowrap}
+.envprev{white-space:pre-wrap;font-size:12.5px;line-height:1.6;background:var(--panel-2);
+  border:1px solid var(--line);border-radius:var(--r-s);padding:11px 12px;max-height:210px;overflow:auto}
+/* --- actions réalisées, empilées sous chaque pièce --- */
+.acts{font-size:11px;line-height:1.55;color:var(--ink-2)}
+.acts .d{color:var(--ink-3);font-variant-numeric:tabular-nums}
+/* --- registre des envois --- */
+.envd td{background:var(--panel-2)}
+.envtl{display:flex;flex-direction:column;gap:5px;padding:3px 0 2px}
+.envtl .l{display:flex;align-items:center;gap:8px;font-size:12px}
+.envtl .p{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none}
+.envtl .d{margin-left:auto;color:var(--ink-3);font-size:11px;font-variant-numeric:tabular-nums}
+.chev2{color:var(--ink-3);font-size:11px}
 .imp-box{background:var(--panel);border-radius:18px;box-shadow:0 26px 70px rgba(0,0,0,.34);
   width:min(1080px,100%);max-height:min(880px,92vh);display:flex;flex-direction:column}
 .imp-h{display:flex;align-items:flex-start;gap:10px;padding:15px 17px 12px;border-bottom:1px solid var(--line)}
@@ -1353,6 +1372,7 @@ tr.supp td{background:var(--crit-w);padding:0}
       <div class="sgroup">Pilotage</div>
       <a data-v="dash" class="on"><span class="i">◈</span>Tableau de bord</a>
       <a data-v="stats"><span class="i">◔</span>Statistiques</a>
+      <a data-v="envois"><span class="i">✉</span>Envois &amp; remises<span class="n" id="n-env">0</span></a>
       <div class="sgroup">Soins</div>
       <a data-v="patients"><span class="i">◍</span>Patients</a>
       <a data-v="actes"><span class="i">✚</span>Actes &amp; schémas</a>
@@ -1406,6 +1426,12 @@ tr.supp td{background:var(--crit-w);padding:0}
     <button class="btn g s" onclick="fermerImport()">✕</button></div>
   <div class="imp-b" id="impB"></div>
   <div class="imp-f" id="impF"></div>
+</div></div>
+<div id="envv"><div class="imp-box" style="width:min(720px,100%)">
+  <div class="imp-h"><div><b id="envT">Envoyer</b><small id="envS"></small></div>
+    <button class="btn g s" onclick="fermerEnvoi()">✕</button></div>
+  <div class="imp-b" id="envB"></div>
+  <div class="imp-f" id="envF"></div>
 </div></div>
 <div class="toast" id="toast"></div>
 
@@ -2207,10 +2233,10 @@ let RULES=[
    consommé du stock. Le médecin soigne et pilote son activité, sans accès aux
    volumes ni à la traçabilité destructive. */
 const ROLES={
- admin:{l:'Administrateur',u:'Dr O. Baroudi',i:'OB',v:['dash','stats','patients','actes','devis','encaiss','relances','stock','equipe','params'],med:true,prix:true,compta:true,volumes:true,suppTrace:true},
- praticien:{l:'Médecin',u:'Dr A. Merlin',i:'AM',v:['dash','stats','patients','actes','devis','encaiss','relances','stock','equipe','params'],med:true,prix:true,compta:true},
- assistante:{l:'Assistante',u:'L. Roche',i:'LR',v:['dash','patients','actes','devis','encaiss','stock','relances'],med:true,prix:true,compta:false},
- secretariat:{l:'Secrétariat',u:'N. Faure',i:'NF',v:['dash','patients','devis','encaiss','relances','stock'],med:false,prix:true,compta:false},
+ admin:{l:'Administrateur',u:'Dr O. Baroudi',i:'OB',v:['dash','stats','envois','patients','actes','devis','encaiss','relances','stock','equipe','params'],med:true,prix:true,compta:true,volumes:true,suppTrace:true},
+ praticien:{l:'Médecin',u:'Dr A. Merlin',i:'AM',v:['dash','stats','envois','patients','actes','devis','encaiss','relances','stock','equipe','params'],med:true,prix:true,compta:true},
+ assistante:{l:'Assistante',u:'L. Roche',i:'LR',v:['dash','envois','patients','actes','devis','encaiss','stock','relances'],med:true,prix:true,compta:false},
+ secretariat:{l:'Secrétariat',u:'N. Faure',i:'NF',v:['dash','envois','patients','devis','encaiss','relances','stock'],med:false,prix:true,compta:false},
 };
 /* prix   = voir les montants d'un acte, d'un devis, d'une facture (métier : facturer, encaisser)
    compta = suivi comptable : CA global, ventilation HT/TVA, rétrocession centre/praticien,
@@ -3499,6 +3525,290 @@ function renderImport(){
    <button class="btn p" ${(c.neuf+c.maj)?'':'disabled'} onclick="appliquerImport()">↧ Importer ${c.neuf+c.maj} fiche${(c.neuf+c.maj)>1?'s':''}</button></div>`;
 }
 
+/* ==========================================================================
+   Service d'envoi horodaté
+   Chaque pièce qui part laisse une trace datée à la minute : mise en file,
+   remise au serveur, remise au destinataire, ouverture — et le motif quand
+   ça échoue. C'est ce registre qui permet d'affirmer, des mois plus tard, que
+   le devis est bien parti, et quand.
+   Le transport lui-même attend le relais (voir Paramètres → Envoi des
+   documents) : ici, seule la trace est réelle.
+   ========================================================================== */
+let ENVOIS=[];
+let ENV=null;                       /* composition en cours */
+let envSel=null;                    /* envoi déroulé dans le registre */
+let envQ='', envCanal='', envStat='';
+let perEnv={k:'90j',from:'',to:''};
+const setPerEnv=x=>{perEnv=x;paint()};
+
+/* L'identité sous laquelle partent les documents. */
+const EXPEDITEUR={ nom:'Cabinet Dr Baroudi', mail:'contact@gemelia.fr',
+  repondre:'contact@gemelia.fr', sms:'Dr Baroudi',
+  relais:false,        /* relais d'envoi branché ? */
+  demo:true,           /* à défaut, on fait vivre les états pour la démonstration */
+  mode:'lien' };       /* lien sécurisé par défaut, plutôt qu'une pièce jointe */
+
+const ENV_ST={ file:['b-neu','⏳ En file'], serveur:['b-info','↗ Remis au serveur'],
+  remis:['b-good','✓ Remis'], ouvert:['b-good','👁 Ouvert'], echec:['b-crit','⚠ Échec'] };
+const ENV_ORDRE=['file','serveur','remis','ouvert'];
+const ENV_EV={ serveur:'Remis au serveur d’envoi', remis:'Remis au destinataire',
+  ouvert:'Ouvert par le destinataire', echec:'Échec de remise' };
+const ENV_MOTIFS=['adresse inexistante','boîte du destinataire pleine','message refusé par le serveur distant'];
+
+let envN=0;
+const envRef=t=>`${String(t).slice(0,10).replace(/-/g,'')}-${String(++envN).padStart(4,'0')}`;
+const envDe=pid=>ENVOIS.filter(e=>e.pid===pid).sort((a,b)=>b.ts.localeCompare(a.ts));
+const envDoc=id=>ENVOIS.filter(e=>e.docId===id).sort((a,b)=>a.ts.localeCompare(b.ts));
+/* le canal par défaut : l'e-mail dès qu'on en a un, le SMS sinon */
+const canalDe=p=>(p&&p.mail&&p.mail!=='—')?'e-mail':'SMS';
+const destDe=(p,c)=>c==='SMS'?(p.tel||'—'):(p.mail||'—');
+
+function creerEnvoi(o){
+ const t=o.t||nowStamp();
+ const e={ id:'E-'+String(ENVOIS.length+1).padStart(4,'0'), ref:envRef(t), ts:t,
+   pid:o.pid, aid:o.aid||null, docId:o.docId, docNom:o.docNom, docK:o.docK||'document',
+   canal:o.canal, dest:o.dest, exp:o.canal==='SMS'?EXPEDITEUR.sms:EXPEDITEUR.mail,
+   objet:o.objet, mode:o.mode||EXPEDITEUR.mode, statut:'file', motif:'',
+   par:o.par||ROLES[role].u, evts:[{t, ev:'Mis en file d’envoi'}] };
+ ENVOIS.push(e);
+ return e;
+}
+function avancerEnvoi(id,st,det,quand){
+ const e=ENVOIS.find(x=>x.id===id); if(!e) return null;
+ e.statut=st;
+ if(st==='echec') e.motif=det||'';
+ e.evts.push({t:quand||nowStamp(), ev:ENV_EV[st]||st, det:det||''});
+ return e;
+}
+/* Le relais n'étant pas branché, on fait vivre l'envoi comme le ferait un
+   service transactionnel — pour montrer ce que le registre affichera. Rien
+   n'est réellement expédié. */
+function simulerEnvoi(id){
+ if(!EXPEDITEUR.demo) return;
+ [[800,'serveur'],[2400,'remis'],[5200,'ouvert']].forEach(([ms,st])=>setTimeout(()=>{
+   const e=ENVOIS.find(x=>x.id===id);
+   if(!e||e.statut==='echec') return;
+   if(ENV_ORDRE.indexOf(st)<=ENV_ORDRE.indexOf(e.statut)) return;
+   avancerEnvoi(id,st);
+   if(view==='envois'||(view==='patients'&&(pTab==='envois'||pTab==='docs'))) paint();
+ },ms));
+}
+
+/* ---- composition : on choisit le canal, l'objet et la forme, puis on envoie ---- */
+function composerEnvoi(aid,id,dvId){
+ let p, d, docId, docNom, docK;
+ if(dvId){ const dv=DEVIS.find(x=>x.id===dvId); if(!dv) return;
+   p=pById(dv.patient); docId=dv.id; docNom=nomDevis(dv); docK='devis'; aid=dv.acte||null }
+ else { const a=ACTES.find(x=>x.id===aid); if(!a) return;
+   p=pById(a.patient); d=docsActe(a).find(x=>x.id===id); if(!d) return;
+   docId=d.id; docNom=d.nom; docK=d.k }
+ const canal=canalDe(p);
+ ENV={aid, docId, docNom, docK, pid:p.id, canal, mode:EXPEDITEUR.mode,
+   objet:objetNeutre(docK)};
+ document.getElementById('envv').classList.add('on');
+ renderEnvoi();
+}
+function fermerEnvoi(){ ENV=null; document.getElementById('envv').classList.remove('on') }
+/* Un objet neutre : ni le soin, ni le motif. Une adresse mal saisie ne doit rien
+   révéler de médical. */
+const objetNeutre=k=>k==='facture'?'Votre facture est à votre disposition'
+  :k==='devis'?'Votre devis est à votre disposition'
+  :'Un document de votre cabinet est à votre disposition';
+function corpsEnvoi(){
+ if(!ENV) return '';
+ const p=pById(ENV.pid);
+ const lien=ENV.mode==='lien';
+ if(ENV.canal==='SMS') return `${EXPEDITEUR.sms} : un document vous attend. `
+   +(lien?'Ouvrez le lien sécurisé reçu et confirmez votre date de naissance.':'Il vous a été adressé par e-mail.');
+ return `Bonjour ${p.prenom},\n\n`
+  +`Un document établi par ${CABINET.nom} est à votre disposition.\n\n`
+  +(lien
+    ? `Pour le consulter : lien sécurisé valable 7 jours, à usage unique.\nVous confirmerez votre date de naissance à l’ouverture.\n\n`
+    : `Vous le trouverez en pièce jointe de ce message.\n\n`)
+  +`Pour toute question, répondez simplement à ce message.\n\n`
+  +`${EXPEDITEUR.nom}\n${EXPEDITEUR.repondre}`;
+}
+function renderEnvoi(){
+ if(!ENV) return;
+ const p=pById(ENV.pid), B=document.getElementById('envB'), F=document.getElementById('envF');
+ document.getElementById('envT').textContent='Envoyer — '+ENV.docNom;
+ document.getElementById('envS').textContent=`${fn(p)} · dossier ${p.id}`;
+ const dest=destDe(p,ENV.canal), sms=ENV.canal==='SMS';
+ const ok=dest&&dest!=='—';
+ B.innerHTML=`
+  <div class="envg">
+   <div><label>Canal</label><div class="seg">
+     ${['e-mail','SMS'].map(c=>`<button class="${ENV.canal===c?'on':''}"
+       onclick="ENV.canal='${c}';ENV.objet=objetNeutre(ENV.docK);renderEnvoi()">${c}</button>`).join('')}</div></div>
+   <div><label>Destinataire</label><div class="v ${ok?'':'mu'}">${esc(dest)}${ok?'':' — non renseigné'}</div></div>
+   <div><label>Expéditeur</label><div class="v">${esc(sms?EXPEDITEUR.sms:EXPEDITEUR.nom)}
+     <span class="mu">${sms?'':'· '+esc(EXPEDITEUR.mail)}</span></div></div>
+   <div><label>Forme</label><div class="seg">
+     ${[['lien','Lien sécurisé'],['piece','Pièce jointe']].map(([k,l])=>`<button class="${ENV.mode===k?'on':''}"
+       ${sms&&k==='piece'?'disabled':''} onclick="ENV.mode='${k}';renderEnvoi()">${l}</button>`).join('')}</div></div>
+  </div>
+  ${sms?'':`<div class="fld"><label>Objet</label>
+    <input class="inp" style="width:100%" value="${esc(ENV.objet)}" oninput="ENV.objet=this.value"></div>`}
+  <div class="fld"><label>Aperçu du message</label>
+    <div class="envprev">${esc(corpsEnvoi())}</div></div>
+  <div class="aide">${ENV.mode==='lien'
+    ? 'Le message ne contient aucune donnée médicale : si l’adresse est erronée, rien d’exploitable ne part. C’est la forme recommandée pour un devis ou un consentement.'
+    : 'La pièce voyage dans le message. Une adresse mal saisie expose son contenu — à réserver aux documents non médicaux.'}</div>`;
+ F.innerHTML=`<span class="mu" style="font-size:11.5px">${EXPEDITEUR.relais
+    ?'Relais d’envoi branché.'
+    :'Relais d’envoi non branché — l’envoi sera journalisé, la remise reste à venir.'}</span>
+   <div class="r"><button class="btn g" onclick="fermerEnvoi()">Annuler</button>
+   <button class="btn p" ${ok?'':'disabled'} onclick="envoyerDepuisComposeur()">✉ Envoyer</button></div>`;
+}
+function envoyerDepuisComposeur(){
+ if(!ENV) return;
+ const o={canal:ENV.canal, objet:ENV.objet, mode:ENV.mode};
+ const aid=ENV.aid, id=ENV.docId, k=ENV.docK, pid=ENV.pid;
+ fermerEnvoi();
+ if(k==='devis'&&!ACTES.find(x=>x.id===aid)) envoyerDevis(id,o);
+ else sendDoc(aid,id,o);
+}
+
+/* ---- l'envoi proprement dit : une trace, un statut, un suivi ---- */
+function poserEnvoi(p,docId,docNom,docK,aid,o){
+ const canal=(o&&o.canal)||canalDe(p);
+ const e=creerEnvoi({pid:p.id, aid, docId, docNom, docK, canal,
+   dest:destDe(p,canal), objet:(o&&o.objet)||objetNeutre(docK), mode:(o&&o.mode)||EXPEDITEUR.mode});
+ logDoc(docId, `Envoyé par ${canal} — ${e.ref}`);
+ simulerEnvoi(e.id);
+ return e;
+}
+function envoyerDevis(id,o){
+ const dv=DEVIS.find(x=>x.id===id); if(!dv) return;
+ const p=pById(dv.patient);
+ if(dv.statut==='brouillon'){ dv.statut='envoye'; dv.envoye=TODAYS }
+ const e=poserEnvoi(p,dv.id,nomDevis(dv),'devis',dv.acte||null,o);
+ paint(); toast(`Devis ${id} envoyé par ${e.canal} à ${fn(p)} · ${e.ref}`);
+}
+
+/* ---- les événements horodatés d'une pièce, façon « actions réalisées » ---- */
+function actionsDoc(id,seed){
+ const H=histo(id,seed||[]).slice();
+ envDoc(id).forEach(e=>e.evts.forEach(x=>H.push({t:x.t,
+   ev:x.ev+(x.det?' — '+x.det:'')+(x.ev==='Mis en file d’envoi'?` (${e.canal})`:''), par:e.par})));
+ return H.sort((a,b)=>a.t.localeCompare(b.t));
+}
+const actionsTxt=(id,seed)=>{
+ const H=actionsDoc(id,seed);
+ return H.length?`<div class="acts">${H.map(h=>`<div>${esc(h.ev)} <span class="d">(${DTS(h.t)})</span></div>`).join('')}</div>`
+   :'<span class="mu">—</span>';
+};
+
+/* ---- jeu de démonstration : les envois déjà partis ---- */
+(function envoisDemo(){
+ let sd=13; const rnd=()=>{sd=(sd*1103515245+12345)%2147483648; return sd/2147483648};
+ const hh=(d,h,m)=>`${d}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+ const plus=(t,min)=>{const [d,h]=t.split('T'); const D=new Date(`${d}T${h}:00`);
+   D.setMinutes(D.getMinutes()+min);
+   return `${D.toISOString().slice(0,10)}T${String(D.getHours()).padStart(2,'0')}:${String(D.getMinutes()).padStart(2,'0')}`};
+ const pose=(p,jour,docId,docNom,docK,aid)=>{
+  const canal=canalDe(p), t=hh(jour, 9+Math.floor(rnd()*9), Math.floor(rnd()*60));
+  const e=creerEnvoi({pid:p.id, aid, docId, docNom, docK, canal, dest:destDe(p,canal),
+    objet:objetNeutre(docK), mode:'lien', t, par:'Secrétariat'});
+  const r=rnd();
+  if(r<.07){ avancerEnvoi(e.id,'echec',ENV_MOTIFS[Math.floor(rnd()*ENV_MOTIFS.length)],plus(t,2)); return e }
+  avancerEnvoi(e.id,'serveur',null,plus(t,1));
+  avancerEnvoi(e.id,'remis',null,plus(t,2));
+  if(rnd()<.72) avancerEnvoi(e.id,'ouvert',null,plus(t,3+Math.floor(rnd()*600)));
+  return e;
+ };
+ DEVIS.filter(d=>d.envoye).forEach(d=>{
+  const p=pById(d.patient); if(!p) return;
+  pose(p,d.envoye,d.id,nomDevis(d),'devis',d.acte||null);
+  if(d.derniere&&d.derniere!==d.envoye) pose(p,d.derniere,d.id,nomDevis(d)+' — relance','devis',d.acte||null);
+ });
+ FACTURES.filter(f=>f.statut!=='annulee').slice(0,26).forEach(f=>{
+  const p=pById(f.patient); if(!p) return;
+  pose(p,f.date,f.id,'Facture '+f.id,'facture',f.acte||null);
+ });
+ ACTES.filter(a=>a.consent&&catById(a.type).cons).slice(0,14).forEach(a=>{
+  const p=pById(a.patient); if(!p) return;
+  pose(p,a.date,'CONS-'+a.id,'Consentement — '+a.nom,'consentement',a.id);
+ });
+ ENVOIS.sort((a,b)=>a.ts.localeCompare(b.ts));
+})();
+
+/* ---- le registre, filtré ---- */
+function envoisFiltres(pid){
+ const q=envQ.trim().toLowerCase();
+ return ENVOIS.filter(e=>(!pid||e.pid===pid)
+   &&inPer(e.ts.slice(0,10),perEnv)
+   &&(!envCanal||e.canal===envCanal)
+   &&(!envStat||e.statut===envStat)
+   &&(!q||[e.docNom,e.dest,e.objet,e.ref,fn(pById(e.pid))||''].join(' ').toLowerCase().includes(q)))
+  .sort((a,b)=>b.ts.localeCompare(a.ts));
+}
+const envLigne=(e,avecPatient)=>{
+ const p=pById(e.pid), st=ENV_ST[e.statut];
+ const ouvert=envSel===e.id;
+ return `<tr class="c" onclick="envSel=envSel==='${e.id}'?null:'${e.id}';paint()">
+   <td class="mono" style="white-space:nowrap">${DTS(e.ts)}</td>
+   ${avecPatient?`<td><b>${esc(p?fn(p):'—')}</b></td>`:''}
+   <td><b>${esc(e.docNom)}</b><div class="mu" style="font-size:11.5px">${esc(e.objet)}</div></td>
+   <td class="mu">${esc(e.canal)}<div style="font-size:11.5px">${esc(e.dest)}</div></td>
+   <td class="mu" style="font-size:11.5px;white-space:nowrap">${e.mode==='lien'?'Lien sécurisé':'Pièce jointe'}</td>
+   <td>${bdg(st[0],st[1])}${e.motif?`<div class="mu" style="font-size:10.5px">${esc(e.motif)}</div>`:''}</td>
+   <td class="mono mu" style="font-size:11px;white-space:nowrap">${esc(e.ref)}</td>
+   <td class="num"><span class="chev2">${ouvert?'▾':'▸'}</span></td></tr>
+  ${ouvert?`<tr class="envd"><td colspan="${avecPatient?8:7}">
+    <div class="envtl">${e.evts.map(x=>`<div class="l"><span class="p"></span>
+      <b>${esc(x.ev)}</b>${x.det?` — ${esc(x.det)}`:''}
+      <span class="d">${DTS(x.t)}</span></div>`).join('')}</div>
+    <div class="mu" style="font-size:11.5px;margin-top:6px">Expédié par ${esc(e.exp)} · déclenché par ${esc(e.par)}
+      · référence ${esc(e.ref)}</div>
+    ${e.statut==='echec'?`<button class="btn xs p" style="margin-top:7px"
+      onclick="event.stopPropagation();renvoyer('${e.id}')">↻ Renvoyer</button>`:''}</td></tr>`:''}`;
+};
+function renvoyer(id){
+ const e=ENVOIS.find(x=>x.id===id); if(!e) return;
+ const p=pById(e.pid); if(!p) return;
+ const n=poserEnvoi(p,e.docId,e.docNom,e.docK,e.aid,{canal:e.canal,objet:e.objet,mode:e.mode});
+ envSel=n.id; paint(); toast(`Renvoyé à ${fn(p)} · ${n.ref}`);
+}
+const envBandeau=()=>EXPEDITEUR.relais?'':`<div class="tip"><span class="e">✉</span><div>
+  <b>Relais d’envoi non branché.</b> Les envois sont journalisés et horodatés ici comme ils le seront en
+  production ; ${EXPEDITEUR.demo?'les états de remise sont simulés pour la démonstration':'ils restent en file tant que le relais n’est pas branché'}.
+  Réglages dans <a onclick="go('params');paramTab='envoi';paint()">Paramètres → Envoi des documents</a>.</div></div>`;
+const envFiltres=pid=>`<div class="fbar">
+  <span class="mu" style="font-size:11.5px;font-weight:600;align-self:center">Canal</span>
+  <div class="seg">${[['','Tous'],['e-mail','E-mail'],['SMS','SMS']].map(([k,l])=>
+    `<button class="${envCanal===k?'on':''}" onclick="envCanal='${k}';paint()">${l}</button>`).join('')}</div>
+  <span class="mu" style="font-size:11.5px;font-weight:600;align-self:center">État</span>
+  <div class="seg">${[['','Tous'],['ouvert','Ouverts'],['remis','Remis'],['file','En file'],['echec','Échecs']].map(([k,l])=>
+    `<button class="${envStat===k?'on':''}" onclick="envStat='${k}';paint()">${l}</button>`).join('')}</div>
+  <input class="inp" id="eqi" style="min-width:170px" placeholder="Document, destinataire, référence…"
+    value="${esc(envQ)}" oninput="envQ=this.value;paint();const e=document.getElementById('eqi');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
+  ${(envCanal||envStat||envQ)?`<button class="chip" style="margin-left:auto"
+    onclick="envCanal='';envStat='';envQ='';paint()">Tout afficher</button>`:''}</div>`;
+
+V.envois=()=>{
+ const L=envoisFiltres(null);
+ const ech=ENVOIS.filter(e=>e.statut==='echec'&&inPer(e.ts.slice(0,10),perEnv)).length;
+ const n=k=>ENVOIS.filter(e=>inPer(e.ts.slice(0,10),perEnv)&&(k==='tous'||e.statut===k)).length;
+ return `<div class="head"><div><h1>Envois &amp; remises</h1>
+   <p>${L.length} envoi${L.length>1?'s':''} · chaque pièce qui part est horodatée à la minute</p></div></div>
+  ${envBandeau()}
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:11px;margin-bottom:13px">
+   ${[['Envoyés',n('tous'),''],['Remis',n('remis')+n('ouvert'),'var(--good)'],
+      ['Ouverts',n('ouvert'),'var(--good)'],['En file',n('file'),''],['Échecs',ech,ech?'var(--crit)':'']]
+    .map(([l,v,c])=>`<div class="kpi"><div class="k">${l}</div>
+      <div class="v" ${c?`style="color:${c}"`:''}>${v}</div></div>`).join('')}
+  </div>
+  ${periodBar(perEnv,'setPerEnv',`${L.length} envoi${L.length>1?'s':''}`,['jour','mois','90j','annee','tout'],1)}
+  ${envFiltres(null)}
+  <div class="card"><div class="tw"><table>
+    <thead><tr><th style="width:132px">Date d’envoi</th><th style="width:150px">Patient</th><th>Document</th>
+      <th style="width:150px">Destinataire</th><th style="width:112px">Forme</th><th style="width:132px">État</th>
+      <th style="width:120px">Référence</th><th style="width:34px"></th></tr></thead>
+    <tbody>${L.map(e=>envLigne(e,true)).join('')}</tbody></table>
+   ${L.length?'':'<div class="empty">Aucun envoi sur cette période.</div>'}</div></div>`;
+};
+
 V.patients=()=>{
  const nFid=PATIENTS.filter(p=>fidLevel(p)).length;
  const nAnn=PATIENTS.filter(p=>annivDate(p,annivF)).length;
@@ -3774,7 +4084,7 @@ function pDetail(p){
  const TB=[['resume','Résumé'],['actes',`Actes · ${A.length}`],['schema','Schéma cumulé'],
            ['photos','Avant / après']]
    .concat(ROLES[role].prix?[['factu',`Facturation · ${nFac}`]]:[])
-   .concat([['docs',`Documents · ${nDoc}`]]);
+   .concat([['docs',`Documents · ${nDoc}`],['envois',`Envois · ${envDe(p.id).length}`]]);
  if(!TB.some(t=>t[0]===pTab)) pTab='resume';
 
  /* ---- tableau des actes, réutilisé sur la fiche synthétique ---- */
@@ -3827,7 +4137,7 @@ function pDetail(p){
           onclick="event.stopPropagation();signerDevis('${d.id}')">✎ Faire signer</button>`}
         <button class="btn xs" onclick="event.stopPropagation();go('devis','${d.id}')">Ouvrir</button>
         ${btnSuppDevis(d)}`,
-    cf:confirmSuppDevis(d,5)})),
+    cf:confirmSuppDevis(d,6)})),
   /* Un seul consentement par soin : ceux qu'une signature antérieure couvre
      feraient doublon dans la liste — l'acte, lui, porte la mention « reconduit ». */
   ...C.filter(a=>!CONS_SUPP.has(a.id)&&!consentPorteur(a)).map(a=>{
@@ -3839,7 +4149,7 @@ function pDetail(p){
     a:pdfBtn(a.id,'CONS-'+a.id)
       +(a.consent?'':`<button class="btn xs p" onclick="event.stopPropagation();signDoc(${a.id},'CONS-${a.id}')">✎ Faire signer</button>`)
       +btnSuppCons(a),
-    cf:confirmSuppCons(a,5)}}),
+    cf:confirmSuppCons(a,6)}}),
   ...AG.map(x=>({k:x.cat==='Courrier'?'courrier':x.cat.toLowerCase(),id:x.id,date:x.ts.slice(0,10),
     t:esc(x.nom), s:`${esc(x.cat)} · généré le ${DTS(x.ts)}`,
     st:x.signe?bdg('b-good','Signé')+horoBdg(x.id,x.signe):x.envoye?bdg('b-info','Envoyé'):bdg('b-neu','Généré'),
@@ -4027,15 +4337,37 @@ function pDetail(p){
       <button class="btn xs" onclick="retablirActe()">↺ Rétablir</button></div>`:''}
     ${C.some(a=>!consentOK(a))?`<div class="tip" style="background:var(--crit-w);border-color:rgba(208,59,59,.25)"><span class="e">⚠</span><div><b>${C.filter(a=>!consentOK(a)).length} consentement${C.filter(a=>!consentOK(a)).length>1?'s non signés':' non signé'}.</b> Un acte injectable sans consentement signé n'est pas défendable en cas de litige — le lien de signature part par SMS en un clic.</div></div>`:''}
     <div class="tw"><table>
-     <thead><tr><th style="width:130px">Type</th><th>Document</th><th style="width:96px">Date</th><th style="width:130px">Statut</th><th style="width:96px"></th></tr></thead>
+     <thead><tr><th style="width:124px">Type</th><th>Document</th><th style="width:92px">Date</th>
+       <th style="width:126px">Statut</th><th style="min-width:230px">Actions réalisées</th><th style="width:96px"></th></tr></thead>
      <tbody>${L.map(d=>`<tr>
        <td><span class="bdg b-neu">${KIND[d.k][1]} ${KIND[d.k][2]}</span></td>
        <td><b>${d.t}</b><div class="mu" style="font-size:11.5px">${esc(d.s)}</div></td>
        <td class="mono" style="white-space:nowrap">${DF(d.date)}</td>
        <td>${d.st}</td>
+       <td>${actionsTxt(d.id, d.seed)}</td>
        <td class="num" style="white-space:nowrap">${d.a}</td></tr>${d.cf||''}`).join('')}
      </tbody></table>${L.length?'':'<div class="empty">Aucun document de ce type.</div>'}</div>
     <div class="mu" style="font-size:11.5px;margin-top:10px">Tout document produit ici est archivé à valeur probante et horodaté. Les factures et avoirs, qui relèvent du suivi financier, sont dans l'onglet <a onclick="pTab='factu';paint()">Facturation</a>.</div>`;
+  },
+
+  /* ---------- Onglet Envois : tout ce qui est parti, et ce qu'il est devenu --- */
+  envois:()=>{
+   const L=envoisFiltres(p.id);
+   const T=envDe(p.id);
+   const ech=T.filter(e=>e.statut==='echec').length;
+   return `${envBandeau()}
+    ${periodBar(perEnv,'setPerEnv',`${L.length} envoi${L.length>1?'s':''} sur ${T.length}`,['mois','90j','annee','tout'],1)}
+    ${envFiltres(p.id)}
+    ${ech?`<div class="tip" style="background:var(--crit-w);border-color:rgba(208,59,59,.25)"><span class="e">⚠</span>
+      <div><b>${ech} envoi${ech>1?'s n’ont':' n’a'} pas abouti.</b> Vérifiez l’adresse dans la fiche, puis renvoyez depuis la ligne concernée.</div></div>`:''}
+    <div class="tw"><table>
+     <thead><tr><th style="width:132px">Date d’envoi</th><th>Document</th><th style="width:150px">Destinataire</th>
+       <th style="width:112px">Forme</th><th style="width:132px">État</th><th style="width:120px">Référence</th>
+       <th style="width:34px"></th></tr></thead>
+     <tbody>${L.map(e=>envLigne(e,false)).join('')}</tbody></table>
+     ${L.length?'':'<div class="empty">Aucun envoi sur cette période.</div>'}</div>
+    <div class="mu" style="font-size:11.5px;margin-top:10px">Chaque ligne se déroule d’un clic sur sa chronologie complète :
+      mise en file, remise au serveur, remise au destinataire, ouverture — à la minute.</div>`;
   },
 
   /* ---------- Onglet Facturation du patient ---------- */
@@ -4696,6 +5028,7 @@ function devisExemple(f){
 }
 V.params=()=>{
  const TB=[['cabinet','Cabinet & praticiens'],['actes',`Actes & tarifs · ${CATALOGUE.length}`],
+          ['envoi','Envoi des documents'],
           ...(EST_ADMIN()?[['doctolib','Passerelle Doctolib']]:[]),
           ['materiels',`Matériels & paramètres · ${MATERIELS.length}`],
           ['facturation','Facturation & rétrocession'],['fidelite','Fidélité & réactivation'],
@@ -4967,6 +5300,60 @@ V.params=()=>{
         <td class="mu">${esc(x.par)}</td><td class="num">${x.neufs}</td><td class="num">${x.majs}</td>
         <td class="num mu">${x.idem}</td><td class="num mu">${x.rejets}</td></tr>`).join('')}</tbody></table></div>`
      :'<div class="empty">Aucune reprise pour l’instant.</div>'}</div>`;
+  },
+  /* --- L'identité sous laquelle partent les documents, et l'état du relais --- */
+  envoi:()=>{
+   const F=(k,l,ph)=>`<div class="fld"><label>${l}</label>
+     <input class="inp" style="width:100%" value="${esc(EXPEDITEUR[k]||'')}" placeholder="${esc(ph||'')}"
+       onchange="EXPEDITEUR['${k}']=this.value;paint()"></div>`;
+   const n=k=>ENVOIS.filter(e=>k==='tous'||e.statut===k).length;
+   const PRE=[
+    ['Un relais d’envoi, hors du navigateur','PRAXIS est une page servie publiquement : tout ce qu’elle contient est lisible. Le mot de passe de la boîte ou la clé du prestataire vivent sur un petit service qui reçoit la demande, vérifie qui appelle, et envoie.'],
+    ['SPF, DKIM et DMARC sur le domaine d’expédition','Sans quoi un message signé contact@… mais expédié par un autre serveur part en indésirable, ou se fait rejeter.'],
+    ['Un lien sécurisé plutôt qu’une pièce jointe','La CNIL demande une messagerie chiffrée pour toute information médicale nominative, et rappelle qu’une adresse mal saisie suffit à rompre le secret. Le message reste neutre, le document derrière une page qui identifie le patient.'],
+    ['MSSanté pour les échanges entre confrères','L’e-mail ordinaire n’est pas le canal attendu pour transmettre une pièce médicale à un autre professionnel.'],
+   ];
+   return `<div class="tip"><span class="e">✉</span><div><b>État du relais : ${EXPEDITEUR.relais?'branché':'non branché'}.</b>
+     Les envois sont journalisés et horodatés dès aujourd’hui — c’est la trace qui compte en cas de litige.
+     Le transport, lui, attend un relais côté serveur : aucune clé ne peut vivre dans cette page.</div></div>
+   <div class="grid g2">
+    <div class="card"><div class="h"><h2>Expéditeur</h2><span class="s">ce que voit le patient</span></div><div class="b">
+      <div class="grid g2" style="gap:10px">
+        ${F('nom','Nom affiché','Cabinet Dr Baroudi')}
+        ${F('mail','Adresse d’expédition','contact@exemple.fr')}
+      </div>
+      <div class="grid g2" style="gap:10px">
+        ${F('repondre','Répondre à','contact@exemple.fr')}
+        ${F('sms','Nom court pour les SMS','Dr Baroudi')}
+      </div>
+      <div class="fld"><label>Forme par défaut des documents</label>
+        <div class="seg">${[['lien','Lien sécurisé'],['piece','Pièce jointe']].map(([k,l])=>
+          `<button class="${EXPEDITEUR.mode===k?'on':''}" onclick="EXPEDITEUR.mode='${k}';paint()">${l}</button>`).join('')}</div>
+        <div class="mu" style="font-size:11.5px;margin-top:5px">Le lien sécurisé garde le message neutre : ni le soin, ni le motif n’apparaissent.
+          Reste modifiable au coup par coup au moment d’envoyer.</div></div>
+      <div class="fld"><label>Aperçu de l’en-tête</label>
+        <div class="v" style="font-family:var(--sans)">
+          <b>De :</b> ${esc(EXPEDITEUR.nom)} &lt;${esc(EXPEDITEUR.mail)}&gt;<br>
+          <b>Répondre à :</b> ${esc(EXPEDITEUR.repondre)}<br>
+          <b>Objet :</b> Un document de votre cabinet est à votre disposition</div></div>
+    </div></div>
+    <div class="card"><div class="h"><h2>Relais d’envoi</h2><span class="s">ce qu’il reste à brancher</span></div><div class="b">
+      <div class="fld"><label>Ce qu’il réclame</label>
+        <ul class="pmajl" style="padding:0">${PRE.map(([t,d])=>`<li><b>${esc(t)}</b>
+          <div class="mu" style="font-size:11.5px">${esc(d)}</div></li>`).join('')}</ul></div>
+      <div class="fld"><label>État en démonstration</label>
+        <div class="seg">
+          <button class="${EXPEDITEUR.demo?'on':''}" onclick="EXPEDITEUR.demo=true;paint()">États simulés</button>
+          <button class="${EXPEDITEUR.demo?'':'on'}" onclick="EXPEDITEUR.demo=false;paint()">Rester en file</button>
+        </div>
+        <div class="mu" style="font-size:11.5px;margin-top:5px">Tant que le relais n’est pas branché : soit on fait vivre
+          la remise pour montrer ce que le registre affichera, soit les envois restent en file — ce qui se passera réellement.</div></div>
+      <div class="fld"><label>Registre</label>
+        <div class="chips">${[['Envois',n('tous')],['Remis',n('remis')+n('ouvert')],['Ouverts',n('ouvert')],['Échecs',n('echec')]]
+          .map(([l,v])=>`<span class="bdg ${l==='Échecs'&&v?'b-crit':'b-info'}">${l} · ${v}</span>`).join('')}</div>
+        <button class="btn s" style="margin-top:8px" onclick="go('envois')">Ouvrir le registre des envois →</button></div>
+    </div></div>
+   </div>`;
   },
   fidelite:()=>{
    const all=PATIENTS.map(p=>({p,f:fidLevel(p)})).filter(x=>x.f);
@@ -7018,15 +7405,16 @@ function docsActe(a){
 const canalPat=p=>p&&p.mail&&p.mail!=='—'?'e-mail':'SMS';
 
 /* --- actions : un clic --- */
-function sendDoc(aid,id){
- const a=ACTES.find(x=>x.id===aid), p=pById(a.patient), ca=canalPat(p);
+function sendDoc(aid,id,o){
+ const a=ACTES.find(x=>x.id===aid), p=pById(a.patient);
  const d=docsActe(a).find(x=>x.id===id); if(!d) return;
- if(d.k==='consentement'){ logDoc(id,`Lien de signature envoyé par ${ca}`); toast(`Lien de signature envoyé par ${ca} à ${fn(p)}`) }
- else if(d.k==='devis'){ const dv=DEVIS.find(x=>x.id===id); if(dv&&dv.statut==='brouillon'){dv.statut='envoye';dv.envoye=TODAYS}
-   logDoc(id,`Devis envoyé par ${ca}`); toast(`Devis ${id} envoyé par ${ca}`) }
- else { const ad=DOCADD.find(x=>x.id===id); if(ad) ad.envoye=nowStamp();
-   logDoc(id,`Envoyé par ${ca}`); toast(`${d.nom} envoyé par ${ca}`) }
- renderOver();
+ if(d.k==='devis'){ const dv=DEVIS.find(x=>x.id===id); if(dv&&dv.statut==='brouillon'){dv.statut='envoye';dv.envoye=TODAYS} }
+ if(d.k!=='consentement'&&d.k!=='devis'){ const ad=DOCADD.find(x=>x.id===id); if(ad) ad.envoye=nowStamp() }
+ const e=poserEnvoi(p,id,d.nom,d.k,aid,o);
+ toast(d.k==='consentement'
+   ? `Lien de signature envoyé par ${e.canal} à ${fn(p)} · ${e.ref}`
+   : `${d.nom} envoyé par ${e.canal} · ${e.ref}`);
+ paint(); if(AS) renderOver();
 }
 function signDoc(aid,id){
  const a=ACTES.find(x=>x.id===aid); if(!a) return;
@@ -7329,7 +7717,7 @@ function secDocuments(a){
       <span class="dch">${docOpen===d.id?'▾':'›'}</span>
     </div>
     <div class="drow-a">
-      ${d.env?`<button class="btn xs p" onclick="sendDoc(${a.id},'${d.id}')" title="Envoi par ${ca} à ${esc(p.mail!=='—'?p.mail:p.tel)}">✉ Envoyer</button>`:''}
+      ${d.env?`<button class="btn xs p" onclick="composerEnvoi(${a.id},'${d.id}')" title="Envoi par ${ca} à ${esc(p.mail!=='—'?p.mail:p.tel)}">✉ Envoyer</button>`:''}
       ${d.sign?`<button class="btn xs" onclick="signDoc(${a.id},'${d.id}')">✎ Faire signer</button>`:''}
       ${(d.k==='facture'&&peutEncaisser()&&(FACTURES.find(x=>x.id===d.id)||{}).statut!=='annulee')
         ?`<button class="btn xs ${encSel===d.id?'g':''}" onclick="ouvrirEnc('${d.id}')">${encSel===d.id?'✕ Fermer':'€ Encaissement'}</button>`:''}
@@ -7811,7 +8199,7 @@ function apercuDoc(aid,id){
  if(d.k==='devis') return apercuDevis(d.id);
  const p=pById(a.patient), st=(DST[d.st]||[d.st])[0];
  pdfView(d.nom, `${d.id} · ${fn(p)} · ${st}`, docDoc(a,d),
-   [d.env?`<button class="pv-b" onclick="fermerPdf();sendDoc(${aid},'${d.id}')">✉ Envoyer</button>`:'',
+   [d.env?`<button class="pv-b" onclick="fermerPdf();composerEnvoi(${aid},'${d.id}')">✉ Envoyer</button>`:'',
     d.sign?`<button class="pv-b" onclick="fermerPdf();signDoc(${aid},'${d.id}')">✎ Faire signer</button>`:''].join(''));
 }
 /* aperçu d'un devis en cours de saisie, avant tout enregistrement */
@@ -8303,11 +8691,13 @@ document.addEventListener('keydown',e=>{
 /* ---------- actions ---------- */
 function sendRel(id){const d=DEVIS.find(x=>x.id===id); if(!d)return;
  d.relances++; d.derniere=TODAYS; d.statut=d.relances>=2?'relance2':'relance1';
+ poserEnvoi(pById(d.patient), d.id, nomDevis(d)+' — relance '+d.relances, 'devis', d.acte||null);
  RELS.length=0; fileRelances().forEach(r=>RELS.push(r));
  RDUE.length=0; RELS.filter(r=>r.du).forEach(r=>RDUE.push(r));
  paint(); toast('Relance envoyée à '+fn(pById(d.patient)));}
 function allRel(){const n=RDUE.length; if(!n){toast('Aucune relance échue');return}
- [...RDUE].forEach(r=>{const d=r.d;d.relances++;d.derniere=TODAYS;d.statut=d.relances>=2?'relance2':'relance1'});
+ [...RDUE].forEach(r=>{const d=r.d;d.relances++;d.derniere=TODAYS;d.statut=d.relances>=2?'relance2':'relance1';
+   poserEnvoi(pById(d.patient), d.id, nomDevis(d)+' — relance '+d.relances, 'devis', d.acte||null)});
  RELS.length=0; fileRelances().forEach(r=>RELS.push(r));
  RDUE.length=0; RELS.filter(r=>r.du).forEach(r=>RDUE.push(r));
  paint(); toast(n+' relance'+(n>1?'s envoyées':' envoyée'));}
@@ -8356,7 +8746,8 @@ function paint(){
  const al=ROLES[role].v; if(!al.includes(view))view='dash';
  document.querySelectorAll('#nav a[data-v]').forEach(a=>{a.classList.toggle('on',a.dataset.v===view);
   a.style.display=al.includes(a.dataset.v)?'':'none'});
- [['n-devis',ATT.length],['n-rel',RDUE.length],['n-stock',ALERTES.length]].forEach(([i,v])=>{
+ [['n-devis',ATT.length],['n-rel',RDUE.length],['n-stock',ALERTES.length],
+  ['n-env',ENVOIS.filter(e=>e.statut==='echec').length]].forEach(([i,v])=>{
   const e=document.getElementById(i); e.textContent=v; e.style.display=v?'':'none'});
  document.getElementById('avat').textContent=ROLES[role].i;
  document.getElementById('who').innerHTML=`${ROLES[role].u}<small>${ROLES[role].l}</small>`;
