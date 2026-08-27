@@ -746,6 +746,7 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
 .sc-z .zrow{padding:4px 0}
 .sc-vide{font-size:11.5px;color:var(--ink-3);padding:2px 0 5px}
 .sc-note{display:block;width:100%;box-sizing:border-box;margin-top:6px;font-size:11.5px;padding:4px 8px}
+.prot-id{display:flex;gap:9px;align-items:flex-end}
 .catr{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
 tr.neuf>td{background:color-mix(in srgb,var(--accent) 9%,transparent)}
 .catr:last-child{border-bottom:none}
@@ -5105,13 +5106,28 @@ V.stats=()=>{
 
 /* ---------- protocoles paramétrables ---------- */
 let protoSel=null;
+/* le tarif d'un protocole : la somme de ses actes — sauf si le cabinet en a fixé
+   un, auquel cas c'est un forfait, et c'est lui qui s'impose. */
+const protoCalc=P=>prixSeance(protoActes(P),1);
+const protoForfait=P=>!!P&&P.prix!=null&&P.prix!=='';
+const protoPrix=P=>protoForfait(P)?+P.prix:protoCalc(P);
+function setProtoPrix(i,v){ const P=PROTOS[i]; if(!P) return;
+ const t=String(v==null?'':v).trim();
+ if(t===''){ P.prix=null; paint();
+   toast(`« ${P.n} » revient au tarif de ses actes · ${EUR(protoCalc(P))}`); return }
+ const n=+t.replace(',','.');
+ if(!isFinite(n)||n<0){ toast('Le tarif du protocole doit être un montant positif'); paint(); return }
+ P.prix=Math.round(n*100)/100; paint();
+ const c=protoCalc(P);
+ toast(`« ${P.n} » au forfait ${EUR(P.prix)}`+(P.prix!==c?` — au lieu de ${EUR(c)} en additionnant les actes`:''));
+}
 const protoResume=x=>{
  const E=Object.keys(x.z);
  if(!E.length) return 'aucune zone';
  const sd=E.filter(z=>!(+x.z[z]>0)).length;
  const par=protoActes(x).map(t=>acteDef(t).n);
  const ns=protoTousSup(x).length;
- return `${E.length} zone${E.length>1?'s':''}${sd?` (dont ${sd} sans dose)`:''}${ns?` · ${ns} acte${ns>1?'s':''} associé${ns>1?'s':''}`:''} · ${par.join(' + ')} · ${EUR(prixSeance(protoActes(x),1))}`;
+ return `${E.length} zone${E.length>1?'s':''}${sd?` (dont ${sd} sans dose)`:''}${ns?` · ${ns} acte${ns>1?'s':''} associé${ns>1?'s':''}`:''} · ${par.join(' + ')} · ${EUR(protoPrix(x))}${protoForfait(x)?' forfait':''}`;
 };
 function zoneOptions(exclues){
  const dispo=ZONES.filter(z=>!exclues.includes(z.id));
@@ -5411,7 +5427,7 @@ V.params=()=>{
    <div class="grid g2 gcat" style="align-items:start">
     <div>
     <div class="card"><div class="h"><h2>Protocoles en 1 clic</h2><span class="s">${PROTOS.length}</span>
-      <div class="r"><button class="btn xs p" onclick="PROTOS.push({n:'Nouveau protocole',z:{},zt:{}});protoSel=PROTOS.length-1;paint()">+ Protocole</button></div></div>
+      <div class="r"><button class="btn xs p" onclick="PROTOS.push({n:'Nouveau protocole',z:{},zt:{},zx:{},prix:null});protoSel=PROTOS.length-1;paint()">+ Protocole</button></div></div>
      <div class="b" style="padding:9px">
       <div class="mu" style="font-size:11.5px;margin-bottom:9px">Un protocole relie chaque zone à l'acte qu'on y pratique et à sa dose usuelle : un clic pose l'ensemble sur le schéma. Tout reste modifiable acte par acte.</div>
       ${PROTOS.map((x,i)=>`<div class="prot ${protoSel===i?'on':''}">
@@ -5422,8 +5438,20 @@ V.params=()=>{
           <button class="rm" onclick="event.stopPropagation();rmProto(${i})">✕</button>
         </div>
         ${protoSel===i?`<div class="prot-b">
-          <div class="fld"><label>Nom du protocole</label>
+          <div class="prot-id">
+           <div class="fld" style="flex:1;min-width:0"><label>Nom du protocole</label>
             <input class="inp" style="width:100%" value="${esc(x.n)}" onchange="PROTOS[${i}].n=this.value;paint()"></div>
+           ${CAN('prix')?`<div class="fld" style="flex:none"><label>Tarif</label>
+            <div style="display:flex;gap:4px;align-items:center">
+             <input class="inp" type="number" min="0" step="10" style="width:96px;text-align:right"
+               value="${protoForfait(x)?x.prix:''}" placeholder="${protoCalc(x)}"
+               title="Laissez vide pour additionner les tarifs des actes"
+               onchange="setProtoPrix(${i},this.value)"><span class="mu">€</span></div></div>`:''}
+          </div>
+          ${CAN('prix')?`<div class="mu prot-aide" style="font-size:11px;padding:0 2px 7px">${protoForfait(x)
+            ? `Forfait : le protocole se pose à <b>${EUR(protoPrix(x))}</b>${protoPrix(x)!==protoCalc(x)
+                ?` au lieu de ${EUR(protoCalc(x))} en additionnant ses actes`:''}. Videz le champ pour revenir au calcul.`
+            : `Tarif calculé : <b>${EUR(protoCalc(x))}</b>, somme des actes du protocole. Saisissez un montant pour en faire un forfait.`}</div>`:''}
           ${Object.entries(x.z).length?Object.entries(x.z).map(([z,q])=>{const Z=zoneDef(z); if(!Z) return '';
             const t=protoActe(x,z), C=acteDef(t);
             return `<div class="zrow"><span class="zd" style="background:${colActe(t)}"></span>
@@ -7619,9 +7647,12 @@ function applyProto(i){
    const m=`protocole « ${P.n} » — ${parT[t].join(', ')}`;
    sn.com=sn.com?(sn.com.includes(m)?sn.com:sn.com+' · '+m):m;
  });
- AS.prix=null; renderOver();
+ /* un protocole au forfait impose son montant ; sinon la séance additionne ses actes */
+ AS.prix=protoForfait(P)?protoPrix(P):null;
+ renderOver();
  toast(`Protocole « ${P.n} » appliqué · ${protoActes(P).map(t=>acteDef(t).n).join(' + ')}`
-   +(sup.length?` · ${sup.length} acte${sup.length>1?'s':''} associé${sup.length>1?'s':''} à la séance`:''));
+   +(sup.length?` · ${sup.length} acte${sup.length>1?'s':''} associé${sup.length>1?'s':''} à la séance`:'')
+   +(protoForfait(P)?` · forfait ${EUR(protoPrix(P))}`:''));
 }
 function mirrorZ(){
  Object.keys({...AS.z}).forEach(k=>{
@@ -8749,20 +8780,27 @@ function dvProto(i){
  let cible=dvLigne;
  const SUP={};
  protoTousSup(P).forEach(x=>{ (SUP[x.t]=SUP[x.t]||[]).push(zoneNom(x.z)) });
+ /* au forfait, le devis porte le montant sur la première prestation : les autres
+    sont comprises dedans, et le total reste exactement celui du protocole */
+ const forf=protoForfait(P);
  T.forEach((t,k)=>{
   const z={};
   Object.keys(P.z).forEach(zn=>{ if(protoActe(P,zn)===t) z[zn]=acteDef(t).unite?P.z[zn]:1 });
   /* un acte seulement associé n'a pas de zone à lui : on note où il était prévu */
-  const com=(!Object.keys(z).length&&SUP[t])?`associé à ${SUP[t].join(', ')}`:'';
+  const ou=(!Object.keys(z).length&&SUP[t])?`associé à ${SUP[t].join(', ')}`:'';
+  const dans=(forf&&k>0)?`compris dans le forfait « ${P.n} »`:'';
+  const com=[ou,dans].filter(Boolean).join(' · ');
+  const prix=forf?(k===0?protoPrix(P):0):null;
   const cur=DV.lignes[cible];
   const vide=cur&&cur.type===null&&cur.libre==null;
-  if(k===0&&vide) Object.assign(cur,{type:t, libre:null, reg:'visage', z, com, prix:null});
+  if(k===0&&vide) Object.assign(cur,{type:t, libre:null, reg:'visage', z, com, prix});
   else { DV.lignes.push({type:t, libre:null, com, reg:'visage', z,
-          seances:1, prix:null, remise:0, remiseType:'%'});
+          seances:1, prix, remise:0, remiseType:'%'});
          cible=DV.lignes.length-1 }
  });
  dvLigne=cible; dvPlie=false; renderDevis();
- toast(`Protocole « ${P.n} » · ${T.map(t=>acteDef(t).n).join(' + ')}`);
+ toast(`Protocole « ${P.n} » · ${T.map(t=>acteDef(t).n).join(' + ')}`
+   +(forf?` · forfait ${EUR(protoPrix(P))}`:''));
 }
 /* reporter à gauche ce qui est posé à droite, et l'inverse */
 function dvMirror(){
