@@ -748,6 +748,18 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
 .sc-note{display:block;width:100%;box-sizing:border-box;margin-top:6px;font-size:11.5px;padding:4px 8px}
 table tfoot td{border-top:2px solid var(--line);background:var(--panel-2);font-weight:620;
   position:sticky;bottom:0}
+/* un tableau qui doit tenir dans la largeur : on resserre, on tronque proprement,
+   et l'infobulle rend ce que la colonne ne peut pas montrer */
+table.tcomp{font-size:12px}
+table.tcomp th{font-size:9.5px;padding:7px 6px;letter-spacing:.03em}
+table.tcomp td{padding:8px 6px}
+table.tcomp .mu{font-size:11.5px}
+table.tcomp .bdg{font-size:10.5px;padding:2px 6px}
+td.nw,th.nw{white-space:nowrap}
+td.el{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.relx{display:inline-flex;align-items:center;gap:6px}
+.relx .inp{height:32px;font-size:12.5px;max-width:170px}
+.relx .mu{font-size:11.5px;white-space:nowrap}
 .prot-id{display:flex;gap:9px;align-items:flex-end}
 /* la ligne dépliée appartient à un tableau qui défile : le panneau reste collé
    au bord visible et borné, pour se lire sans faire défiler quoi que ce soit */
@@ -2106,6 +2118,13 @@ function moyenTxt(f){
  const P=f.plan;
  if(!P||!(P.n>1)) return f.moyen;
  return `${f.moyen} — ${P.n} fois (${Math.min(P.faites||0,P.n)}/${P.n})`;
+}
+/* le même règlement, en plus court : « Virement 1/2 » plutôt que
+   « Virement — 2 fois (1/2) ». Le libellé complet reste en infobulle. */
+function moyenCourt(f){
+ if(!f||f.statut==='annulee'||!f.moyen) return '';
+ const P=f.plan;
+ return (!P||!(P.n>1))?f.moyen:`${f.moyen} ${Math.min(P.faites||0,P.n)}/${P.n}`;
 }
 /* montant d'une échéance */
 const echeance=f=>(f&&f.plan&&f.plan.n>1)?Math.round(fTTC(f)/f.plan.n):0;
@@ -4696,17 +4715,19 @@ function pDetail(p){
         onclick="${factNew&&factNew.pid===p.id?'fermerFactNew()':`ouvrirFactNew(${p.id})`}">+ Facture</button></div></div>
    ${factNew&&factNew.pid===p.id?factForm(p):''}
    ${avoirNew&&avoirNew.pid===p.id?avoirForm(p):''}
-   <div class="tw"><table><thead><tr><th>N°</th><th>Date</th><th>Acte</th>${cpt?'<th class="num">HT</th><th class="num">TVA</th>':''}<th class="num">TTC</th><th class="num">Avoir</th><th class="num">Encaissé</th><th>Mode</th><th class="num">Reste</th><th>Statut</th><th></th></tr></thead>
+   <div class="tw"><table class="tcomp"><thead><tr><th>N°</th><th>Date</th><th>Acte</th>${cpt?'<th class="num">HT</th><th class="num">TVA</th>':''}<th class="num">TTC</th><th class="num">Avoir</th><th class="num">Encaissé</th><th>Mode</th><th class="num">Reste</th><th>Statut</th><th></th></tr></thead>
     <tbody>${F.map(f=>{const act=ACTES.find(x=>x.id===f.acte), an=f.statut==='annulee';
+      const nom=act?act.nom:(f.libelle||'—');
       return `<tr class="${an?'annul':''}">
-      <td class="mono" style="white-space:nowrap">${f.id}</td><td class="mono" style="white-space:nowrap">${DF(f.date)}</td>
-      <td style="white-space:nowrap">${act?esc(act.nom):esc(f.libelle||'—')}${act?'':'<div class="mu" style="font-size:11px">sans acte</div>'}</td>
-      ${cpt?`<td class="num">${EUR(fHT(f))}</td><td class="num mu">${EUR(fTVA(f))}</td>`:''}
-      <td class="num"><b>${EUR(fTTC(f))}</b></td>
-      <td class="num ${f.avoir?'':'mu'}" style="white-space:nowrap${f.avoir?';color:var(--warn)':''}">${f.avoir
+      <td class="mono nw">${f.id}</td><td class="mono nw" title="${DF(f.date)}">${DFP(f.date)}</td>
+      <td class="el" style="max-width:138px" title="${esc(nom)}${act?'':' — facture sans acte'}">${esc(nom)}${act?'':'<div class="mu" style="font-size:10.5px">sans acte</div>'}</td>
+      ${cpt?`<td class="num nw">${EUR(fHT(f))}</td><td class="num mu nw">${EUR(fTVA(f))}</td>`:''}
+      <td class="num nw"><b>${EUR(fTTC(f))}</b></td>
+      <td class="num nw ${f.avoir?'':'mu'}" style="${f.avoir?'color:var(--warn)':''}">${f.avoir
         ?`− ${EUR(f.avoir)}${avoirsDe(f.id).length>1?`<div class="mu" style="font-size:10.5px">${avoirsDe(f.id).length} avoirs</div>`:''}`
         :'—'}</td>
-      <td class="num">${EUR(f.paye)}</td><td class="mu">${moyenTxt(f)||'—'}</td>
+      <td class="num nw">${EUR(f.paye)}</td>
+      <td class="mu el" style="max-width:74px" title="${esc(moyenTxt(f)||'non réglé')}">${esc(moyenCourt(f)||'—')}</td>
       <td class="num">${rdu(f)>0?`<span style="color:var(--crit);font-weight:650">${EUR(rdu(f))}</span>`
         :trop(f)?`<span style="color:var(--warn);font-weight:650" title="Encaissé au-delà du dû après avoir">↩ ${EUR(trop(f))}</span>`
         :'<span class="mu">—</span>'}</td>
@@ -4714,9 +4735,9 @@ function pDetail(p){
       <td class="num" style="white-space:nowrap">
         ${(an||!voitRetro())?'':`<button class="btn xs ${retroSel===f.id?'g':''}"
           title="Part centre et part praticien rétrocédée"
-          onclick="event.stopPropagation();ouvrirRetro('${f.id}')">${retroSel===f.id?'✕':'⇄ Rétrocession'}</button>`}
+          onclick="event.stopPropagation();ouvrirRetro('${f.id}')">${retroSel===f.id?'✕':'⇄ Rétroc.'}</button>`}
         ${(an||!peutEncaisser())?'':`<button class="btn xs ${encSel===f.id?'g':''}" title="Corriger l’encaissement, même sur une facture soldée"
-          onclick="event.stopPropagation();ouvrirEnc('${f.id}')">${encSel===f.id?'✕':'€ Encaissement'}</button>`}
+          onclick="event.stopPropagation();ouvrirEnc('${f.id}')">${encSel===f.id?'✕':'€ Encaisser'}</button>`}
         <button class="btn xs" onclick="toast('PDF Factur-X de ${f.id}')">PDF</button></td></tr>
       ${encSel===f.id?`<tr class="supp"><td colspan="${cpt?12:10}">${encForm(f)}</td></tr>`:''}
       ${retroSel===f.id?`<tr class="supp"><td colspan="${cpt?12:10}">${retroDetail(f)}</td></tr>`:''}`}).join('')}
@@ -4866,6 +4887,21 @@ V.devis=()=>{
 
 /* ---------------- Encaissements ---------------- */
 let encView='detail', fMoyen='tous', fStatut='tous', fPrat='', fCat='', fq='';
+/* le relevé se transmet à un praticien : on choisit lequel, et c'est le sien
+   seul qui part — « tous » reste possible pour l'usage comptable interne */
+let retroPrat=null;
+const retroQui=()=>{ if(retroPrat!==null) return retroPrat;
+ return PRATICIENS.includes(fPrat)?fPrat:(PRATICIENS[0]||'') };
+function setRetroPrat(v){ retroPrat=v; paint() }
+function choixRetro(){
+ const q=retroQui();
+ return `<span class="relx"><span class="mu">Relevé de</span>
+   <select class="inp" title="Le praticien à qui le relevé sera transmis"
+     onchange="setRetroPrat(this.value)">
+     ${PRATICIENS.map(x=>`<option value="${esc(x)}" ${q===x?'selected':''}>${esc(x)}</option>`).join('')}
+     <option value="" ${q===''?'selected':''}>Tous les praticiens</option></select>
+   <button class="btn" onclick="releveRetro(retroQui())">⭳ Exporter le relevé</button></span>`;
+}
 const ENCV=[['detail','Facturations détaillées'],['jours','Totaux journaliers'],
             ['caisse','Encaissement & caisse'],['retro','Rétrocession']];
 const encVues=()=>ENCV.filter(([k])=>k!=='retro'||(FACTU.double&&CAN('compta')));
@@ -5010,8 +5046,7 @@ function eDetail(){
  const cpt=CAN('compta'), dbl=FACTU.double&&cpt;
  return `<div class="head" style="margin-bottom:12px">
    <div><h1>Facturations détaillées</h1><p>${L.length} facturation${L.length>1?'s':''} sur la période${L.length!==ok.length?` · ${L.length-ok.length} annulée(s) exclue(s) des totaux`:''}</p></div>
-   <div class="r">${(FACTU.double&&CAN('compta'))?`<button class="btn" title="Le détail des factures et la part de chaque praticien"
-      onclick="releveRetro('')">⭳ Relevé de rétrocession</button>`:''}
+   <div class="r">${(FACTU.double&&CAN('compta'))?choixRetro():''}
     <button class="btn" onclick="exportFactures()">⭳ Exporter la liste</button>
     <button class="btn p" onclick="toast('Facturation créée')">+ Facturation</button></div></div>
  ${periodBar(perE,'setPerE',`${L.length} ligne${L.length>1?'s':''}`,presetsFactu(),1)}
@@ -5022,27 +5057,28 @@ function eDetail(){
   ${kpi('Encaissé',EUR(enc),ttc?Math.round(enc/ttc*100)+' % du facturé':'—','up')}
   ${kpi('Reste dû',EUR(reste),ok.filter(f=>rdu(f)>0).length+' facture(s)',reste?'dn':'up')}
   ${dbl?kpi('Rétrocession praticien',EUR(pp),`part centre ${EUR(pc)}`):''}</div>
- <div class="card"><div class="tw"><table>
-  <thead><tr><th style="white-space:nowrap">N°</th><th style="white-space:nowrap">Date</th><th style="white-space:nowrap">Patient</th><th style="white-space:nowrap">Acte</th><th style="white-space:nowrap">Catégorie</th><th style="white-space:nowrap">Praticien</th>
-   ${dbl?'<th>Facturé par</th>':''}
+ <div class="card"><div class="tw"><table class="tcomp">
+  <thead><tr><th>N°</th><th>Date</th><th>Patient</th><th>Acte</th><th>Praticien</th>
    ${cpt?'<th class="num">HT</th><th class="num">TVA</th>':''}<th class="num">TTC</th>
-   ${dbl?'<th class="num">Part centre</th><th class="num">Part praticien</th>':''}
+   ${dbl?'<th class="num" title="Part revenant au centre">Centre</th><th class="num" title="Part rétrocédée au praticien">Rétroc.</th>':''}
    <th class="num">Encaissé</th><th>Mode</th><th class="num">Reste</th><th>Statut</th></tr></thead>
   <tbody>${L.map(f=>{const p=pById(f.patient), a=ACTES.find(x=>x.id===f.acte), an=f.statut==='annulee';
+   const acte=a?a.nom:(f.libelle||'—'), md=moyenCourt(f);
    return `<tr class="c ${an?'annul':''}" onclick="openPatient(${f.patient})">
-    <td class="mono" style="white-space:nowrap">${f.id}</td><td class="mono" style="white-space:nowrap">${DF(f.date)}</td>
-    <td style="white-space:nowrap"><span class="nm">${esc(fn(p))}</span><div class="mu" style="font-size:11px">n° ${p.id}</div></td>
-    <td style="white-space:nowrap">${a?esc(a.nom):esc(f.libelle||'—')}${f.avoir?`<div class="mu" style="font-size:11px">avoir ${EUR(f.avoir)}</div>`:''}</td>
-    <td class="mu">${esc(f.cat)}</td><td class="mu" style="white-space:nowrap">${esc(f.praticien)}</td>
-    ${dbl?`<td><span class="bdg b-neu">${FACTU.modele==='split'?'Centre + Praticien':esc(FACTU.centre.nom)}</span></td>`:''}
-    ${cpt?`<td class="num">${EUR(fHT(f))}</td><td class="num mu">${EUR(fTVA(f))}</td>`:''}
-    <td class="num"><b>${EUR(fTTC(f))}</b></td>
-    ${dbl?`<td class="num mu">${EUR(partCentre(f))}</td><td class="num" style="color:var(--accent-ink);font-weight:620">${EUR(partPrat(f))}</td>`:''}
-    <td class="num">${EUR(f.paye)}</td><td class="mu">${moyenTxt(f)||'—'}</td>
-    <td class="num">${rdu(f)>0?`<span style="color:var(--crit);font-weight:650">${EUR(rdu(f))}</span>`:'<span class="mu">—</span>'}</td>
-    <td>${an?bdg('b-crit','⊘ Annulée'):f.avoir?bdg('b-warn','Avoir'):rdu(f)>0?bdg('b-warn','Partielle'):bdg('b-good','Soldée')}</td></tr>`}).join('')}
+    <td class="mono nw">${f.id}</td><td class="mono nw" title="${DF(f.date)}">${DFP(f.date)}</td>
+    <td class="el" style="max-width:106px" title="${esc(fn(p))} — dossier n° ${p.id}"><span class="nm">${esc(fn(p))}</span></td>
+    <td class="el" style="max-width:138px" title="${esc(acte)}${f.cat?' · '+esc(f.cat):''}${f.avoir?' · avoir '+EUR(f.avoir):''}">${esc(acte)}${f.avoir?`<div class="mu" style="font-size:10.5px">avoir ${EUR(f.avoir)}</div>`:''}</td>
+    <td class="mu el" style="max-width:88px" title="${esc(f.praticien)}">${esc(f.praticien)}</td>
+    ${cpt?`<td class="num nw">${EUR(fHT(f))}</td><td class="num mu nw">${EUR(fTVA(f))}</td>`:''}
+    <td class="num nw"><b>${EUR(fTTC(f))}</b></td>
+    ${dbl?`<td class="num mu nw">${EUR(partCentre(f))}</td><td class="num nw" style="color:var(--accent);font-weight:640">${EUR(partPrat(f))}</td>`:''}
+    <td class="num nw">${EUR(f.paye)}</td>
+    <td class="mu el" style="max-width:78px" title="${esc(moyenTxt(f)||'non réglé')}">${esc(md||'—')}</td>
+    <td class="num nw">${rdu(f)>0?`<span style="color:var(--crit);font-weight:650">${EUR(rdu(f))}</span>`:'<span class="mu">—</span>'}</td>
+    <td class="nw">${an?bdg('b-crit','Annulée'):f.avoir?bdg('b-warn','Avoir'):rdu(f)>0?bdg('b-warn','Partielle'):bdg('b-good','Soldée')}</td></tr>`}).join('')}
   </tbody></table>${L.length?'':'<div class="empty">Aucune facturation avec ces filtres.</div>'}</div></div>
- <div class="mu" style="font-size:11.5px;margin-top:10px">⊘ Les facturations annulées ne sont pas prises en compte dans les totaux. Les avoirs sont déduits des montants HT et TTC.</div>`;
+ <div class="mu" style="font-size:11.5px;margin-top:10px">⊘ Les facturations annulées ne sont pas prises en compte dans les totaux. Les avoirs sont déduits des montants HT et TTC.
+   La catégorie et l’émetteur de la facture restent lisibles en infobulle et dans le relevé exporté.</div>`;
 }
 
 /* ---------- Rétrocession : ce qu'on transmet à chaque praticien ---------- */
@@ -5088,20 +5124,21 @@ function eRetro(){
    <div class="r"><select class="inp" onchange="fPrat=this.value;paint()"><option value="">Tous praticiens</option>
      ${prats.map(x=>`<option ${fPrat===x?'selected':''}>${esc(x)}</option>`).join('')}</select>
     <button class="btn xs" onclick="releveRetro(fPrat||'')">⭳ Exporter ce détail</button></div></div>
-  <div class="tw"><table>
-   <thead><tr><th style="white-space:nowrap">N°</th><th style="white-space:nowrap">Date</th><th>Patient</th><th>Prestation</th>
+  <div class="tw"><table class="tcomp">
+   <thead><tr><th>N°</th><th>Date</th><th>Patient</th><th>Prestation</th>
     <th>Praticien</th><th class="num">TTC</th><th class="num">Taux</th>
-    <th class="num">Part praticien</th><th class="num">Part centre</th>
+    <th class="num" title="Part rétrocédée au praticien">Rétroc.</th><th class="num" title="Part revenant au centre">Centre</th>
     <th class="num">Encaissé</th><th class="num">Reste</th></tr></thead>
    <tbody>${L.map(f=>{const p=pById(f.patient), a=ACTES.find(x=>x.id===f.acte);
+    const nom=a?a.nom:(f.libelle||'—');
     return `<tr class="c" onclick="openPatient(${f.patient})">
-     <td class="mono" style="white-space:nowrap">${f.id}</td>
-     <td class="mono" style="white-space:nowrap">${DF(f.date)}</td>
-     <td style="white-space:nowrap"><span class="nm">${esc(fn(p))}</span></td>
-     <td>${a?esc(a.nom):esc(f.libelle||'—')}${f.avoir?`<div class="mu" style="font-size:11px">avoir ${EUR(f.avoir)} déduit</div>`:''}</td>
-     <td class="mu" style="white-space:nowrap">${esc(f.praticien)}</td>
-     <td class="num"><b>${EUR(fTTC(f))}</b></td>
-     <td class="num mu">${tauxRetro(f.praticien)} %</td>
+     <td class="mono nw">${f.id}</td>
+     <td class="mono nw" title="${DF(f.date)}">${DFP(f.date)}</td>
+     <td class="el" style="max-width:118px" title="${esc(fn(p))}"><span class="nm">${esc(fn(p))}</span></td>
+     <td class="el" style="max-width:158px" title="${esc(nom)}${f.avoir?' · avoir '+EUR(f.avoir)+' déduit':''}">${esc(nom)}${f.avoir?`<div class="mu" style="font-size:10.5px">avoir ${EUR(f.avoir)} déduit</div>`:''}</td>
+     <td class="mu el" style="max-width:92px" title="${esc(f.praticien)}">${esc(f.praticien)}</td>
+     <td class="num nw"><b>${EUR(fTTC(f))}</b></td>
+     <td class="num mu nw">${tauxRetro(f.praticien)} %</td>
      <td class="num" style="color:var(--accent);font-weight:640">${EUR(partPrat(f))}</td>
      <td class="num mu">${EUR(partCentre(f))}</td>
      <td class="num">${EUR(f.paye)}</td>
@@ -5135,10 +5172,10 @@ function eJours(){
   ${kpi('Moyenne par jour',EUR(jours.length?tot/jours.length:0),`sur ${jours.length} jour(s) travaillé(s)`)}
   ${kpi('Encaissé',EUR(L.reduce((s,f)=>s+f.paye,0)))}
   ${kpi('Reste dû',EUR(L.reduce((s,f)=>s+rdu(f),0)),'',L.reduce((s,f)=>s+rdu(f),0)?'dn':'up')}</div>
- <div class="card"><div class="tw"><table>
-  <thead><tr><th>Date</th><th class="num">Nb factures</th><th class="num">Nb avoirs</th>${cpt?'<th class="num">HT</th><th class="num">TVA</th>':''}
-   <th class="num">TTC</th>${dbl?'<th class="num">Part centre</th><th class="num">Part praticien</th>':''}
-   <th class="num">Encaissé</th><th>Modes de paiement</th><th class="num">Restant dû</th></tr></thead>
+ <div class="card"><div class="tw"><table class="tcomp">
+  <thead><tr><th>Date</th><th class="num" title="Nombre de factures">Factures</th><th class="num" title="Nombre d’avoirs">Avoirs</th>${cpt?'<th class="num">HT</th><th class="num">TVA</th>':''}
+   <th class="num">TTC</th>${dbl?'<th class="num" title="Part revenant au centre">Centre</th><th class="num" title="Part rétrocédée au praticien">Rétroc.</th>':''}
+   <th class="num">Encaissé</th><th>Moyens de paiement</th><th class="num">Restant dû</th></tr></thead>
   <tbody>${jours.map(d=>{const F=j[d], ok=F.filter(f=>f.statut==='ok');
    const modes={}; ok.forEach(f=>{if(f.moyen) modes[f.moyen]=(modes[f.moyen]||0)+f.paye});
    return `<tr class="c" onclick="encView='detail';setPerE({k:'perso',from:'${d}',to:'${d}'})">
