@@ -747,6 +747,25 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
 .sc-vide{font-size:11.5px;color:var(--ink-3);padding:2px 0 5px}
 .sc-note{display:block;width:100%;box-sizing:border-box;margin-top:6px;font-size:11.5px;padding:4px 8px}
 .prot-id{display:flex;gap:9px;align-items:flex-end}
+/* la ligne dépliée appartient à un tableau qui défile : le panneau reste collé
+   au bord visible et borné, pour se lire sans faire défiler quoi que ce soit */
+.retrod{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:16px;padding:4px 2px;
+  position:sticky;left:0;max-width:900px}
+.retrod-b{display:flex;flex-direction:column;gap:4px}
+.rtl{display:flex;align-items:baseline;gap:9px;font-size:12.5px}
+.rtl>span{flex:1;min-width:0;color:var(--ink-2)}
+.rtl>span small{display:block;color:var(--ink-3);font-size:11px}
+.rtl>b{font-variant-numeric:tabular-nums;font-weight:660}
+.rtl.acc>b{color:var(--accent)}
+.rtb{height:7px;border-radius:4px;background:var(--panel-3);overflow:hidden;margin-top:5px}
+.rtb-p{height:100%;background:var(--accent)}
+.retrod-t{font-size:11.5px;color:var(--ink-2);line-height:1.55}
+.retrod-t a{color:var(--accent);cursor:pointer}
+.rtap{display:inline-block;margin-left:9px;padding:1px 7px;border-radius:6px;
+  background:var(--panel-2);color:var(--ink-2);font-size:11px;white-space:nowrap}
+.rtap b{color:var(--ink);font-variant-numeric:tabular-nums}
+@media(max-width:1300px){.retrod{grid-template-columns:minmax(0,1fr);max-width:620px;gap:9px}}
+@media(max-width:960px){.retrod{max-width:520px}}
 .catr{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
 tr.neuf>td{background:color-mix(in srgb,var(--accent) 9%,transparent)}
 .catr:last-child{border-bottom:none}
@@ -2456,7 +2475,9 @@ const consentDejaSigne=()=>AS?consentAnterieur({patient:AS.pid, id:AS.aid, date:
 const consentOK=a=>!!(a&&(a.consent||consentPorteur(a)));
 /* évalué à la demande : CABINET est déclaré plus bas, et le réglage
    « consentement reconduit » peut changer en cours de session */
-const consentKO=()=>ACTES.filter(a=>catById(a.type).cons&&!consentOK(a));
+/* un acte retiré du catalogue ne dit plus s'il exigeait un consentement :
+   on ne réclame pas ce qu'on ne peut plus établir */
+const consentKO=()=>ACTES.filter(a=>(catById(a.type)||{}).cons&&!consentOK(a));
 
 /* ==========================================================================
    Photothèque, fidélité, anniversaires, modèles — paramétrables au back-office
@@ -3772,7 +3793,7 @@ function envoyerDevis(id,o){
   const p=pById(f.patient); if(!p) return;
   pose(p,f.date,f.id,'Facture '+f.id,'facture',f.acte||null);
  });
- ACTES.filter(a=>a.consent&&catById(a.type).cons).slice(0,14).forEach(a=>{
+ ACTES.filter(a=>a.consent&&(catById(a.type)||{}).cons).slice(0,14).forEach(a=>{
   const p=pById(a.patient); if(!p) return;
   pose(p,a.date,'CONS-'+a.id,'Consentement — '+a.nom,'consentement',a.id);
  });
@@ -4217,7 +4238,8 @@ function factForm(p){
        ${FRACTIONS.map(k=>`<option value="${k}" ${n===k?'selected':''}>En ${k} fois${m?` — ${EUR(Math.round(m/k))} par échéance`:''}</option>`).join('')}</select></label>
   </div>
   <div class="encf-a">
-   <span class="mu" style="font-size:11px;flex:1">${m?`${EUR(m)} TTC · dont ${EUR(Math.round(m-m/(1+t/100)))} de TVA à ${t} %`:'Le montant se saisit TTC ; la TVA en est déduite au taux de la nature choisie.'}</span>
+   <span class="mu" style="font-size:11px;flex:1">${m?`${EUR(m)} TTC · dont ${EUR(Math.round(m-m/(1+t/100)))} de TVA à ${t} %`:'Le montant se saisit TTC ; la TVA en est déduite au taux de la nature choisie.'}
+     ${retroApercu(m, a?a.praticien:(factNew.prat||PRATICIENS[0]))}</span>
    <button class="btn xs g" onclick="fermerFactNew()">Annuler</button>
    <button class="btn xs p" onclick="creerFacture()">Établir la facture</button>
   </div></div>`;
@@ -4322,7 +4344,7 @@ function pDetail(p){
  const F=FACTURES.filter(f=>f.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
  const D=DEVIS.filter(d=>d.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
  const O=ORDONNANCES.filter(o=>o.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
- const C=A.filter(a=>catById(a.type).cons);
+ const C=A.filter(a=>(catById(a.type)||{}).cons);
  const ca=F.reduce((s,f)=>s+f.paye,0), rd=F.reduce((s,f)=>s+rdu(f),0);
  const cumul={}, cumulT={};   /* dose cumulée par zone, et acte le plus récent sur cette zone */
  A.slice().sort((x,y)=>x.date.localeCompare(y.date)).forEach(a=>zonesOf(a).forEach(([z,q])=>{
@@ -4671,10 +4693,14 @@ function pDetail(p){
         :'<span class="mu">—</span>'}</td>
       <td>${an?bdg('b-crit','⊘ Annulée'):f.avoir?bdg('b-warn','Avoir'):rdu(f)>0?bdg('b-warn','Partielle'):bdg('b-good','Soldée')}</td>
       <td class="num" style="white-space:nowrap">
+        ${(an||!voitRetro())?'':`<button class="btn xs ${retroSel===f.id?'g':''}"
+          title="Part centre et part praticien rétrocédée"
+          onclick="event.stopPropagation();ouvrirRetro('${f.id}')">${retroSel===f.id?'✕':'⇄ Rétrocession'}</button>`}
         ${(an||!peutEncaisser())?'':`<button class="btn xs ${encSel===f.id?'g':''}" title="Corriger l’encaissement, même sur une facture soldée"
           onclick="event.stopPropagation();ouvrirEnc('${f.id}')">${encSel===f.id?'✕':'€ Encaissement'}</button>`}
         <button class="btn xs" onclick="toast('PDF Factur-X de ${f.id}')">PDF</button></td></tr>
-      ${encSel===f.id?`<tr class="supp"><td colspan="${cpt?12:10}">${encForm(f)}</td></tr>`:''}`}).join('')}
+      ${encSel===f.id?`<tr class="supp"><td colspan="${cpt?12:10}">${encForm(f)}</td></tr>`:''}
+      ${retroSel===f.id?`<tr class="supp"><td colspan="${cpt?12:10}">${retroDetail(f)}</td></tr>`:''}`}).join('')}
     </tbody></table>${F.length?'':'<div class="empty">Aucune facture.</div>'}</div>
 
    ${(()=>{const AV=AVOIRS.filter(a=>a.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
@@ -5417,7 +5443,8 @@ V.params=()=>{
           <label>Échéance RCP<input class="inp" type="date" value="${x.rcpFin}" onchange="PRATS[${i}].rcpFin=this.value;paint()"></label>
         </div></div>`).join('')}
      </div></div>
-   </div>`;
+   </div>
+   ${carteSauvegarde()}`;
   },
 
   actes:()=>{
@@ -8428,7 +8455,42 @@ function docAutre(x){
    revient impayé, on s'est trompé de moyen. Rien n'est effacé : chaque
    correction est journalisée sur la pièce, avec l'avant et l'après.
    ========================================================================== */
-let encSel=null;
+let encSel=null, retroSel=null;
+/* La rétrocession se lit là où l'argent se décide : sur la facture de l'acte.
+   Elle n'a de sens que si le cabinet exploite la double facturation, et ne
+   s'ouvre qu'aux rôles qui suivent la comptabilité. */
+const voitRetro=()=>FACTU.double&&CAN('compta');
+function ouvrirRetro(id){ retroSel=(retroSel===id)?null:id; encSel=null; paint() }
+/* le détail d'un partage centre / praticien, pour une facture donnée */
+function retroDetail(f){
+ const ttc=fTTC(f), tx=tauxRetro(f.praticien), pp=partPrat(f), pc=partCentre(f);
+ const split=FACTU.modele==='split';
+ return `<div class="retrod">
+  <div class="retrod-b">
+   <div class="rtl"><span>Facturé au patient <small>TTC${f.avoir?`, après ${EUR(f.avoir)} d’avoir`:''}</small></span>
+     <b class="mono">${EUR(ttc)}</b></div>
+   <div class="rtl acc"><span>Part praticien <small>${esc(f.praticien)} · ${tx} %</small></span>
+     <b class="mono">${EUR(pp)}</b></div>
+   <div class="rtl"><span>Part centre <small>${esc(FACTU.centre.nom)} · ${100-tx} %</small></span>
+     <b class="mono">${EUR(pc)}</b></div>
+   <div class="rtb"><div class="rtb-p" style="width:${ttc?Math.round(pp/ttc*100):0}%"></div></div>
+  </div>
+  <div class="retrod-t">
+   ${split
+     ? `<b>Facturation séparée</b> — deux factures sont émises pour cet acte : ${EUR(pc)} par ${esc(FACTU.centre.nom)} (part structure)
+        et ${EUR(pp)} par ${esc(f.praticien)} (honoraires). Le patient reçoit les deux.`
+     : `<b>Rétrocession</b> — ${esc(FACTU.centre.nom)} encaisse la totalité, puis reverse ${EUR(pp)} à ${esc(f.praticien)}.
+        Une seule facture patient, un relevé de rétrocession mensuel.`}
+   ${f.paye<ttc?`<div style="margin-top:5px;color:var(--warn)">Encaissé ${EUR(f.paye)} sur ${EUR(ttc)} : la part n’est acquise qu’au règlement complet.</div>`:''}
+   ${CAN('compta')?`<div style="margin-top:6px"><a onclick="closeAll();go('params');paramTab='facturation';paint()">Régler les taux de rétrocession →</a></div>`:''}
+  </div></div>`;
+}
+/* la même lecture, en une ligne, pendant qu'on établit la facture */
+function retroApercu(m,prat){
+ if(!voitRetro()||!(m>0)) return '';
+ const tx=tauxRetro(prat), pp=Math.round(m*tx/100);
+ return `<span class="rtap">⇄ ${esc(prat)} <b>${EUR(pp)}</b> (${tx} %) · ${esc(FACTU.centre.nom)} <b>${EUR(m-pp)}</b></span>`;
+}
 const peutEncaisser=()=>ROLES[role].v.includes('encaiss');
 function ouvrirEnc(id){ encSel=(encSel===id)?null:id; paint&&paint(); if(AS) renderOver() }
 function fermerEnc(){ encSel=null; paint&&paint(); if(AS) renderOver() }
@@ -9161,6 +9223,7 @@ function paint(){
  document.getElementById('who').innerHTML=`${ROLES[role].u}<small>${ROLES[role].l}</small>`;
  document.getElementById('main').innerHTML=(V[view]||V.dash)();
  bindBA(); calerCumul();
+ if(typeof cfgPlanifier==='function') cfgPlanifier();
 }
 /* Le schéma cumulé prend la hauteur qui reste réellement sous lui : l'en-tête
    du patient passe sur deux lignes quand la fenêtre se resserre, une hauteur
@@ -9191,6 +9254,160 @@ document.querySelectorAll('#nav a[data-v]').forEach(a=>a.onclick=()=>{
  if(v==='devis') dSel=null;
  go(v);
 });
+
+/* ==========================================================================
+   Vos réglages vous appartiennent
+   Le catalogue, les catégories, les protocoles, les zones du schéma, les
+   consommables, l'identité du cabinet et les règles de facturation sont
+   enregistrés dans ce navigateur et rechargés à l'ouverture : une nouvelle
+   version du logiciel ne les efface plus. Le jeu de démonstration — patients,
+   séances, factures — reste fictif et se régénère à chaque ouverture.
+   ========================================================================== */
+const CFG_CLE='praxis.reglages.v1';
+let cfgQuand=null, cfgEtat='', cfgActif=false;
+const remplTab=(t,v)=>{ if(!Array.isArray(v)) return; const c=v.slice(); t.length=0; c.forEach(x=>t.push(x)) };
+const remplObj=(o,v)=>{ if(!v||typeof v!=='object') return; const c={...v};
+  Object.keys(o).forEach(k=>delete o[k]); Object.assign(o,c) };
+/* fondre plutôt que remplacer : un réglage ajouté par une version ultérieure
+   garde sa valeur d'usine au lieu de disparaître */
+const fondObj=(o,v)=>{ if(!v||typeof v!=='object') return;
+  Object.keys(v).forEach(k=>{ const a=o[k], b=v[k];
+    (a&&b&&typeof a==='object'&&typeof b==='object'&&!Array.isArray(a)&&!Array.isArray(b))
+      ? fondObj(a,b) : (o[k]=b) }) };
+const CFG={
+ cats:      {l:'Catégories',        lit:()=>CATS,       ecrit:v=>remplTab(CATS,v)},
+ catalogue: {l:'Catalogue d’actes', lit:()=>CATALOGUE,  ecrit:v=>remplTab(CATALOGUE,v)},
+ protos:    {l:'Protocoles',        lit:()=>PROTOS,     ecrit:v=>remplTab(PROTOS,v)},
+ zdef:      {l:'Zones du visage',   lit:()=>ZDEF,       ecrit:v=>remplTab(ZDEF,v)},
+ bdef:      {l:'Zones du corps',    lit:()=>BDEF,       ecrit:v=>remplTab(BDEF,v)},
+ zretire:   {l:'Zones retirées',    lit:()=>ZRETIRE,    ecrit:v=>remplObj(ZRETIRE,v)},
+ stock:     {l:'Consommables',      lit:()=>STOCK,      ecrit:v=>remplTab(STOCK,v)},
+ praticiens:{l:'Praticiens',        lit:()=>PRATICIENS, ecrit:v=>remplTab(PRATICIENS,v)},
+ factu:     {l:'Facturation',       lit:()=>FACTU,      ecrit:v=>fondObj(FACTU,v)},
+ cabinet:   {l:'Cabinet',           lit:()=>CABINET,    ecrit:v=>fondObj(CABINET,v)},
+ expediteur:{l:'Expéditeur',        lit:()=>EXPEDITEUR, ecrit:v=>fondObj(EXPEDITEUR,v)},
+ roles:     {l:'Droits',            lit:()=>ROLES,      ecrit:v=>fondObj(ROLES,v)},
+ prats:     {l:'Fiches praticien',  lit:()=>PRATS,      ecrit:v=>remplTab(PRATS,v)},
+ materiels: {l:'Matériels',         lit:()=>MATERIELS,  ecrit:v=>remplTab(MATERIELS,v)},
+ modeles:   {l:'Modèles de message',lit:()=>MODELES,    ecrit:v=>remplTab(MODELES,v)},
+ docmod:    {l:'Modèles de document',lit:()=>DOCMOD,    ecrit:v=>remplTab(DOCMOD,v)},
+ trames:    {l:'Trames',            lit:()=>TRAMES,     ecrit:v=>fondObj(TRAMES,v)},
+};
+/* une copie, pas la liste elle-même : réappliquer un paquet ne doit pas vider
+   ce qu'il contient au moment où on le repose */
+const cfgPaquet=()=>{ const o={_v:1,_build:BUILD,_le:new Date().toISOString()};
+  Object.keys(CFG).forEach(k=>{ try{ o[k]=JSON.parse(JSON.stringify(CFG[k].lit())) }catch(e){ o[k]=CFG[k].lit() } });
+  return o };
+function cfgEcrire(){
+ try{ localStorage.setItem(CFG_CLE, JSON.stringify(cfgPaquet()));
+      cfgQuand=new Date(); cfgEtat=''; return true }
+ catch(e){ cfgEtat=(e&&/quota/i.test(String(e.name)+String(e.message)))?'plein':'refus'; return false }
+}
+/* Une zone que le schéma ne connaît plus, mais qu'une séance porte encore, doit
+   rester lisible : on la range parmi les zones retirées plutôt que de la perdre. */
+function cfgZonesOrphelines(){
+ const vues={};
+ const voir=z=>{ if(!z||typeof z!=='object') return; Object.keys(z).forEach(k=>{
+   if(!zoneLibre(k)&&!zoneDef(k)) vues[k]=1 }) };
+ ACTES.forEach(a=>voir(a.zones));
+ (typeof DEVIS!=='undefined'?DEVIS:[]).forEach(d=>(d.lignes||[]).forEach(l=>voir(l&&l.z)));
+ PROTOS.forEach(P=>{ voir(P&&P.z); voir(P&&P.zx) });
+ Object.keys(vues).forEach(k=>{ ZRETIRE[k]={id:k,k:'zone',n:'Zone incertaine',p:'ah',
+   u:'ml',d:1,s:0.1,r:'visage',le:TODAYS,par:'—'} });
+}
+function cfgAppliquer(o){
+ if(!o||typeof o!=='object') return false;
+ let n=0;
+ Object.keys(CFG).forEach(k=>{ if(o[k]!==undefined){ CFG[k].ecrit(o[k]); n++ } });
+ if(!n) return false;
+ /* on ne se laisse pas enfermer dans une configuration vide */
+ if(!CATS.length) CATS.push('Divers');
+ if(!CATALOGUE.length) CATALOGUE.push({...CNUL, id:'X0', n:'Acte', cat:CATS[0], prix:0});
+ rebuildZones(); cfgZonesOrphelines();
+ return true;
+}
+function cfgCharger(){
+ let t=null;
+ try{ t=localStorage.getItem(CFG_CLE) }catch(e){ cfgEtat='refus'; return false }
+ if(!t) return false;
+ let o=null;
+ try{ o=JSON.parse(t) }catch(e){ cfgEtat='illisible'; return false }
+ if(!cfgAppliquer(o)){ cfgEtat='illisible'; return false }
+ cfgQuand=o._le?new Date(o._le):null; return true;
+}
+let cfgT=null;
+/* on n'écrit pas à chaque frappe : une pause suffit à regrouper la rafale */
+function cfgPlanifier(){ if(!cfgActif) return;
+ if(cfgT) clearTimeout(cfgT);
+ cfgT=setTimeout(()=>{ cfgT=null; cfgEcrire() },700) }
+const cfgQuandTxt=()=>{ if(!cfgQuand) return 'pas encore enregistrés';
+ const j=cfgQuand.toISOString().slice(0,10);
+ const h=String(cfgQuand.getHours()).padStart(2,'0')+'h'+String(cfgQuand.getMinutes()).padStart(2,'0');
+ return (j===TODAYS?'aujourd’hui':'le '+DF(j))+' à '+h };
+function cfgExporter(){
+ const t=JSON.stringify(cfgPaquet(),null,1);
+ const a=document.createElement('a');
+ a.href=URL.createObjectURL(new Blob([t],{type:'application/json'}));
+ a.download='praxis-reglages-'+TODAYS+'.json';
+ document.body.appendChild(a); a.click();
+ setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove() },400);
+ toast('Réglages exportés — ce fichier rejoue votre configuration sur un autre poste');
+}
+function cfgImporter(inp){
+ const f=inp&&inp.files&&inp.files[0]; if(!f) return;
+ const r=new FileReader();
+ r.onload=()=>{ let o=null;
+   try{ o=JSON.parse(String(r.result)) }catch(e){ toast('Ce fichier n’est pas un export de réglages'); return }
+   if(!cfgAppliquer(o)){ toast('Ce fichier ne contient aucun réglage reconnu'); return }
+   cfgEcrire(); paint();
+   toast(`Réglages repris · ${CATALOGUE.length} actes, ${PROTOS.length} protocoles, ${CATS.length} catégories`) };
+ r.onerror=()=>toast('Fichier illisible');
+ r.readAsText(f); inp.value='';
+}
+let cfgRAZ=false;
+function cfgOublier(ok){
+ if(!ok){ cfgRAZ=true; paint(); return }
+ try{ localStorage.removeItem(CFG_CLE) }catch(e){}
+ location.reload();
+}
+const CFG_EMPECHE={
+ refus:'Ce navigateur refuse l’enregistrement local — navigation privée, ou stockage bloqué par une règle du poste.',
+ plein:'L’espace de stockage de ce navigateur est saturé : les derniers réglages n’ont pas pu être enregistrés.',
+ illisible:'Les réglages enregistrés étaient illisibles : la configuration d’usine a été reprise.'};
+/* Ce que le cabinet a paramétré ne doit pas dépendre de la version installée :
+   on le montre, on dit où c'est gardé, et on permet de l'emporter. */
+function carteSauvegarde(){
+ const D=Object.keys(CFG).map(k=>{const v=CFG[k].lit();
+   return {l:CFG[k].l, n:Array.isArray(v)?v.length:Object.keys(v||{}).length}});
+ const poids=(()=>{try{return Math.round(JSON.stringify(cfgPaquet()).length/1024)}catch(e){return 0}})();
+ return `<div class="card" style="margin-top:13px"><div class="h"><h2>Vos réglages</h2>
+    <span class="s">${cfgEtat?'non enregistrés':'enregistrés '+cfgQuandTxt()}</span>
+    <div class="r">
+      <button class="btn xs" onclick="cfgExporter()">⭳ Exporter</button>
+      <button class="btn xs" onclick="document.getElementById('cfgf').click()">⭱ Importer</button>
+      <input type="file" id="cfgf" accept=".json,application/json" style="display:none" onchange="cfgImporter(this)">
+      <button class="btn xs" onclick="cfgOublier(false)">Rétablir l’origine</button></div></div>
+   <div class="b">
+    ${cfgEtat?`<div class="tip" style="margin-bottom:10px"><span class="e">⚠️</span><div>
+       ${CFG_EMPECHE[cfgEtat]||'Les réglages n’ont pas pu être enregistrés.'}
+       <b>Exportez-les</b> pour ne rien perdre.</div></div>`
+     :`<div class="mu" style="font-size:11.5px;margin-bottom:10px">Le catalogue, les catégories, les protocoles, les zones du schéma,
+       les consommables, les modèles et les règles de facturation sont conservés dans <b>ce navigateur</b> et rechargés à l’ouverture :
+       <b>une mise à jour du logiciel ne les efface plus</b>. Les patients, séances et factures de démonstration restent fictifs et se régénèrent à chaque ouverture.
+       L’export produit un fichier qui rejoue votre configuration sur un autre poste.</div>`}
+    <div style="display:flex;flex-wrap:wrap;gap:5px">${D.map(x=>
+      `<span class="bdg b-neu">${esc(x.l)} · ${x.n}</span>`).join('')}</div>
+    ${cfgRAZ?`<div class="suppb" style="margin-top:11px"><span class="e">⚠</span>
+      <div style="flex:1;min-width:0"><b>Rétablir la configuration d’origine ?</b>
+       <div class="mu">Vos ${CATALOGUE.length} actes, ${PROTOS.length} protocoles et ${CATS.length} catégories seront remplacés
+        par ceux d’usine. Exportez-les d’abord si vous voulez pouvoir y revenir.</div></div>
+      <button class="btn xs g" onclick="cfgRAZ=false;paint()">Annuler</button>
+      <button class="btn xs crit" onclick="cfgOublier(true)">Rétablir</button></div>`:''}
+    <div class="mu" style="font-size:11px;margin-top:9px">Sauvegarde ${poids} Ko · clé <span class="mono">${CFG_CLE}</span></div>
+   </div></div>`;
+}
+cfgCharger();
+cfgActif=true;
 paint();
 initVersion();
 </script>
