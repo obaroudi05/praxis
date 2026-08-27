@@ -747,6 +747,7 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
 .sc-vide{font-size:11.5px;color:var(--ink-3);padding:2px 0 5px}
 .sc-note{display:block;width:100%;box-sizing:border-box;margin-top:6px;font-size:11.5px;padding:4px 8px}
 .catr{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
+tr.neuf>td{background:color-mix(in srgb,var(--accent) 9%,transparent)}
 .catr:last-child{border-bottom:none}
 .catr-o{display:flex;flex-direction:column;gap:1px;flex:none;width:18px}
 .catr-o button{border:none;background:transparent;color:var(--ink-3);font-size:8px;line-height:1;cursor:pointer;padding:1px}
@@ -1825,6 +1826,32 @@ const regionFam=f=>{const L=CATALOGUE.filter(c=>(c.fam||'esth')===f&&c.zoned);
  return L.length?regionDef(L[0].id):'visage'};
 const uniteActe=t=>acteDef(t).unite;
 const colActe=t=>'var(--'+(acteDef(t).col||'accent')+')';
+/* Tout le catalogue, groupé par catégorie : un acte que le cabinet a défini doit
+   pouvoir être posé sur une zone, y compris celui créé il y a deux minutes. */
+function optionsActes(sel,euros,filtre){
+ const L=CATALOGUE.filter(c=>!filtre||filtre(c));
+ return catsUtilisees().map(k=>{const G=L.filter(c=>(c.cat||'Divers')===k);
+   return G.length?`<optgroup label="${esc(k)}">${G.map(c=>
+     `<option value="${c.id}" ${c.id===sel?'selected':''}>${esc(c.n)}${euros&&c.prix?' · '+EUR(c.prix):''}</option>`
+    ).join('')}</optgroup>`:''}).join('');
+}
+/* Un acte créé à la main part avec ce qu'il faut pour servir : posable sur le
+   schéma, dosé en millilitres s'il s'agit d'une injection. Tout reste réglable
+   dans la ligne du catalogue. */
+let acteNouv=null;                      /* la ligne du catalogue à mettre en avant */
+function nouvelActe(cat){
+ cat=cat||CATS[0]||'Injections';
+ const inj=/inject|méso|meso|botox|toxine|comble/i.test(cat);
+ const id='X'+Date.now();
+ CATALOGUE.push({id, n:'Nouvel acte', cat, fam:'esth',
+   reg:['visage','corps'], conso:null, cons:false, zoned:true,
+   unite:inj?'ml':null, prix:0, col:'accent'});
+ acteNouv=id; paint();
+ /* on ouvre le nom : l'acte n'existe vraiment que quand il est nommé */
+ const e=document.querySelector('.catl-n[data-a="'+id+'"]');
+ if(e){ e.focus(); e.select(); e.scrollIntoView({block:'center'}) }
+ toast('Acte ajouté dans « '+cat+' » — nommez-le et réglez son tarif');
+}
 const nb=q=>String(+(+q).toFixed(2));      /* 16.00 → 16 · 1.20 → 1.2 */
 const uniteZone=id=>{const z=zoneDef(id); return (z&&z.u)||null};
 /* l'unité d'une quantité de zone : celle réglée sur la zone, sinon aucune */
@@ -5239,6 +5266,8 @@ function rmProtoZone(i,z){
 function setProtoActe(i,z,t){
  PROTOS[i].zt=PROTOS[i].zt||{}; PROTOS[i].zt[z]=t;
  const C=acteDef(t);
+ /* poser un acte sur une zone, c'est dire qu'il se pratique sur le schéma */
+ if(C&&C.id&&!C.zoned){ C.zoned=true; if(!C.reg) C.reg=['visage','corps'] }
  if(!C.unite) PROTOS[i].z[z]=1;
  else if(!Object.prototype.hasOwnProperty.call(PROTOS[i].z,z)) PROTOS[i].z[z]=(zoneDef(z)||{}).d||1;
  paint(); toast((zoneDef(z)||{}).k+' → '+C.n);
@@ -5396,11 +5425,11 @@ V.params=()=>{
           <div class="fld"><label>Nom du protocole</label>
             <input class="inp" style="width:100%" value="${esc(x.n)}" onchange="PROTOS[${i}].n=this.value;paint()"></div>
           ${Object.entries(x.z).length?Object.entries(x.z).map(([z,q])=>{const Z=zoneDef(z); if(!Z) return '';
-            const t=protoActe(x,z), C=acteDef(t), AZ=CATALOGUE.filter(c=>c.zoned&&(c.reg||['visage']).includes('visage'));
+            const t=protoActe(x,z), C=acteDef(t);
             return `<div class="zrow"><span class="zd" style="background:${colActe(t)}"></span>
              <div class="zn">${esc(zoneNom(z))}
-              <select class="zsel" onchange="setProtoActe(${i},'${z}',this.value)">
-                ${AZ.map(c=>`<option value="${c.id}" ${c.id===t?'selected':''}>${esc(c.n)}</option>`).join('')}</select></div>
+              <select class="zsel" title="Tous les actes du catalogue" onchange="setProtoActe(${i},'${z}',this.value)">
+                ${optionsActes(t,CAN('prix'))}</select></div>
              ${C.unite?`<input class="inp" style="width:66px;text-align:right" type="number" min="0" step="${C.unite==='U'?1:0.1}"
                value="${q>0?q:''}" placeholder="—" title="Laissez vide pour poser la zone sans dose"
                onchange="setProtoZone(${i},'${z}',this.value)">
@@ -5419,8 +5448,7 @@ V.params=()=>{
                 <button class="rm" title="Retirer cet acte associé" onclick="rmProtoSup(${i},'${z}',${k})">✕</button></div>`}).join('')}
              ${protoZS===i+'|'+z?`<div class="addz zsup">
                 <select class="inp" id="psup" style="flex:1">
-                  ${CATALOGUE.filter(c=>c.id!==protoActe(x,z)&&!protoSup(x,z).some(y=>y.t===c.id))
-                    .map(c=>`<option value="${c.id}">${esc(c.n)}</option>`).join('')}</select>
+                  ${optionsActes(null,CAN('prix'),c=>c.id!==protoActe(x,z)&&!protoSup(x,z).some(y=>y.t===c.id))}</select>
                 <button class="btn xs g" onclick="protoZS=null;paint()">Annuler</button>
                 <button class="btn xs p" onclick="addProtoSup(${i})">＋ Associer</button></div>`:''}`}).join('')
             :'<div class="empty" style="padding:14px">Aucune zone dans ce protocole.</div>'}
@@ -5448,6 +5476,7 @@ V.params=()=>{
            <button ${i===CATS.length-1?'disabled':''} onclick="moveCat(${i},1)" title="Descendre">▼</button></div>
          <input class="inp" value="${esc(k)}" onchange="renomCat(${i},this.value)">
          <span class="catr-a">${A.length?A.map(c=>`<span class="bdg b-neu">${esc(c.n)}</span>`).join(''):'<span class="mu">aucun acte</span>'}</span>
+         <button class="ib" title="Créer un acte dans « ${esc(k)} »" onclick="nouvelActe(CATS[${i}])">＋</button>
          <button class="rm" onclick="rmCat(${i})" title="${A.length?'catégorie utilisée par '+A.length+' acte(s)':'Supprimer'}" ${A.length?'disabled':''}>✕</button>
         </div>`}).join('')}
       ${catsUtilisees().filter(k=>!CATS.includes(k)).map(k=>`<div class="catr">
@@ -5457,19 +5486,25 @@ V.params=()=>{
      </div></div>
 
     <div class="card" style="margin-top:13px;grid-column:1/-1"><div class="h"><h2>Catalogue des actes</h2><span class="s">${CATALOGUE.length} actes</span>
-      <div class="r"><button class="btn xs p" onclick="CATALOGUE.push({id:'X'+Date.now(),n:'Nouvel acte',cat:'Injections',conso:null,cons:false,zoned:false,prix:0});paint()">+ Acte</button></div></div>
+      <div class="r"><button class="btn xs p" onclick="nouvelActe()">+ Acte</button></div></div>
      <div class="tw"><table>
-      <thead><tr><th>Acte</th><th>Catégorie</th><th class="num">Tarif</th><th class="num">TVA</th><th>Consommable</th><th>Consent.</th><th class="num">Réalisés</th><th class="num">CA</th></tr></thead>
-      <tbody>${CATALOGUE.map((c,i)=>`<tr>
-        <td><input class="inp" style="width:100%;min-width:170px" value="${esc(c.n)}" onchange="CATALOGUE[${i}].n=this.value;paint()"></td>
+      <thead><tr><th>Acte</th><th>Catégorie</th><th class="num">Tarif</th><th class="num">TVA</th><th>Unité</th><th>Consommable</th><th style="text-align:center">Schéma</th><th>Consent.</th><th class="num">Réalisés</th><th class="num">CA</th></tr></thead>
+      <tbody>${CATALOGUE.map((c,i)=>`<tr${acteNouv===c.id?' class="neuf"':''}>
+        <td><input class="inp catl-n" data-a="${c.id}" style="width:100%;min-width:170px" value="${esc(c.n)}"
+          onchange="CATALOGUE[${i}].n=this.value;acteNouv=null;paint()"></td>
         <td><select class="inp" onchange="CATALOGUE[${i}].cat=this.value;paint()">${catsUtilisees().map(x=>`<option ${c.cat===x?'selected':''}>${esc(x)}</option>`).join('')}</select></td>
         <td class="num">${c.zoned&&!c.prix?'<span class="mu" style="font-size:11.5px">à l’unité</span>'
           :`<div style="display:flex;gap:4px;align-items:center;justify-content:flex-end">
              <input class="inp" style="width:76px;text-align:right" type="number" min="0" step="10" value="${c.prix||0}" onchange="CATALOGUE[${i}].prix=+this.value||0;paint()"><span class="mu">€</span></div>`}</td>
         <td class="num"><div style="display:flex;gap:3px;align-items:center;justify-content:flex-end">
           <input class="inp" style="width:56px;text-align:right" type="number" min="0" max="20" value="${tauxTVA(c.id)}" onchange="FACTU.tvaParActe['${c.id}']=+this.value||0;paint()"><span class="mu">%</span></div></td>
+        <td><select class="inp" title="Unité de dose : ce qui se saisit sur une zone"
+          onchange="CATALOGUE[${i}].unite=this.value||null;paint()">
+          ${[['','sans dose'],['ml','ml'],['U','U']].map(([v,l])=>`<option value="${v}" ${(c.unite||'')===v?'selected':''}>${l}</option>`).join('')}</select></td>
         <td><select class="inp" onchange="CATALOGUE[${i}].conso=this.value||null;paint()">
           <option value="">aucun</option>${STOCK.map(st=>`<option value="${st.ref}" ${c.conso===st.ref?'selected':''}>${st.ref}</option>`).join('')}</select></td>
+        <td style="text-align:center"><input type="checkbox" title="L’acte se pose sur une zone du schéma et peut entrer dans un protocole"
+          ${c.zoned?'checked':''} onchange="CATALOGUE[${i}].zoned=this.checked;if(this.checked&&!CATALOGUE[${i}].reg)CATALOGUE[${i}].reg=['visage','corps'];paint()"></td>
         <td style="text-align:center"><input type="checkbox" ${c.cons?'checked':''} onchange="CATALOGUE[${i}].cons=this.checked;paint()"></td>
         <td class="num mu">${vol(c.id)}</td><td class="num">${EUR(ca(c.id))}</td></tr>`).join('')}
       </tbody></table></div></div>
@@ -6676,9 +6711,7 @@ function renderOver(){
          ${D.t?`<button class="chip xs" style="margin-left:auto" onclick="setDraftActe('')">Annuler</button>`:''}</div>`}
        <div class="soins-a">
          <select class="inp" id="addSoin" ${dispo.length?'':'disabled'} onchange="setDraftActe(this.value)">
-           ${dispo.length?`<option value="">Choisir un acte…</option>`+catsUtilisees().map(k=>{const L2=dispo.filter(c=>(c.cat||'Divers')===k);
-             return L2.length?`<optgroup label="${esc(k)}">${L2.map(c=>
-               `<option value="${c.id}" ${D.t===c.id?'selected':''}>${esc(c.n)}${EUROS&&c.prix?' · '+EUR(c.prix):''}</option>`).join('')}</optgroup>`:''}).join('')
+           ${dispo.length?`<option value="">Choisir un acte…</option>`+optionsActes(D.t,EUROS,c=>dispo.some(d=>d.id===c.id))
              :'<option value="">tous les soins du catalogue sont déjà dans la séance</option>'}</select>
        </div>
        ${D.t?`
