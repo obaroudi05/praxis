@@ -5429,7 +5429,7 @@ V.params=()=>{
             return `<div class="zrow"><span class="zd" style="background:${colActe(t)}"></span>
              <div class="zn">${esc(zoneNom(z))}
               <select class="zsel" title="Tous les actes du catalogue" onchange="setProtoActe(${i},'${z}',this.value)">
-                ${optionsActes(t,CAN('prix'))}</select></div>
+                ${optionsActes(t)}</select></div>
              ${C.unite?`<input class="inp" style="width:66px;text-align:right" type="number" min="0" step="${C.unite==='U'?1:0.1}"
                value="${q>0?q:''}" placeholder="—" title="Laissez vide pour poser la zone sans dose"
                onchange="setProtoZone(${i},'${z}',this.value)">
