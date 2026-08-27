@@ -757,6 +757,12 @@ table.tcomp .mu{font-size:11.5px}
 table.tcomp .bdg{font-size:10.5px;padding:2px 6px}
 td.nw,th.nw{white-space:nowrap}
 td.el{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* une case de la grille : le taux, l'unité, et ce que ça fait en euros */
+.rcell{display:inline-flex;align-items:baseline;gap:3px;justify-content:flex-end}
+.rcell input{width:56px;text-align:right;height:28px;font-size:12.5px}
+.rcell.herite input{color:var(--ink-3);border-style:dashed}
+.rcell small{display:block;color:var(--ink-3);font-size:10.5px;min-width:44px;text-align:right}
+table.rgr td{vertical-align:middle}
 .relx{display:inline-flex;align-items:center;gap:6px}
 .relx .inp{height:32px;font-size:12.5px;max-width:170px}
 .relx .mu{font-size:11.5px;white-space:nowrap}
@@ -2098,12 +2104,38 @@ const bdgDevis=d=>d&&d.realise?bdg('b-good','✓ Réalisé'):bdg(SD[d.statut][1]
 let FACTU={
  double:true, modele:'retro',           /* 'retro' = une facture centre + reversement · 'split' = deux factures */
  centre:{nom:'Centre Gemelia', siret:'812 456 789 00021'},
- retro:{'Dr O. Baroudi':70, 'Dr A. Merlin':60},   /* part praticien en % */
+ retro:{'Dr O. Baroudi':70, 'Dr A. Merlin':60},   /* part praticien en %, par défaut */
+ /* et, quand le contrat le prévoit, un taux propre à un acte pour un praticien :
+    { praticien : { acte : % } }. Ce qui n'y figure pas suit le taux général. */
+ retroActe:{'Dr O. Baroudi':{EPIL2:50, LAS1:50, LAS2:55, ELEC:50},
+            'Dr A. Merlin':{EPIL2:45, LAS1:45, LAS2:50, ELEC:45}},
  tvaDefaut:20,
  tvaParActe:{AH:20,BTX:20,SKB:20,MESO:20,PEEL:20,LAS1:20,LAS2:20,RF:20,EPIL2:20,ELEC:20}
 };
 const tauxTVA=t=>FACTU.tvaParActe[t]!==undefined?FACTU.tvaParActe[t]:FACTU.tvaDefaut;
-const tauxRetro=pr=>FACTU.retro[pr]!==undefined?FACTU.retro[pr]:70;
+const RETRO_DEFAUT=70;
+/* Le taux de rétrocession se lit du plus précis au plus général : celui réglé
+   pour cet acte et ce praticien, sinon le taux général du praticien, sinon
+   celui du cabinet. Un acte d'épilation ne se rétrocède pas comme une injection. */
+const tauxActe=(pr,t)=>{ const G=FACTU.retroActe&&FACTU.retroActe[pr];
+ const v=G&&t?G[t]:undefined; return (v===undefined||v===null||v==='')?null:+v };
+const tauxGen=pr=>FACTU.retro[pr]!==undefined?FACTU.retro[pr]:RETRO_DEFAUT;
+const tauxRetro=(pr,t)=>{ const v=tauxActe(pr,t); return v===null?tauxGen(pr):v };
+/* d'où vient le taux appliqué — pour l'expliquer là où on le montre */
+const retroSource=(pr,t)=>tauxActe(pr,t)===null?'general':'acte';
+function setRetroActe(pr,t,v){
+ FACTU.retroActe=FACTU.retroActe||{};
+ const G=FACTU.retroActe[pr]=FACTU.retroActe[pr]||{};
+ const x=String(v==null?'':v).trim();
+ if(x===''){ delete G[t]; paint();
+   toast(`${acteDef(t).n} — ${pr} revient au taux général de ${tauxGen(pr)} %`); return }
+ const n=Math.max(0,Math.min(100,+x.replace(',','.')||0));
+ G[t]=n; paint();
+ toast(`${acteDef(t).n} — ${pr} : ${n} % rétrocédés`);
+}
+function setRetroGen(pr,v){
+ FACTU.retro[pr]=Math.max(0,Math.min(100,+v||0)); paint();
+}
 
 /* Comment le patient a réglé : l'instrument d'un côté, l'étalement de l'autre.
    « CB en 3 fois » n'est pas un cinquième moyen de paiement, c'est une carte
@@ -2152,7 +2184,7 @@ const rdu=f=>f.statut==='annulee'?0:Math.max(0,f.montant-f.avoir-f.paye);
 const fTTC=f=>f.statut==='annulee'?0:f.montant-f.avoir;
 const fHT =f=>Math.round(fTTC(f)/(1+tauxTVA(f.type)/100)*100)/100;
 const fTVA=f=>Math.round((fTTC(f)-fHT(f))*100)/100;
-const partPrat=f=>Math.round(fTTC(f)*tauxRetro(f.praticien)/100);
+const partPrat=f=>Math.round(fTTC(f)*tauxRetro(f.praticien,f.type)/100);
 const partCentre=f=>fTTC(f)-partPrat(f);
 
 /* ---------- Ordonnances (générées à partir des actes) ---------- */
@@ -4277,7 +4309,7 @@ function factForm(p){
   </div>
   <div class="encf-a">
    <span class="mu" style="font-size:11px;flex:1">${m?`${EUR(m)} TTC · dont ${EUR(Math.round(m-m/(1+t/100)))} de TVA à ${t} %`:'Le montant se saisit TTC ; la TVA en est déduite au taux de la nature choisie.'}
-     ${retroApercu(m, a?a.praticien:(factNew.prat||PRATICIENS[0]))}</span>
+     ${retroApercu(m, a?a.praticien:(factNew.prat||PRATICIENS[0]), a?a.type:(factNew.type||null))}</span>
    <button class="btn xs g" onclick="fermerFactNew()">Annuler</button>
    <button class="btn xs p" onclick="creerFacture()">Établir la facture</button>
   </div></div>`;
@@ -4937,7 +4969,7 @@ function retroLignes(f){
  const p=pById(f.patient), a=ACTES.find(x=>x.id===f.acte);
  return [f.praticien, f.id, DF(f.date), fn(p), f.patient,
    a?a.nom:(f.libelle||'—'), f.cat||'', nbFR(fTTC(f)), nbFR(f.avoir||0),
-   tauxRetro(f.praticien), nbFR(partPrat(f)), nbFR(partCentre(f)),
+   tauxRetro(f.praticien,f.type), nbFR(partPrat(f)), nbFR(partCentre(f)),
    nbFR(f.paye), nbFR(rdu(f)), moyenTxt(f)||'non réglé'];
 }
 /* Le relevé qu'on transmet au praticien en fin de mois : l'en-tête dit de quoi
@@ -4965,7 +4997,7 @@ function releveRetro(prat){
   L.filter(f=>f.praticien===p).forEach(f=>R.push(retroLignes(f)));
   const t=T(p);
   R.push(['Total '+p, t.n+' facture'+(t.n>1?'s':''), '', '', '', '', '',
-    nbFR(t.ttc), '', tauxRetro(p), nbFR(t.pp), nbFR(t.pc), nbFR(t.enc), nbFR(t.du), '']);
+    nbFR(t.ttc), '', t.ttc?nbFR(t.pp/t.ttc*100):'', nbFR(t.pp), nbFR(t.pc), nbFR(t.enc), nbFR(t.du), '']);
   R.push([]);
  });
  if(prats.length>1){ const t=T(null);
@@ -5081,6 +5113,50 @@ function eDetail(){
    La catégorie et l’émetteur de la facture restent lisibles en infobulle et dans le relevé exporté.</div>`;
 }
 
+/* ==========================================================================
+   Rétrocession acte par acte
+   Un contrat de collaboration ne fixe pas un taux unique : une épilation laser
+   ne se rétrocède pas comme une injection, et une consultation encore moins.
+   Chaque case laissée vide suit le taux général du praticien — ce qui rend la
+   grille lisible : on n'y voit que ce qui déroge.
+   ========================================================================== */
+let retroCat='';                       /* filtre de catégorie de la grille */
+function grilleRetro(){
+ const L=CATALOGUE.filter(c=>!retroCat||(c.cat||'Divers')===retroCat);
+ const cats=catsUtilisees().filter(k=>actesDeCat(k).length);
+ const n=PRATICIENS.reduce((t,pr)=>t+Object.keys((FACTU.retroActe&&FACTU.retroActe[pr])||{})
+   .filter(k=>catById(k)).length,0);
+ return `<div class="card" style="margin-top:13px"><div class="h"><h2>Rétrocession acte par acte</h2>
+   <span class="s">${n?`${n} taux particulier${n>1?'s':''}`:'aucun taux particulier'} · ${CATALOGUE.length} actes</span>
+   <div class="r"><div class="seg"><button class="${retroCat?'':'on'}" onclick="retroCat='';paint()">Tout</button>
+     ${cats.map(k=>`<button class="${retroCat===k?'on':''}" onclick="retroCat=${JSON.stringify(k).replace(/"/g,'&quot;')};paint()">${esc(k)}</button>`).join('')}</div></div></div>
+  <div class="b" style="padding:0 0 4px">
+   <div class="mu" style="font-size:11.5px;padding:11px 13px 9px">Fixez ici la part revenant au praticien <b>pour un acte donné</b> — une épilation laser
+    ne se partage pas comme une injection. Une case vide suit le taux général : ${PRATICIENS.map(pr=>`<b>${esc(pr)} ${tauxGen(pr)} %</b>`).join(' · ')}.
+    C'est ce taux qui est appliqué à la facturation, au relevé de rétrocession et aux totaux journaliers.</div>
+   <div class="tw"><table class="tcomp rgr">
+    <thead><tr><th>Acte</th><th>Catégorie</th><th class="num">Tarif</th>
+      ${PRATICIENS.map(pr=>`<th class="num" title="Part conservée par ${esc(pr)}">${esc(pr)}</th>`).join('')}
+      <th class="num" title="Ce que le centre conserve, au tarif affiché">Part centre</th></tr></thead>
+    <tbody>${L.map(c=>`<tr>
+      <td class="el" style="max-width:200px" title="${esc(c.n)}"><span class="nm">${esc(c.n)}</span></td>
+      <td class="mu el" style="max-width:120px">${esc(c.cat||'Divers')}</td>
+      <td class="num mu nw">${c.prix?EUR(c.prix):'—'}</td>
+      ${PRATICIENS.map(pr=>{const v=tauxActe(pr,c.id), t=tauxRetro(pr,c.id);
+        return `<td class="num nw"><span class="rcell ${v===null?'herite':''}">
+          <input class="inp" type="number" min="0" max="100" step="5" value="${v===null?'':v}"
+            placeholder="${tauxGen(pr)}" title="${v===null?`Suit le taux général de ${pr} (${tauxGen(pr)} %)`:`Taux propre à cet acte`}"
+            onchange="setRetroActe(${JSON.stringify(pr).replace(/"/g,'&quot;')},'${c.id}',this.value)">
+          <span class="mu">%</span>
+          ${c.prix?`<small>${EUR(Math.round(c.prix*t/100))}</small>`:''}</span></td>`}).join('')}
+      <td class="num mu nw">${c.prix?PRATICIENS.map(pr=>EUR(c.prix-Math.round(c.prix*tauxRetro(pr,c.id)/100))).join(' · '):'—'}</td>
+    </tr>`).join('')}</tbody></table>
+    ${L.length?'':'<div class="empty">Aucun acte dans cette catégorie.</div>'}</div>
+   <div class="mu" style="font-size:11px;padding:9px 13px 4px">Videz une case pour revenir au taux général. Les montants indiqués sous chaque taux
+    valent pour le tarif catalogue de l'acte ; la rétrocession réelle se calcule sur le montant effectivement facturé, avoir déduit.</div>
+  </div></div>`;
+}
+
 /* ---------- Rétrocession : ce qu'on transmet à chaque praticien ---------- */
 function eRetro(){
  if(!CAN('compta')||!FACTU.double) return bandeauCompta();
@@ -5091,7 +5167,9 @@ function eRetro(){
  const T=p=>{const F=factRetro(perE,p);
    return {n:F.length, ttc:F.reduce((s,f)=>s+fTTC(f),0), pp:F.reduce((s,f)=>s+partPrat(f),0),
      pc:F.reduce((s,f)=>s+partCentre(f),0), enc:F.reduce((s,f)=>s+f.paye,0),
-     du:F.reduce((s,f)=>s+rdu(f),0), acquis:F.reduce((s,f)=>s+Math.round(f.paye*tauxRetro(p)/100),0)}};
+     du:F.reduce((s,f)=>s+rdu(f),0),
+     acquis:F.reduce((s,f)=>s+Math.round(f.paye*tauxRetro(f.praticien,f.type)/100),0),
+     propres:[...new Set(F.map(f=>f.type).filter(t=>tauxActe(p,t)!==null))].length}};
  const G=T(null);
  return `<div class="head" style="margin-bottom:12px">
    <div><h1>Rétrocession</h1><p>${G.n} facturation${G.n>1?'s':''} · ${EUR(G.pp)} à reverser · ${perLabel(perE)}</p></div>
@@ -5108,12 +5186,14 @@ function eRetro(){
   ${kpi('Acquis au règlement',EUR(G.acquis),G.du?`${EUR(G.du)} encore dû par les patients`:'tout est encaissé',G.du?'dn':'up')}</div>
  <div class="grid g2" style="margin-bottom:13px;align-items:start">
   ${prats.map(p=>{const t=T(p);
-   return `<div class="card"><div class="h"><h2>${esc(p)}</h2><span class="s">${tauxRetro(p)} % · ${t.n} facture${t.n>1?'s':''}</span>
+   const eff=t.ttc?Math.round(t.pp/t.ttc*1000)/10:tauxGen(p);
+   return `<div class="card"><div class="h"><h2>${esc(p)}</h2>
+     <span class="s">${tauxGen(p)} % général${t.propres?` · ${t.propres} acte${t.propres>1?'s':''} à taux propre`:''} · ${t.n} facture${t.n>1?'s':''}</span>
      <div class="r"><button class="btn xs p" onclick="releveRetro(${JSON.stringify(p).replace(/"/g,'&quot;')})">⭳ Son relevé</button></div></div>
     <div class="b">
      <div class="rtl"><span>Facturé au patient <small>TTC sur la période</small></span><b class="mono">${EUR(t.ttc)}</b></div>
-     <div class="rtl acc"><span>Part praticien <small>${tauxRetro(p)} %</small></span><b class="mono">${EUR(t.pp)}</b></div>
-     <div class="rtl"><span>Part centre <small>${100-tauxRetro(p)} %</small></span><b class="mono">${EUR(t.pc)}</b></div>
+     <div class="rtl acc"><span>Part praticien <small>${eff} % en moyenne sur la période</small></span><b class="mono">${EUR(t.pp)}</b></div>
+     <div class="rtl"><span>Part centre <small>${Math.round((100-eff)*10)/10} %</small></span><b class="mono">${EUR(t.pc)}</b></div>
      <div class="rtb"><div class="rtb-p" style="width:${t.ttc?Math.round(t.pp/t.ttc*100):0}%"></div></div>
      <div class="mu" style="font-size:11.5px;margin-top:8px">Encaissé ${EUR(t.enc)} sur ${EUR(t.ttc)}${t.du
        ?` — ${EUR(t.du)} restent dus, soit ${EUR(t.pp-t.acquis)} de part non encore acquise`:` — part entièrement acquise`}.</div>
@@ -5138,7 +5218,8 @@ function eRetro(){
      <td class="el" style="max-width:158px" title="${esc(nom)}${f.avoir?' · avoir '+EUR(f.avoir)+' déduit':''}">${esc(nom)}${f.avoir?`<div class="mu" style="font-size:10.5px">avoir ${EUR(f.avoir)} déduit</div>`:''}</td>
      <td class="mu el" style="max-width:92px" title="${esc(f.praticien)}">${esc(f.praticien)}</td>
      <td class="num nw"><b>${EUR(fTTC(f))}</b></td>
-     <td class="num mu nw">${tauxRetro(f.praticien)} %</td>
+     <td class="num nw ${retroSource(f.praticien,f.type)==='acte'?'':'mu'}"
+       title="${retroSource(f.praticien,f.type)==='acte'?'Taux réglé pour cet acte':'Taux général du praticien'}">${tauxRetro(f.praticien,f.type)} %${retroSource(f.praticien,f.type)==='acte'?'<span class="mu">*</span>':''}</td>
      <td class="num" style="color:var(--accent);font-weight:640">${EUR(partPrat(f))}</td>
      <td class="num mu">${EUR(partCentre(f))}</td>
      <td class="num">${EUR(f.paye)}</td>
@@ -6113,20 +6194,22 @@ V.params=()=>{
        <div class="fld"><label>Raison sociale du centre</label><input class="inp" style="width:100%" value="${esc(FACTU.centre.nom)}" onchange="FACTU.centre.nom=this.value;paint()"></div>
        <div class="fld"><label>SIRET</label><input class="inp" style="width:100%" value="${esc(FACTU.centre.siret)}" onchange="FACTU.centre.siret=this.value;paint()"></div></div>
       <div style="margin-top:6px;padding-top:12px;border-top:1px solid var(--line)">
-       <div class="fld"><label>Taux de rétrocession — part conservée par le praticien</label>
+       <div class="fld"><label>Taux général — part conservée par le praticien</label>
         ${PRATICIENS.map(pr=>`<div class="zrow">
-          <div class="zn">${esc(pr)}<small>le centre conserve ${100-tauxRetro(pr)} %</small></div>
+          <div class="zn">${esc(pr)}<small>le centre conserve ${100-tauxGen(pr)} %</small></div>
           <div style="display:flex;align-items:center;gap:6px">
-            <input class="inp" style="width:74px;text-align:right" type="number" min="0" max="100" value="${tauxRetro(pr)}"
-              onchange="FACTU.retro['${pr}']=Math.max(0,Math.min(100,+this.value||0));paint()">
-            <span class="mu">%</span></div></div>`).join('')}</div></div>
+            <input class="inp" style="width:74px;text-align:right" type="number" min="0" max="100" value="${tauxGen(pr)}"
+              onchange="setRetroGen('${pr}',this.value)">
+            <span class="mu">%</span></div></div>`).join('')}
+        <div class="mu" style="font-size:11.5px;margin-top:7px">Ce taux s'applique à tout acte pour lequel rien de particulier n'a été convenu.
+          Le tableau ci-dessous permet d'en fixer un, acte par acte.</div></div></div>
      </div></div>
     <div class="card"><div class="h"><h2>Simulation sur la période</h2><span class="s">${FP.length} facture(s) · ${EUR(ttc)} TTC</span></div>
      <div class="b">
       ${FACTU.double?`<div class="tw"><table>
         <thead><tr><th>Praticien</th><th class="num">Factures</th><th class="num">TTC</th><th class="num">Taux</th><th class="num">Part praticien</th><th class="num">Part centre</th></tr></thead>
         <tbody>${parPrat.map(x=>`<tr><td class="nm">${esc(x.pr)}</td><td class="num">${x.n}</td>
-          <td class="num">${EUR(x.ttc)}</td><td class="num">${tauxRetro(x.pr)} %</td>
+          <td class="num">${EUR(x.ttc)}</td><td class="num">${x.ttc?Math.round(x.pp/x.ttc*1000)/10:tauxGen(x.pr)} %</td>
           <td class="num" style="color:var(--accent-ink);font-weight:650">${EUR(x.pp)}</td>
           <td class="num">${EUR(x.pc)}</td></tr>`).join('')}
         <tr><td colspan="2"><b>Total</b></td><td class="num"><b>${EUR(ttc)}</b></td><td></td>
@@ -6143,7 +6226,8 @@ V.params=()=>{
         <div class="mu" style="font-size:11.5px;margin-top:6px">Les actes de médecine esthétique sont soumis à TVA à 20 %. Mettez 0 pour un acte à visée thérapeutique exonéré (art. 261-4-1° du CGI) — à valider avec votre expert-comptable.</div></div>
       </div>
      </div></div>
-   </div>`;
+   </div>
+   ${FACTU.double?grilleRetro():''}`;
   },
   messages:()=>{
    const m=modById(modSel)||MODELES[0];
@@ -8689,13 +8773,16 @@ const voitRetro=()=>FACTU.double&&CAN('compta');
 function ouvrirRetro(id){ retroSel=(retroSel===id)?null:id; encSel=null; paint() }
 /* le détail d'un partage centre / praticien, pour une facture donnée */
 function retroDetail(f){
- const ttc=fTTC(f), tx=tauxRetro(f.praticien), pp=partPrat(f), pc=partCentre(f);
+ const ttc=fTTC(f), tx=tauxRetro(f.praticien,f.type), pp=partPrat(f), pc=partCentre(f);
+ const propre=retroSource(f.praticien,f.type)==='acte';
+ const C=f.type?acteDef(f.type):null;
  const split=FACTU.modele==='split';
  return `<div class="retrod">
   <div class="retrod-b">
    <div class="rtl"><span>Facturé au patient <small>TTC${f.avoir?`, après ${EUR(f.avoir)} d’avoir`:''}</small></span>
      <b class="mono">${EUR(ttc)}</b></div>
-   <div class="rtl acc"><span>Part praticien <small>${esc(f.praticien)} · ${tx} %</small></span>
+   <div class="rtl acc"><span>Part praticien <small>${esc(f.praticien)} · ${tx} % — ${propre
+     ?`taux propre à « ${esc(C?C.n:'cet acte')} »`:'taux général du praticien'}</small></span>
      <b class="mono">${EUR(pp)}</b></div>
    <div class="rtl"><span>Part centre <small>${esc(FACTU.centre.nom)} · ${100-tx} %</small></span>
      <b class="mono">${EUR(pc)}</b></div>
@@ -8712,9 +8799,9 @@ function retroDetail(f){
   </div></div>`;
 }
 /* la même lecture, en une ligne, pendant qu'on établit la facture */
-function retroApercu(m,prat){
+function retroApercu(m,prat,t){
  if(!voitRetro()||!(m>0)) return '';
- const tx=tauxRetro(prat), pp=Math.round(m*tx/100);
+ const tx=tauxRetro(prat,t), pp=Math.round(m*tx/100);
  return `<span class="rtap">⇄ ${esc(prat)} <b>${EUR(pp)}</b> (${tx} %) · ${esc(FACTU.centre.nom)} <b>${EUR(m-pp)}</b></span>`;
 }
 const peutEncaisser=()=>ROLES[role].v.includes('encaiss');
@@ -9511,7 +9598,10 @@ const CFG={
  zretire:   {l:'Zones retirées',    lit:()=>ZRETIRE,    ecrit:v=>remplObj(ZRETIRE,v)},
  stock:     {l:'Consommables',      lit:()=>STOCK,      ecrit:v=>remplTab(STOCK,v)},
  praticiens:{l:'Praticiens',        lit:()=>PRATICIENS, ecrit:v=>remplTab(PRATICIENS,v)},
- factu:     {l:'Facturation',       lit:()=>FACTU,      ecrit:v=>fondObj(FACTU,v)},
+ factu:     {l:'Facturation',       lit:()=>FACTU,      ecrit:v=>{ fondObj(FACTU,v);
+   /* une grille de taux se remplace, elle ne se fond pas : un taux qu'on a retiré
+      doit le rester, sans que la valeur d'usine ne revienne par la fenêtre */
+   ['retro','retroActe','tvaParActe'].forEach(k=>{ if(v&&v[k]) FACTU[k]=v[k] }) }},
  cabinet:   {l:'Cabinet',           lit:()=>CABINET,    ecrit:v=>fondObj(CABINET,v)},
  expediteur:{l:'Expéditeur',        lit:()=>EXPEDITEUR, ecrit:v=>fondObj(EXPEDITEUR,v)},
  roles:     {l:'Droits',            lit:()=>ROLES,      ecrit:v=>fondObj(ROLES,v)},
