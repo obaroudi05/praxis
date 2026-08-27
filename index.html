@@ -746,6 +746,8 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
 .sc-z .zrow{padding:4px 0}
 .sc-vide{font-size:11.5px;color:var(--ink-3);padding:2px 0 5px}
 .sc-note{display:block;width:100%;box-sizing:border-box;margin-top:6px;font-size:11.5px;padding:4px 8px}
+table tfoot td{border-top:2px solid var(--line);background:var(--panel-2);font-weight:620;
+  position:sticky;bottom:0}
 .prot-id{display:flex;gap:9px;align-items:flex-end}
 /* la ligne dépliée appartient à un tableau qui défile : le panneau reste collé
    au bord visible et borné, pour se lire sans faire défiler quoi que ce soit */
@@ -2349,9 +2351,21 @@ function fileRelances(){
 }
 /* ---------- Périodes personnalisables ---------- */
 const DATE_MIN=[...FACTURES.map(f=>f.date),...ACTES.map(a=>a.date)].sort()[0];
-const PRESET_L={jour:'Journée','7j':'7 jours','30j':'30 jours','90j':'90 jours',mois:'Mois en cours',annee:'Année',tout:'Tout',perso:'Personnalisée',moisSel:'Mois choisi',anneeSel:'Année choisie'};
-const PRESETS=[['7j','7 jours'],['30j','30 jours'],['90j','90 jours'],['mois','Mois en cours'],['annee','Année'],['tout','Tout']];
-const PRESETS_FACTU=['jour','annee','perso'];
+const PRESET_L={jour:'Journée',semaine:'Semaine','7j':'7 jours','30j':'30 jours','90j':'90 jours',
+ mois:'Mois',annee:'Année',tout:'Tout',perso:'Personnalisée',moisSel:'Mois choisi',anneeSel:'Année choisie'};
+/* ce que chaque raccourci recouvre au juste — l'infobulle le dit, la barre reste courte */
+const PRESET_T={jour:'Aujourd’hui',semaine:'Depuis lundi',mois:'Depuis le 1er du mois',
+ annee:'Depuis le 1er janvier',tout:'Depuis la première écriture','7j':'Les 7 derniers jours',
+ '30j':'Les 30 derniers jours','90j':'Les 90 derniers jours'};
+/* les mêmes raccourcis partout : journée, semaine, mois, année, tout */
+const PRESETS_STD=['jour','semaine','mois','annee','tout'];
+const PRESETS=PRESETS_STD.map(k=>[k,PRESET_L[k]]);
+const PRESETS_FACTU=PRESETS_STD;
+/* le lundi de la semaine en cours — calculé sur la date du jour et non sur l'heure,
+   pour que le fuseau horaire ne fasse pas basculer d'un jour */
+const lundi=()=>{ const d=new Date(TODAYS+'T00:00:00Z');
+ const j=(d.getUTCDay()+6)%7;                       /* lundi = 0 */
+ return new Date(d.getTime()-j*864e5).toISOString().slice(0,10) };
 /* dernier jour du mois « AAAA-MM » */
 const finMois=m=>{const [y,n]=m.split('-').map(Number);
  return new Date(Date.UTC(y, n, 0)).toISOString().slice(0,10)};
@@ -2361,6 +2375,7 @@ function perRange(per){
  if(per.k==='moisSel'){const m=per.m||TODAYS.slice(0,7); return [m+'-01', finMois(m)]}
  if(per.k==='anneeSel'){const y=per.y||TODAYS.slice(0,4); return [y+'-01-01', y+'-12-31']}
  if(per.k==='jour')  return [TODAYS, TODAYS];
+ if(per.k==='semaine') return [lundi(), TODAYS];
  if(per.k==='tout')  return ['1900-01-01', TODAYS];   /* aucune borne basse */
  if(per.k==='mois')  return [TODAYS.slice(0,7)+'-01', TODAYS];
  if(per.k==='annee') return [TODAYS.slice(0,4)+'-01-01', TODAYS];
@@ -2384,6 +2399,7 @@ function perBuckets(per){
    au plus ancien : on ne propose pas des périodes vides */
 function moisConnus(){
  const S=new Set(ACTES.map(a=>a.date.slice(0,7)));
+ FACTURES.forEach(f=>S.add(f.date.slice(0,7)));
  S.add(TODAYS.slice(0,7));
  return [...S].sort().reverse();
 }
@@ -2391,10 +2407,13 @@ const anneesConnues=()=>[...new Set(moisConnus().map(m=>m.slice(0,4)))].sort().r
 /* barre de filtre période réutilisable ; `mois` ajoute le choix d'un mois et
    d'une année précis, comme sur la page des statistiques d'Amesla */
 function periodBar(per,setter,info,presets,mois){
- const keys=presets||PRESETS.map(x=>x[0]);
- const [ra,rb]=perRange(per);
+ const keys=presets||PRESETS_STD;
+ const [ra0,rb]=perRange(per);
+ /* « Tout » remonte au 1er janvier 1900 pour filtrer : on n'en fait pas une date
+    de saisie, on montre la première écriture du dossier */
+ const ra=(ra0<DATE_MIN?DATE_MIN:ra0);
  return `<div class="fbar perbar">
-  <div class="seg">${keys.map(k=>`<button class="${per.k===k?'on':''}" onclick="${setter}({k:'${k}',from:'${ra}',to:'${rb}'})">${PRESET_L[k]}</button>`).join('')}</div>
+  <div class="seg">${keys.map(k=>`<button class="${per.k===k?'on':''}" title="${PRESET_T[k]||''}" onclick="${setter}({k:'${k}',from:'${ra}',to:'${rb}'})">${PRESET_L[k]}</button>`).join('')}</div>
   ${mois?`<select class="inp perms" title="Un mois en particulier"
       onchange="this.value?${setter}({k:'moisSel',m:this.value}):${setter}({k:'tout'})">
       <option value="">Mois…</option>
@@ -3123,7 +3142,7 @@ function setPerD2(x){ perD2={...perD2,...x}; paint() }
 /* suivi chronologique des actes d'un patient */
 let actTri='desc', actCat='', actPrat='', actQ='';
 let schemaReg='visage';
-let pView='liste', fidF='tous', annivF='mois', perP={k:'90j',from:'',to:''}, photoQ='', photoKind='tous';
+let pView='liste', fidF='tous', annivF='mois', perP={k:'mois',from:'',to:''}, photoQ='', photoKind='tous';
 function setPerP(x){perP=x;paint()}
 const PVIEWS=[['liste','Tous les patients'],['fideles','Fidèles'],['reactiver','À réactiver'],['anniv','Anniversaires'],['photos','Photothèque']];
 
@@ -3614,7 +3633,7 @@ let ENVOIS=[];
 let ENV=null;                       /* composition en cours */
 let envSel=null;                    /* envoi déroulé dans le registre */
 let envQ='', envCanal='', envStat='';
-let perEnv={k:'90j',from:'',to:''};
+let perEnv={k:'mois',from:'',to:''};
 const setPerEnv=x=>{perEnv=x;paint()};
 
 /* L'identité sous laquelle partent les documents. */
@@ -3866,7 +3885,7 @@ V.envois=()=>{
     .map(([l,v,c])=>`<div class="kpi"><div class="k">${l}</div>
       <div class="v" ${c?`style="color:${c}"`:''}>${v}</div></div>`).join('')}
   </div>
-  ${periodBar(perEnv,'setPerEnv',`${L.length} envoi${L.length>1?'s':''}`,['jour','mois','90j','annee','tout'],1)}
+  ${periodBar(perEnv,'setPerEnv',`${L.length} envoi${L.length>1?'s':''}`,PRESETS_STD,1)}
   ${envFiltres(null)}
   <div class="card"><div class="tw"><table>
     <thead><tr><th style="width:132px">Date d’envoi</th><th style="width:150px">Patient</th><th>Document</th>
@@ -4114,7 +4133,7 @@ function pPhotos(){
  return `<div class="head" style="margin-bottom:12px">
    <div><h1>Photothèque</h1><p>${L.length} photo${L.length>1?'s':''} sur ${PHOTOS.length} · ${jours.length} date${jours.length>1?'s':''} de prise de vue</p></div>
    <div class="r"><button class="btn" onclick="toast('QR code affiché : photographiez avec le téléphone')">📱 Importer par QR code</button></div></div>
- ${periodBar(perP,'setPerP',`${L.length} photo${L.length>1?'s':''}`)}
+ ${periodBar(perP,'setPerP',`${L.length} photo${L.length>1?'s':''}`,PRESETS_STD,1)}
  <div class="fbar">
   <input class="inp" id="phq" style="min-width:240px" placeholder="Nom du patient…" value="${esc(photoQ)}"
     oninput="photoQ=this.value;paint();const e=document.getElementById('phq');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
@@ -4593,7 +4612,7 @@ function pDetail(p){
        <button class="btn s" onclick="toast('Ordonnance créée')">℞ Ordonnance</button>
        <button class="btn s" onclick="toast('Document téléversé')">↑ Téléverser</button>
      </div></div>
-    ${periodBar(perD2,'setPerD2',`${L.length} document${L.length>1?'s':''}`,['mois','90j','annee','tout'],1)}
+    ${periodBar(perD2,'setPerD2',`${L.length} document${L.length>1?'s':''}`,PRESETS_STD,1)}
     <div class="fbar" style="margin-top:-4px">
       <span class="mu" style="font-size:11.5px;font-weight:600;align-self:center">Classer</span>
       <div class="seg">
@@ -4626,7 +4645,7 @@ function pDetail(p){
    const T=envDe(p.id);
    const ech=T.filter(e=>e.statut==='echec').length;
    return `${envBandeau()}
-    ${periodBar(perEnv,'setPerEnv',`${L.length} envoi${L.length>1?'s':''} sur ${T.length}`,['mois','90j','annee','tout'],1)}
+    ${periodBar(perEnv,'setPerEnv',`${L.length} envoi${L.length>1?'s':''} sur ${T.length}`,PRESETS_STD,1)}
     ${envFiltres(p.id)}
     ${ech?`<div class="tip" style="background:var(--crit-w);border-color:rgba(208,59,59,.25)"><span class="e">⚠</span>
       <div><b>${ech} envoi${ech>1?'s n’ont':' n’a'} pas abouti.</b> Vérifiez l’adresse dans la fiche, puis renvoyez depuis la ligne concernée.</div></div>`:''}
@@ -4729,7 +4748,7 @@ function pDetail(p){
 }
 
 /* ---------------- Actes ---------------- */
-let aq='',aCat='',aPrat='',perA={k:'tout',from:'',to:''};
+let aq='',aCat='',aPrat='',perA={k:'mois',from:'',to:''};
 function setPerA(p){ perA={...perA,...p}; paint() }
 V.actes=()=>{
  const L=ACTES.filter(a=>{const q=aq.toLowerCase();
@@ -4752,7 +4771,7 @@ V.actes=()=>{
   <select class="inp" onchange="aPrat=this.value;paint()"><option value="">Tous praticiens</option>
    ${PRATICIENS.map(x=>`<option ${aPrat===x?'selected':''}>${x}</option>`).join('')}</select>
  </div>
- ${periodBar(perA,'setPerA',`${L.length} acte${L.length>1?'s':''}`,['mois','90j','annee','tout'],1)}
+ ${periodBar(perA,'setPerA',`${L.length} acte${L.length>1?'s':''}`,PRESETS_STD,1)}
  <div class="card"><div class="tw"><table>
   <thead><tr><th>Date</th><th>Patient</th><th>Acte</th><th>Zones &amp; quantités</th><th>Lot</th>${ROLES[role].prix?'<th class="num">Montant</th>':''}<th style="width:74px"></th></tr></thead>
   <tbody>${L.map(a=>`<tr class="c" onclick="openActe(${a.patient},${a.id})">
@@ -4769,7 +4788,7 @@ V.actes=()=>{
 };
 
 /* ---------------- Devis ---------------- */
-let dF='tous',dSel=null,devFam='esth',perD={k:'90j',from:'',to:''},perE={k:'jour',from:'',to:''};
+let dF='tous',dSel=null,devFam='esth',perD={k:'mois',from:'',to:''},perE={k:'mois',from:'',to:''};
 V.devis=()=>{
  if(dSel){const d=DEVIS.find(x=>x.id===dSel),p=pById(d.patient);
   const h=[]; if(d.envoye)h.push([d.envoye,'Devis envoyé par e-mail','✉']);
@@ -4821,7 +4840,7 @@ V.devis=()=>{
  <div class="fbar" style="margin-bottom:12px"><div class="seg">${FAMILLES.map(f=>{
    const n=DEVIS.filter(d=>(d.fam||'esth')===f.id).length;
    return `<button class="${devFam===f.id?'on':''}" onclick="devFam='${f.id}';paint()">${f.i} ${f.n} · ${n}</button>`}).join('')}</div></div>
- ${periodBar(perD,'setPerD',`${base.length} devis`)}
+ ${periodBar(perD,'setPerD',`${base.length} devis`,PRESETS_STD,1)}
  <div class="grid g4" style="margin-bottom:14px">
   ${kpi('Taux d’acceptation',dec.length?tx+' %':'—',dec.length?`${base.filter(d=>d.statut==='accepte').length} sur ${dec.length} devis décidés`:'aucun devis décidé',tx>=60?'up':'dn')}
   ${kpi('En attente',EUR(matt),att.length+' devis')}
@@ -4847,7 +4866,103 @@ V.devis=()=>{
 
 /* ---------------- Encaissements ---------------- */
 let encView='detail', fMoyen='tous', fStatut='tous', fPrat='', fCat='', fq='';
-const ENCV=[['detail','Facturations détaillées'],['jours','Totaux journaliers'],['caisse','Encaissement & caisse']];
+const ENCV=[['detail','Facturations détaillées'],['jours','Totaux journaliers'],
+            ['caisse','Encaissement & caisse'],['retro','Rétrocession']];
+const encVues=()=>ENCV.filter(([k])=>k!=='retro'||(FACTU.double&&CAN('compta')));
+
+/* ==========================================================================
+   Exports — un fichier qu'on ouvre dans un tableur, pas un message d'attente
+   Séparateur point-virgule et virgule décimale : c'est ce qu'attend un Excel
+   configuré en français. Le BOM lui évite de massacrer les accents.
+   ========================================================================== */
+function csvTelecharger(nom,lignes){
+ const cell=v=>{ const t=String(v==null?'':v);
+   return /[";\n\r]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t };
+ const txt='﻿'+lignes.map(l=>l.map(cell).join(';')).join('\r\n');
+ const a=document.createElement('a');
+ a.href=URL.createObjectURL(new Blob([txt],{type:'text/csv;charset=utf-8'}));
+ a.download=nom; document.body.appendChild(a); a.click();
+ setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove() },400);
+ return lignes.length;
+}
+const nbFR=v=>(Math.round((+v||0)*100)/100).toFixed(2).replace('.',',');
+const nomFichier=t=>t.normalize('NFD').replace(/[̀-ͯ]/g,'')
+  .replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'').toLowerCase();
+
+/* les facturations d'une période qui donnent lieu à rétrocession : une facture
+   annulée ne partage rien, et un avoir a déjà été déduit du TTC */
+const factRetro=(per,prat)=>FACTURES
+ .filter(f=>f.statut==='ok'&&inPer(f.date,per||perE)&&(!prat||f.praticien===prat))
+ .sort((a,b)=>a.date.localeCompare(b.date)||String(a.id).localeCompare(String(b.id)));
+const RETRO_COLS=['Praticien','N° de facture','Date','Patient','N° de dossier','Prestation',
+ 'Catégorie','TTC facturé','Avoir déduit','Taux praticien %','Part praticien','Part centre',
+ 'Encaissé','Reste dû','Règlement'];
+function retroLignes(f){
+ const p=pById(f.patient), a=ACTES.find(x=>x.id===f.acte);
+ return [f.praticien, f.id, DF(f.date), fn(p), f.patient,
+   a?a.nom:(f.libelle||'—'), f.cat||'', nbFR(fTTC(f)), nbFR(f.avoir||0),
+   tauxRetro(f.praticien), nbFR(partPrat(f)), nbFR(partCentre(f)),
+   nbFR(f.paye), nbFR(rdu(f)), moyenTxt(f)||'non réglé'];
+}
+/* Le relevé qu'on transmet au praticien en fin de mois : l'en-tête dit de quoi
+   il s'agit, le détail justifie le total, le total se recolle au détail. */
+function releveRetro(prat){
+ if(!CAN('compta')||!FACTU.double){ toast('Le relevé de rétrocession relève du suivi comptable'); return }
+ const L=factRetro(perE,prat);
+ if(!L.length){ toast(`Aucune facturation ${prat?'de '+prat+' ':''}sur ${perLabel(perE)}`); return }
+ const [ra,rb]=perRange(perE);
+ const prats=prat?[prat]:[...new Set(L.map(f=>f.praticien))].sort();
+ const T=p=>{const F=L.filter(f=>!p||f.praticien===p);
+   return {n:F.length, ttc:F.reduce((s,f)=>s+fTTC(f),0), pp:F.reduce((s,f)=>s+partPrat(f),0),
+     pc:F.reduce((s,f)=>s+partCentre(f),0), enc:F.reduce((s,f)=>s+f.paye,0),
+     du:F.reduce((s,f)=>s+rdu(f),0)}};
+ const R=[
+  ['Relevé de rétrocession'],
+  ['Structure', FACTU.centre.nom, 'SIRET', FACTU.centre.siret],
+  ['Modèle', FACTU.modele==='split'?'Facturation séparée — deux factures par acte'
+    :'Rétrocession — le centre encaisse puis reverse'],
+  ['Période', 'du '+DF(ra)+' au '+DF(rb)],
+  ['Praticien', prat||'tous les praticiens'],
+  ['Établi le', DF(TODAYS), 'par', ROLES[role].u],
+  [], RETRO_COLS];
+ prats.forEach(p=>{
+  L.filter(f=>f.praticien===p).forEach(f=>R.push(retroLignes(f)));
+  const t=T(p);
+  R.push(['Total '+p, t.n+' facture'+(t.n>1?'s':''), '', '', '', '', '',
+    nbFR(t.ttc), '', tauxRetro(p), nbFR(t.pp), nbFR(t.pc), nbFR(t.enc), nbFR(t.du), '']);
+  R.push([]);
+ });
+ if(prats.length>1){ const t=T(null);
+  R.push(['TOTAL GÉNÉRAL', t.n+' factures','','','','','',
+    nbFR(t.ttc),'','',nbFR(t.pp), nbFR(t.pc), nbFR(t.enc), nbFR(t.du),'']) }
+ R.push([]);
+ R.push(['Les facturations annulées sont exclues. Les avoirs sont déjà déduits du TTC facturé.']);
+ R.push(['La part praticien n’est due qu’à hauteur de ce qui a été encaissé.']);
+ csvTelecharger('retrocession-'+nomFichier(prat||'tous-praticiens')+'-'+ra+'-'+rb+'.csv', R);
+ const t=T(prat||null);
+ toast(`Relevé exporté · ${t.n} facture${t.n>1?'s':''} · ${EUR(t.pp)} à ${prat||'reverser'}`);
+}
+/* l'export de la liste affichée, avec ses filtres */
+function exportFactures(){
+ const L=factFiltrees();
+ if(!L.length){ toast('Aucune facturation à exporter avec ces filtres'); return }
+ const dbl=FACTU.double&&CAN('compta'), cpt=CAN('compta');
+ const tete=['N° de facture','Date','Patient','N° de dossier','Prestation','Catégorie','Praticien']
+  .concat(cpt?['HT','TVA']:[]).concat(['TTC','Avoir'])
+  .concat(dbl?['Part centre','Part praticien']:[])
+  .concat(['Encaissé','Reste dû','Règlement','Statut']);
+ const [ra,rb]=perRange(perE);
+ const R=[['Facturations détaillées'],['Période','du '+DF(ra)+' au '+DF(rb)],
+   ['Établi le',DF(TODAYS),'par',ROLES[role].u],[],tete];
+ L.forEach(f=>{ const p=pById(f.patient), a=ACTES.find(x=>x.id===f.acte);
+  R.push([f.id, DF(f.date), fn(p), f.patient, a?a.nom:(f.libelle||'—'), f.cat||'', f.praticien]
+   .concat(cpt?[nbFR(fHT(f)),nbFR(fTVA(f))]:[]).concat([nbFR(fTTC(f)), nbFR(f.avoir||0)])
+   .concat(dbl?[nbFR(partCentre(f)),nbFR(partPrat(f))]:[])
+   .concat([nbFR(f.paye), nbFR(rdu(f)), moyenTxt(f)||'non réglé',
+     f.statut==='annulee'?'Annulée':rdu(f)>0?'Partielle':'Soldée'])) });
+ csvTelecharger('facturations-'+ra+'-'+rb+'.csv', R);
+ toast(`${L.length} facturation${L.length>1?'s':''} exportée${L.length>1?'s':''}`);
+}
 
 function factFiltrees(){
  const q=fq.toLowerCase();
@@ -4879,10 +4994,10 @@ function barreFiltres(){
 }
 
 V.encaiss=()=>{
- const sub=`<div class="fbar" style="margin-bottom:14px"><div class="seg">${ENCV.map(([k,l])=>
+ const sub=`<div class="fbar" style="margin-bottom:14px"><div class="seg">${encVues().map(([k,l])=>
    `<button class="${encView===k?'on':''}" onclick="encView='${k}';paint()">${l}</button>`).join('')}</div>
    ${CAN('compta')?`<div style="margin-left:auto"><button class="btn s g" onclick="go('params');paramTab='facturation';paint()">⚙ Double facturation &amp; rétrocession</button></div>`:''}</div>`;
- return sub+(CAN('compta')?'':bandeauCompta())+({detail:eDetail, jours:eJours, caisse:eCaisse}[encView]||eDetail)();
+ return sub+(CAN('compta')?'':bandeauCompta())+({detail:eDetail, jours:eJours, caisse:eCaisse, retro:eRetro}[encView]||eDetail)();
 };
 
 /* ---------- Facturations détaillées ---------- */
@@ -4895,9 +5010,11 @@ function eDetail(){
  const cpt=CAN('compta'), dbl=FACTU.double&&cpt;
  return `<div class="head" style="margin-bottom:12px">
    <div><h1>Facturations détaillées</h1><p>${L.length} facturation${L.length>1?'s':''} sur la période${L.length!==ok.length?` · ${L.length-ok.length} annulée(s) exclue(s) des totaux`:''}</p></div>
-   <div class="r"><button class="btn" onclick="toast('Export CSV généré')">Exporter la liste</button>
+   <div class="r">${(FACTU.double&&CAN('compta'))?`<button class="btn" title="Le détail des factures et la part de chaque praticien"
+      onclick="releveRetro('')">⭳ Relevé de rétrocession</button>`:''}
+    <button class="btn" onclick="exportFactures()">⭳ Exporter la liste</button>
     <button class="btn p" onclick="toast('Facturation créée')">+ Facturation</button></div></div>
- ${periodBar(perE,'setPerE',`${L.length} ligne${L.length>1?'s':''}`,presetsFactu())}
+ ${periodBar(perE,'setPerE',`${L.length} ligne${L.length>1?'s':''}`,presetsFactu(),1)}
  ${barreFiltres()}
  <div class="grid ${dbl?'g5':cpt?'g4':'g3'}" style="margin-bottom:13px">
   ${kpi('Facturation TTC',EUR(ttc),`${ok.length} facture(s) · moyenne ${EUR(ok.length?ttc/ok.length:0)}`)}
@@ -4928,6 +5045,78 @@ function eDetail(){
  <div class="mu" style="font-size:11.5px;margin-top:10px">⊘ Les facturations annulées ne sont pas prises en compte dans les totaux. Les avoirs sont déduits des montants HT et TTC.</div>`;
 }
 
+/* ---------- Rétrocession : ce qu'on transmet à chaque praticien ---------- */
+function eRetro(){
+ if(!CAN('compta')||!FACTU.double) return bandeauCompta();
+ const L=factRetro(perE, fPrat||null);
+ const [ra,rb]=perRange(perE);
+ const prats=[...new Set(FACTURES.filter(f=>f.statut==='ok'&&inPer(f.date,perE)).map(f=>f.praticien))]
+   .sort((a,b)=>a.localeCompare(b));
+ const T=p=>{const F=factRetro(perE,p);
+   return {n:F.length, ttc:F.reduce((s,f)=>s+fTTC(f),0), pp:F.reduce((s,f)=>s+partPrat(f),0),
+     pc:F.reduce((s,f)=>s+partCentre(f),0), enc:F.reduce((s,f)=>s+f.paye,0),
+     du:F.reduce((s,f)=>s+rdu(f),0), acquis:F.reduce((s,f)=>s+Math.round(f.paye*tauxRetro(p)/100),0)}};
+ const G=T(null);
+ return `<div class="head" style="margin-bottom:12px">
+   <div><h1>Rétrocession</h1><p>${G.n} facturation${G.n>1?'s':''} · ${EUR(G.pp)} à reverser · ${perLabel(perE)}</p></div>
+   <div class="r"><button class="btn p" onclick="releveRetro('')">⭳ Relevé de tous les praticiens</button></div></div>
+ ${periodBar(perE,'setPerE',`${G.n} facture${G.n>1?'s':''}`,presetsFactu(),1)}
+ <div class="tip"><span class="e">🧾</span><div>${FACTU.modele==='split'
+   ? `<b>Facturation séparée</b> — pour chaque acte, ${esc(FACTU.centre.nom)} facture la part structure et le praticien ses honoraires. Le relevé récapitule ce que chacun a émis.`
+   : `<b>Rétrocession</b> — ${esc(FACTU.centre.nom)} encaisse la totalité puis reverse à chaque praticien sa part. Le relevé détaille facture par facture ce qui compose le montant reversé, pour être transmis en fin de mois.`}
+   Les taux se règlent dans <a onclick="go('params');paramTab='facturation';paint()">Paramètres → Facturation &amp; rétrocession</a>.</div></div>
+ <div class="grid g4" style="margin-bottom:13px">
+  ${kpi('Facturé TTC',EUR(G.ttc),`${G.n} facture(s) sur la période`)}
+  ${kpi('Part praticiens',EUR(G.pp),`${prats.length} praticien(s)`)}
+  ${kpi('Part centre',EUR(G.pc),G.ttc?Math.round(G.pc/G.ttc*100)+' % du facturé':'—')}
+  ${kpi('Acquis au règlement',EUR(G.acquis),G.du?`${EUR(G.du)} encore dû par les patients`:'tout est encaissé',G.du?'dn':'up')}</div>
+ <div class="grid g2" style="margin-bottom:13px;align-items:start">
+  ${prats.map(p=>{const t=T(p);
+   return `<div class="card"><div class="h"><h2>${esc(p)}</h2><span class="s">${tauxRetro(p)} % · ${t.n} facture${t.n>1?'s':''}</span>
+     <div class="r"><button class="btn xs p" onclick="releveRetro(${JSON.stringify(p).replace(/"/g,'&quot;')})">⭳ Son relevé</button></div></div>
+    <div class="b">
+     <div class="rtl"><span>Facturé au patient <small>TTC sur la période</small></span><b class="mono">${EUR(t.ttc)}</b></div>
+     <div class="rtl acc"><span>Part praticien <small>${tauxRetro(p)} %</small></span><b class="mono">${EUR(t.pp)}</b></div>
+     <div class="rtl"><span>Part centre <small>${100-tauxRetro(p)} %</small></span><b class="mono">${EUR(t.pc)}</b></div>
+     <div class="rtb"><div class="rtb-p" style="width:${t.ttc?Math.round(t.pp/t.ttc*100):0}%"></div></div>
+     <div class="mu" style="font-size:11.5px;margin-top:8px">Encaissé ${EUR(t.enc)} sur ${EUR(t.ttc)}${t.du
+       ?` — ${EUR(t.du)} restent dus, soit ${EUR(t.pp-t.acquis)} de part non encore acquise`:` — part entièrement acquise`}.</div>
+    </div></div>`}).join('')||'<div class="empty" style="grid-column:1/-1">Aucune facturation sur cette période.</div>'}
+ </div>
+ <div class="card"><div class="h"><h2>Détail des facturations</h2>
+   <span class="s">${L.length} ligne${L.length>1?'s':''}${fPrat?' · '+esc(fPrat):''}</span>
+   <div class="r"><select class="inp" onchange="fPrat=this.value;paint()"><option value="">Tous praticiens</option>
+     ${prats.map(x=>`<option ${fPrat===x?'selected':''}>${esc(x)}</option>`).join('')}</select>
+    <button class="btn xs" onclick="releveRetro(fPrat||'')">⭳ Exporter ce détail</button></div></div>
+  <div class="tw"><table>
+   <thead><tr><th style="white-space:nowrap">N°</th><th style="white-space:nowrap">Date</th><th>Patient</th><th>Prestation</th>
+    <th>Praticien</th><th class="num">TTC</th><th class="num">Taux</th>
+    <th class="num">Part praticien</th><th class="num">Part centre</th>
+    <th class="num">Encaissé</th><th class="num">Reste</th></tr></thead>
+   <tbody>${L.map(f=>{const p=pById(f.patient), a=ACTES.find(x=>x.id===f.acte);
+    return `<tr class="c" onclick="openPatient(${f.patient})">
+     <td class="mono" style="white-space:nowrap">${f.id}</td>
+     <td class="mono" style="white-space:nowrap">${DF(f.date)}</td>
+     <td style="white-space:nowrap"><span class="nm">${esc(fn(p))}</span></td>
+     <td>${a?esc(a.nom):esc(f.libelle||'—')}${f.avoir?`<div class="mu" style="font-size:11px">avoir ${EUR(f.avoir)} déduit</div>`:''}</td>
+     <td class="mu" style="white-space:nowrap">${esc(f.praticien)}</td>
+     <td class="num"><b>${EUR(fTTC(f))}</b></td>
+     <td class="num mu">${tauxRetro(f.praticien)} %</td>
+     <td class="num" style="color:var(--accent);font-weight:640">${EUR(partPrat(f))}</td>
+     <td class="num mu">${EUR(partCentre(f))}</td>
+     <td class="num">${EUR(f.paye)}</td>
+     <td class="num">${rdu(f)>0?`<span style="color:var(--crit);font-weight:650">${EUR(rdu(f))}</span>`:'<span class="mu">—</span>'}</td></tr>`}).join('')}
+   </tbody>
+   ${L.length?`<tfoot><tr><td colspan="5"><b>Total${fPrat?' — '+esc(fPrat):''}</b></td>
+     <td class="num"><b>${EUR(L.reduce((s,f)=>s+fTTC(f),0))}</b></td><td></td>
+     <td class="num" style="color:var(--accent);font-weight:660">${EUR(L.reduce((s,f)=>s+partPrat(f),0))}</td>
+     <td class="num">${EUR(L.reduce((s,f)=>s+partCentre(f),0))}</td>
+     <td class="num">${EUR(L.reduce((s,f)=>s+f.paye,0))}</td>
+     <td class="num">${EUR(L.reduce((s,f)=>s+rdu(f),0))}</td></tr></tfoot>`:''}
+   </table>${L.length?'':'<div class="empty">Aucune facturation sur cette période.</div>'}</div></div>
+ <div class="mu" style="font-size:11.5px;margin-top:10px">Les facturations annulées sont exclues. Les avoirs sont déjà déduits du TTC facturé. Le relevé exporté s’ouvre dans un tableur.</div>`;
+}
+
 /* ---------- Totaux journaliers ---------- */
 function eJours(){
  const L=factFiltrees();
@@ -4939,7 +5128,7 @@ function eJours(){
    <div><h1>Totaux journaliers</h1><p>${jours.length} jour${jours.length>1?'s':''} de facturation sur la période</p></div>
    <div class="r"><button class="btn" onclick="toast('Ticket de synthèse envoyé à l’imprimante')">🖨 Ticket de synthèse</button>
     <button class="btn" onclick="toast('Export CSV généré')">Exporter la liste</button></div></div>
- ${periodBar(perE,'setPerE',`${jours.length} jour${jours.length>1?'s':''}`,presetsFactu())}
+ ${periodBar(perE,'setPerE',`${jours.length} jour${jours.length>1?'s':''}`,presetsFactu(),1)}
  ${barreFiltres()}
  <div class="grid g4" style="margin-bottom:13px">
   ${kpi('Facturation totale TTC',EUR(tot))}
@@ -4985,7 +5174,7 @@ function eCaisse(){
   <div><h1>Encaissement &amp; caisse</h1><p>${FP.length} facture${FP.length>1?'s':''} · ${EUR(enc)} encaissés</p></div>
   <div class="r"><button class="btn" onclick="toast('Clôture de caisse enregistrée')">Clôture du jour</button>
    <button class="btn p" onclick="toast('Encaissement saisi')">+ Encaissement</button></div></div>
- ${periodBar(perE,'setPerE',`${FP.length} facture${FP.length>1?'s':''}`,presetsFactu())}
+ ${periodBar(perE,'setPerE',`${FP.length} facture${FP.length>1?'s':''}`,presetsFactu(),1)}
  <div class="grid g4" style="margin-bottom:14px">
   ${kpi('Encaissé sur la période',EUR(enc),encPrev?`${ev>=0?'▲':'▼'} ${Math.abs(ev)} % vs période précédente`:'pas de comparatif',ev>=0?'up':'dn')}
   ${kpi('Reste dû',EUR(reste),im.length+' facture'+(im.length>1?'s':''),reste?'dn':'up')}
@@ -5108,7 +5297,7 @@ V.stats=()=>{
  const serC=B.map(b=>({k:b.from,label:b.label,v:F.filter(f=>f.date>=b.from&&f.date<=b.to).reduce((s,f)=>s+f.paye,0)}));
  return `<div class="head"><div><h1>Statistiques</h1>
    <p>${acte?'Activité':'Suivi comptable'}${acte&&sous?' et suivi comptable':''} · ${perLabel(perS)}</p></div></div>
- ${periodBar(perS,'setPerS',`${A.length} acte${A.length>1?'s':''}`,['mois','90j','annee','tout'],1)}
+ ${periodBar(perS,'setPerS',`${A.length} acte${A.length>1?'s':''}`,PRESETS_STD,1)}
  ${acte?'':`<div class="tip"><span class="e">🔒</span><div>Les <b>statistiques des actes</b> ne sont pas ouvertes à votre rôle : seuls les montants s'affichent. Ce droit se règle dans Équipe &amp; droits.</div></div>`}
  ${sous?'':`<div class="tip"><span class="e">🔒</span><div>Les montants relèvent du <b>suivi comptable</b>, qui n'est pas ouvert à votre rôle. L'activité, elle, s'affiche entièrement.</div></div>`}
  <div class="grid g4" style="margin-bottom:14px">
@@ -5906,7 +6095,7 @@ V.params=()=>{
         <tr><td colspan="2"><b>Total</b></td><td class="num"><b>${EUR(ttc)}</b></td><td></td>
           <td class="num"><b>${EUR(parPrat.reduce((s,x)=>s+x.pp,0))}</b></td>
           <td class="num"><b>${EUR(parPrat.reduce((s,x)=>s+x.pc,0))}</b></td></tr></tbody></table></div>
-        <button class="btn s" style="margin-top:12px" onclick="toast('Relevé de rétrocession généré')">Générer le relevé de rétrocession</button>`
+        <button class="btn s" style="margin-top:12px" onclick="closeAll();go('encaiss');encView='retro';paint()">Voir et exporter les relevés de rétrocession →</button>`
         :'<div class="empty">Double facturation désactivée — une seule facture est émise, sans répartition.</div>'}
       <div style="margin-top:16px;padding-top:13px;border-top:1px solid var(--line)">
        <div class="fld"><label>Taux de TVA par acte</label>
@@ -9195,7 +9384,9 @@ function cycleRole(){const k=Object.keys(ROLES);role=k[(k.indexOf(role)+1)%k.len
  PE=null;                       /* changer de rôle referme une saisie en cours */
  paint();toast('Vue « '+ROLES[role].l+' »')}
 function setPerD(p){perD=p;paint()}
-function presetsFactu(){ return CAN('compta')?PRESETS_FACTU:['jour','perso'] }
+/* sans droit comptable, la période consultable est bornée : on ne propose que
+   les raccourcis qui tiennent dans cet horizon */
+function presetsFactu(){ return CAN('compta')?PRESETS_STD:['jour','semaine','mois'] }
 function bandeauCompta(){ return `<div class="tip" style="margin-bottom:13px"><span class="e">🔒</span><div>Vue <b>facturation</b> : vous voyez les facturations, les encaissements et les restes dus. Le <b>suivi comptable</b> — chiffre d'affaires cumulé, ventilation HT/TVA et rétrocession centre/praticien — est réservé au praticien. Période consultable limitée à ${HORIZON_SANS_COMPTA} jours.</div></div>` }
 function setPerE(p){
  if(!CAN('compta')){
