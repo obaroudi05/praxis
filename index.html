@@ -925,7 +925,8 @@ tr.neuf>td{background:color-mix(in srgb,var(--accent) 9%,transparent)}
 .psg-t{font-size:14.5px;font-weight:620;margin-bottom:6px}
 .psg-b p{font-size:12.5px;color:var(--ink-2);line-height:1.55;margin:0 0 7px}
 .psg-m{font-size:11px !important;color:var(--ink-3) !important}
-.sc-mat.vide a{color:var(--accent);cursor:pointer;white-space:nowrap}
+.sc-mat.vide a,.encf .tip a{color:var(--accent);cursor:pointer}
+.sc-mat.vide a{white-space:nowrap}
 /* repliée : une seule ligne, mais lisible — ce qui n'était pas le cas avant */
 .syn{border-top:1px solid var(--line);padding:5px 12px 6px;display:flex;align-items:baseline;
   gap:6px;cursor:pointer;font-size:12.5px;line-height:1.3}
@@ -3748,6 +3749,129 @@ const EXPEDITEUR={ nom:'Cabinet Dr Baroudi', mail:'contact@gemelia.fr',
   demo:true,           /* à défaut, on fait vivre les états pour la démonstration */
   mode:'lien' };       /* lien sécurisé par défaut, plutôt qu'une pièce jointe */
 
+/* ==========================================================================
+   Le message qui accompagne un document
+   Un devis et un consentement n'appellent pas le même mot. Chaque type de pièce
+   a donc son objet et son corps, réglables au back-office. Une règle ne se
+   négocie pas : le message ne nomme jamais le soin — une adresse mal saisie ne
+   doit rien révéler de médical. Les variables disponibles s'arrêtent donc au
+   patient, au cabinet et au praticien.
+   ========================================================================== */
+const MSG_KINDS=[['devis','Devis','◫'],['consentement','Consentement','✎'],
+  ['ordonnance','Ordonnance','℞'],['facture','Facture','€'],['document','Autre document','▤']];
+const MSG_VARS=[['prenom','le prénom du patient'],['nom','son nom'],['cabinet','le nom du cabinet'],
+  ['praticien','le praticien référent'],['piece','le type de pièce — devis, consentement…'],
+  ['validite','la validité du lien, en jours'],['signature','la phrase de signature, quand elle est demandée'],
+  ['tel','le téléphone du cabinet'],['mail','l’adresse de réponse']];
+const MSG_DEF={
+ devis:{objet:'Votre devis est à votre disposition',
+  mail:'Bonjour {{prenom}},\n\nVotre devis établi par {{cabinet}} est à votre disposition.\n\n{{signature}}Il ne vous engage à rien : prenez le temps de le lire, et posez-nous vos questions.\n\nPour toute question, répondez à ce message ou appelez-nous au {{tel}}.\n\n{{cabinet}}\n{{mail}}',
+  sms:'{{cabinet}} : votre devis est à votre disposition. {{signature}}'},
+ consentement:{objet:'Un document à signer est à votre disposition',
+  mail:'Bonjour {{prenom}},\n\nAvant votre rendez-vous, {{praticien}} vous adresse un document d’information à lire et à signer.\n\n{{signature}}Prenez le temps de le lire entièrement : il détaille le déroulement, les suites et les alternatives. Vos questions sont les bienvenues avant la signature.\n\n{{cabinet}}\n{{mail}}',
+  sms:'{{cabinet}} : un document à lire et signer avant votre rendez-vous. {{signature}}'},
+ ordonnance:{objet:'Un document de votre dossier est à votre disposition',
+  mail:'Bonjour {{prenom}},\n\n{{praticien}} vous adresse un document de votre dossier.\n\n{{signature}}Si quelque chose vous paraît peu clair, appelez-nous au {{tel}}.\n\n{{cabinet}}\n{{mail}}',
+  sms:'{{cabinet}} : un document de votre dossier vous attend. {{signature}}'},
+ facture:{objet:'Votre facture est à votre disposition',
+  mail:'Bonjour {{prenom}},\n\nVotre facture établie par {{cabinet}} est à votre disposition.\n\n{{signature}}Pour toute question de facturation, répondez simplement à ce message.\n\n{{cabinet}}\n{{mail}}',
+  sms:'{{cabinet}} : votre facture est disponible. {{signature}}'},
+ document:{objet:'Un document de votre dossier est à votre disposition',
+  mail:'Bonjour {{prenom}},\n\nUn document établi par {{cabinet}} est à votre disposition.\n\n{{signature}}Pour toute question, répondez simplement à ce message.\n\n{{cabinet}}\n{{mail}}',
+  sms:'{{cabinet}} : un document vous attend. {{signature}}'},
+};
+let MSGENV=JSON.parse(JSON.stringify(MSG_DEF));
+const msgK=k=>MSGENV[k]?k:'document';
+const msgDe=k=>MSGENV[msgK(k)]||MSGENV.document;
+/* la phrase de signature : elle change selon ce qu'on demande vraiment */
+function msgSignature(k,lien,sign,sms){
+ if(!lien) return sms?'':'Vous le trouverez en pièce jointe de ce message.\n\n';
+ if(sign) return sms
+  ? `Ouvrez le lien reçu, confirmez votre date de naissance et signez en ligne (${LIEN_JOURS} j).`
+  : `Il vous est demandé de le signer en ligne : lien sécurisé valable ${LIEN_JOURS} jours, à usage unique. Vous confirmerez votre date de naissance à l’ouverture, puis signerez directement sur votre écran.\n\n`;
+ return sms
+  ? 'Ouvrez le lien sécurisé reçu et confirmez votre date de naissance.'
+  : `Pour le consulter : lien sécurisé valable ${LIEN_JOURS} jours, à usage unique. Vous confirmerez votre date de naissance à l’ouverture.\n\n`;
+}
+function msgCtx(p,k,lien,sign,sms){
+ const lib=(MSG_KINDS.find(x=>x[0]===msgK(k))||['','document'])[1].toLowerCase();
+ return { prenom:p?p.prenom:'Claire', nom:p?p.nom:'MARTIN',
+   cabinet:CABINET.nom||EXPEDITEUR.nom, praticien:(p&&p.prat)||PRATICIENS[0],
+   piece:lib, validite:String(LIEN_JOURS), tel:CABINET.tel||'', mail:EXPEDITEUR.repondre||EXPEDITEUR.mail||'',
+   signature:msgSignature(k,lien,sign,sms) };
+}
+const msgRendu=(p,k,lien,sign,sms)=>fillTpl(msgDe(k)[sms?'sms':'mail'], msgCtx(p,k,lien,sign,sms))
+  .replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
+function setMsg(k,champ,v){ MSGENV[k]=MSGENV[k]||{}; MSGENV[k][champ]=v; paint() }
+/* Un message part en clair : il ne doit pas nommer le soin. On ne l'interdit
+   pas — c'est le cabinet qui décide — mais on le dit, et on montre quoi. */
+const MSG_MOTS=['botox','toxine','injection','injectable','hyaluronique','comblement','ride',
+ 'peeling','laser','épilation','epilation','esthétique','esthetique','lifting','cellulite',
+ 'radiofréquence','mésothérapie','mesotherapie','skinbooster','électrolyse','electrolyse',
+ 'consentement','ordonnance','prescription','traitement','pathologie','diagnostic'];
+function msgRisque(k){
+ const M=msgDe(k);
+ const t=[M.objet,M.mail,M.sms].join(' ').toLowerCase();
+ const mots=[...new Set(MSG_MOTS.filter(m=>t.includes(m)))];
+ const actes=[...new Set(CATALOGUE.map(c=>c.n).filter(n=>n.length>3&&t.includes(n.toLowerCase())))];
+ return [...actes, ...mots];
+}
+let msgSel='devis', msgApSig=true, msgApSMS=false;
+/* le message tel qu'il partira, sur un patient réel du dossier */
+function carteMessages(){
+ const k=msgSel, M=msgDe(k);
+ const p=PATIENTS[0];
+ const modif=JSON.stringify(M)!==JSON.stringify(MSG_DEF[k]||{});
+ return `<div class="card" style="margin-bottom:13px"><div class="h"><h2>Message d’accompagnement</h2>
+   <span class="s">un mot propre à chaque pièce</span>
+   <div class="r"><div class="seg">${MSG_KINDS.map(([id,l,i])=>
+     `<button class="${k===id?'on':''}" onclick="msgSel='${id}';paint()">${i} ${l}</button>`).join('')}</div>
+    ${modif?`<button class="btn xs g" onclick="razMsg('${k}')">Rétablir l’original</button>`:''}</div></div>
+  <div class="b">
+   <div class="mu" style="font-size:11.5px;margin-bottom:10px">Ce message accompagne le lien ou la pièce.
+    Écrivez-le comme vous parlez à vos patients : les variables reprennent le prénom, le cabinet et le praticien.
+    <b>{{signature}}</b> est remplacée par la phrase qui convient — lien à signer, lien simple, ou pièce jointe.
+    Le document, lui, reste derrière le lien : il n’est jamais dans le message.</div>
+   ${(()=>{const R=msgRisque(k); return R.length?`<div class="tip" style="margin-bottom:11px;background:var(--crit-w);border-color:rgba(208,59,59,.25)">
+     <span class="e">⚠</span><div><b>Ce message nomme le soin.</b> Un e-mail ou un SMS voyage en clair :
+       si l’adresse est erronée, ${R.map(x=>`« ${esc(x)} »`).join(', ')} part avec.
+       La CNIL demande que l’information médicale nominative reste derrière le lien.
+       À vous de juger — le message n’est pas bloqué.</div></div>`:''})()}
+   <div class="grid g2" style="gap:13px;align-items:start">
+    <div>
+     <div class="fld"><label>Objet de l’e-mail</label>
+       <input class="inp" style="width:100%" value="${esc(M.objet||'')}"
+         onchange="setMsg('${k}','objet',this.value)"></div>
+     <div class="fld"><label>Corps de l’e-mail</label>
+       <textarea class="note" style="min-height:190px;width:100%;font-size:12.5px"
+         onchange="setMsg('${k}','mail',this.value)">${esc(M.mail||'')}</textarea></div>
+     <div class="fld"><label>Version SMS <small>160 caractères conseillés</small></label>
+       <textarea class="note" style="min-height:62px;width:100%;font-size:12.5px"
+         onchange="setMsg('${k}','sms',this.value)">${esc(M.sms||'')}</textarea></div>
+     <div class="chips">${MSG_VARS.map(([v,d])=>
+       `<span class="bdg b-neu" title="${esc(d)}" style="font-family:var(--mono,monospace);font-size:10.5px">{{${v}}}</span>`).join('')}</div>
+    </div>
+    <div>
+     <div class="fld"><label>Aperçu — ce que reçoit ${esc(fn(p))}</label>
+      <div class="fbar" style="margin:0 0 7px">
+       <div class="seg">
+        <button class="${msgApSMS?'':'on'}" onclick="msgApSMS=false;paint()">E-mail</button>
+        <button class="${msgApSMS?'on':''}" onclick="msgApSMS=true;paint()">SMS</button></div>
+       <div class="seg">
+        <button class="${msgApSig?'on':''}" onclick="msgApSig=true;paint()">Signature demandée</button>
+        <button class="${msgApSig?'':'on'}" onclick="msgApSig=false;paint()">Lien simple</button></div></div>
+      ${msgApSMS?'':`<div class="v" style="font-weight:620;margin-bottom:6px">${esc(fillTpl(M.objet||'',msgCtx(p,k,true,msgApSig,false)))}</div>`}
+      <div class="envprev" style="min-height:${msgApSMS?'70':'240'}px">${esc(msgRendu(p,k,true,msgApSig,msgApSMS))}</div>
+      ${msgApSMS?(()=>{const n=msgRendu(p,k,true,msgApSig,true).length;
+        return `<div class="mu" style="font-size:11px;margin-top:5px">${n} caractère${n>1?'s':''}${n>160?` — soit ${Math.ceil(n/153)} SMS`:''}</div>`})():''}
+     </div>
+    </div>
+   </div>
+  </div></div>`;
+}
+function razMsg(k){ MSGENV[k]=JSON.parse(JSON.stringify(MSG_DEF[k]||MSG_DEF.document)); paint();
+ toast('Message rétabli dans sa rédaction d’origine') }
+
 const ENV_ST={ file:['b-neu','⏳ En file'], serveur:['b-info','↗ Remis au serveur'],
   remis:['b-good','✓ Remis'], ouvert:['b-good','👁 Ouvert'], echec:['b-crit','⚠ Échec'] };
 const ENV_ORDRE=['file','serveur','remis','ouvert'];
@@ -3797,44 +3921,31 @@ function simulerEnvoi(id){
 /* ---- composition : on choisit le canal, l'objet et la forme, puis on envoie ---- */
 function composerEnvoi(aid,id,dvId){
  let p, d, docId, docNom, docK;
+ const lb=(!dvId&&id)?libById(id):null;
  if(dvId){ const dv=DEVIS.find(x=>x.id===dvId); if(!dv) return;
    p=pById(dv.patient); docId=dv.id; docNom=nomDevis(dv); docK='devis'; aid=dv.acte||null }
+ else if(lb){ p=pById(lb.patient); docId=lb.id; docNom=lb.nom; docK=lb.k; aid=null }
  else { const a=ACTES.find(x=>x.id===aid); if(!a) return;
    p=pById(a.patient); d=docsActe(a).find(x=>x.id===id); if(!d) return;
    docId=d.id; docNom=d.nom; docK=d.k }
  const canal=canalDe(p);
  /* un devis ou un consentement part pour être signé : c'est le cas courant */
  const modeE=EXPEDITEUR.mode;
- ENV={aid, docId, docNom, docK, pid:p.id, canal, mode:modeE,
-   sign:docSignable(docK)&&modeE==='lien'&&!signOf(docId),
-   objet:objetNeutre(docK)};
+ const sg=docSignable(docK)&&modeE==='lien'&&!signOf(docId);
+ ENV={aid, docId, docNom, docK, pid:p.id, canal, mode:modeE, sign:sg,
+   objet:objetPour(p,docK,modeE==='lien',sg)};
  document.getElementById('envv').classList.add('on');
  renderEnvoi();
 }
 function fermerEnvoi(){ ENV=null; document.getElementById('envv').classList.remove('on') }
 /* Un objet neutre : ni le soin, ni le motif. Une adresse mal saisie ne doit rien
    révéler de médical. */
-const objetNeutre=k=>k==='facture'?'Votre facture est à votre disposition'
-  :k==='devis'?'Votre devis est à votre disposition'
-  :'Un document de votre cabinet est à votre disposition';
+const objetNeutre=k=>msgDe(k).objet||'Un document de votre dossier';
+/* l'objet, variables résolues pour ce patient */
+const objetPour=(p,k,lien,sign)=>fillTpl(objetNeutre(k), msgCtx(p,k,lien!==false,!!sign,false)).trim();
 function corpsEnvoi(){
  if(!ENV) return '';
- const p=pById(ENV.pid);
- const lien=ENV.mode==='lien';
- if(ENV.canal==='SMS') return `${EXPEDITEUR.sms} : un document vous attend. `
-   +(lien?(ENV.sign
-      ?'Ouvrez le lien sécurisé, confirmez votre date de naissance et signez en ligne.'
-      :'Ouvrez le lien sécurisé reçu et confirmez votre date de naissance.')
-     :'Il vous a été adressé par e-mail.');
- return `Bonjour ${p.prenom},\n\n`
-  +`Un document établi par ${CABINET.nom} est à votre disposition.\n\n`
-  +(lien
-    ? (ENV.sign
-       ? `Il vous est demandé de le signer en ligne : lien sécurisé valable ${LIEN_JOURS} jours, à usage unique.\nVous confirmerez votre date de naissance à l’ouverture, puis signerez directement sur votre écran.\n\n`
-       : `Pour le consulter : lien sécurisé valable ${LIEN_JOURS} jours, à usage unique.\nVous confirmerez votre date de naissance à l’ouverture.\n\n`)
-    : `Vous le trouverez en pièce jointe de ce message.\n\n`)
-  +`Pour toute question, répondez simplement à ce message.\n\n`
-  +`${EXPEDITEUR.nom}\n${EXPEDITEUR.repondre}`;
+ return msgRendu(pById(ENV.pid), ENV.docK, ENV.mode==='lien', !!ENV.sign, ENV.canal==='SMS');
 }
 function renderEnvoi(){
  if(!ENV) return;
@@ -3847,7 +3958,7 @@ function renderEnvoi(){
   <div class="envg">
    <div><label>Canal</label><div class="seg">
      ${['e-mail','SMS'].map(c=>`<button class="${ENV.canal===c?'on':''}"
-       onclick="ENV.canal='${c}';ENV.objet=objetNeutre(ENV.docK);renderEnvoi()">${c}</button>`).join('')}</div></div>
+       onclick="ENV.canal='${c}';renderEnvoi()">${c}</button>`).join('')}</div></div>
    <div><label>Destinataire</label><div class="v ${ok?'':'mu'}">${esc(dest)}${ok?'':' — non renseigné'}</div></div>
    <div><label>Expéditeur</label><div class="v">${esc(sms?EXPEDITEUR.sms:EXPEDITEUR.nom)}
      <span class="mu">${sms?'':'· '+esc(EXPEDITEUR.mail)}</span></div></div>
@@ -3883,7 +3994,8 @@ function envoyerDepuisComposeur(){
  const o={canal:ENV.canal, objet:ENV.objet, mode:ENV.mode, sign:!!ENV.sign};
  const aid=ENV.aid, id=ENV.docId, k=ENV.docK, pid=ENV.pid;
  fermerEnvoi();
- if(k==='devis'&&!ACTES.find(x=>x.id===aid)) envoyerDevis(id,o);
+ if(libById(id)) sendDocLib(id,o);
+ else if(k==='devis'&&!ACTES.find(x=>x.id===aid)) envoyerDevis(id,o);
  else sendDoc(aid,id,o);
 }
 
@@ -3892,7 +4004,7 @@ function poserEnvoi(p,docId,docNom,docK,aid,o){
  const canal=(o&&o.canal)||canalDe(p);
  const mode=(o&&o.mode)||EXPEDITEUR.mode;
  const e=creerEnvoi({pid:p.id, aid, docId, docNom, docK, canal,
-   dest:destDe(p,canal), objet:(o&&o.objet)||objetNeutre(docK), mode});
+   dest:destDe(p,canal), objet:(o&&o.objet)||objetPour(p,docK,mode==='lien',o&&o.sign), mode});
  logDoc(docId, `Envoyé par ${canal} — ${e.ref}`);
  /* une pièce envoyée pour signature emporte son lien : c'est lui que le patient
     ouvrira, et c'est sur lui que se lit l'état de la signature */
@@ -4579,6 +4691,17 @@ function pDetail(p){
   ...AD.map(x=>({k:x.cat==='Courrier'?'courrier':'information',id:x.id,date:x.date,
     t:esc(x.nom), s:esc(x.sous), st:bdg('b-neu','Archivé'),
     a:`<button class="btn xs" onclick="event.stopPropagation();apercuAutre('${x.id}')">◫ PDF</button>`})),
+  /* les pièces établies hors séance : mêmes commandes que les autres */
+  ...libDe(p.id).map(x=>({k:x.k, id:x.id, date:x.date,
+    t:esc(x.nom), s:`${x.id} · établi hors séance le ${DTS(x.ts)} par ${esc(x.par)}`,
+    st:(x.signe?bdg('b-good','Signé')+horoBdg(x.id,x.date):lienDe(x.id)?lienBadge(x.id)
+        :x.k==='consentement'?bdg('b-crit','⚠ Non signé'):bdg('b-neu','Établie'))
+       +bdg('b-neu','hors séance'),
+    a:`<button class="btn xs" onclick="event.stopPropagation();apercuLib('${x.id}')">◫ PDF</button>
+       ${x.signe?'':`<button class="btn xs" title="Le patient signe dans l’encadré, ici"
+         onclick="event.stopPropagation();signerLib('${x.id}')">✎ Signer sur place</button>`}
+       <button class="btn xs p" onclick="event.stopPropagation();composerEnvoi(null,'${x.id}')">✉ Envoyer</button>
+       ${lienDe(x.id)?`<button class="btn xs" onclick="event.stopPropagation();pageSignature('${lienDe(x.id).jeton}')">🔗</button>`:''}`})),
  ].sort((a,b)=>b.date.localeCompare(a.date));
  const KIND={devis:['Devis','◫','Devis'],ordonnance:['Ordonnances','℞','Ordonnance'],consentement:['Consentements','✎','Consentement'],
              information:['Informations','ⓘ','Information'],courrier:['Courriers','✉','Courrier']};
@@ -4740,9 +4863,15 @@ function pDetail(p){
        oninput="docQ=this.value;paint();const e=document.getElementById('dqi');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
      <div style="margin-left:auto;display:flex;gap:6px">
        <button class="btn s" onclick="dvChoix(${p.id})">◫ Devis</button>
-       <button class="btn s" onclick="toast('Ordonnance créée')">℞ Ordonnance</button>
+       ${CAN('med')?`<button class="btn s ${docLib&&docLib.k==='ordonnance'?'g':''}"
+         onclick="${docLib&&docLib.k==='ordonnance'?'fermerDocLib()':`ouvrirDocLib(${p.id},'ordonnance')`}"
+         title="Établir une ordonnance sans passer par une séance">℞ Ordonnance</button>`:''}
+       <button class="btn s ${docLib&&docLib.k==='consentement'?'g':''}"
+         onclick="${docLib&&docLib.k==='consentement'?'fermerDocLib()':`ouvrirDocLib(${p.id},'consentement')`}"
+         title="Faire signer un consentement avant la séance">✎ Consentement</button>
        <button class="btn s" onclick="toast('Document téléversé')">↑ Téléverser</button>
      </div></div>
+    ${(docLib&&docLib.pid===p.id)?formDocLib(p):''}
     ${periodBar(perD2,'setPerD2',`${L.length} document${L.length>1?'s':''}`,PRESETS_STD,1)}
     <div class="fbar" style="margin-top:-4px">
       <span class="mu" style="font-size:11.5px;font-weight:600;align-self:center">Classer</span>
@@ -6132,6 +6261,7 @@ V.params=()=>{
    return `<div class="tip"><span class="e">✉</span><div><b>État du relais : ${EXPEDITEUR.relais?'branché':'non branché'}.</b>
      Les envois sont journalisés et horodatés dès aujourd’hui — c’est la trace qui compte en cas de litige.
      Le transport, lui, attend un relais côté serveur : aucune clé ne peut vivre dans cette page.</div></div>
+   ${carteMessages()}
    <div class="grid g2">
     <div class="card"><div class="h"><h2>Expéditeur</h2><span class="s">ce que voit le patient</span></div><div class="b">
       <div class="grid g2" style="gap:10px">
@@ -8347,6 +8477,170 @@ function addDocActe(aid,mid,silent){
  docAdd=false; toast(m.cat+' « '+m.nom+' » générée'); renderOver();
  return id;
 }
+/* ==========================================================================
+   Documents établis hors séance
+   Un consentement se signe souvent avant la consultation, une ordonnance se
+   refait sans revoir le patient. Ces pièces n'ont pas d'acte derrière elles :
+   on leur donne le contexte minimal qui permet de les écrire — le soin
+   concerné, la date, le praticien — sans créer d'acte fantôme dans le dossier.
+   ========================================================================== */
+let DOCLIB=[], docLib=null;
+const libById=id=>DOCLIB.find(x=>x.id===id)||null;
+const libDe=pid=>DOCLIB.filter(x=>x.patient===pid).sort((a,b)=>b.ts.localeCompare(a.ts));
+const numLib=k=>(k==='ordonnance'?'ORD-L':'CONS-L')
+  +String(DOCLIB.filter(x=>x.k===k).length+1).padStart(3,'0');
+/* l'acte fictif qui porte la pièce : il n'entre ni dans les actes, ni dans les
+   statistiques, ni dans la facturation — il ne sert qu'à l'écrire */
+const acteLib=x=>({id:x.id, patient:x.patient, praticien:x.praticien, date:x.date,
+  type:x.type, nom:x.type?acteDef(x.type).n:'Prescription', cat:(catById(x.type)||{}).cat||'',
+  zones:null, lot:null, consent:!!x.signe, soins:[], horsSeance:true});
+const ficheLib=x=>{ const l=lienDe(x.id), e=l&&lienEtat(l);
+ return {id:x.id, k:x.k, ic:x.k==='ordonnance'?'℞':'✎', nom:x.nom,
+  st:x.signe?'signe':(e==='ouvert'?'lienOuvert':e==='envoye'?'lien':'attente'),
+  ts:x.ts, sous:'établi hors séance',
+  seed:[{t:x.ts, ev:'Établi hors séance', par:x.par}],
+  env:true, sign:x.k==='consentement'&&!x.signe} };
+/* le patient a-t-il déjà un consentement signé pour ce soin, séance ou pas ? */
+function consentAcquis(pid,type){
+ const a=ACTES.find(x=>x.patient===pid&&x.type===type&&x.consent);
+ if(a) return {le:a.date, quoi:`la séance du ${DF(a.date)}`};
+ const l=DOCLIB.find(x=>x.patient===pid&&x.k==='consentement'&&x.type===type&&x.signe);
+ return l?{le:l.date, quoi:`le document ${l.id}`}:null;
+}
+/* un consentement déjà établi mais pas encore signé : on ne le refait pas, on
+   le fait signer */
+const consentEnCours=(pid,type)=>DOCLIB.find(x=>x.patient===pid&&x.k==='consentement'
+  &&x.type===type&&!x.signe)||null;
+function ouvrirDocLib(pid,k){
+ /* un refus referme ce qui était ouvert : on ne laisse pas un formulaire
+    orphelin derrière un message d'interdiction */
+ if(k==='ordonnance'&&!CAN('med')){ docLib=null; paint();
+   toast('Une ordonnance relève du praticien'); return }
+ const p=pById(pid);
+ docLib={k, pid, date:TODAYS, prat:(p&&p.prat)||PRATICIENS[0],
+   type:k==='consentement'?((CATALOGUE.find(c=>c.cons)||{}).id||null):null,
+   modele:'', lignes:'', note:''};
+ docAdd=false; paint();
+}
+function fermerDocLib(){ docLib=null; paint() }
+function dlMaj(champ,v){ if(!docLib) return;
+ docLib[champ]=v;
+ if(champ==='modele'&&v){
+   const m=DOCMOD.find(x=>x.id===v);
+   if(m) docLib.lignes=fillTpl(m.corps, tplCtx(pById(docLib.pid)));
+   else docLib.lignes=(ORDO_TPL[v]||[]).join('\n');
+ }
+ paint();
+}
+function creerDocLib(){
+ if(!docLib) return;
+ const p=pById(docLib.pid); if(!p) return;
+ if(docLib.date>TODAYS){ toast('Un document ne s’établit pas dans le futur'); return }
+ if(docLib.k==='ordonnance'){
+  const L=String(docLib.lignes||'').split('\n').map(x=>x.trim()).filter(Boolean);
+  if(!L.length){ toast('Écrivez au moins une ligne de prescription'); return }
+  const id=numLib('ordonnance');
+  DOCLIB.push({id, k:'ordonnance', patient:p.id, date:docLib.date, praticien:docLib.prat,
+    type:null, nom:`Ordonnance — ${L.length} ligne${L.length>1?'s':''}`, lignes:L,
+    ts:nowStamp(), par:ROLES[role].u, envoye:null, signe:null});
+  logDoc(id, 'Ordonnance établie hors séance', ROLES[role].u);
+  docLib=null; paint();
+  toast(`Ordonnance ${id} établie pour ${fn(p)} — ${L.length} ligne${L.length>1?'s':''}`);
+  return;
+ }
+ const t=docLib.type;
+ if(!t){ toast('Choisissez le soin que le consentement couvre'); return }
+ const d=consentAcquis(p.id,t);
+ if(d){ toast(`${fn(p)} a déjà signé un consentement pour ${acteDef(t).n} — ${d.quoi}. Il ne s’établit pas une seconde fois.`); return }
+ const enc=consentEnCours(p.id,t);
+ if(enc){ toast(`Un consentement pour ${acteDef(t).n} attend déjà d’être signé — ${enc.id}. Faites-le signer plutôt que d’en établir un second.`); return }
+ const id=numLib('consentement');
+ DOCLIB.push({id, k:'consentement', patient:p.id, date:docLib.date, praticien:docLib.prat,
+   type:t, nom:`Consentement — ${acteDef(t).n}`, note:String(docLib.note||'').trim(),
+   ts:nowStamp(), par:ROLES[role].u, envoye:null, signe:null});
+ logDoc(id, `Consentement établi hors séance — ${acteDef(t).n}`, ROLES[role].u);
+ docLib=null; paint();
+ toast(`Consentement établi pour ${fn(p)} — à faire signer sur place ou à distance`);
+}
+/* la saisie d'une pièce hors séance : courte, et qui dit ce qu'elle engage */
+function formDocLib(p){
+ const k=docLib.k, ord=k==='ordonnance';
+ const CONS=CATALOGUE.filter(c=>c.cons);
+ const dej=(!ord&&docLib.type)?consentAcquis(p.id,docLib.type):null;
+ const enc=(!ord&&!dej&&docLib.type)?consentEnCours(p.id,docLib.type):null;
+ const MODS=DOCMOD.filter(m=>m.cat==='Ordonnance');
+ return `<div class="encf" style="margin:2px 0 13px">
+  <div class="encf-g">
+   <label>${ord?'Ordonnance pour':'Consentement pour'}
+     <div class="v" style="font-size:12.5px;padding-top:6px">${esc(fn(p))} <span class="mu">· dossier ${p.id}</span></div></label>
+   <label>Date
+     <input class="inp" type="date" max="${TODAYS}" value="${docLib.date}" onchange="dlMaj('date',this.value)"></label>
+   <label>Praticien
+     <select class="inp" onchange="dlMaj('prat',this.value)">
+       ${PRATICIENS.map(x=>`<option ${docLib.prat===x?'selected':''}>${esc(x)}</option>`).join('')}</select></label>
+   ${ord?`<label>Partir d’un modèle
+     <select class="inp" onchange="dlMaj('modele',this.value)">
+       <option value="">— page blanche —</option>
+       <optgroup label="Suites d’un soin">${Object.keys(ORDO_TPL).filter(t=>catById(t)).map(t=>
+         `<option value="${t}" ${docLib.modele===t?'selected':''}>${esc(acteDef(t).n)}</option>`).join('')}</optgroup>
+       ${MODS.length?`<optgroup label="Modèles du cabinet">${MODS.map(m=>
+         `<option value="${m.id}" ${docLib.modele===m.id?'selected':''}>${esc(m.nom)}</option>`).join('')}</optgroup>`:''}
+     </select></label>`
+    :`<label>Soin concerné
+      <select class="inp" onchange="dlMaj('type',this.value)">
+        ${CONS.map(c=>`<option value="${c.id}" ${docLib.type===c.id?'selected':''}>${esc(c.n)}</option>`).join('')}
+      </select></label>`}
+  </div>
+  ${ord?`<div class="fld" style="margin-top:4px"><label>Prescription <small>une ligne par produit</small></label>
+    <textarea class="note" style="min-height:130px;width:100%;font-size:12.5px"
+      placeholder="Arnica montana 9 CH — 5 granules 3 fois par jour pendant 5 jours&#10;Paracétamol 1 g si douleur, maximum 3 g par 24 h"
+      oninput="docLib.lignes=this.value">${esc(docLib.lignes||'')}</textarea></div>`
+   :`<div class="aide" style="margin-top:6px">Le consentement reprend le texte du soin choisi : information délivrée, risques, alternatives,
+     suites et mention manuscrite. Il vaut ensuite pour les séances de ce soin, comme s’il avait été signé en consultation.</div>`}
+  ${dej?`<div class="tip" style="margin-top:9px;background:var(--crit-w);border-color:rgba(208,59,59,.25)"><span class="e">⚠</span>
+    <div>${esc(fn(p))} a déjà signé un consentement pour <b>${esc(acteDef(docLib.type).n)}</b> — ${esc(dej.quoi)}.
+      Il ne s’établit pas une seconde fois.</div></div>`:''}
+  ${enc?`<div class="tip" style="margin-top:9px"><span class="e">⏳</span>
+    <div>Un consentement pour <b>${esc(acteDef(docLib.type).n)}</b> attend déjà d’être signé — <b>${esc(enc.id)}</b>,
+      établi le ${DF(enc.date)}. <a onclick="fermerDocLib();signerLib('${enc.id}')">Le faire signer →</a>
+      ou <a onclick="fermerDocLib();composerEnvoi(null,'${enc.id}')">l’envoyer pour signature →</a></div></div>`:''}
+  <div class="encf-a">
+   <span class="mu" style="font-size:11px;flex:1">Cette pièce n’est rattachée à aucune séance : elle n’entre ni dans les statistiques, ni dans la facturation.</span>
+   <button class="btn xs g" onclick="fermerDocLib()">Annuler</button>
+   <button class="btn xs p" ${(dej||enc)?'disabled':''} onclick="creerDocLib()">${ord?'℞ Établir l’ordonnance':'✎ Établir le consentement'}</button>
+  </div></div>`;
+}
+function apercuLib(id){
+ const x=libById(id); if(!x) return;
+ const p=pById(x.patient), d=ficheLib(x);
+ pdfView(x.nom, `${x.id} · ${fn(p)} · ${DF(x.date)} · établi hors séance`,
+   docDoc(acteLib(x), d),
+   [`<button class="pv-b" onclick="fermerPdf();composerEnvoi(null,'${x.id}')">✉ Envoyer</button>`,
+    d.sign?`<button class="pv-b" onclick="fermerPdf();signerLib('${x.id}')">✎ Faire signer</button>`:''].join(''));
+}
+function sendDocLib(id,o){
+ const x=libById(id); if(!x) return;
+ const p=pById(x.patient);
+ x.envoye=nowStamp();
+ const e=poserEnvoi(p, x.id, x.nom, x.k, null, o);
+ paint();
+ toast(x.k==='consentement'&&o&&o.sign
+   ? `Lien de signature envoyé par ${e.canal} à ${fn(p)} · ${e.ref}`
+   : `${x.nom} envoyé par ${e.canal} · ${e.ref}`);
+}
+function signerLib(id){
+ const x=libById(id); if(!x) return;
+ if(x.signe){ toast(`Déjà signé — ${signTxt(signOf(id))||'signature au dossier'}`); return }
+ const p=pById(x.patient);
+ ouvrirSign(id, x.nom, `${fn(p)} · ${DF(x.date)} · hors séance`, fn(p), mode=>{
+  x.signe=nowStamp();
+  logDoc(id, mode==='papier'
+    ? 'Signé à la main sur un exemplaire papier'
+    : 'Signé dans l’encadré par le patient', fn(p));
+  paint();
+  toast(`${x.nom} — signé le ${DTS(x.signe)}`);
+ });
+}
 let docAdd=false, docOpen=null;
 function toggleDocAdd(){docAdd=!docAdd;renderOver()}
 function toggleDocHist(id){docOpen=docOpen===id?null:id;renderOver()}
@@ -8829,8 +9123,8 @@ function corpsDoc(a,d){
  }
 
  if(d.k==='ordonnance'){
-  const o=ORDONNANCES.find(x=>x.id===d.id);
-  const L=o?o.lignes:(DOCADD.find(x=>x.id===d.id)?.corps||'').split('\n').filter(Boolean);
+  const o=ORDONNANCES.find(x=>x.id===d.id)||libById(d.id);
+  const L=(o&&o.lignes)?o.lignes:(DOCADD.find(x=>x.id===d.id)?.corps||'').split('\n').filter(Boolean);
   return `${bloc('Patient',`<b>${esc(fn(p))}</b> — né(e) le ${DF(p.ddn)}`)}
   <div class="dv-s">Prescription</div>
   <div class="dv-p">${L.map(l=>`<div style="padding:1.4mm 0 1.4mm 4mm;border-left:2px solid #d4d4d8;margin-bottom:1.6mm">${esc(l)}</div>`).join('')}</div>
@@ -9132,7 +9426,8 @@ function signerADistance(j){
     : 'Signé à distance par le patient — lien sécurisé', fn(p));
   if(l.docK==='devis'){ const d=DEVIS.find(x=>x.id===l.docId);
     if(d){ d.statut='accepte'; d.derniere=TODAYS } }
-  else { const a=ACTES.find(x=>x.id===l.aid); if(a) a.consent=true }
+  else { const a=ACTES.find(x=>x.id===l.aid); if(a) a.consent=true;
+    const lb=libById(l.docId); if(lb) lb.signe=l.signe }
   paint(); if(AS) renderOver();
   toast(`${l.docNom} — signé à distance le ${DTS(l.signe)}`);
  });
@@ -9875,6 +10170,7 @@ const CFG={
  modeles:   {l:'Modèles de message',lit:()=>MODELES,    ecrit:v=>remplTab(MODELES,v)},
  docmod:    {l:'Modèles de document',lit:()=>DOCMOD,    ecrit:v=>remplTab(DOCMOD,v)},
  trames:    {l:'Trames',            lit:()=>TRAMES,     ecrit:v=>fondObj(TRAMES,v)},
+ msgenv:    {l:'Messages d’envoi',   lit:()=>MSGENV,     ecrit:v=>{ if(v&&typeof v==='object') MSGENV=v }},
 };
 /* une copie, pas la liste elle-même : réappliquer un paquet ne doit pas vider
    ce qu'il contient au moment où on le repose */
