@@ -1055,6 +1055,10 @@ table.chrono thead th:last-child{position:sticky;right:0;background:var(--panel-
 .ib:disabled{opacity:.3;cursor:not-allowed}
 tr.supp td{background:var(--crit-w);padding:0}
 .suppb{display:flex;align-items:center;gap:10px;padding:9px 12px}
+/* dans une colonne étroite, la confirmation s'empile au lieu de s'écraser */
+.suppb.sm{display:block;padding:9px 10px}
+.suppb.sm .e{display:none}
+.suppb.sm .sr{display:flex;gap:6px;justify-content:flex-end;margin-top:8px}
 .suppb .e{font-size:15px;flex:none}
 .suppb b{font-size:12.5px}
 .suppb .mu{font-size:11.5px;line-height:1.45}
@@ -1215,6 +1219,8 @@ tr.supp td{background:var(--crit-w);padding:0}
 .vars{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
 .varchip{font:600 11px var(--sans);border:1px solid var(--line);background:var(--panel-2);border-radius:7px;padding:3px 7px;color:var(--ink-2)}
 .varchip:hover{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-wash)}
+.mrow .rm{margin-left:auto;flex:none;opacity:0;transition:opacity .12s}
+.mrow:hover .rm,.mrow.on .rm{opacity:1}
 .mcat{font-size:10px;font-weight:650;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);padding:10px 8px 4px}
 .mrow{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:9px;cursor:pointer;transition:.12s}
 .mrow:hover{background:var(--panel-2)}
@@ -6536,10 +6542,16 @@ V.params=()=>{
       ${cats.map(c=>`<div class="mcat">${c}</div>`+MODELES.filter(x=>x.cat===c).map(x=>
         `<div class="mrow ${modSel===x.id?'on':''}" onclick="modSel='${x.id}';paint()">
           <span class="bdg b-neu">${x.canal}</span><div class="nm">${esc(x.nom)}</div>
-          ${x.actif?'<span class="dotk"></span>':''}</div>`).join('')).join('')}
+          ${x.actif?'<span class="dotk"></span>':''}
+          <button class="rm" title="Supprimer ce modèle" onclick="event.stopPropagation();rmModele('${x.id}')">✕</button></div>`
+        +(modSupp===x.id?confirmModele(x.id,x.nom,
+          (ANNIV.modele===x.id?'C’est le modèle de la campagne anniversaire : elle repassera sur un autre. ':'')
+          +(x.actif?'Ce modèle est actif : il ne partira plus.':'Il n’est pas actif.'),
+          `rmModele('${x.id}',1)`,`modSupp=null;paint()`):'')).join('')).join('')}
      </div></div>
     <div class="card"><div class="h"><h2>${esc(m.nom)}</h2>
-      <div class="r"><button class="sw ${m.actif?'on':''}" onclick="modById('${m.id}').actif=!modById('${m.id}').actif;paint()"></button></div></div>
+      <div class="r"><button class="btn xs g" onclick="rmModele('${m.id}')">Supprimer</button>
+        <button class="sw ${m.actif?'on':''}" onclick="modById('${m.id}').actif=!modById('${m.id}').actif;paint()"></button></div></div>
      <div class="b">
       <div class="grid g3" style="gap:10px">
        <div class="fld"><label>Nom</label><input class="inp" style="width:100%" value="${esc(m.nom)}" onchange="modById('${m.id}').nom=this.value;paint()"></div>
@@ -6577,9 +6589,16 @@ V.params=()=>{
       ${FAMILLES.map(f=>`<div class="mrow ${docMode==='trame'&&trSel===f.id?'on':''}" onclick="docMode='trame';trSel='${f.id}';paint()">
         <div class="nm">${f.i} ${esc(TRAMES[f.id].titre)}</div><div class="mu" style="font-size:11px">mise en page complète</div></div>`).join('')}
       ${cats.map(c=>`<div class="mcat">${c}</div>`+DOCMOD.filter(x=>x.cat===c).map(x=>
-        `<div class="mrow ${docMode==='modele'&&docSel===x.id?'on':''}" onclick="docMode='modele';docSel='${x.id}';paint()"><div class="nm">${esc(x.nom)}</div></div>`).join('')).join('')}
+        `<div class="mrow ${docMode==='modele'&&docSel===x.id?'on':''}" onclick="docMode='modele';docSel='${x.id}';paint()">
+          <div class="nm">${esc(x.nom)}</div>
+          <button class="rm" title="Supprimer ce modèle" onclick="event.stopPropagation();rmDoc('${x.id}')">✕</button></div>`
+        +(docSupp===x.id?confirmModele(x.id,x.nom,
+          `Il ne sera plus proposé à la génération d’un document. Les pièces déjà établies gardent leur texte.`,
+          `rmDoc('${x.id}',1)`,`docSupp=null;paint()`):'')).join('')).join('')}
+      ${DOCMOD.length?'':'<div class="empty" style="padding:14px">Aucun modèle — le bouton ＋ en crée un.</div>'}
      </div></div>
-    ${docMode==='trame'?trameEditeur():`<div class="card"><div class="h"><h2>${esc(d.nom)}</h2><span class="s">${d.cat}</span></div>
+    ${(docMode==='trame'||!d)?trameEditeur():`<div class="card"><div class="h"><h2>${esc(d.nom)}</h2><span class="s">${d.cat}</span>
+      <div class="r"><button class="btn xs g" onclick="rmDoc('${d.id}')">Supprimer</button></div></div>
      <div class="b">
       <div class="grid g2" style="gap:10px">
        <div class="fld"><label>Nom</label><input class="inp" style="width:100%" value="${esc(d.nom)}" onchange="DOCMOD.find(x=>x.id==='${d.id}').nom=this.value;paint()"></div>
@@ -6687,7 +6706,43 @@ function insVar(id,v,mid,did){
  else {const pv=document.getElementById('mprev'); if(pv) pv.innerHTML=prevHTML(e.value);}
 }
 function newModele(){const id='m'+Date.now();MODELES.push({id,cat:'Fidélité',canal:'SMS',nom:'Nouveau modèle',actif:false,texte:'Bonjour {{prenom}}, '});modSel=id;paint()}
-function newDoc(){const id='x'+Date.now();DOCMOD.push({id,cat:'Ordonnance',nom:'Nouveau modèle',corps:''});docSel=id;paint()}
+function newDoc(){const id='x'+Date.now();DOCMOD.push({id,cat:'Ordonnance',nom:'Nouveau modèle',corps:''});docSel=id;docMode='modele';paint()}
+/* Un modèle qui ne sert plus se supprime — les pièces déjà générées, elles,
+   portent leur propre texte : elles ne perdent rien. */
+let docSupp=null, modSupp=null;
+function rmDoc(id,ok){
+ const i=DOCMOD.findIndex(x=>x.id===id); if(i<0) return;
+ const m=DOCMOD[i];
+ if(!ok){ docSupp=id; docMode='modele'; docSel=id; modSupp=null; paint(); return }
+ const n=DOCADD.filter(x=>x.nom===m.nom).length;
+ DOCMOD.splice(i,1);
+ docSupp=null;
+ if(docSel===id) docSel=DOCMOD[0]?DOCMOD[0].id:null;
+ if(!DOCMOD.length) docMode='trame';
+ paint();
+ toast(`Modèle « ${m.nom} » supprimé`+(n?` — les ${n} document${n>1?'s':''} déjà généré${n>1?'s':''} gardent leur texte`:''));
+}
+function rmModele(id,ok){
+ const i=MODELES.findIndex(x=>x.id===id); if(i<0) return;
+ const m=MODELES[i];
+ if(MODELES.length<2){ toast('Gardez au moins un modèle de message'); return }
+ if(!ok){ modSupp=id; modSel=id; docSupp=null; paint(); return }
+ const anniv=ANNIV.modele===id;
+ MODELES.splice(i,1);
+ modSupp=null;
+ if(modSel===id) modSel=MODELES[0]?MODELES[0].id:null;
+ if(anniv) ANNIV.modele=(MODELES[0]||{}).id||null;
+ paint();
+ toast(`Modèle « ${m.nom} » supprimé`+(anniv?` — la campagne anniversaire repasse sur « ${(MODELES[0]||{}).nom} »`:''));
+}
+/* le pavé de confirmation, commun aux deux listes */
+const confirmModele=(id,nom,quoi,sur,annule)=>`<div class="suppb sm" style="margin:4px 2px 8px" onclick="event.stopPropagation()">
+  <b>⚠ Supprimer « ${esc(nom)} » ?</b>
+  <div class="mu">${quoi}</div>
+  <div class="sr">
+    <button class="btn xs g" onclick="${annule}">Annuler</button>
+    <button class="btn xs crit" onclick="${sur}">Supprimer</button></div>
+ </div>`;
 
 /* ---------------- Composeur de message ---------------- */
 let MS=null;
