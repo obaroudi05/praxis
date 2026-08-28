@@ -5347,6 +5347,7 @@ function eDetail(){
    Chaque case laissée vide suit le taux général du praticien — ce qui rend la
    grille lisible : on n'y voit que ce qui déroge.
    ========================================================================== */
+let consSel=null;                      /* modèle de consentement en cours d'édition */
 let retroCat='';                       /* filtre de catégorie de la grille */
 function grilleRetro(){
  const L=CATALOGUE.filter(c=>!retroCat||(c.cat||'Divers')===retroCat);
@@ -5939,6 +5940,7 @@ V.params=()=>{
           ['envoi','Envoi des documents'],
           ...(EST_ADMIN()?[['doctolib','Passerelle Doctolib']]:[]),
           ['materiels',`Matériels & paramètres · ${MATERIELS.length}`],
+          ['consent',`Consentements · ${CONSMOD.length}`],
           ['facturation','Facturation & rétrocession'],['fidelite','Fidélité & réactivation'],
           ['messages',`Modèles de message · ${MODELES.length}`],
           ['documents',`Modèles de document · ${DOCMOD.length+Object.keys(TRAMES).length}`]];
@@ -6397,6 +6399,74 @@ V.params=()=>{
         <div class="parg" style="max-width:340px">${m.params.map(p=>`<label><span>${esc(p.n)}</span>
           <span class="pl"><input class="inp" placeholder="—" disabled>${p.u?`<i>${esc(p.u)}</i>`:''}</span></label>`).join('')||'<span class="mu">rien à saisir</span>'}</div></div>
      </div></div>`:'<div class="card"><div class="b"><div class="empty">Sélectionnez un appareil.</div></div></div>'}
+   </div>`;
+  },
+
+  consent:()=>{
+   if(!CONSMOD.some(m=>m.id===consSel)) consSel=CONSMOD[0]?CONSMOD[0].id:null;
+   const m=consModById(consSel);
+   const orphelins=CATALOGUE.filter(c=>c.cons&&consSansModele(c.id));
+   const couvre=x=>(x.actes||[]).filter(t=>catById(t));
+   return `<div class="tip"><span class="e">✎</span><div>Un même texte couvre souvent plusieurs soins : ces modèles évitent de le réécrire.
+     <b>Chaque acte du catalogue est rattaché à un modèle</b> — celui qui le nomme, ou le modèle général à défaut.
+     C'est ce texte qui est repris dans le consentement remis au patient, en séance comme hors séance.</div></div>
+   ${orphelins.length?`<div class="tip" style="background:var(--warn-w);border-color:rgba(217,119,6,.3)"><span class="e">⚠</span>
+     <div><b>${orphelins.length} acte${orphelins.length>1?'s exigent':' exige'} un consentement sans avoir de modèle propre</b> —
+       ${orphelins.map(c=>esc(c.n)).join(', ')}. ${orphelins.length>1?'Ils suivent':'Il suit'} le modèle général, ce qui reste défendable
+       mais moins précis : rattachez-${orphelins.length>1?'les':'le'} à un modèle ci-dessous.</div></div>`:''}
+   <div class="grid" style="grid-template-columns:300px minmax(0,1fr);gap:13px;align-items:start">
+    <div class="card"><div class="h"><h2>Modèles</h2>
+      <div class="r"><button class="btn xs p" onclick="addConsMod()">＋</button></div></div>
+     <div class="b" style="padding:8px">
+      ${CONSMOD.map(x=>{const A=couvre(x);
+        return `<div class="mrow ${consSel===x.id?'on':''}" onclick="consSel='${x.id}';paint()">
+        <span class="mdot" style="background:${x.defaut?'var(--ink-3)':'var(--accent)'}"></span>
+        <div style="min-width:0;flex:1">
+          <b style="display:block;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.nom)}</b>
+          <small class="mu" style="font-size:11px">${x.defaut?'couvre tout le reste'
+            :A.length?`${A.length} acte${A.length>1?'s':''} · ${A.map(t=>esc(acteDef(t).n)).join(', ')}`:'aucun acte rattaché'}</small></div>
+        </div>`}).join('')}
+     </div></div>
+    ${m?`<div class="card"><div class="h"><h2>${esc(m.nom)}</h2>
+       ${m.defaut?'<span class="s">modèle général — non supprimable</span>':''}
+       <div class="r">${m.defaut?'':`<button class="btn xs g" onclick="rmConsMod('${m.id}')">Supprimer</button>`}</div></div>
+     <div class="b">
+      <div class="fld"><label>Intitulé du modèle</label>
+        <input class="inp" style="width:100%" value="${esc(m.nom)}" onchange="setConsMod('${m.id}','nom',this.value)"></div>
+      <div class="fld"><label>Produit ou appareil <small>tel qu'il sera nommé dans le document</small></label>
+        <input class="inp" style="width:100%" value="${esc(m.prod||'')}"
+          placeholder="acide hyaluronique réticulé" onchange="setConsMod('${m.id}','prod',this.value)"></div>
+      <div class="fld"><label>Risques et effets indésirables</label>
+        <textarea class="note" style="min-height:110px;width:100%;font-size:12.5px"
+          onchange="setConsMod('${m.id}','risq',this.value)">${esc(m.risq||'')}</textarea></div>
+      <div class="grid g2" style="gap:11px">
+       <div class="fld"><label>Suites et conduite à tenir</label>
+         <textarea class="note" style="min-height:82px;width:100%;font-size:12.5px"
+           onchange="setConsMod('${m.id}','suites',this.value)">${esc(m.suites||'')}</textarea></div>
+       <div class="fld"><label>Anesthésie</label>
+         <textarea class="note" style="min-height:82px;width:100%;font-size:12.5px"
+           onchange="setConsMod('${m.id}','anesth',this.value)">${esc(m.anesth||'')}</textarea></div>
+      </div>
+      <div class="subh" style="margin-top:6px"><h3>Actes couverts par ce modèle</h3>
+        <span class="mu" style="font-size:11.5px">${m.defaut?'tout acte qu’aucun autre modèle ne nomme'
+          :'un acte n’appartient qu’à un seul modèle'}</span></div>
+      ${m.defaut
+       ? `<div class="mu" style="font-size:11.5px">Ce modèle prend en charge tous les actes que les autres ne nomment pas :
+          ${(()=>{const R=CATALOGUE.filter(c=>consSansModele(c.id));
+            return R.length?R.map(c=>`<span class="bdg ${c.cons?'b-warn':'b-neu'}">${esc(c.n)}</span>`).join(' '):'aucun pour l’instant'})()}</div>`
+       : catsUtilisees().filter(k=>actesDeCat(k).length).map(k=>`<div style="margin-bottom:7px">
+          <div class="mu" style="font-size:10.5px;font-weight:640;letter-spacing:.05em;text-transform:uppercase;margin-bottom:4px">${esc(k)}</div>
+          <div class="chips">${actesDeCat(k).map(c=>{
+            const a2=CONSMOD.find(x=>x.id!==m.id&&(x.actes||[]).includes(c.id));
+            return `<button class="chip ${(m.actes||[]).includes(c.id)?'on':''}"
+              title="${a2?`Couvert par « ${esc(a2.nom)} » — le cocher ici le transfère`:c.cons?'Cet acte exige un consentement':'Cet acte n’exige pas de consentement'}"
+              onclick="toggleConsActe('${m.id}','${c.id}')">${esc(c.n)}${c.cons?'':' <span class="mu">·</span>'}</button>`}).join('')}</div>
+         </div>`).join('')}
+      <div class="fld" style="margin-top:12px"><label>Aperçu du texte</label>
+        <div class="v" style="font-size:12px;line-height:1.55;white-space:pre-wrap">${esc(
+          `Produit utilisé : ${m.prod||'—'}\n\nRisques — ${m.risq||'—'}\n\nSuites — ${m.suites||'—'}\n\nAnesthésie — ${m.anesth||'—'}`)}</div></div>
+     </div></div>`
+    :'<div class="card"><div class="b"><div class="empty">Aucun modèle.</div></div></div>'}
    </div>`;
   },
 
@@ -8565,7 +8635,7 @@ function creerDocLib(){
 /* la saisie d'une pièce hors séance : courte, et qui dit ce qu'elle engage */
 function formDocLib(p){
  const k=docLib.k, ord=k==='ordonnance';
- const CONS=CATALOGUE.filter(c=>c.cons);
+ const M=(!ord&&docLib.type)?consentModele(docLib.type):null;
  const dej=(!ord&&docLib.type)?consentAcquis(p.id,docLib.type):null;
  const enc=(!ord&&!dej&&docLib.type)?consentEnCours(p.id,docLib.type):null;
  const MODS=DOCMOD.filter(m=>m.cat==='Ordonnance');
@@ -8588,15 +8658,20 @@ function formDocLib(p){
      </select></label>`
     :`<label>Soin concerné
       <select class="inp" onchange="dlMaj('type',this.value)">
-        ${CONS.map(c=>`<option value="${c.id}" ${docLib.type===c.id?'selected':''}>${esc(c.n)}</option>`).join('')}
+        ${optionsActes(docLib.type)}
       </select></label>`}
   </div>
   ${ord?`<div class="fld" style="margin-top:4px"><label>Prescription <small>une ligne par produit</small></label>
     <textarea class="note" style="min-height:130px;width:100%;font-size:12.5px"
       placeholder="Arnica montana 9 CH — 5 granules 3 fois par jour pendant 5 jours&#10;Paracétamol 1 g si douleur, maximum 3 g par 24 h"
       oninput="docLib.lignes=this.value">${esc(docLib.lignes||'')}</textarea></div>`
-   :`<div class="aide" style="margin-top:6px">Le consentement reprend le texte du soin choisi : information délivrée, risques, alternatives,
-     suites et mention manuscrite. Il vaut ensuite pour les séances de ce soin, comme s’il avait été signé en consultation.</div>`}
+   :`<div class="aide" style="margin-top:6px">
+      Texte repris : <b>${esc(M?M.nom:'—')}</b>${(M&&M.defaut)?' <span class="mu">— modèle général, aucun modèle propre à ce soin</span>':''}.
+      Il détaille l’information délivrée, les risques, les alternatives, les suites et la mention manuscrite,
+      et vaut ensuite pour les séances de ce soin.
+      ${(docLib.type&&!acteDef(docLib.type).cons)?`<br><span style="color:var(--warn-ink,#a15c07)">⚠ <b>${esc(acteDef(docLib.type).n)}</b> n’est pas marqué comme exigeant un consentement dans le catalogue —
+        vous pouvez tout de même en établir un.</span>`:''}
+      <br><a onclick="fermerDocLib();closeAll();go('params');paramTab='consent';consSel='${M?M.id:''}';paint()">Régler les modèles de consentement →</a></div>`}
   ${dej?`<div class="tip" style="margin-top:9px;background:var(--crit-w);border-color:rgba(208,59,59,.25)"><span class="e">⚠</span>
     <div>${esc(fn(p))} a déjà signé un consentement pour <b>${esc(acteDef(docLib.type).n)}</b> — ${esc(dej.quoi)}.
       Il ne s’établit pas une seconde fois.</div></div>`:''}
@@ -9093,7 +9168,79 @@ const CONSENT_TXT={
  RF:{prod:'radiofréquence', risq:'Chaleur, rougeur transitoire. Plus rarement : brûlure superficielle.'},
  ELEC:{prod:'électrolyse à l’aiguille', risq:'Rougeur, œdème et petites croûtes transitoires. Plus rarement : trouble pigmentaire, cicatrice punctiforme.'},
 };
-const consentTxt=t=>CONSENT_TXT[t]||{prod:acteDef(t).n.toLowerCase(), risq:'Effets indésirables transitoires au point de traitement.'};
+/* ==========================================================================
+   Modèles de consentement
+   Un consentement n'est pas propre à un acte : le même texte couvre souvent
+   plusieurs soins d'une même famille. On les tient donc comme des modèles, et
+   c'est le cabinet qui dit quels actes chacun couvre. Un acte que rien ne
+   couvre retombe sur le modèle général — jamais sur rien.
+   ========================================================================== */
+let CONSMOD=[];
+(function seedConsMod(){
+ /* on repart des textes déjà écrits : rien ne se perd au passage aux modèles */
+ const G=[
+  ['C-AH','Comblement par acide hyaluronique',['AH']],
+  ['C-BTX','Toxine botulique',['BTX']],
+  ['C-SKB','Skinbooster — hydratation profonde',['SKB']],
+  ['C-MESO','Mésothérapie',['MESO']],
+  ['C-PEEL','Peeling chimique',['PEEL']],
+  ['C-LAS','Laser et lumière pulsée',['LAS2']],
+  ['C-EPIL','Épilation laser',['LAS1','EPIL2']],
+  ['C-RF','Radiofréquence',['RF']],
+  ['C-ELEC','Électrolyse',['ELEC']],
+ ];
+ G.forEach(([id,nom,actes])=>{
+  const t=actes[0], c=CONSENT_TXT[t]||{}, m=MEDLEG[t]||{};
+  CONSMOD.push({id, nom, actes:actes.slice(),
+    prod:c.prod||'', risq:c.risq||'',
+    suites:m.su||'', anesth:m.an||'aucune', defaut:false});
+ });
+ CONSMOD.push({id:'C-GEN', nom:'Consentement général', actes:[], defaut:true,
+   prod:'le produit ou l’appareil décrit ci-dessus',
+   risq:'Rougeur, œdème et sensibilité transitoires au point de traitement, régressifs en quelques jours. Plus rarement : ecchymose, trouble pigmentaire, réaction inflammatoire locale.',
+   suites:'Suites habituellement simples. Tout événement inhabituel doit être signalé sans délai au cabinet.',
+   anesth:'aucune'});
+})();
+const consModById=id=>CONSMOD.find(x=>x.id===id)||null;
+const consModDefaut=()=>CONSMOD.find(x=>x.defaut)||CONSMOD[CONSMOD.length-1]||null;
+/* le modèle qui couvre un acte : celui qui le nomme, sinon le modèle général */
+const consentModele=t=>CONSMOD.find(m=>(m.actes||[]).includes(t))||consModDefaut();
+/* un acte que seul le modèle général couvre : utile à signaler au paramétrage */
+const consSansModele=t=>!CONSMOD.some(m=>!m.defaut&&(m.actes||[]).includes(t));
+const consentTxt=t=>{ const m=consentModele(t);
+ return { prod:(m&&m.prod)||acteDef(t).n.toLowerCase(),
+   risq:(m&&m.risq)||'Effets indésirables transitoires au point de traitement.',
+   suites:(m&&m.suites)||medleg(t).su, nom:(m&&m.nom)||'' } };
+function setConsMod(id,champ,v){ const m=consModById(id); if(!m) return;
+ m[champ]=v; paint() }
+function toggleConsActe(id,t){ const m=consModById(id); if(!m) return;
+ m.actes=m.actes||[];
+ const i=m.actes.indexOf(t);
+ if(i>=0){ m.actes.splice(i,1); paint();
+   toast(`${acteDef(t).n} — retiré de « ${m.nom} », il suit désormais ${consentModele(t).nom.toLowerCase()}`); return }
+ /* un acte n'est couvert que par un modèle : on le retire de l'ancien */
+ const av=CONSMOD.find(x=>x.id!==id&&(x.actes||[]).includes(t));
+ if(av) av.actes=av.actes.filter(y=>y!==t);
+ m.actes.push(t); paint();
+ toast(`${acteDef(t).n} — couvert par « ${m.nom} »${av?` (retiré de « ${av.nom} »)`:''}`);
+}
+function addConsMod(){
+ const id='C-'+Date.now().toString(36).slice(-4).toUpperCase();
+ const g=consModDefaut()||{};
+ CONSMOD.splice(Math.max(0,CONSMOD.length-1),0,{id, nom:'Nouveau modèle', actes:[], defaut:false,
+   prod:'', risq:g.risq||'', suites:g.suites||'', anesth:'aucune'});
+ consSel=id; paint(); toast('Modèle de consentement ajouté — nommez-le et rattachez-lui ses actes');
+}
+function rmConsMod(id){
+ const m=consModById(id); if(!m) return;
+ if(m.defaut){ toast('Le modèle général ne se supprime pas : c’est lui qui couvre le reste'); return }
+ const n=(m.actes||[]).length;
+ CONSMOD=CONSMOD.filter(x=>x.id!==id);
+ if(consSel===id) consSel=CONSMOD[0]?CONSMOD[0].id:null;
+ paint();
+ toast(n?`« ${m.nom} » supprimé — ${n} acte${n>1?'s repassent':' repasse'} au modèle général`
+        :`« ${m.nom} » supprimé`);
+}
 
 /* corps de chaque type de document, en HTML de feuille */
 function corpsDoc(a,d){
@@ -9115,7 +9262,7 @@ function corpsDoc(a,d){
   ${bloc('Risques et effets indésirables', esc(ct.risq))}
   ${bloc('Alternatives',
     `L’abstention thérapeutique m’a été présentée comme une option, ainsi que les alternatives disponibles au cabinet.`)}
-  ${bloc('Suites et conduite à tenir', esc(medleg(a.type).su)+'<br>Je m’engage à signaler sans délai tout événement inhabituel.')}
+  ${bloc('Suites et conduite à tenir', esc(ct.suites||medleg(a.type).su)+'<br>Je m’engage à signaler sans délai tout événement inhabituel.')}
   <div class="dv-men">Je soussigné(e) <b>${esc(fn(p))}</b>, né(e) le ${DF(p.ddn)}, déclare avoir reçu une information claire,
    loyale et appropriée, l’avoir comprise, et donner mon consentement libre et éclairé à l’acte décrit ci-dessus.<br>
    <b>Mention à recopier de la main du patient :</b> « Lu et approuvé, bon pour accord ».</div>
@@ -10171,6 +10318,7 @@ const CFG={
  docmod:    {l:'Modèles de document',lit:()=>DOCMOD,    ecrit:v=>remplTab(DOCMOD,v)},
  trames:    {l:'Trames',            lit:()=>TRAMES,     ecrit:v=>fondObj(TRAMES,v)},
  msgenv:    {l:'Messages d’envoi',   lit:()=>MSGENV,     ecrit:v=>{ if(v&&typeof v==='object') MSGENV=v }},
+ consmod:   {l:'Modèles de consentement', lit:()=>CONSMOD, ecrit:v=>{ if(Array.isArray(v)&&v.length) CONSMOD=v }},
 };
 /* une copie, pas la liste elle-même : réappliquer un paquet ne doit pas vider
    ce qu'il contient au moment où on le repose */
