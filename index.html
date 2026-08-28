@@ -4944,7 +4944,16 @@ V.devis=()=>{
     ${d.realise
       ? `<button class="btn" onclick="const a=ACTES.find(x=>x.id===${d.realise}); a&&openActe(a.patient,a.id)">✚ Voir l'acte réalisé</button>`
       : `<button class="btn" onclick="realiserDevis('${d.id}')" title="Reprendre ces soins pour la consultation d'aujourd'hui">✚ Réaliser l'acte</button>`}
-    <button class="btn p" onclick="sendRel('${d.id}')">Relancer maintenant</button></div></div>
+    ${d.statut==='accepte'&&signOf(d.id)?`<span class="bdg b-good" style="align-self:center" title="${esc(signTxt(signOf(d.id)))}">✎ ${esc(signTxt(signOf(d.id)))}</span>`
+      :`<button class="btn p" title="Ouvrir le message d’envoi — lien sécurisé et signature à distance"
+        onclick="composerEnvoi(null,null,'${d.id}')">✉ Envoyer pour signature</button>`}
+    ${lienDe(d.id)?`<button class="btn" onclick="pageSignature('${lienDe(d.id).jeton}')">🔗 Page du patient</button>`:''}
+    <button class="btn" onclick="sendRel('${d.id}')">↻ Relancer</button></div></div>
+  ${lienDe(d.id)?(()=>{const l=lienDe(d.id), e=lienEtat(l);
+    return `<div class="tip"><span class="e">✎</span><div><b>Signature à distance — ${LIEN_ST[e][1].replace(/^[^ ]+ /,'')}</b> ·
+      lien émis le ${DTS(l.cree)}${l.ouvert?`, ouvert le ${DTS(l.ouvert)}`:''}${l.signe?`, signé le ${DTS(l.signe)}`:''}
+      · valable jusqu’au ${DF(l.exp)} · référence <span class="mono">${esc(l.jeton)}</span>
+      <div style="margin-top:5px">${lienActions(d.id)}</div></div></div>`})():''}
   <div class="grid g2">
    <div class="card"><div class="h"><h2>Détail</h2></div><div class="tw"><table>
     <thead><tr><th>Prestation</th><th class="num">Qté</th><th class="num">P.U.</th><th class="num">Total</th></tr></thead><tbody>
@@ -4993,7 +5002,13 @@ V.devis=()=>{
     <td class="mono" ${ag>21?'style="color:var(--crit);font-weight:620"':'class="mono mu"'}>${ag!==null?ag+' j':'—'}</td>
     <td>${nx?(nx.du?bdg('b-crit','⚠ '+nx.r.c+' échu'):bdg('b-info',nx.r.c+' le '+DFS(nx.e))):'<span class="mu">—</span>'}</td>
     <td class="num" style="white-space:nowrap">
-      ${nx&&nx.du?`<button class="btn xs p" onclick="event.stopPropagation();sendRel('${d.id}')">Envoyer</button>`:''}
+      ${d.statut==='accepte'?(signOf(d.id)?`<span class="bdg b-good" title="${esc(signTxt(signOf(d.id)))}">✎ Signé</span>`:'')
+        :lienDe(d.id)?`${lienBadge(d.id)}<button class="btn xs" title="Voir la page telle que le patient la reçoit"
+            onclick="event.stopPropagation();pageSignature('${lienDe(d.id).jeton}')">🔗</button>`
+        :`<button class="btn xs p" title="Ouvrir le message d’envoi — lien sécurisé et signature à distance"
+            onclick="event.stopPropagation();composerEnvoi(null,null,'${d.id}')">✉ Envoyer</button>`}
+      ${nx&&nx.du?`<button class="btn xs" title="Envoyer une relance sans repasser par le message"
+          onclick="event.stopPropagation();sendRel('${d.id}')">↻ Relancer</button>`:''}
       ${(d.realise||['refuse','expire'].includes(d.statut))?'':`<button class="btn xs" title="Reprendre ces soins pour la consultation d’aujourd’hui"
         onclick="event.stopPropagation();realiserDevis('${d.id}')">✚ Réaliser</button>`}
       ${btnSuppDevis(d)}</td></tr>${confirmSuppDevis(d,8)}`}).join('')}
