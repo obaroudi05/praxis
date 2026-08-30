@@ -2421,6 +2421,11 @@ const ROLES={
    caCabinet= voir les montants de tous les praticiens. Sans lui, un médecin
               travaille sur les siens : son CA, ses factures, sa caisse.
               L'activité — actes, zones, devis, patients — reste globale. */
+/* La matrice d'usine, figée avant toute reprise de réglages : c'est elle qui
+   fait référence. Ce qui est enregistré n'est pas la matrice entière, mais ce
+   que le cabinet a changé — sans quoi un droit retiré d'usine reviendrait par
+   la sauvegarde d'hier. */
+const ROLES_USINE=JSON.parse(JSON.stringify(ROLES));
 const CAN=k=>!!ROLES[role][k];
 /* Sans le droit « CA du cabinet », les montants affichés sont ceux du praticien
    connecté — jamais ceux de ses confrères. L'activité, elle, reste globale :
@@ -6867,6 +6872,52 @@ function toggleDroit(r,i){
  else { const v=ROLES[r].v, k=v.indexOf(d.vu); k<0?v.push(d.vu):v.splice(k,1) }
  paint(); toast(`${ROLES[r].l} : ${d.l.replace(/<[^>]+>/g,'')} ${droitOn(r,d)?'autorisé':'retiré'}`);
 }
+/* ce que le cabinet a changé, droit par droit : { rôle : { droit : oui/non } } */
+function droitsDiff(){
+ const o={};
+ RK.forEach(r=>{ if(!ROLES_USINE[r]) return;
+  DROITS.forEach(d=>{
+   const k=d.f||('vu:'+d.vu);
+   const now  =d.f?!!ROLES[r][d.f]      :ROLES[r].v.includes(d.vu);
+   const usine=d.f?!!ROLES_USINE[r][d.f]:ROLES_USINE[r].v.includes(d.vu);
+   if(now!==usine) (o[r]=o[r]||{})[k]=now }) });
+ return o;
+}
+function appliqueDroits(o){
+ /* on repart toujours de l'usine : un droit qu'une nouvelle version retire
+    doit disparaître, même chez un cabinet qui avait déjà enregistré ses réglages */
+ RK.forEach(r=>{ if(!ROLES_USINE[r]) return;
+   ROLES[r].v=ROLES_USINE[r].v.slice();
+   DROITS.forEach(d=>{ if(d.f) ROLES[r][d.f]=!!ROLES_USINE[r][d.f] }) });
+ if(!o||typeof o!=='object') return;
+ Object.keys(o).forEach(r=>{ if(!ROLES[r]||typeof o[r]!=='object') return;
+  Object.keys(o[r]).forEach(k=>{
+   const v=!!o[r][k];
+   if(k.indexOf('vu:')===0){ const vu=k.slice(3), i=ROLES[r].v.indexOf(vu);
+     if(v&&i<0) ROLES[r].v.push(vu);
+     if(!v&&i>=0) ROLES[r].v.splice(i,1) }
+   else ROLES[r][k]=v }) });
+}
+/* Droits qu'une version du logiciel a retirés d'office : une sauvegarde plus
+   ancienne ne doit pas les faire revenir. On les inscrit ici, une fois pour
+   toutes — la liste ne fait que s'allonger. */
+const DROITS_RETIRES=[['assistante','vu:encaiss'],['secretariat','vu:encaiss']];
+/* Réglages enregistrés avant cette version : la matrice entière y figurait.
+   On la relit comme des écarts, en laissant de côté les droits retirés — ce
+   que le cabinet avait volontairement changé est ainsi conservé. */
+function droitsHerites(R){
+ const o={};
+ RK.forEach(r=>{ const A=R&&R[r]; if(!A||!ROLES_USINE[r]) return;
+  DROITS.forEach(d=>{
+   const k=d.f||('vu:'+d.vu);
+   if(DROITS_RETIRES.some(x=>x[0]===r&&x[1]===k)) return;
+   const av=d.f?(A[d.f]===undefined?undefined:!!A[d.f])
+               :(Array.isArray(A.v)?A.v.includes(d.vu):undefined);
+   if(av===undefined) return;
+   const usine=d.f?!!ROLES_USINE[r][d.f]:ROLES_USINE[r].v.includes(d.vu);
+   if(av!==usine) (o[r]=o[r]||{})[k]=av }) });
+ return o;
+}
 V.equipe=()=>{
  const U=[['Dr O. Baroudi','Administrateur','OB',TODAYS,1],['Dr A. Merlin','Médecin','AM',addD(TODAYS,-2),1],
   ['L. Roche','Assistante','LR',TODAYS,1],['S. Vidal','Assistante','SV',addD(TODAYS,-3),0],['N. Faure','Secrétariat','NF',TODAYS,0]];
@@ -9085,7 +9136,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='dev';
+const BUILD='CF';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -10410,7 +10461,7 @@ const CFG={
    ['retro','retroActe','tvaParActe'].forEach(k=>{ if(v&&v[k]) FACTU[k]=v[k] }) }},
  cabinet:   {l:'Cabinet',           lit:()=>CABINET,    ecrit:v=>fondObj(CABINET,v)},
  expediteur:{l:'Expéditeur',        lit:()=>EXPEDITEUR, ecrit:v=>fondObj(EXPEDITEUR,v)},
- roles:     {l:'Droits',            lit:()=>ROLES,      ecrit:v=>fondObj(ROLES,v)},
+ droits:    {l:'Droits',            lit:()=>droitsDiff(), ecrit:v=>appliqueDroits(v)},
  prats:     {l:'Fiches praticien',  lit:()=>PRATS,      ecrit:v=>remplTab(PRATS,v)},
  materiels: {l:'Matériels',         lit:()=>MATERIELS,  ecrit:v=>remplTab(MATERIELS,v)},
  modeles:   {l:'Modèles de message',lit:()=>MODELES,    ecrit:v=>remplTab(MODELES,v)},
@@ -10443,6 +10494,9 @@ function cfgZonesOrphelines(){
 }
 function cfgAppliquer(o){
  if(!o||typeof o!=='object') return false;
+ /* réglages d'une version antérieure : on convertit la matrice de droits
+    en écarts avant de l'appliquer, sinon elle réimposerait l'ancien menu */
+ if(o.roles&&!o.droits) o.droits=droitsHerites(o.roles);
  let n=0;
  Object.keys(CFG).forEach(k=>{ if(o[k]!==undefined){ CFG[k].ecrit(o[k]); n++ } });
  if(!n) return false;
