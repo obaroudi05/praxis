@@ -1478,7 +1478,7 @@ tr.supp td{background:var(--crit-w);padding:0}
       <a data-v="actes"><span class="i">✚</span>Actes &amp; schémas</a>
       <a class="soon"><span class="i">▤</span>Agenda<span class="n">Phase 2</span></a>
       <div class="sgroup">Facturation</div>
-      <a data-v="devis"><span class="i">◫</span>Devis &amp; factures<span class="n" id="n-devis">0</span></a>
+      <a data-v="devis"><span class="i">◫</span>Devis et conversions<span class="n" id="n-devis">0</span></a>
       <a data-v="encaiss"><span class="i">€</span>Facturation &amp; caisse</a>
       <a data-v="relances"><span class="i">↻</span>Relances auto<span class="n" id="n-rel">0</span></a>
       <div class="sgroup">Logistique</div>
@@ -2409,15 +2409,30 @@ let RULES=[
    consommé du stock. Le médecin soigne et pilote son activité, sans accès aux
    volumes ni à la traçabilité destructive. */
 const ROLES={
- admin:{l:'Administrateur',u:'Dr O. Baroudi',i:'OB',v:['dash','stats','envois','patients','actes','devis','encaiss','relances','stock','equipe','params'],med:true,prix:true,compta:true,volumes:true,suppTrace:true},
- praticien:{l:'Médecin',u:'Dr A. Merlin',i:'AM',v:['dash','stats','envois','patients','actes','devis','encaiss','relances','stock','equipe','params'],med:true,prix:true,compta:true},
- assistante:{l:'Assistante',u:'L. Roche',i:'LR',v:['dash','envois','patients','actes','devis','encaiss','stock','relances'],med:true,prix:true,compta:false},
- secretariat:{l:'Secrétariat',u:'N. Faure',i:'NF',v:['dash','envois','patients','devis','encaiss','relances','stock'],med:false,prix:true,compta:false},
+ admin:{l:'Administrateur',u:'Dr O. Baroudi',i:'OB',v:['dash','stats','envois','patients','actes','devis','encaiss','relances','stock','equipe','params'],med:true,prix:true,compta:true,volumes:true,suppTrace:true,encaisse:true,caCabinet:true},
+ praticien:{l:'Médecin',u:'Dr A. Merlin',i:'AM',v:['dash','stats','envois','patients','actes','devis','encaiss','relances','stock','equipe','params'],med:true,prix:true,compta:true,encaisse:true,caCabinet:false},
+ assistante:{l:'Assistante',u:'L. Roche',i:'LR',v:['dash','envois','patients','actes','devis','relances','stock'],med:true,prix:true,compta:false,encaisse:true,caCabinet:false},
+ secretariat:{l:'Secrétariat',u:'N. Faure',i:'NF',v:['dash','envois','patients','devis','relances','stock'],med:false,prix:true,compta:false,encaisse:true,caCabinet:false},
 };
-/* prix   = voir les montants d'un acte, d'un devis, d'une facture (métier : facturer, encaisser)
-   compta = suivi comptable : CA global, ventilation HT/TVA, rétrocession centre/praticien,
-            statistiques et périodes au-delà de la journée. Réservé au praticien par défaut. */
+/* prix     = voir les montants d'un acte, d'un devis, d'une facture (métier : facturer, encaisser)
+   encaisse = saisir et corriger un règlement, depuis la fiche du patient
+   compta   = suivi comptable : ventilation HT/TVA, rétrocession, statistiques,
+              périodes au-delà de la journée, et les écrans financiers globaux
+   caCabinet= voir les montants de tous les praticiens. Sans lui, un médecin
+              travaille sur les siens : son CA, ses factures, sa caisse.
+              L'activité — actes, zones, devis, patients — reste globale. */
 const CAN=k=>!!ROLES[role][k];
+/* Sans le droit « CA du cabinet », les montants affichés sont ceux du praticien
+   connecté — jamais ceux de ses confrères. L'activité, elle, reste globale :
+   un médecin doit pouvoir juger la marche du cabinet sans en voir les comptes. */
+const caGlobal=()=>!!ROLES[role].caCabinet;
+const monPrat=()=>ROLES[role].u;
+/* la restriction n'a de sens que pour un praticien : lui a des montants à lui.
+   Une assistante n'en a pas — ce qui la protège, c'est de ne pas avoir l'écran. */
+const estPraticien=()=>PRATICIENS.includes(monPrat());
+const filtrePrat=()=>(!caGlobal()&&estPraticien())?monPrat():null;
+const mesFact=L=>{const p=filtrePrat(); return p?L.filter(f=>f.praticien===p):L};
+const mesDevis=L=>{const p=filtrePrat(); return p?L.filter(d=>d.praticien===p):L};
 const EST_ADMIN=()=>role==='admin';
 const HORIZON_SANS_COMPTA=31;   /* jours consultables sans droit comptable */
 let role='admin';
@@ -3085,11 +3100,16 @@ V.dash=()=>{
  </div>
 
  ${CAN('compta')
-  ? `<div class="grid g3" style="margin-bottom:13px">
-   ${kpi('CA encaissé — 30 j',EUR(CAM),`${ev>=0?'▲':'▼'} ${Math.abs(ev)} % vs 30 j précédents`,ev>=0?'up':'dn')}
-   ${kpi('Devis en attente',EUR(MATT),`${ATT.length} devis · ${RDUE.length} à relancer`,RDUE.length?'dn':'')}
-   ${kpi('Reste dû',EUR(RESTE),`${FACTURES.filter(f=>rdu(f)>0).length} factures partielles`,RESTE?'dn':'up')}
-   </div>`
+  ? (()=>{ const FM=mesFact(FACTURES), DM=mesDevis(ATT), mien=!!filtrePrat();
+     const cam=FM.filter(f=>in30(f.date)).reduce((s,f)=>s+f.paye,0);
+     const cap=FM.filter(f=>inP30(f.date)).reduce((s,f)=>s+f.paye,0);
+     const e2=cap?Math.round((cam-cap)/cap*100):0;
+     const reste=FM.reduce((s,f)=>s+rdu(f),0);
+     return `<div class="grid g3" style="margin-bottom:13px">
+   ${kpi(mien?'Votre CA encaissé — 30 j':'CA encaissé — 30 j',EUR(cam),`${e2>=0?'▲':'▼'} ${Math.abs(e2)} % vs 30 j précédents`,e2>=0?'up':'dn')}
+   ${kpi(mien?'Vos devis en attente':'Devis en attente',EUR(DM.reduce((s,d)=>s+d.montant,0)),`${DM.length} devis · ${RDUE.length} à relancer`,RDUE.length?'dn':'')}
+   ${kpi(mien?'Votre reste dû':'Reste dû',EUR(reste),`${FM.filter(f=>rdu(f)>0).length} factures partielles`,reste?'dn':'up')}
+   </div>`})()
   : `<div class="grid g2" style="margin-bottom:13px">
    <div class="kpic" onclick="go('devis')">${kpi('Devis en attente',NUM(ATT.length),`${RDUE.length} à relancer aujourd’hui`,RDUE.length?'dn':'')}</div>
    <div class="kpic" onclick="go('patients');pView='reactiver';paint()">${kpi('Patients à réactiver',NUM(NREACT),`${REACT.miniActes}+ actes, rien depuis ${REACT.mois} mois`,NREACT?'dn':'up')}</div>
@@ -5114,7 +5134,7 @@ V.devis=()=>{
  const tx=dec.length?Math.round(base.filter(d=>d.statut==='accepte').length/dec.length*100):0;
  const perdus=base.filter(d=>['refuse','expire'].includes(d.statut)).reduce((s,d)=>s+d.montant,0);
  return `<div class="head">
-  <div><h1>Devis &amp; factures</h1><p>${base.length} devis sur la période · ${EUR(matt)} en attente de réponse</p></div>
+  <div><h1>Devis et conversions</h1><p>${base.length} devis sur la période · ${EUR(matt)} en attente de réponse</p></div>
   <div class="r"><button class="btn" onclick="go('relances')">Régler les relances</button>
    <button class="btn p" onclick="openDevis(null,devFam)">+ ${esc(trame(devFam).titre)}</button></div></div>
  <div class="fbar" style="margin-bottom:12px"><div class="seg">${FAMILLES.map(f=>{
@@ -5192,7 +5212,7 @@ const nomFichier=t=>t.normalize('NFD').replace(/[̀-ͯ]/g,'')
 
 /* les facturations d'une période qui donnent lieu à rétrocession : une facture
    annulée ne partage rien, et un avoir a déjà été déduit du TTC */
-const factRetro=(per,prat)=>FACTURES
+const factRetro=(per,prat)=>mesFact(FACTURES)
  .filter(f=>f.statut==='ok'&&inPer(f.date,per||perE)&&(!prat||f.praticien===prat))
  .sort((a,b)=>a.date.localeCompare(b.date)||String(a.id).localeCompare(String(b.id)));
 const RETRO_COLS=['Praticien','N° de facture','Date','Patient','N° de dossier','Prestation',
@@ -5267,7 +5287,7 @@ function exportFactures(){
 
 function factFiltrees(){
  const q=fq.toLowerCase();
- return FACTURES.filter(f=>inPer(f.date,perE))
+ return mesFact(FACTURES).filter(f=>inPer(f.date,perE))
   .filter(f=>fMoyen==='tous'||(fMoyen==='impaye'?!f.moyen&&f.statut!=='annulee':f.moyen===fMoyen))
   .filter(f=>fStatut==='tous'?true:fStatut==='annulee'?f.statut==='annulee':fStatut==='avoir'?f.avoir>0:
              fStatut==='solde'?(f.statut==='ok'&&rdu(f)===0):(f.statut==='ok'&&rdu(f)>0))
@@ -5628,11 +5648,14 @@ function setPerS(p){ perS={...perS,...p}; paint() }
 V.stats=()=>{
  const acte=ROLES[role].v.includes('stats'), sous=CAN('compta');
  if(!acte&&!sous) return `<div class="head"><div><h1>Statistiques</h1></div></div><div class="empty">🔒 Les statistiques ne sont pas ouvertes au rôle « ${ROLES[role].l} ». Ce droit se règle dans Équipe &amp; droits.</div>`;
+ /* l'activité est celle du cabinet ; les montants, ceux qu'on a le droit de voir */
  const A=ACTES.filter(a=>inPer(a.date,perS));
- const F=FACTURES.filter(f=>inPer(f.date,perS));
+ const AM=(()=>{const p=filtrePrat(); return p?A.filter(a=>a.praticien===p):A})();
+ const F=mesFact(FACTURES).filter(f=>inPer(f.date,perS));
+ const DV=DEVIS.filter(d=>inPer(d.date,perS));
  const mAct=a=>montantActe(a)||0;
  const nz=v=>v.filter(x=>x.v).sort((a,b)=>b.v-a.v);
- const pc=nz(CATS.map(c=>({label:c,v:A.filter(a=>a.cat===c).reduce((s,a)=>s+mAct(a),0)})));
+ const pc=nz(CATS.map(c=>({label:c,v:AM.filter(a=>a.cat===c).reduce((s,a)=>s+mAct(a),0)})));
  const pp=nz(PRATICIENS.map(p=>({label:p,v:A.filter(a=>a.praticien===p).reduce((s,a)=>s+mAct(a),0)})));
  const nc=nz(CATS.map(c=>({label:c,v:A.filter(a=>a.cat===c).length})));
  const np=nz(PRATICIENS.map(p=>({label:p,v:A.filter(a=>a.praticien===p).length})));
@@ -5647,28 +5670,47 @@ V.stats=()=>{
  const B=perBuckets(perS).slice(-14);
  const serA=B.map(b=>({k:b.from,label:b.label,v:A.filter(a=>a.date>=b.from&&a.date<=b.to).length}));
  const serC=B.map(b=>({k:b.from,label:b.label,v:F.filter(f=>f.date>=b.from&&f.date<=b.to).reduce((s,f)=>s+f.paye,0)}));
+ const perso=sous&&!!filtrePrat();
+ const dvAcc=DV.filter(d=>d.statut==='accepte').length;
+ const dvDec=DV.filter(d=>['accepte','refuse','expire'].includes(d.statut)).length;
+ const dvAtt=DV.filter(d=>['envoye','relance1','relance2'].includes(d.statut));
+ const dvM=(perso?mesDevis(dvAtt):dvAtt).reduce((s,d)=>s+d.montant,0);
  return `<div class="head"><div><h1>Statistiques</h1>
-   <p>${acte?'Activité':'Suivi comptable'}${acte&&sous?' et suivi comptable':''} · ${perLabel(perS)}</p></div></div>
+   <p>${acte?'Activité':'Suivi comptable'}${acte&&sous?' et suivi comptable':''}${perso?' — vos montants':''} · ${perLabel(perS)}</p></div></div>
  ${periodBar(perS,'setPerS',`${A.length} acte${A.length>1?'s':''}`,PRESETS_STD,1)}
  ${acte?'':`<div class="tip"><span class="e">🔒</span><div>Les <b>statistiques des actes</b> ne sont pas ouvertes à votre rôle : seuls les montants s'affichent. Ce droit se règle dans Équipe &amp; droits.</div></div>`}
  ${sous?'':`<div class="tip"><span class="e">🔒</span><div>Les montants relèvent du <b>suivi comptable</b>, qui n'est pas ouvert à votre rôle. L'activité, elle, s'affiche entièrement.</div></div>`}
+ ${perso?`<div class="tip"><span class="e">€</span><div><b>Les montants affichés sont les vôtres</b> — ${esc(monPrat())}, ${AM.length} acte${AM.length>1?'s':''} sur ${A.length} sur la période.
+   Le chiffre d'affaires du cabinet, tous praticiens confondus, relève du droit <b>« CA du cabinet »</b>.
+   L'activité — actes, catégories, zones, patients, devis — s'affiche entière : elle vous dit comment tourne le cabinet.</div></div>`:''}
  <div class="grid g4" style="margin-bottom:14px">
   ${acte?kpi('Actes sur la période',NUM(A.length),`${pat.length} patient${pat.length>1?'s':''}`):''}
-  ${sous?kpi('Panier moyen',(()=>{const P=A.filter(a=>montantActe(a)!=null);
-     return P.length?EUR(Math.round(P.reduce((s,a)=>s+montantActe(a),0)/P.length)):'—'})()):''}
+  ${sous?kpi('Panier moyen',(()=>{const P=AM.filter(a=>montantActe(a)!=null);
+     return P.length?EUR(Math.round(P.reduce((s,a)=>s+montantActe(a),0)/P.length)):'—'})(),perso?'sur vos actes':''):''}
   ${acte?kpi('Patients fidélisés',fid+' / '+(pat.length||1),pat.length?Math.round(fid/pat.length*100)+' % ont ≥ 2 actes':'—','up'):''}
   ${acte?kpi('Actes par patient',pat.length?(A.length/pat.length).toFixed(1):'—'):''}
-  ${sous?kpi('CA encaissé',EUR(F.reduce((s,f)=>s+f.paye,0))):''}
+  ${sous?kpi(perso?'Votre CA encaissé':'CA encaissé',EUR(F.reduce((s,f)=>s+f.paye,0)),perso?esc(monPrat()):''):''}
   ${(acte&&CAN('volumes'))?kpi('Produit injecté',`${NUM(tox)} U`,`et ${ah.toFixed(1)} ml d'acide hyaluronique`):''}</div>
  <div class="grid g2" style="margin-bottom:13px">
-  ${sous?`<div class="card"><div class="h"><h2>CA encaissé</h2><span class="s">sur la période</span></div><div class="b">${bars(serC)}</div></div>`:''}
+  ${sous?`<div class="card"><div class="h"><h2>${perso?'Votre CA encaissé':'CA encaissé'}</h2><span class="s">sur la période</span></div><div class="b">${bars(serC)}</div></div>`:''}
   ${acte?`<div class="card"><div class="h"><h2>Nombre d'actes</h2><span class="s">sur la période</span></div><div class="b">${bars(serA,{fmt:NUM})}</div></div>`:''}</div>
  <div class="grid g3">
   ${acte?`<div class="card"><div class="h"><h2>Actes par catégorie</h2></div><div class="b">${hbars(nc,{fmt:NUM})}</div></div>`:''}
   ${acte?`<div class="card"><div class="h"><h2>Actes par praticien</h2></div><div class="b">${hbars(np,{fmt:NUM})}</div></div>`:''}
   ${acte?`<div class="card"><div class="h"><h2>Zones les plus traitées</h2></div><div class="b">${hbars(pz,{fmt:NUM})}</div></div>`:''}
-  ${sous?`<div class="card"><div class="h"><h2>CA par catégorie</h2></div><div class="b">${hbars(pc)}</div></div>`:''}
-  ${sous?`<div class="card"><div class="h"><h2>CA par praticien</h2></div><div class="b">${hbars(pp)}</div></div>`:''}</div>`;
+  ${sous?`<div class="card"><div class="h"><h2>${perso?'Votre CA par catégorie':'CA par catégorie'}</h2></div><div class="b">${hbars(pc)}</div></div>`:''}
+  ${(sous&&!perso)?`<div class="card"><div class="h"><h2>CA par praticien</h2></div><div class="b">${hbars(pp)}</div></div>`:''}
+  ${acte?`<div class="card"><div class="h"><h2>Devis et conversions</h2><span class="s">tout le cabinet</span></div>
+   <div class="b">
+    <div class="rtl"><span>Devis établis <small>sur la période</small></span><b class="mono">${NUM(DV.length)}</b></div>
+    <div class="rtl acc"><span>Acceptés <small>${dvDec?Math.round(dvAcc/dvDec*100)+' % des devis décidés':'aucun devis décidé'}</small></span>
+      <b class="mono">${NUM(dvAcc)}</b></div>
+    <div class="rtl"><span>En attente de réponse <small>${dvAtt.length} devis</small></span>
+      <b class="mono">${sous?EUR(dvM):NUM(dvAtt.length)}</b></div>
+    <div class="rtb"><div class="rtb-p" style="width:${dvDec?Math.round(dvAcc/dvDec*100):0}%"></div></div>
+    <div class="mu" style="font-size:11.5px;margin-top:8px">Le nombre de devis et le taux d'acceptation portent sur tout le cabinet.${
+      perso?` Le montant en attente, lui, est le vôtre.`:''}</div>
+   </div></div>`:''}</div>`;
 };
 
 /* ---------- protocoles paramétrables ---------- */
@@ -6806,8 +6848,10 @@ const DROITS=[
  {l:'Lire les notes médicales',     f:'med'},
  {l:'Voir les montants',            f:'prix',   h:'tarifs des actes, montants des devis et factures'},
  {l:'Créer devis / facture',        vu:'devis'},
- {l:'Encaisser',                    vu:'encaiss'},
+ {l:'Encaisser',                    f:'encaisse', h:'saisir et corriger un règlement depuis la fiche du patient'},
+ {l:'<b>Caisse du cabinet</b>',     vu:'encaiss', h:'facturations détaillées, totaux journaliers, caisse et rétrocession — les tableaux financiers d’ensemble'},
  {l:'<b>Suivi comptable</b>',       f:'compta', h:'CA cumulé, ventilation HT / TVA, rétrocession centre-praticien, statistiques, périodes au-delà de '+HORIZON_SANS_COMPTA+' jours'},
+ {l:'<b>CA du cabinet</b>',         f:'caCabinet', h:'les montants de tous les praticiens ; sans ce droit, un médecin ne voit que les siens'},
  {l:'Gérer le stock',               vu:'stock'},
  {l:'Paramétrer le logiciel',       vu:'params'},
  {l:'Gérer les utilisateurs',       vu:'equipe'},
@@ -9445,7 +9489,7 @@ function retroApercu(m,prat,t){
  const tx=tauxRetro(prat,t), pp=Math.round(m*tx/100);
  return `<span class="rtap">⇄ ${esc(prat)} <b>${EUR(pp)}</b> (${tx} %) · ${esc(FACTU.centre.nom)} <b>${EUR(m-pp)}</b></span>`;
 }
-const peutEncaisser=()=>ROLES[role].v.includes('encaiss');
+const peutEncaisser=()=>CAN('encaisse');
 function ouvrirEnc(id){ encSel=(encSel===id)?null:id; paint&&paint(); if(AS) renderOver() }
 function fermerEnc(){ encSel=null; paint&&paint(); if(AS) renderOver() }
 /* le formulaire, réutilisé dans la fiche patient comme dans un acte */
@@ -10178,7 +10222,7 @@ function buildPal(q){
   {t:'Tableau de bord',s:'',ic:'◈',k:'Aller à',go:()=>{closeAll();go('dash')}},
   {t:'Patients',s:'',ic:'◍',k:'Aller à',go:()=>{closeAll();go('patients')}},
   {t:'Actes & schémas',s:'',ic:'✚',k:'Aller à',go:()=>{closeAll();go('actes')}},
-  {t:'Devis & factures',s:'',ic:'◫',k:'Aller à',go:()=>{closeAll();go('devis')}},
+  {t:'Devis et conversions',s:'',ic:'◫',k:'Aller à',go:()=>{closeAll();go('devis')}},
   {t:'Stock & lots',s:'',ic:'▧',k:'Aller à',go:()=>{closeAll();go('stock')}},
   {t:'Statistiques',s:'',ic:'◔',k:'Aller à',go:()=>{closeAll();go('stats')}},
  ];
