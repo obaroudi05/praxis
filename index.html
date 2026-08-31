@@ -1112,6 +1112,21 @@ tr.supp td{background:var(--crit-w);padding:0}
 .scanb .e{font-family:ui-monospace,monospace;letter-spacing:-1px;color:var(--mu);font-size:13px}
 .scanb.on .e{color:var(--good)}
 .scanb b{font-size:12.5px}
+/* Un en-tête qui se trie le dit : la flèche est un décor, pas un mot — le
+   titre de la colonne reste lisible tel quel par qui la relit. */
+th.tri{cursor:pointer;user-select:none;transition:color .12s}
+/* la flèche ne doit pas élargir l'en-tête : elle occupe une largeur fixe,
+   la même qu'elle soit au repos ou active, et n'empêche pas le titre de
+   passer à la ligne comme il le faisait avant */
+th.tri::after{content:'⇅';margin-left:3px;font-size:9px;opacity:.28;
+ display:inline-block;width:7px;text-align:center;vertical-align:1px}
+th.tri:hover{color:var(--ink)}
+th.tri:hover::after{opacity:.6}
+th.tri:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:4px}
+th.tri.on{color:var(--accent-ink)}
+th.tri.on::after{opacity:1;font-size:10px}
+th.tri.on.asc::after{content:'▲'}
+th.tri.on.desc::after{content:'▼'}
 /* une sous-famille se lit en entier : le libellé prime sur les exemples */
 .sfr{display:grid;grid-template-columns:minmax(160px,1.1fr) minmax(0,1.4fr) auto;
  gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
@@ -5931,6 +5946,59 @@ let mvtF={t:'tous',ref:'',qui:'',per:'annee'};
 let stkTab='actif';     /* actif · journal · archives */
 let stkQui='';          /* filtre praticien de la liste */
 let sfF='';             /* sous-famille retenue, dans la famille courante */
+/* ==========================================================================
+   Trier une colonne
+   --------------------------------------------------------------------------
+   Un tableau de stock ne se lit pas toujours dans le même ordre : un lundi on
+   cherche ce qui manque, un vendredi ce qui périme. Chaque en-tête utile est
+   donc cliquable, et le premier clic prend le sens qui sert — les stocks bas
+   en haut, la péremption la plus proche en tête, la plus grosse commande en
+   premier. Le second clic renverse. La flèche est posée en CSS : le titre de
+   la colonne reste le titre de la colonne.
+   ========================================================================== */
+const TRI={};
+const triDe=t=>TRI[t]||(TRI[t]={c:'',d:1});
+function trier(t,c,def){
+ const T=triDe(t);
+ if(T.c===c) T.d=-T.d; else { T.c=c; T.d=def||1 }
+ paint();
+}
+/* un en-tête cliquable : sa clé, son libellé, le sens de son premier clic */
+function thT(t,c,l,o){
+ o=o||{}; const T=triDe(t), on=T.c===c, mont=on&&T.d>0;
+ return `<th class="tri${on?' on '+(mont?'asc':'desc'):''}${o.num?' num':''}"
+   onclick="trier('${t}','${c}',${o.def||1})" role="button" tabindex="0"
+   onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();trier('${t}','${c}',${o.def||1})}"
+   aria-sort="${on?(mont?'ascending':'descending'):'none'}"
+   title="${esc(o.aide||('Classer par '+String(l).replace(/<[^>]+>/g,'').toLowerCase()))}">${l}</th>`;
+}
+/* Trier une liste selon la colonne retenue. Les textes se comparent en
+   français — « Émile » après « Emile », « lot 10 » après « lot 9 ». */
+function triApplique(t,L,cles){
+ const T=triDe(t); const f=T.c&&cles[T.c];
+ if(!f) return L;
+ return L.slice().sort((a,b)=>{
+   const x=f(a), y=f(b);
+   const vide=v=>v===null||v===undefined||v==='';
+   if(vide(x)&&vide(y)) return 0;
+   if(vide(x)) return 1;            /* ce qui manque va toujours en bas */
+   if(vide(y)) return -1;
+   const r=(typeof x==='number'&&typeof y==='number')
+     ? x-y
+     : String(x).localeCompare(String(y),'fr',{numeric:true,sensitivity:'base'});
+   return r*T.d;
+ });
+}
+/* la gravité d'un statut, pour pouvoir la classer : le pire d'abord */
+const RANG_ST={rupture:4, bas:3, per:2, surv:1, ok:0};
+/* Les lots d'une référence se lisent dans l'ordre où on les entame : le plus
+   proche de la péremption d'abord. C'est l'ordre FEFO, celui de la main qui
+   attrape la boîte — et c'est donc lui qu'on affiche. */
+const lotsRanges=x=>lotsActifs(x).slice().sort((a,b)=>
+  String(a.per||'9999-12-31').localeCompare(String(b.per||'9999-12-31')));
+/* la péremption qui compte, c'est la plus proche parmi ce qu'il reste */
+const perProche=x=>{const L=lotsRanges(x).filter(l=>!lotEpuise(l)&&l.per).map(l=>l.per);
+ return L[0]||''};
 
 /* ---- Réception ---- */
 function ouvrirReception(ref,lot){
@@ -6404,8 +6472,24 @@ function vueJournal(){
       .map(([k,l])=>`<option value="${k}" ${mvtF.per===k?'selected':''}>${l}</option>`).join('')}</select>
    <button class="btn s" style="margin-left:auto" onclick="exportMvt()">Export CSV</button></div>
   <div class="card"><div class="tw"><table>
-   <thead><tr><th>Date</th><th>Type</th><th>Produit</th><th>Lot</th><th class="num">Qté</th><th>Pour le compte de</th><th>Motif</th><th>Saisi par</th></tr></thead>
-   <tbody>${M.length?M.slice(0,400).map(m=>{const T=MVT_T[m.t]||MVT_T.edit;
+   <thead><tr>${thT('journal','ts','Date',{def:-1,aide:'Classer par date — la plus récente en premier'})}
+    ${thT('journal','t','Type')}
+    ${thT('journal','nom','Produit')}
+    ${thT('journal','lot','Lot')}
+    ${thT('journal','q','Qté',{num:1,def:-1,aide:'Classer par quantité — la plus grande en premier'})}
+    ${thT('journal','qui','Pour le compte de')}
+    ${thT('journal','note','Motif')}
+    ${thT('journal','par','Saisi par')}</tr></thead>
+   <tbody>${M.length?triApplique('journal',M,{
+     ts:  m=>String(m.ts||''),
+     t:   m=>(MVT_T[m.t]||{}).l||m.t,
+     nom: m=>nomProduit(STOCK.find(x=>x.ref===m.ref))||m.nom||m.ref||'',
+     lot: m=>m.lot||'',
+     q:   m=>Math.max(0,+m.q||0),
+     qui: m=>m.qui?partNom(m.qui):'',
+     note:m=>m.note||'',
+     par: m=>m.par||'',
+    }).slice(0,400).map(m=>{const T=MVT_T[m.t]||MVT_T.edit;
     return `<tr${m.patient?` class="c" onclick="openPatient(${m.patient})"`:''}>
      <td class="mono" style="font-size:11.5px;white-space:nowrap">${DF(String(m.ts||'').slice(0,10))}
        <span class="mu">${esc(String(m.ts||'').slice(11,16))}</span></td>
@@ -6439,8 +6523,18 @@ function vueArchives(){
    Il reste ${ARCH_JOURS} jours dans la liste active — le temps d'une erreur de saisie — puis il se range ici.
    Sa traçabilité ne bouge pas : les patients qui l'ont reçu restent retrouvables, des années après.</div></div>
   <div class="card" style="margin-top:13px"><div class="tw"><table>
-   <thead><tr><th>Produit</th><th>Lot</th><th>Péremption</th><th>Épuisé le</th><th class="num">Patients exposés</th><th></th></tr></thead>
-   <tbody>${R.length?R.map(({x,l})=>{const exp=ACTES.filter(a=>a.lot===l.lot).length;
+   <thead><tr>${thT('arch','nom','Produit')}
+    ${thT('arch','lot','Lot')}
+    ${thT('arch','per','Péremption',{def:1})}
+    ${thT('arch','vide','Épuisé le',{def:-1,aide:'Classer par date d’épuisement — la plus récente en premier'})}
+    ${thT('arch','exp','Patients exposés',{num:1,def:-1})}<th></th></tr></thead>
+   <tbody>${R.length?triApplique('arch',R,{
+     nom: o=>nomProduit(o.x),
+     lot: o=>o.l.lot||'',
+     per: o=>o.l.per||'',
+     vide:o=>o.l.videLe||'',
+     exp: o=>ACTES.filter(a=>a.lot===o.l.lot).length,
+    }).map(({x,l})=>{const exp=ACTES.filter(a=>a.lot===l.lot).length;
     return `<tr><td><b>${esc(x.n)}</b><div class="mu mono" style="font-size:11px">${x.ref}</div></td>
      <td class="mono">${l.lot?esc(l.lot):'<span class="mu">n/a</span>'}</td>
      <td class="mono" style="font-size:11.5px">${DFP(l.per)}${lotPerime(l)?' '+bdg('b-neu','périmé'):''}</td>
@@ -6492,25 +6586,40 @@ V.stock=()=>{
     ${SF.map(k=>`<button class="chip xs ${sfF===k?'on':''}" onclick="sfF=${JSON.stringify(k).replace(/"/g,'&quot;')};paint()">${esc(k)} <span class="mu">${n(k)}</span></button>`).join('')}
     <button class="btn xs g" style="margin-left:auto" onclick="go('params');paramTab='stock';paint()">Gérer les sous-familles</button></div>`})()}
  <div class="card" style="margin-bottom:13px"><div class="tw"><table>
-  <thead><tr><th>Référence</th><th class="num">Stock</th><th>Niveau</th><th>Répartition</th><th>Lot</th><th>Péremption</th><th class="num">À cder</th><th>Statut</th></tr></thead>
-  <tbody>${L.map(s=>{const st=sst(s),
+  <thead><tr>${thT('actif','ref','Référence',{aide:'Classer par nom de produit'})}
+   ${thT('actif','q','Stock',{num:1,def:1,aide:'Classer par stock — les plus bas en premier'})}
+   ${thT('actif','niv','Niveau',{def:1,aide:'Classer par niveau de remplissage'})}
+   <th>Répartition</th>
+   ${thT('actif','lot','Lot',{aide:'Classer par n° de lot'})}
+   ${thT('actif','per','Péremption',{def:1,aide:'Classer par péremption — la plus proche en premier'})}
+   ${thT('actif','cder','À cder',{num:1,def:-1,aide:'Classer par quantité à commander — la plus grosse en premier'})}
+   ${thT('actif','st','Statut',{def:-1,aide:'Classer par gravité — les ruptures en premier'})}</tr></thead>
+  <tbody>${triApplique('actif',L,{
+   ref: x=>nomProduit(x),
+   q:   x=>x.q,
+   niv: x=>x.s?stockUtile(x)/x.s:stockUtile(x),
+   lot: x=>{const A=lotsActifs(x).map(l=>l.lot).filter(Boolean).sort(); return A[0]||''},
+   per: x=>perProche(x),
+   cder:x=>Math.max(0,x.s*2-x.q),
+   st:  x=>RANG_ST[sst(x).k]||0,
+  }).map(s=>{const st=sst(s),
    col=st.k==='ok'?'var(--good)':(st.k==='surv'||st.k==='per')?'var(--warn)':'var(--crit)',
    pctU=Math.min(100,stockUtile(s)/(s.s*2)*100),
-   bas=sousSeuilPrat(s), sp=seuilPrat(s), A=lotsActifs(s),
+   bas=sousSeuilPrat(s), sp=seuilPrat(s), A=lotsRanges(s),
    bes=Math.max(0,s.s*2-s.q);
    return `<tr><td><b>${esc(nomProduit(s))}</b>
     ${sousTitre(s)?`<div class="mu" style="font-size:11.5px">${esc(sousTitre(s))}</div>`:''}
     <div class="mu mono" style="font-size:11px">${s.ref} · ${esc(sfamDe(s))} · ${EUR(s.pu)}/${s.u} · ${esc(s.f)}</div></td>
     <td class="num"><b>${s.q}</b> <span class="mu" style="font-size:11px">/ ${s.s}</span>
-      ${stockPerime(s)?`<div class="mu" style="font-size:10px;color:var(--crit);font-weight:640">dont ${stockPerime(s)} périmé${stockPerime(s)>1?'s':''}</div>`:''}</td>
+      ${stockPerime(s)?`<div class="mu" style="font-size:10px;color:var(--crit);font-weight:640;white-space:nowrap">dont ${stockPerime(s)} périmé${stockPerime(s)>1?'s':''}</div>`:''}</td>
     <td><div class="bar"><i style="width:${pctU}%;background:${col}"></i></div></td>
     <td><div class="pchips">${[...PRATICIENS,PART_COMMUN].map(k=>{const n=partDe(s,k);
       if(!n&&!(k===moi&&sp!==null)) return '';
       const cl=bas.includes(k)?'bas':(k===PART_COMMUN?'com':(k===moi?'moi':''));
       return `<span class="pchip ${cl}" title="${esc(partNom(k))}${sp!==null&&k!==PART_COMMUN?` · seuil ${sp}`:''}">${esc(k===PART_COMMUN?'commun':k.replace('Dr ','').replace(/^([A-Z])\. /,'$1. '))} ${n}</span>`}).join('')||'<span class="mu" style="font-size:11px">—</span>'}</div>
       ${sp!==null?`<div class="mu" style="font-size:10px;margin-top:2px">seuil individuel ${sp}</div>`:''}</td>
-    <td class="mono" style="font-size:11.5px">${A.map(l=>`<div class="${lotPerime(l)?'lko':lotEpuise(l)?'lvide':''}">${l.lot?esc(l.lot):'<span class="mu">n/a</span>'}</div>`).join('')||'<span class="mu">n/a</span>'}</td>
-    <td class="mono" style="font-size:11.5px">${A.map(l=>{const d=days(TODAY,l.per);
+    <td class="mono" style="font-size:11.5px;white-space:nowrap">${A.map(l=>`<div class="${lotPerime(l)?'lko':lotEpuise(l)?'lvide':''}">${l.lot?esc(l.lot):'<span class="mu">n/a</span>'}</div>`).join('')||'<span class="mu">n/a</span>'}</td>
+    <td class="mono" style="font-size:11.5px;white-space:nowrap">${A.map(l=>{const d=days(TODAY,l.per);
       return `<div class="${lotPerime(l)?'lko':lotEpuise(l)?'lvide':''}" ${(!lotPerime(l)&&d<90)?'style="color:var(--warn);font-weight:620"':''}>${DFP(l.per)} <span class="mu">· ${Math.max(0,+l.q||0)}</span></div>`}).join('')||`<span class="mu">${DFP(s.per)}</span>`}</td>
     <td class="num">${bes?`<b>${bes}</b>`:'<span class="mu">—</span>'}</td>
     <td>${bdg(st.c,st.l)}${bas.length?`<div style="margin-top:3px">${bdg('b-crit',bas.map(q=>q.replace('Dr ','')).join(', ')+' bas')}</div>`:''}
@@ -6915,8 +7024,13 @@ V.params=()=>{
      <span class="s">${STOCK.length} produits · nom commercial, famille et seuils</span>
      <div class="r"><button class="btn xs p" onclick="ouvrirReception()">+ Réception de lot</button></div></div>
     <div class="tw"><table>
-     <thead><tr><th>Produit</th><th>Famille</th><th>Sous-famille</th><th class="num">Stock</th><th class="num">Seuil</th><th class="num">Seuil/prat.</th><th></th></tr></thead>
-     <tbody>${STOCK.map(x=>`<tr>
+     <thead><tr>${thT('refs','nom','Produit')}${thT('refs','fam','Famille')}
+      ${thT('refs','sfam','Sous-famille')}${thT('refs','q','Stock',{num:1,def:1})}
+      ${thT('refs','s','Seuil',{num:1})}${thT('refs','sp','Seuil/prat.',{num:1})}<th></th></tr></thead>
+     <tbody>${triApplique('refs',STOCK,{
+       nom: x=>nomProduit(x), fam:x=>FAM_L[x.cat]||x.cat||'', sfam:x=>sfamDe(x),
+       q:x=>x.q, s:x=>x.s, sp:x=>seuilPrat(x),
+      }).map(x=>`<tr>
        <td><b>${esc(nomProduit(x))}</b>${sousTitre(x)?`<div class="mu" style="font-size:11.5px">${esc(sousTitre(x))}</div>`:''}
         <div class="mu mono" style="font-size:11px">${x.ref}</div></td>
        <td class="mu">${esc(FAM_L[x.cat]||x.cat||'—')}</td>
@@ -10069,7 +10183,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='CH';
+const BUILD='CI';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
