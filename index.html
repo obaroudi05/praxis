@@ -1112,6 +1112,22 @@ tr.supp td{background:var(--crit-w);padding:0}
 .scanb .e{font-family:ui-monospace,monospace;letter-spacing:-1px;color:var(--mu);font-size:13px}
 .scanb.on .e{color:var(--good)}
 .scanb b{font-size:12.5px}
+/* une sous-famille se lit en entier : le libellé prime sur les exemples */
+.sfr{display:grid;grid-template-columns:minmax(160px,1.1fr) minmax(0,1.4fr) auto;
+ gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.sfr>.inp{width:100%}
+.sfr .catr-a{display:flex;flex-wrap:wrap;gap:3px;min-width:0}
+/* dans une fenêtre du stock, un champ occupe la largeur qu'on lui donne :
+   un nom de produit ne doit pas se lire à travers une meurtrière */
+.over.mini .fld>.inp{width:100%}
+.over.mini .cadd .fld>.inp{width:100%}
+/* un lot dans la fenêtre de modification : son en-tête puis ses parts */
+.lotb{border:1px solid var(--line);border-radius:9px;padding:8px 9px;margin-bottom:8px;background:var(--panel)}
+.lotb-h{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.lotb-h .inp{height:27px;width:auto;font-size:11.5px}
+/* le deuxième niveau du filtre : les sous-familles de la famille choisie */
+.sfbar{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin:-4px 0 12px 2px}
+.sfbar .mu{font-size:11.5px;margin-right:2px}
 /* la répartition d'un lot entre praticiens */
 .parts{display:flex;flex-direction:column;gap:5px}
 .prow{display:grid;grid-template-columns:minmax(0,1fr) 92px;gap:8px;align-items:center;
@@ -2307,19 +2323,19 @@ const ORDONNANCES=[];
    est donc une liste de lots ; `q`, `lot` et `per` de la référence en sont dérivés
    (voir recalcStock plus bas) et valent « ce qu'il reste » et « le lot qu'on entame ». */
 const STOCK=[
- {ref:'AH-VOLB',sp:3,n:'Acide hyaluronique — volumateur 1 ml',cat:'Injectable',sfam:'Acide hyaluronique',u:'seringue',s:8,pu:78,f:'Allergan France',
+ {ref:'AH-VOLB',marque:'Juvéderm Volift',sp:3,n:'Acide hyaluronique — volumateur 1 ml',cat:'Injectable',sfam:'Acide hyaluronique',u:'seringue',s:8,pu:78,f:'Allergan France',
   lots:[{lot:'L-AH2409',per:'2027-03-31',p:{'Dr O. Baroudi':4,'Dr A. Merlin':3}},{lot:'L-AH2511',per:'2027-09-30',p:{'Dr O. Baroudi':4}}]},
- {ref:'AH-LYFT',sp:2,n:'Acide hyaluronique — comblement profond 1 ml',cat:'Injectable',sfam:'Acide hyaluronique',u:'seringue',s:6,pu:82,f:'Galderma',
+ {ref:'AH-LYFT',marque:'Restylane Lyft',sp:2,n:'Acide hyaluronique — comblement profond 1 ml',cat:'Injectable',sfam:'Acide hyaluronique',u:'seringue',s:6,pu:82,f:'Galderma',
   lots:[{lot:'L-RL2502',per:'2027-01-31',p:{'Dr A. Merlin':2}},{lot:'L-RL2504',per:'2027-06-30',p:{'Dr O. Baroudi':1,'Dr A. Merlin':1}}]},
- {ref:'BTX-100',sp:2,n:'Toxine botulique 100 U',cat:'Injectable',sfam:'Toxine botulique',u:'flacon',s:5,pu:210,f:'Allergan France',
+ {ref:'BTX-100',marque:'Vistabel 100 U',sp:2,n:'Toxine botulique 100 U',cat:'Injectable',sfam:'Toxine botulique',u:'flacon',s:5,pu:210,f:'Allergan France',
   lots:[{lot:'L-BX2601',per:'2026-11-30',p:{'Dr O. Baroudi':2}},{lot:'L-BX2512',per:'2027-02-28',p:{'Dr A. Merlin':1}},{lot:'L-BX2504',per:'2026-06-30',p:{'Dr O. Baroudi':1}}]},
- {ref:'SKB-PRO',sp:2,n:'Skinbooster 2 ml',cat:'Injectable',sfam:'Skinboosters',u:'seringue',s:5,pu:96,f:'IBSA',
+ {ref:'SKB-PRO',marque:'Profhilo',sp:2,n:'Skinbooster 2 ml',cat:'Injectable',sfam:'Skinboosters',u:'seringue',s:5,pu:96,f:'IBSA',
   lots:[{lot:'L-PF2603',per:'2027-05-31',p:{'Dr O. Baroudi':3,'Dr A. Merlin':2}},{lot:'L-PF2606',per:'2027-11-30',p:{'Dr O. Baroudi':2,[PART_COMMUN]:2}}]},
- {ref:'MESO-K',sp:3,n:'Cocktail mésothérapie',cat:'Injectable',sfam:'Mésothérapie',u:'flacon',s:6,pu:34,f:'Filorga',
+ {ref:'MESO-K',marque:'NCTF 135 HA',sp:3,n:'Cocktail mésothérapie',cat:'Injectable',sfam:'Mésothérapie',u:'flacon',s:6,pu:34,f:'Filorga',
   lots:[{lot:'L-MK2602',per:'2026-09-30',p:{'Dr O. Baroudi':6,'Dr A. Merlin':5,[PART_COMMUN]:3}}]},
- {ref:'PEEL-S',n:'Peeling — acide glycolique',cat:'Topique',sfam:'Peelings',u:'flacon',s:3,pu:41,f:'SkinCeuticals',
+ {ref:'PEEL-S',marque:'Glycolic Renewal 30 %',n:'Peeling — acide glycolique',cat:'Topique',sfam:'Peelings',u:'flacon',s:3,pu:41,f:'SkinCeuticals',
   lots:[{lot:'L-PE2604',per:'2027-02-28',q:6}]},
- {ref:'ANE-EML',n:'Crème anesthésiante 30 g',cat:'Topique',sfam:'Anesthésiques',u:'tube',s:4,pu:12,f:'Cooper',
+ {ref:'ANE-EML',marque:'Emla 5 %',n:'Crème anesthésiante 30 g',cat:'Topique',sfam:'Anesthésiques',u:'tube',s:4,pu:12,f:'Cooper',
   lots:[{lot:'L-EM2508',per:'2026-08-31',q:2},{lot:'L-EM2602',per:'2027-01-31',q:3}]},
  {ref:'AIG-30G',n:'Aiguilles 30 G',cat:'Consommable',sfam:'Aiguilles & canules',u:'boîte 100',s:4,pu:14,f:'B. Braun',
   lots:[{lot:null,per:'2028-06-30',q:9}]},
@@ -2331,7 +2347,61 @@ const STOCK=[
 /* le catalogue produit, rangé pour s'y retrouver : famille puis sous-famille */
 const FAMS=['Injectable','Topique','Consommable'];
 const FAM_L={Injectable:'Injectables', Topique:'Topiques', Consommable:'Consommables'};
+/* ==========================================================================
+   Familles et sous-familles
+   --------------------------------------------------------------------------
+   Un injectable n'est pas un injectable : c'est un acide hyaluronique, une
+   toxine, un skinbooster. C'est à ce niveau-là qu'on cherche un produit, et
+   c'est donc à ce niveau-là qu'on filtre. La liste se règle dans les
+   paramètres ; une sous-famille employée par une référence mais absente de la
+   liste reste utilisable — on ne perd rien de ce qui a été saisi.
+   ========================================================================== */
+let SFAMS={
+ Injectable: ['Acide hyaluronique','Toxine botulique','Skinboosters','Mésothérapie',
+              'Biostimulateurs','PRP'],
+ Topique:    ['Peelings','Anesthésiques','Soins post-acte'],
+ Consommable:['Aiguilles & canules','Pansements & compresses','Antiseptiques','Petit matériel'],
+};
 const sfamDe=x=>x.sfam||x.cat||'Divers';
+/* le nom qu'on lit sur la boîte passe devant la désignation clinique */
+const nomProduit=x=>(x&&x.marque)?x.marque:((x&&x.n)||'');
+const sousTitre=x=>(x&&x.marque&&x.n&&x.marque!==x.n)?x.n:'';
+/* les sous-familles d'une famille : celles réglées, plus celles déjà employées */
+const sfamsDe=fam=>{const L=(SFAMS[fam]||[]).slice();
+ STOCK.filter(x=>(x.cat||'Divers')===fam).forEach(x=>{const k=sfamDe(x);
+   if(k&&!L.includes(k)) L.push(k)});
+ return L};
+const sfamUtilisees=fam=>sfamsDe(fam).filter(k=>STOCK.some(x=>(x.cat||'Divers')===fam&&sfamDe(x)===k));
+/* Renommer une sous-famille la renomme sur les références qui la portent :
+   sinon on créerait un doublon au lieu de corriger un libellé. */
+function renomSfam(fam,av,ap){
+ ap=(ap||'').trim(); if(!ap||ap===av) { paint(); return }
+ const L=SFAMS[fam]||(SFAMS[fam]=[]);
+ const i=L.indexOf(av); if(i<0) return;
+ if(L.includes(ap)){ toast(`« ${ap} » existe déjà dans ${FAM_L[fam]||fam}`); paint(); return }
+ L[i]=ap;
+ let n=0; STOCK.forEach(x=>{ if((x.cat||'Divers')===fam&&sfamDe(x)===av){ x.sfam=ap; n++ } });
+ if(sfF===av) sfF=ap;
+ cfgPlanifier(); paint();
+ toast(`Sous-famille renommée${n?` · ${n} référence${n>1?'s':''} suivi${n>1?'es':'e'}`:''}`);
+}
+function ajouterSfam(fam){
+ const L=SFAMS[fam]||(SFAMS[fam]=[]);
+ let n='Nouvelle sous-famille', i=2;
+ while(L.includes(n)) n='Nouvelle sous-famille '+(i++);
+ L.push(n); cfgPlanifier(); paint(); toast(`Sous-famille ajoutée dans ${FAM_L[fam]||fam}`);
+}
+/* Retirer une sous-famille de la liste ne la retire pas des produits : ils la
+   gardent, et elle reste proposée tant qu'une référence la porte. */
+function rmSfam(fam,k){
+ const L=SFAMS[fam]||[]; const i=L.indexOf(k); if(i<0) return;
+ const n=STOCK.filter(x=>(x.cat||'Divers')===fam&&sfamDe(x)===k).length;
+ L.splice(i,1); cfgPlanifier(); paint();
+ toast(n?`« ${k} » retirée de la liste — ${n} référence${n>1?'s la gardent':' la garde'}`
+       :`« ${k} » retirée`);
+}
+const reprendreSfam=(fam,k)=>{ (SFAMS[fam]=SFAMS[fam]||[]).push(k); cfgPlanifier(); paint();
+ toast(`« ${k} » reprise dans la liste`) };
 /* deux niveaux : la famille, puis la sous-famille */
 function stockRange(q,fam){
  const t=(q||'').trim().toLowerCase();
@@ -2539,7 +2609,8 @@ const MVT=[];
 let mvtN=0;
 const MVT_T={reception:{l:'Réception',c:'b-good',s:'+'}, sortie:{l:'Utilisation',c:'b-info',s:'−'},
  retour:{l:'Retour',c:'b-good',s:'+'}, ajust:{l:'Ajustement',c:'b-warn',s:'±'},
- archive:{l:'Archivage',c:'b-neu',s:''}, edit:{l:'Correction',c:'b-neu',s:''}};
+ archive:{l:'Archivage',c:'b-neu',s:''}, edit:{l:'Correction',c:'b-neu',s:''},
+ transfert:{l:'Répartition',c:'b-info',s:'⇄'}};
 function logMvt(o){
  const m={id:'MV-'+(++mvtN), ts:(o.ts||nowStamp()), par:(o.par||ROLES[role].u), ...o};
  MVT.unshift(m); return m;
@@ -5859,11 +5930,12 @@ let SO=null;            /* sortie manuelle en cours */
 let mvtF={t:'tous',ref:'',qui:'',per:'annee'};
 let stkTab='actif';     /* actif · journal · archives */
 let stkQui='';          /* filtre praticien de la liste */
+let sfF='';             /* sous-famille retenue, dans la famille courante */
 
 /* ---- Réception ---- */
 function ouvrirReception(ref,lot){
  const x=ref?STOCK.find(y=>y.ref===ref):null;
- RC={ref:(x&&x.ref)||'', lot:lot||'', per:'', seuil:'', sp:'', f:'', n:'', u:'', cat:'Injectable',
+ RC={ref:(x&&x.ref)||'', lot:lot||'', per:'', seuil:'', sp:'', f:'', n:'', marque:'', u:'', cat:'Injectable',
      sfam:'', pu:'', parts:{}, note:'', nouveau:!x, gs1:null};
  if(x) rcDepuisRef(x);
  scanCible=rcScan;
@@ -5873,7 +5945,7 @@ function ouvrirReception(ref,lot){
 function rcDepuisRef(x){
  if(!x) return;
  RC.ref=x.ref; RC.n=x.n; RC.f=x.f||''; RC.u=x.u||''; RC.cat=x.cat||'Injectable';
- RC.sfam=x.sfam||''; RC.pu=x.pu!=null?x.pu:''; RC.seuil=x.s!=null?x.s:'';
+ RC.sfam=sfamDe(x); RC.marque=x.marque||''; RC.pu=x.pu!=null?x.pu:''; RC.seuil=x.s!=null?x.s:'';
  RC.sp=(x.sp===undefined||x.sp===null)?'':x.sp; RC.nouveau=false;
  const l=RC.lot?lotDe(x,RC.lot):null;
  if(l&&l.per) RC.per=l.per;
@@ -5896,6 +5968,7 @@ const rcTotal=()=>PARTS_CIBLE().reduce((n,k)=>n+Math.max(0,+RC.parts[k]||0),0);
 const PARTS_CIBLE=()=>[...PRATICIENS,PART_COMMUN];
 function rcSet(k,v){ if(!RC) return; RC[k]=v;
  if(k==='ref'){ const x=STOCK.find(y=>y.ref===v); x?rcDepuisRef(x):(RC.nouveau=true); }
+ if(k==='cat'){ const L=sfamsDe(v); if(!L.includes(RC.sfam)) RC.sfam=L[0]||v }
  renderRC() }
 function rcPart(k,v){ if(!RC) return; RC.parts[k]=Math.max(0,+v||0); renderRC() }
 function validerReception(){
@@ -5906,7 +5979,8 @@ function validerReception(){
  let x=STOCK.find(y=>y.ref===RC.ref);
  if(!x){
   const ref=(RC.ref||('REF-'+(STOCK.length+1))).toUpperCase().replace(/\s+/g,'-');
-  x={ref, n:RC.n||ref, cat:RC.cat||'Injectable', sfam:RC.sfam||RC.cat||'Divers',
+  x={ref, n:RC.n||RC.marque||ref, marque:(RC.marque||'').trim()||undefined,
+     cat:RC.cat||'Injectable', sfam:RC.sfam||RC.cat||'Divers',
      u:RC.u||'unité', s:Math.max(0,+RC.seuil||0), pu:Math.max(0,+RC.pu||0),
      f:RC.f||'—', lots:[]};
   if(RC.sp!=='') x.sp=+RC.sp;
@@ -5919,6 +5993,8 @@ function validerReception(){
   if(RC.f) x.f=RC.f;
   if(RC.pu!=='') x.pu=Math.max(0,+RC.pu||0);
   if(RC.gtinVu&&!x.gtin) x.gtin=RC.gtinVu;
+  /* le nom lu sur la boîte à la réception fait foi : il remplace l'ancien */
+  const m=(RC.marque||'').trim(); if(m&&m!==x.marque) x.marque=m;
  }
  const nLot=(RC.lot||'').trim()||null;
  let l=lotDe(x,nLot);
@@ -5934,6 +6010,108 @@ function validerReception(){
    .map(k=>`${k===PART_COMMUN?'commun':k.replace('Dr ','')} +${+RC.parts[k]}`).join(' · ');
  toast(`${x.n} · lot ${nLot||'sans n°'} — ${det}`);
  RC=null; scanCible=null; closeAll(); go('stock');
+}
+
+/* ---- Modifier une référence ---- */
+/* Une référence vit : elle change de nom commercial, de laboratoire, de prix.
+   La modifier ne doit rien coûter — et surtout ne rien casser de ce qui la
+   cite déjà : consommations tracées, journal, actes du catalogue. */
+let MR=null;
+function ouvrirModifRef(ref){
+ const x=STOCK.find(y=>y.ref===ref); if(!x){ toast('Référence introuvable'); return }
+ MR={ref0:x.ref, ref:x.ref, n:x.n||'', marque:x.marque||'', cat:x.cat||'Injectable',
+     sfam:sfamDe(x), u:x.u||'', pu:x.pu!=null?x.pu:'', f:x.f||'',
+     s:x.s!=null?x.s:'', sp:(x.sp===undefined||x.sp===null)?'':x.sp, gtin:x.gtin||'',
+     lots:lotsDe(x).map(l=>({lot:l.lot, per:l.per||'',
+       p:Object.assign({}, lotParts(l)||{})}))};
+ scanCible=mrScan; renderMR();
+}
+function mrScan(L){ if(!MR||!L) return;
+ if(L.gtin){ MR.gtin=L.gtin; toast('Code produit enregistré') }
+ else if(L.lot){ const i=MR.lots.findIndex(z=>z.lot===L.lot);
+   toast(i>=0?`Lot ${L.lot} déjà sur cette référence`:`Lot ${L.lot} inconnu ici`) }
+ renderMR();
+}
+function mrSet(k,v){ if(!MR) return; MR[k]=v;
+ if(k==='cat'){ const L=sfamsDe(v); if(!L.includes(MR.sfam)) MR.sfam=L[0]||v }
+ renderMR() }
+function mrPart(i,qui,v){ if(!MR||!MR.lots[i]) return;
+ const q=Math.max(0,+v||0); q?(MR.lots[i].p[qui]=q):delete MR.lots[i].p[qui]; renderMR() }
+const mrTotal=i=>{const L=MR&&MR.lots[i]; return L?Object.keys(L.p).reduce((n,k)=>n+Math.max(0,+L.p[k]||0),0):0};
+/* Renommer une référence, c'est la renommer partout où elle est citée —
+   sans quoi une consommation tracée perdrait son produit. */
+function renommerRef(av,ap){
+ if(!av||!ap||av===ap) return 0;
+ let n=0;
+ CONSO.forEach(c=>{ if(c.ref===av){ c.ref=ap; n++ } });
+ MVT.forEach(m=>{ if(m.ref===av){ m.ref=ap; n++ } });
+ CATALOGUE.forEach(c=>{ if(c.conso===av){ c.conso=ap; n++ } });
+ if(typeof AS==='object'&&AS&&Array.isArray(AS.conso)) AS.conso.forEach(l=>{ if(l.ref===av) l.ref=ap });
+ if(typeof CS!=='undefined'&&Array.isArray(CS)) CS.forEach(l=>{ if(l.ref===av) l.ref=ap });
+ if(typeof csRefSel!=='undefined'&&csRefSel===av) csRefSel=ap;
+ return n;
+}
+function validerModifRef(){
+ if(!MR) return;
+ const x=STOCK.find(y=>y.ref===MR.ref0); if(!x){ toast('Référence introuvable'); return }
+ const nom=(MR.n||'').trim(), ref=(MR.ref||'').trim().toUpperCase().replace(/\s+/g,'-');
+ if(!nom){ toast('La désignation ne peut pas être vide'); return }
+ if(!ref){ toast('La référence ne peut pas être vide'); return }
+ if(ref!==MR.ref0&&STOCK.some(y=>y.ref===ref)){ toast(`La référence ${ref} existe déjà`); return }
+ const chg=[];
+ if(nom!==x.n) chg.push(`désignation « ${x.n} » → « ${nom} »`);
+ if((MR.marque||'')!==(x.marque||'')) chg.push(MR.marque?`nom commercial « ${MR.marque} »`:'nom commercial retiré');
+ if(ref!==MR.ref0) chg.push(`référence ${MR.ref0} → ${ref}`);
+ if(MR.cat!==x.cat) chg.push(`famille ${x.cat} → ${MR.cat}`);
+ if(MR.sfam!==sfamDe(x)) chg.push(`sous-famille ${sfamDe(x)} → ${MR.sfam}`);
+ let cite=0;
+ if(ref!==MR.ref0) cite=renommerRef(MR.ref0,ref);
+ x.ref=ref; x.n=nom;
+ MR.marque?(x.marque=MR.marque.trim()):delete x.marque;
+ x.cat=MR.cat; x.sfam=MR.sfam; x.u=MR.u||x.u;
+ if(MR.pu!=='') x.pu=Math.max(0,+MR.pu||0);
+ x.f=MR.f||x.f;
+ if(MR.s!=='') x.s=Math.max(0,+MR.s||0);
+ MR.sp===''?delete x.sp:(x.sp=Math.max(0,+MR.sp||0));
+ MR.gtin?(x.gtin=MR.gtin.trim()):delete x.gtin;
+ /* la répartition : ce qui change de main est un transfert, ce qui change de
+    total est un écart d'inventaire. Les deux se disent, séparément. */
+ MR.lots.forEach((L,i)=>{
+  const l=lotDe(x,L.lot); if(!l) return;
+  if(L.per&&L.per!==l.per){ chg.push(`lot ${l.lot||'sans n°'} : péremption au ${DFP(L.per)}`); l.per=L.per }
+  const av=Object.assign({}, lotParts(l)||{}), ap={};
+  Object.keys(L.p).forEach(k=>{ const v=Math.max(0,+L.p[k]||0); if(v) ap[k]=v });
+  const tAv=Object.values(av).reduce((a,b)=>a+b,0), tAp=Object.values(ap).reduce((a,b)=>a+b,0);
+  const bouge=JSON.stringify(av)!==JSON.stringify(ap);
+  if(!bouge) return;
+  l.p=ap; normLot(l); majEpuise(l);
+  if(tAp===tAv){
+   const vers=Object.keys(ap).filter(k=>(ap[k]||0)>(av[k]||0));
+   const de  =Object.keys(av).filter(k=>(av[k]||0)>(ap[k]||0));
+   logMvt({t:'transfert', ref:x.ref, nom:x.n, lot:l.lot, per:l.per,
+     q:vers.reduce((n,k)=>n+(ap[k]-(av[k]||0)),0),
+     qui:vers[0]||null, emprunts:de,
+     note:`Répartition modifiée — ${de.map(k=>partNom(k)).join(', ')||'—'} → ${vers.map(k=>partNom(k)).join(', ')||'—'}`});
+  } else {
+   logMvt({t:'ajust', ref:x.ref, nom:x.n, lot:l.lot, per:l.per, q:Math.abs(tAp-tAv),
+     qui:null, note:`Inventaire corrigé — ${tAv} → ${tAp} ${x.u||'unité'}${tAp>1?'s':''}`});
+  }
+ });
+ recalcStock(x); cfgPlanifier();
+ MR=null; scanCible=null; closeAll(); go('stock');
+ toast(chg.length?`${nomProduit(x)} — ${chg.slice(0,2).join(' · ')}${cite?` · ${cite} référence(s) mise(s) à jour`:''}`
+                 :`${nomProduit(x)} enregistré`);
+}
+function supprimerRef(){
+ if(!MR) return;
+ const x=STOCK.find(y=>y.ref===MR.ref0); if(!x) return;
+ const cite=CONSO.filter(c=>c.ref===x.ref).length;
+ if(x.q>0){ toast(`Il reste ${x.q} ${x.u||'unité'}${x.q>1?'s':''} en stock — sortez-les d’abord`); return }
+ if(cite){ toast(`${cite} consommation${cite>1?'s tracées':' tracée'} citent ce produit — il reste au catalogue`); return }
+ const i=STOCK.indexOf(x); STOCK.splice(i,1);
+ logMvt({t:'edit', ref:x.ref, nom:x.n, q:0, note:'Référence supprimée du catalogue'});
+ MR=null; scanCible=null; closeAll(); cfgPlanifier(); go('stock');
+ toast(`${nomProduit(x)} retiré du catalogue`);
 }
 
 /* ---- Sortie manuelle ---- */
@@ -5973,7 +6151,7 @@ function validerSortie(){
 function ouvrirModale(){ const o=document.getElementById('over');
  o.classList.add('mini'); o.classList.add('on');
  document.getElementById('scrim').classList.add('on') }
-function fermerStock(){ RC=null; SO=null; scanCible=null; closeAll() }
+function fermerStock(){ RC=null; SO=null; MR=null; scanCible=null; closeAll() }
 /* Le bandeau de la scannette, présent dans les deux écrans : il dit si l'écoute
    est active, et ce qu'elle a lu en dernier. */
 const barreScan=(aide)=>`<div class="scanb ${SCANNETTE?'on':''}">
@@ -5982,7 +6160,7 @@ const barreScan=(aide)=>`<div class="scanb ${SCANNETTE?'on':''}">
    <div class="mu" style="font-size:11px">${SCANNETTE?esc(aide):'la saisie se fait au clavier'}${
     scanDernier?` · dernier scan <span class="mono">${esc(scanDernier.lot||scanDernier.brut||'')}</span>${scanDernier.gs1?' <span class="bdg b-good">GS1</span>':''}`:''}</div></div>
   <button class="btn xs ${SCANNETTE?'g':'p'}" style="margin-left:auto"
-    onclick="SCANNETTE=!SCANNETTE;${RC?'renderRC':'renderSO'}()">${SCANNETTE?'Mettre en pause':'Activer'}</button></div>`;
+    onclick="SCANNETTE=!SCANNETTE;${RC?'renderRC':MR?'renderMR':'renderSO'}()">${SCANNETTE?'Mettre en pause':'Activer'}</button></div>`;
 
 function renderRC(){
  if(!RC) return;
@@ -6004,12 +6182,21 @@ function renderRC(){
       ${FAMS.map(f=>`<optgroup label="${esc(FAM_L[f]||f)}">${STOCK.filter(y=>y.cat===f)
         .map(y=>`<option value="${y.ref}" ${RC.ref===y.ref?'selected':''}>${esc(y.n)}</option>`).join('')}</optgroup>`).join('')}
      </select></div>
-    ${x?'':`<div class="fld"><label>Nom du produit</label>
+    <div class="fld"><label>Nom commercial <span class="mu">— ce qui est écrit sur la boîte</span></label>
+     <input class="inp" value="${esc(RC.marque)}" oninput="RC.marque=this.value"
+       placeholder="ex. Juvéderm Volift"></div>
+    ${x?`<div class="mu" style="font-size:11.5px;margin:-4px 0 9px">Désignation : ${esc(x.n)}${
+        (RC.marque||'').trim()&&(RC.marque||'').trim()!==(x.marque||'')?' · le nom commercial sera mis à jour sur la référence':''}
+      <button class="btn xs g" style="margin-left:6px" onclick="fermerStock();ouvrirModifRef('${x.ref}')">Modifier la référence</button></div>`
+     :`<div class="fld"><label>Désignation</label>
       <input class="inp" value="${esc(RC.n)}" oninput="RC.n=this.value"
         placeholder="ex. Acide hyaluronique — volumateur 1 ml"></div>
-     <div class="cadd" style="grid-template-columns:1fr 1fr;margin-bottom:9px">
+     <div class="cadd" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:9px">
       <div class="fld" style="margin:0"><label>Famille</label>
-       <select class="inp" onchange="RC.cat=this.value">${FAMS.map(f=>`<option ${RC.cat===f?'selected':''}>${f}</option>`).join('')}</select></div>
+       <select class="inp" onchange="rcSet('cat',this.value)">${FAMS.map(f=>`<option value="${f}" ${RC.cat===f?'selected':''}>${esc(FAM_L[f]||f)}</option>`).join('')}</select></div>
+      <div class="fld" style="margin:0"><label>Sous-famille</label>
+       <input class="inp" list="rcsf" value="${esc(RC.sfam)}" oninput="RC.sfam=this.value">
+       <datalist id="rcsf">${sfamsDe(RC.cat).map(k=>`<option value="${esc(k)}">`).join('')}</datalist></div>
       <div class="fld" style="margin:0"><label>Unité</label>
        <input class="inp" value="${esc(RC.u)}" oninput="RC.u=this.value" placeholder="seringue, flacon…"></div>
      </div>`}
@@ -6059,6 +6246,82 @@ function renderRC(){
    <button class="btn p" onclick="validerReception()">Enregistrer la réception</button></div>`;
  ouvrirModale();
  const f=document.getElementById('rcLot'); if(f&&!RC.lot) f.focus();
+}
+
+function renderMR(){
+ if(!MR) return;
+ const x=STOCK.find(y=>y.ref===MR.ref0);
+ const cite=CONSO.filter(c=>c.ref===MR.ref0).length;
+ const actes=CATALOGUE.filter(c=>c.conso===MR.ref0).length;
+ document.getElementById('overh').innerHTML=`
+  <button class="btn g s" onclick="fermerStock()">✕</button>
+  <div><h2>Modifier la référence</h2><div class="mu" style="font-size:11.5px">
+   ${esc(MR.ref0)}${cite?` · ${cite} consommation${cite>1?'s':''} tracée${cite>1?'s':''}`:''}${actes?` · ${actes} acte${actes>1?'s':''} du catalogue`:''}</div></div>`;
+ document.getElementById('overb').innerHTML=`
+  ${barreScan('scannez une boîte pour enregistrer son code produit — le prochain scan reconnaîtra la référence')}
+  <div class="grid g2" style="grid-template-columns:1fr 1fr;gap:14px;margin-top:12px">
+   <div>
+    <div class="fld"><label>Nom commercial <span class="mu">— ce qui est écrit sur la boîte</span></label>
+     <input class="inp" value="${esc(MR.marque)}" oninput="MR.marque=this.value"
+       placeholder="ex. Juvéderm Volift"></div>
+    <div class="fld"><label>Désignation</label>
+     <input class="inp" value="${esc(MR.n)}" oninput="MR.n=this.value"
+       placeholder="ex. Acide hyaluronique — volumateur 1 ml">
+     <div class="mu" style="font-size:11px;margin-top:4px">Sans nom commercial, c’est elle qu’on lit partout.</div></div>
+    <div class="cadd" style="grid-template-columns:1fr 1fr;margin-bottom:9px">
+     <div class="fld" style="margin:0"><label>Famille</label>
+      <select class="inp" onchange="mrSet('cat',this.value)">${FAMS.map(f=>`<option value="${f}" ${MR.cat===f?'selected':''}>${esc(FAM_L[f]||f)}</option>`).join('')}</select></div>
+     <div class="fld" style="margin:0"><label>Sous-famille</label>
+      <input class="inp" list="mrsf" value="${esc(MR.sfam)}" oninput="MR.sfam=this.value"
+        placeholder="ex. Acide hyaluronique">
+      <datalist id="mrsf">${sfamsDe(MR.cat).map(k=>`<option value="${esc(k)}">`).join('')}</datalist></div>
+    </div>
+    <div class="cadd" style="grid-template-columns:1fr 1fr 1fr">
+     <div class="fld" style="margin:0"><label>Unité</label>
+      <input class="inp" value="${esc(MR.u)}" oninput="MR.u=this.value"></div>
+     <div class="fld" style="margin:0"><label>Prix unitaire</label>
+      <input class="inp" type="number" min="0" value="${MR.pu}" oninput="MR.pu=this.value"></div>
+     <div class="fld" style="margin:0"><label>Fournisseur</label>
+      <input class="inp" value="${esc(MR.f)}" oninput="MR.f=this.value"></div>
+    </div>
+    <div class="cadd" style="grid-template-columns:1fr 1fr 1.4fr">
+     <div class="fld" style="margin:0"><label>Seuil cabinet</label>
+      <input class="inp" type="number" min="0" value="${MR.s}" oninput="MR.s=this.value"></div>
+     <div class="fld" style="margin:0"><label>Seuil praticien</label>
+      <input class="inp" type="number" min="0" value="${MR.sp}" oninput="MR.sp=this.value" placeholder="aucun"></div>
+     <div class="fld" style="margin:0"><label>Code produit (GTIN)</label>
+      <input class="inp mono" value="${esc(MR.gtin)}" oninput="MR.gtin=this.value" placeholder="scannez la boîte"></div>
+    </div>
+    <div class="fld"><label>Code interne</label>
+     <input class="inp mono" value="${esc(MR.ref)}" oninput="MR.ref=this.value">
+     <div class="mu" style="font-size:11px;margin-top:4px">${MR.ref.trim().toUpperCase().replace(/\s+/g,'-')!==MR.ref0
+       ?`<span style="color:var(--warn);font-weight:620">Renommer propage le changement aux ${cite+actes} élément(s) qui citent ce produit.</span>`
+       :'Identifiant interne — les consommations tracées s’y rattachent.'}</div></div>
+   </div>
+   <div>
+    <div class="fld"><label>Répartition des lots entre praticiens</label>
+     ${MR.lots.length?MR.lots.map((L,i)=>`<div class="lotb">
+       <div class="lotb-h"><b class="mono">${esc(L.lot||'sans n° de lot')}</b>
+        <input class="inp" type="date" value="${esc(L.per||'')}" onchange="MR.lots[${i}].per=this.value;renderMR()">
+        <span class="mu" style="margin-left:auto;font-size:11.5px">total <b>${mrTotal(i)}</b></span></div>
+       <div class="parts">
+        ${[...PRATICIENS,PART_COMMUN].map(k=>`<div class="prow ${k===PART_COMMUN?'com':''}">
+          <div class="pn">${esc(partNom(k))}</div>
+          <input class="inp" type="number" min="0" value="${L.p[k]||''}" placeholder="0"
+            oninput="mrPart(${i},'${esc(k).replace(/'/g,"\\'")}',this.value)"></div>`).join('')}
+       </div></div>`).join('')
+      :'<div class="mu" style="font-size:12px">Aucun lot — recevez-en un pour commencer.</div>'}
+     <div class="mu" style="font-size:11.5px;margin-top:8px">Déplacer une quantité d’une personne à l’autre est un
+      transfert ; changer le total est un écart d’inventaire. Le journal distingue les deux.</div></div>
+   </div></div>`;
+ document.getElementById('overf').innerHTML=`
+  <button class="btn g s" onclick="supprimerRef()" title="${x&&x.q>0?'il reste du stock':(cite?'des consommations la citent':'retirer du catalogue')}"
+    ${(x&&x.q>0)||cite?'disabled':''}>Supprimer</button>
+  <span class="mu" style="font-size:11.5px">Rien n’est perdu : les consommations déjà tracées gardent leur lot et leur date.</span>
+  <div style="margin-left:auto;display:flex;gap:8px">
+   <button class="btn" onclick="fermerStock()">Annuler</button>
+   <button class="btn p" onclick="validerModifRef()">Enregistrer</button></div>`;
+ ouvrirModale();
 }
 
 function renderSO(){
@@ -6132,7 +6395,7 @@ function vueJournal(){
      .map(([k,l])=>`<button class="${mvtF.t===k?'on':''}" onclick="mvtF.t='${k}';paint()">${l}</button>`).join('')}</div>
    <select class="inp" style="max-width:200px" onchange="mvtF.ref=this.value;paint()">
     <option value="">Tous les produits</option>
-    ${STOCK.map(x=>`<option value="${x.ref}" ${mvtF.ref===x.ref?'selected':''}>${esc(x.n)}</option>`).join('')}</select>
+    ${STOCK.map(x=>`<option value="${x.ref}" ${mvtF.ref===x.ref?'selected':''}>${esc(nomProduit(x))}</option>`).join('')}</select>
    <select class="inp" style="max-width:180px" onchange="mvtF.qui=this.value;paint()">
     <option value="">Tous les praticiens</option>
     ${[...PRATICIENS,PART_COMMUN].map(k=>`<option value="${esc(k)}" ${mvtF.qui===k?'selected':''}>${esc(partNom(k))}</option>`).join('')}</select>
@@ -6147,7 +6410,7 @@ function vueJournal(){
      <td class="mono" style="font-size:11.5px;white-space:nowrap">${DF(String(m.ts||'').slice(0,10))}
        <span class="mu">${esc(String(m.ts||'').slice(11,16))}</span></td>
      <td>${bdg(T.c,T.l)}</td>
-     <td><b>${esc(m.nom||m.ref||'—')}</b></td>
+     <td><b>${esc(nomProduit(STOCK.find(x=>x.ref===m.ref))||m.nom||m.ref||'—')}</b></td>
      <td class="mono" style="font-size:11.5px">${m.lot?esc(m.lot):'<span class="mu">n/a</span>'}</td>
      <td class="num"><b>${T.s}${Math.max(0,+m.q||0)}</b>${m.manque?`<div class="mu" style="font-size:10px;color:var(--crit)">manquait ${m.manque}</div>`:''}</td>
      <td>${m.qui?esc(partNom(m.qui)):'<span class="mu">—</span>'}
@@ -6192,7 +6455,10 @@ function vueArchives(){
 
 V.stock=()=>{
  /* Ce qu'on regarde : le stock actif, le journal, ou ce qui a été archivé. */
+ /* une sous-famille ne vaut que dans sa famille : changer de famille la relâche */
+ if(sfF&&!(FAMS.includes(sF)&&sfamsDe(sF).includes(sfF))) sfF='';
  const L=STOCK.filter(s=>sF==='tous'||(sF==='alerte'?['bas','rupture','per'].includes(sst(s).k)||sousSeuilPrat(s).length:s.cat===sF))
+   .filter(s=>!sfF||sfamDe(s)===sfF)
    .filter(s=>!stkQui||partDe(s,stkQui)>0||lotsDe(s).some(l=>lotParts(l)&&lotParts(l)[stkQui]!==undefined));
  const val=STOCK.reduce((a,s)=>a+s.q*s.pu,0);
  const nLots=STOCK.reduce((n,s)=>n+lotsActifs(s).length,0);
@@ -6213,10 +6479,18 @@ V.stock=()=>{
   ${kpi('Seuil individuel franchi',alertesPrat.length,alertesPrat.length?`${[...new Set(alertesPrat.flatMap(sousSeuilPrat))].map(q=>q.replace('Dr ','')).join(' · ')} — ${alertesPrat.length} référence${alertesPrat.length>1?'s':''}`:'chacun a de quoi travailler',alertesPrat.length?'dn':'up')}
   ${kpi('Péremption < 3 mois',STOCK.reduce((n,s)=>n+lotsActifs(s).filter(l=>!lotEpuise(l)&&days(TODAY,l.per)<90).length,0),'lots à écouler')}</div>
  <div class="fbar"><div class="seg">${[['tous','Toutes'],['alerte','⚠ Alertes'],['Injectable','Injectables'],['Topique','Topiques'],['Consommable','Consommables']]
-  .map(([k,l])=>`<button class="${sF===k?'on':''}" onclick="sF='${k}';paint()">${l}</button>`).join('')}</div>
+  .map(([k,l])=>`<button class="${sF===k?'on':''}" onclick="sF='${k}';sfF='';paint()">${l}</button>`).join('')}</div>
   <select class="inp" style="max-width:210px" onchange="stkQui=this.value;paint()">
    <option value="">Tout le cabinet</option>
    ${[...PRATICIENS,PART_COMMUN].map(k=>`<option value="${esc(k)}" ${stkQui===k?'selected':''}>${esc(partNom(k))}</option>`).join('')}</select></div>
+ ${(()=>{ /* le second niveau ne s'affiche que là où il sert : dans une famille qui en a */
+   if(!FAMS.includes(sF)) return '';
+   const SF=sfamUtilisees(sF); if(SF.length<2) return '';
+   const n=k=>STOCK.filter(x=>x.cat===sF&&sfamDe(x)===k).length;
+   return `<div class="sfbar"><span class="mu">${esc(FAM_L[sF]||sF)} :</span>
+    <button class="chip xs ${sfF?'':'on'}" onclick="sfF='';paint()">Toutes</button>
+    ${SF.map(k=>`<button class="chip xs ${sfF===k?'on':''}" onclick="sfF=${JSON.stringify(k).replace(/"/g,'&quot;')};paint()">${esc(k)} <span class="mu">${n(k)}</span></button>`).join('')}
+    <button class="btn xs g" style="margin-left:auto" onclick="go('params');paramTab='stock';paint()">Gérer les sous-familles</button></div>`})()}
  <div class="card" style="margin-bottom:13px"><div class="tw"><table>
   <thead><tr><th>Référence</th><th class="num">Stock</th><th>Niveau</th><th>Répartition</th><th>Lot</th><th>Péremption</th><th class="num">À cder</th><th>Statut</th></tr></thead>
   <tbody>${L.map(s=>{const st=sst(s),
@@ -6224,7 +6498,9 @@ V.stock=()=>{
    pctU=Math.min(100,stockUtile(s)/(s.s*2)*100),
    bas=sousSeuilPrat(s), sp=seuilPrat(s), A=lotsActifs(s),
    bes=Math.max(0,s.s*2-s.q);
-   return `<tr><td><b>${esc(s.n)}</b><div class="mu mono" style="font-size:11px">${s.ref} · ${EUR(s.pu)}/${s.u} · ${esc(s.f)}</div></td>
+   return `<tr><td><b>${esc(nomProduit(s))}</b>
+    ${sousTitre(s)?`<div class="mu" style="font-size:11.5px">${esc(sousTitre(s))}</div>`:''}
+    <div class="mu mono" style="font-size:11px">${s.ref} · ${esc(sfamDe(s))} · ${EUR(s.pu)}/${s.u} · ${esc(s.f)}</div></td>
     <td class="num"><b>${s.q}</b> <span class="mu" style="font-size:11px">/ ${s.s}</span>
       ${stockPerime(s)?`<div class="mu" style="font-size:10px;color:var(--crit);font-weight:640">dont ${stockPerime(s)} périmé${stockPerime(s)>1?'s':''}</div>`:''}</td>
     <td><div class="bar"><i style="width:${pctU}%;background:${col}"></i></div></td>
@@ -6238,8 +6514,10 @@ V.stock=()=>{
       return `<div class="${lotPerime(l)?'lko':lotEpuise(l)?'lvide':''}" ${(!lotPerime(l)&&d<90)?'style="color:var(--warn);font-weight:620"':''}>${DFP(l.per)} <span class="mu">· ${Math.max(0,+l.q||0)}</span></div>`}).join('')||`<span class="mu">${DFP(s.per)}</span>`}</td>
     <td class="num">${bes?`<b>${bes}</b>`:'<span class="mu">—</span>'}</td>
     <td>${bdg(st.c,st.l)}${bas.length?`<div style="margin-top:3px">${bdg('b-crit',bas.map(q=>q.replace('Dr ','')).join(', ')+' bas')}</div>`:''}
-      <div style="margin-top:4px;display:flex;gap:4px"><button class="btn xs" onclick="ouvrirReception('${s.ref}')">+</button>
-      <button class="btn xs g" onclick="ouvrirSortie('${s.ref}')">−</button></div></td></tr>`}).join('')}
+      <div style="margin-top:4px;display:flex;gap:4px">
+      <button class="btn xs" title="Réception sur cette référence" onclick="ouvrirReception('${s.ref}')">＋</button>
+      <button class="btn xs g" title="Sortie de stock" onclick="ouvrirSortie('${s.ref}')">－</button>
+      <button class="btn xs g" title="Modifier la référence, ses seuils et la répartition de ses lots" onclick="ouvrirModifRef('${s.ref}')">⚙</button></div></td></tr>`}).join('')}
   </tbody></table></div></div>
  <div class="card"><div class="h"><h2>Traçabilité — lot → patients</h2><span class="s">rappel produit / matériovigilance</span>
    <div class="r"><select class="inp" style="box-shadow:none" onchange="lotSel=this.value;paint()">
@@ -6603,11 +6881,50 @@ V.params=()=>{
           ['envoi','Envoi des documents'],
           ...(EST_ADMIN()?[['doctolib','Passerelle Doctolib']]:[]),
           ['materiels',`Matériels & paramètres · ${MATERIELS.length}`],
+          ['stock',`Familles de produits · ${STOCK.length}`],
           ['consent',`Consentements · ${CONSMOD.length}`],
           ['facturation','Facturation & rétrocession'],['fidelite','Fidélité & réactivation'],
           ['messages',`Modèles de message · ${MODELES.length}`],
           ['documents',`Modèles de document · ${DOCMOD.length+Object.keys(TRAMES).length}`]];
+ /* --- Familles et sous-familles du stock --- */
  const body={
+  stock:()=>`
+   <div class="tip"><span class="e">🗂</span><div><b>Deux niveaux, comme pour les actes.</b>
+     La famille dit à quoi sert le produit ; la sous-famille dit ce qu'il est. C'est à ce
+     second niveau qu'on cherche une seringue un mardi matin — d'où le filtre de l'écran Stock.
+     Une sous-famille employée par une référence reste utilisable même si vous la retirez d'ici.</div></div>
+   <div class="grid g2" style="grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:13px;margin-top:13px">
+    ${FAMS.map(f=>`<div class="card"><div class="h"><h2>${esc(FAM_L[f]||f)}</h2>
+      <span class="s">${STOCK.filter(x=>(x.cat||'Divers')===f).length} référence(s)</span>
+      <div class="r"><button class="btn xs p" onclick="ajouterSfam('${f}')">+ Sous-famille</button></div></div>
+     <div class="b">${sfamsDe(f).map((k,i)=>{const N=STOCK.filter(x=>(x.cat||'Divers')===f&&sfamDe(x)===k);
+       const regle=(SFAMS[f]||[]).includes(k);
+       return `<div class="sfr">
+        <input class="inp" value="${esc(k)}" ${regle?'':'disabled'}
+          onchange="renomSfam('${f}',${JSON.stringify(k).replace(/"/g,'&quot;')},this.value)">
+        <span class="catr-a">${N.length?N.slice(0,4).map(x=>`<span class="bdg b-neu">${esc(nomProduit(x))}</span>`).join('')
+          +(N.length>4?`<span class="mu" style="font-size:11px"> +${N.length-4}</span>`:'')
+          :'<span class="mu">aucune référence</span>'}</span>
+        ${regle?`<button class="rm" onclick="rmSfam('${f}',${JSON.stringify(k).replace(/"/g,'&quot;')})"
+           title="${N.length?N.length+' référence(s) l’emploient — elles la garderont':'Retirer de la liste'}">✕</button>`
+         :`<button class="btn xs" onclick="reprendreSfam('${f}',${JSON.stringify(k).replace(/"/g,'&quot;')})"
+           title="sous-famille héritée d’une saisie">Reprendre</button>`}
+       </div>`}).join('')||'<div class="mu" style="font-size:12px">Aucune sous-famille.</div>'}</div></div>`).join('')}
+   </div>
+   <div class="card" style="margin-top:13px"><div class="h"><h2>Références</h2>
+     <span class="s">${STOCK.length} produits · nom commercial, famille et seuils</span>
+     <div class="r"><button class="btn xs p" onclick="ouvrirReception()">+ Réception de lot</button></div></div>
+    <div class="tw"><table>
+     <thead><tr><th>Produit</th><th>Famille</th><th>Sous-famille</th><th class="num">Stock</th><th class="num">Seuil</th><th class="num">Seuil/prat.</th><th></th></tr></thead>
+     <tbody>${STOCK.map(x=>`<tr>
+       <td><b>${esc(nomProduit(x))}</b>${sousTitre(x)?`<div class="mu" style="font-size:11.5px">${esc(sousTitre(x))}</div>`:''}
+        <div class="mu mono" style="font-size:11px">${x.ref}</div></td>
+       <td class="mu">${esc(FAM_L[x.cat]||x.cat||'—')}</td>
+       <td>${esc(sfamDe(x))}</td>
+       <td class="num">${x.q}</td><td class="num">${x.s}</td>
+       <td class="num">${seuilPrat(x)===null?'<span class="mu">—</span>':seuilPrat(x)}</td>
+       <td style="text-align:right"><button class="btn xs" onclick="ouvrirModifRef('${x.ref}')">Modifier</button></td></tr>`).join('')}
+     </tbody></table></div></div>`,
   cabinet:()=>{
    const F=(k,l,w)=>`<div class="fld"><label>${l}</label><input class="inp" style="width:100%" value="${esc(CABINET[k]||'')}" onchange="CABINET['${k}']=this.value;paint()"></div>`;
    return `<div class="tip"><span class="e">🏛️</span><div>Ces informations alimentent l'en-tête et le pied de page de tous les documents générés — devis, factures, ordonnances, consentements — ainsi que les variables des modèles.</div></div>
@@ -9752,7 +10069,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='CG';
+const BUILD='CH';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -11074,6 +11391,7 @@ const CFG={
  zdef:      {l:'Zones du visage',   lit:()=>ZDEF,       ecrit:v=>remplTab(ZDEF,v)},
  bdef:      {l:'Zones du corps',    lit:()=>BDEF,       ecrit:v=>remplTab(BDEF,v)},
  zretire:   {l:'Zones retirées',    lit:()=>ZRETIRE,    ecrit:v=>remplObj(ZRETIRE,v)},
+ sfams:     {l:'Sous-familles',    lit:()=>SFAMS,      ecrit:v=>{ if(v&&typeof v==='object') SFAMS=v }},
  stock:     {l:'Consommables',      lit:()=>STOCK,      ecrit:v=>{ remplTab(STOCK,v);
    /* un stock repris d'une sauvegarde ne connaît pas forcément la répartition :
       on la reconstitue, et ce qui n'était à personne devient commun */
