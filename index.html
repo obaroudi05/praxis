@@ -1105,6 +1105,29 @@ tr.supp td{background:var(--crit-w);padding:0}
 .phl{display:flex;align-items:baseline;gap:6px;padding:5px 8px;font-size:11.5px}
 .phl span{color:var(--ink-3);font-size:11px;margin-left:auto}
 /* consommables */
+/* la scannette : un bandeau qui dit si l'écoute est ouverte */
+.scanb{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;
+ background:var(--panel-2);border:1px solid var(--line)}
+.scanb.on{background:var(--good-w);border-color:var(--good)}
+.scanb .e{font-family:ui-monospace,monospace;letter-spacing:-1px;color:var(--mu);font-size:13px}
+.scanb.on .e{color:var(--good)}
+.scanb b{font-size:12.5px}
+/* la répartition d'un lot entre praticiens */
+.parts{display:flex;flex-direction:column;gap:5px}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) 92px;gap:8px;align-items:center;
+ padding:6px 9px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line)}
+.prow.com{background:var(--accent-wash);border-color:var(--accent-line,var(--line))}
+.prow .pn{font-size:12.5px;font-weight:560;min-width:0}
+.prow .pn small{display:block;font-weight:400;font-size:10.5px;color:var(--mu)}
+.prow .inp{height:29px;text-align:right}
+/* la répartition, lue dans le tableau */
+.pchips{display:flex;flex-wrap:wrap;gap:3px}
+.pchip{font-size:10.5px;padding:1px 6px;border-radius:99px;background:var(--panel-3);
+ color:var(--ink-2);white-space:nowrap}
+.pchip.moi{background:var(--accent-wash);color:var(--accent-ink);font-weight:620}
+.pchip.com{background:var(--panel-2);color:var(--mu);font-style:italic}
+.pchip.bas{background:var(--crit-w);color:#a52a2a;font-weight:620}
+:root[data-theme="dark"] .pchip.bas{color:#f08b8b}
 .cadd{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;align-items:center;
   background:var(--accent-wash);border:1px solid var(--accent);border-radius:11px;padding:8px;overflow:hidden}
 .cadd .inp{height:30px;background:var(--panel);min-width:0;max-width:100%}
@@ -1263,6 +1286,14 @@ tr.supp td{background:var(--crit-w);padding:0}
   box-shadow:var(--sh-3);transform:translateX(100%);transition:transform .24s cubic-bezier(.4,0,.2,1);
   display:flex;flex-direction:column;overflow:hidden}
 .over.on{transform:none}
+/* Réception et sortie sont des gestes courts : ils méritent une fenêtre à leur
+   taille, pas le plein écran du composeur d'acte. */
+.over.mini{inset:auto;left:50%;top:50%;width:min(960px,94vw);height:auto;max-height:88vh;
+  border-radius:14px;border:1px solid var(--line);opacity:0;
+  transform:translate(-50%,-50%) scale(.97);transition:transform .18s ease,opacity .18s ease}
+.over.mini.on{transform:translate(-50%,-50%) scale(1);opacity:1}
+.over.mini .ob{display:block;overflow:auto}
+@media (max-width:900px){ .over.mini{width:96vw;max-height:92vh} }
 .over .oh{display:flex;align-items:center;gap:12px;padding:9px 18px;border-bottom:1px solid var(--line);flex:none}
 .over .oh h2{margin:0;font-size:14.5px;font-weight:670;letter-spacing:-.02em}
 /* le corps ne défile pas : chaque colonne gère sa propre hauteur */
@@ -1821,6 +1852,10 @@ const protoActes=P=>[...new Set(Object.keys(P.z).map(z=>protoActe(P,z))
 
 /* ---------- Référentiels ---------- */
 const PRATICIENS=['Dr O. Baroudi','Dr A. Merlin'];
+/* Le pot commun : ce que le cabinet achète pour tout le monde. Il n'appartient
+   à personne en particulier, et c'est là qu'on puise quand sa propre part
+   est finie. */
+const PART_COMMUN='_commun';
 /* D'où vient le patient : ce qu'on demande une fois, à l'ouverture du dossier,
    et qui dit ensuite ce qui fait vraiment venir les gens au cabinet. */
 const ORIGINES=['Bouche à oreille','Réseaux sociaux','Recherche Google','Doctolib',
@@ -2272,16 +2307,16 @@ const ORDONNANCES=[];
    est donc une liste de lots ; `q`, `lot` et `per` de la référence en sont dérivés
    (voir recalcStock plus bas) et valent « ce qu'il reste » et « le lot qu'on entame ». */
 const STOCK=[
- {ref:'AH-VOLB',n:'Acide hyaluronique — volumateur 1 ml',cat:'Injectable',sfam:'Acide hyaluronique',u:'seringue',s:8,pu:78,f:'Allergan France',
-  lots:[{lot:'L-AH2409',per:'2027-03-31',q:7},{lot:'L-AH2511',per:'2027-09-30',q:4}]},
- {ref:'AH-LYFT',n:'Acide hyaluronique — comblement profond 1 ml',cat:'Injectable',sfam:'Acide hyaluronique',u:'seringue',s:6,pu:82,f:'Galderma',
-  lots:[{lot:'L-RL2502',per:'2027-01-31',q:2},{lot:'L-RL2504',per:'2027-06-30',q:2}]},
- {ref:'BTX-100',n:'Toxine botulique 100 U',cat:'Injectable',sfam:'Toxine botulique',u:'flacon',s:5,pu:210,f:'Allergan France',
-  lots:[{lot:'L-BX2601',per:'2026-11-30',q:2},{lot:'L-BX2512',per:'2027-02-28',q:1},{lot:'L-BX2504',per:'2026-06-30',q:1}]},
- {ref:'SKB-PRO',n:'Skinbooster 2 ml',cat:'Injectable',sfam:'Skinboosters',u:'seringue',s:5,pu:96,f:'IBSA',
-  lots:[{lot:'L-PF2603',per:'2027-05-31',q:5},{lot:'L-PF2606',per:'2027-11-30',q:4}]},
- {ref:'MESO-K',n:'Cocktail mésothérapie',cat:'Injectable',sfam:'Mésothérapie',u:'flacon',s:6,pu:34,f:'Filorga',
-  lots:[{lot:'L-MK2602',per:'2026-09-30',q:14}]},
+ {ref:'AH-VOLB',sp:3,n:'Acide hyaluronique — volumateur 1 ml',cat:'Injectable',sfam:'Acide hyaluronique',u:'seringue',s:8,pu:78,f:'Allergan France',
+  lots:[{lot:'L-AH2409',per:'2027-03-31',p:{'Dr O. Baroudi':4,'Dr A. Merlin':3}},{lot:'L-AH2511',per:'2027-09-30',p:{'Dr O. Baroudi':4}}]},
+ {ref:'AH-LYFT',sp:2,n:'Acide hyaluronique — comblement profond 1 ml',cat:'Injectable',sfam:'Acide hyaluronique',u:'seringue',s:6,pu:82,f:'Galderma',
+  lots:[{lot:'L-RL2502',per:'2027-01-31',p:{'Dr A. Merlin':2}},{lot:'L-RL2504',per:'2027-06-30',p:{'Dr O. Baroudi':1,'Dr A. Merlin':1}}]},
+ {ref:'BTX-100',sp:2,n:'Toxine botulique 100 U',cat:'Injectable',sfam:'Toxine botulique',u:'flacon',s:5,pu:210,f:'Allergan France',
+  lots:[{lot:'L-BX2601',per:'2026-11-30',p:{'Dr O. Baroudi':2}},{lot:'L-BX2512',per:'2027-02-28',p:{'Dr A. Merlin':1}},{lot:'L-BX2504',per:'2026-06-30',p:{'Dr O. Baroudi':1}}]},
+ {ref:'SKB-PRO',sp:2,n:'Skinbooster 2 ml',cat:'Injectable',sfam:'Skinboosters',u:'seringue',s:5,pu:96,f:'IBSA',
+  lots:[{lot:'L-PF2603',per:'2027-05-31',p:{'Dr O. Baroudi':3,'Dr A. Merlin':2}},{lot:'L-PF2606',per:'2027-11-30',p:{'Dr O. Baroudi':2,[PART_COMMUN]:2}}]},
+ {ref:'MESO-K',sp:3,n:'Cocktail mésothérapie',cat:'Injectable',sfam:'Mésothérapie',u:'flacon',s:6,pu:34,f:'Filorga',
+  lots:[{lot:'L-MK2602',per:'2026-09-30',p:{'Dr O. Baroudi':6,'Dr A. Merlin':5,[PART_COMMUN]:3}}]},
  {ref:'PEEL-S',n:'Peeling — acide glycolique',cat:'Topique',sfam:'Peelings',u:'flacon',s:3,pu:41,f:'SkinCeuticals',
   lots:[{lot:'L-PE2604',per:'2027-02-28',q:6}]},
  {ref:'ANE-EML',n:'Crème anesthésiante 30 g',cat:'Topique',sfam:'Anesthésiques',u:'tube',s:4,pu:12,f:'Cooper',
@@ -2338,6 +2373,51 @@ const lotsDe=x=>(x&&Array.isArray(x.lots))?x.lots:[];
 const lotCle=l=>String((l&&l.lot)||'');
 const lotPerime=l=>!!(l&&l.per&&l.per<TODAYS);
 const lotEpuise=l=>!(l&&(+l.q||0)>0);
+/* ==========================================================================
+   Un lot appartient à quelqu'un
+   --------------------------------------------------------------------------
+   Dans un cabinet où plusieurs praticiens exercent, une boîte n'est pas « au
+   cabinet » : elle est à quelqu'un, qui l'a commandée et qui la paiera. Un lot
+   porte donc une répartition — tant pour l'un, tant pour l'autre, et un pot
+   commun pour ce que le cabinet achète pour tous. Ce qui reste au total n'est
+   plus une donnée : c'est la somme des parts.
+   Un praticien puise d'abord dans la sienne, puis dans le commun. Il ne prend
+   dans celle d'un confrère qu'en dernier ressort, et le journal le dit.
+   ========================================================================== */
+const partNom=k=>k===PART_COMMUN?'Commun au cabinet':k;
+const lotParts=l=>(l&&l.p&&typeof l.p==='object'&&!Array.isArray(l.p))?l.p:null;
+const lotPart=(l,q)=>{const P=lotParts(l); return P?Math.max(0,+P[q]||0):0};
+/* les détenteurs d'un lot, le commun mis à part et rangé en dernier */
+const lotDetenteurs=l=>{const P=lotParts(l)||{};
+ return Object.keys(P).filter(k=>Math.max(0,+P[k]||0)>0)
+  .sort((a,b)=>(a===PART_COMMUN)-(b===PART_COMMUN)||a.localeCompare(b))};
+/* Un lot d'avant la répartition est réputé commun : ce qu'il porte est à tous. */
+function normLot(l){
+ if(!l) return l;
+ if(!lotParts(l)) l.p={[PART_COMMUN]:Math.max(0,+l.q||0)};
+ Object.keys(l.p).forEach(k=>{ const v=Math.max(0,+l.p[k]||0);
+   v?(l.p[k]=v):delete l.p[k] });
+ l.q=Object.keys(l.p).reduce((n,k)=>n+l.p[k],0);
+ return l;
+}
+/* Ce qu'une personne peut employer d'un lot : sa part, plus le commun. */
+const lotDispo=(l,q)=>q?lotPart(l,q)+lotPart(l,PART_COMMUN):Math.max(0,+l.q||0);
+/* Retirer q d'un lot pour le compte de « qui » : d'abord sa part, puis le
+   commun, puis — faute de mieux — celle des confrères, ce qui se signale. */
+function retirerPart(l,q,qui){
+ normLot(l); let reste=Math.max(0,+q||0); const pris={};
+ const prendre=k=>{ if(reste<=0) return; const d=Math.min(lotPart(l,k),reste);
+   if(d<=0) return; l.p[k]=lotPart(l,k)-d; reste-=d; pris[k]=(pris[k]||0)+d };
+ if(qui) prendre(qui);
+ prendre(PART_COMMUN);
+ if(reste>0) lotDetenteurs(l).forEach(prendre);
+ normLot(l);
+ const autres=Object.keys(pris).filter(k=>k!==qui&&k!==PART_COMMUN);
+ return {pris:Math.max(0,+q||0)-reste, manque:reste, detail:pris, emprunts:autres};
+}
+/* Créditer une part — c'est ce que fait une réception, ou l'annulation d'une sortie */
+function crediterPart(l,q,qui){ normLot(l);
+ const k=qui||PART_COMMUN; l.p[k]=lotPart(l,k)+Math.max(0,+q||0); normLot(l) }
 /* Le lot qu'on entame : le plus proche de la péremption parmi ceux qui restent
    et qui ne sont pas périmés (FEFO). À défaut, le premier qui reste ; à défaut,
    le premier tout court — un lot périmé ou vide se propose quand même, marqué. */
@@ -2356,29 +2436,136 @@ const lotDe=(x,n)=>lotsDe(x).find(l=>lotCle(l)===String(n||''))||null;
 function recalcStock(x){
  if(!x) return x;
  if(!Array.isArray(x.lots)) x.lots=[{lot:x.lot||null, per:x.per||null, q:+x.q||0}];
+ x.lots.forEach(normLot);
  x.q=x.lots.reduce((n,l)=>n+Math.max(0,+l.q||0),0);
  const f=lotFEFO(x);
  x.lot=f?f.lot:null; x.per=f?f.per:null;
  return x;
 }
 STOCK.forEach(recalcStock);
+/* ==========================================================================
+   La scannette
+   --------------------------------------------------------------------------
+   Une douchette code-barres, USB ou Bluetooth, n'est pas un périphérique
+   exotique : pour l'ordinateur c'est un clavier. Elle « tape » le code puis
+   appuie sur Entrée — mais bien plus vite qu'une main. C'est à cela qu'on la
+   reconnaît, et c'est tout ce qu'il faut : aucun pilote, aucune permission,
+   aucune caméra. On branche, on scanne.
+   Les étiquettes de boîtes médicales suivent le plus souvent la norme GS1 :
+   le code porte le produit (01), la péremption (17) et le n° de lot (10) dans
+   une seule chaîne. Quand c'est le cas, un scan remplit trois champs.
+   ========================================================================== */
+const SCAN_MS=45;       /* au-delà, c'est une main qui tape */
+const SCAN_MIN=4;       /* en deçà, ce n'est pas un code-barres */
+let SCANNETTE=true;     /* l'écoute est active tant qu'on ne la coupe pas */
+let scanBuf='', scanT0=0, scanLast=0, scanCible=null, scanDernier=null;
+/* Séparateur de groupe : ce que la douchette envoie entre deux champs GS1 */
+const GS=String.fromCharCode(29);
+/* Longueur fixe des identifiants GS1 qu'on sait lire ; les autres sont variables */
+const GS1_FIXE={'00':18,'01':14,'11':6,'13':6,'15':6,'17':6,'20':2};
+/* Décoder une étiquette GS1-128 : produit, péremption, lot, n° de série.
+   Rien de deviné — ce qu'on ne reconnaît pas est laissé de côté. */
+function gs1Lire(code){
+ let t=String(code||'').trim();
+ if(!t) return null;
+ t=t.replace(/^\]\w\d?/,'');                       /* préfixe AIM éventuel */
+ if(/^\(/.test(t)) t=t.replace(/\((\d{2,4})\)/g,'$1'+GS).replace(new RegExp(GS+'(?=\\d)','g'),'');
+ const o={}; let i=0, vu=0;
+ while(i<t.length){
+  const ai=t.slice(i,i+2); if(!/^\d{2}$/.test(ai)) break;
+  i+=2;
+  let v;
+  if(GS1_FIXE[ai]!==undefined){ v=t.slice(i,i+GS1_FIXE[ai]); i+=GS1_FIXE[ai];
+    if(t[i]===GS) i++ }
+  else { const j=t.indexOf(GS,i); v=(j<0?t.slice(i):t.slice(i,j)); i=(j<0?t.length:j+1) }
+  if(!v) break;
+  vu++;
+  if(ai==='01') o.gtin=v;
+  else if(ai==='17') o.per=gs1Date(v);
+  else if(ai==='10') o.lot=v;
+  else if(ai==='21') o.serie=v;
+ }
+ return (vu&&(o.lot||o.gtin||o.per))?o:null;
+}
+/* AAMMJJ → date ISO. Un jour à 00 désigne la fin du mois, comme le veut GS1. */
+function gs1Date(v){
+ if(!/^\d{6}$/.test(v)) return null;
+ const an=2000+ +v.slice(0,2), mo=+v.slice(2,4); let j=+v.slice(4,6);
+ if(mo<1||mo>12) return null;
+ if(!j) j=new Date(an,mo,0).getDate();
+ return `${an}-${String(mo).padStart(2,'0')}-${String(j).padStart(2,'0')}`;
+}
+/* Ce qu'un scan a donné : un code GS1 décodé, ou le code brut pris pour un lot */
+function scanLu(code){
+ const g=gs1Lire(code);
+ return g?{...g, brut:code, gs1:true}:{lot:String(code||'').trim(), brut:code, gs1:false};
+}
+/* On n'écoute que la cadence : une rafale courte, régulière, close par Entrée.
+   Une saisie au clavier, même rapide, ne passe pas — et si l'utilisateur est en
+   train d'écrire dans un champ libre, on ne lui vole pas ses touches. */
+function scanTouche(e){
+ if(!SCANNETTE||!scanCible) return;
+ const t=e.target, tag=t&&t.tagName;
+ const champLibre=(tag==='TEXTAREA')||(t&&t.isContentEditable);
+ if(champLibre) return;
+ const now=Date.now();
+ if(e.key==='Enter'){
+  const dur=now-scanT0, n=scanBuf.length;
+  if(n>=SCAN_MIN&&dur<=n*SCAN_MS){ e.preventDefault(); e.stopPropagation();
+    const c=scanBuf; scanBuf=''; scanRecu(c); return }
+  scanBuf=''; return;
+ }
+ if(e.key&&e.key.length===1){
+  if(!scanBuf.length||now-scanLast>250){ scanBuf=''; scanT0=now }
+  scanLast=now; scanBuf+=e.key;
+  if(scanBuf.length>128) scanBuf='';
+ }
+}
+/* Le scan arrive toujours quelque part : c'est l'écran ouvert qui dit où. */
+function scanRecu(code){
+ const L=scanLu(code); scanDernier=L;
+ if(typeof scanCible==='function'){ scanCible(L); return }
+}
+document.addEventListener('keydown',scanTouche,true);
+
+/* ==========================================================================
+   Journal des mouvements
+   --------------------------------------------------------------------------
+   Rien ne bouge dans le stock sans laisser une ligne : qui, quoi, quel lot,
+   pour le compte de qui, et pourquoi. C'est ce registre — pas le compteur —
+   qui fait foi le jour où l'on doit rendre des comptes sur un lot.
+   ========================================================================== */
+const MVT=[];
+let mvtN=0;
+const MVT_T={reception:{l:'Réception',c:'b-good',s:'+'}, sortie:{l:'Utilisation',c:'b-info',s:'−'},
+ retour:{l:'Retour',c:'b-good',s:'+'}, ajust:{l:'Ajustement',c:'b-warn',s:'±'},
+ archive:{l:'Archivage',c:'b-neu',s:''}, edit:{l:'Correction',c:'b-neu',s:''}};
+function logMvt(o){
+ const m={id:'MV-'+(++mvtN), ts:(o.ts||nowStamp()), par:(o.par||ROLES[role].u), ...o};
+ MVT.unshift(m); return m;
+}
 /* Sortir une quantité d'un lot donné — c'est là, et nulle part ailleurs, que le
    stock bouge. On ne descend jamais sous zéro : ce qui manque est simplement noté. */
-function sortirLot(x,n,q){
+function sortirLot(x,n,q,qui,info){
  if(!x) return 0;
  const l=lotDe(x,n)||lotFEFO(x);
  if(!l){ x.q=Math.max(0,(x.q||0)-q); return 0 }
- const pris=Math.min(Math.max(0,+l.q||0), Math.max(0,+q||0));
- l.q=Math.max(0,(+l.q||0)-(+q||0));
- recalcStock(x); return pris;
+ const r=retirerPart(l,q,qui);
+ if(r.pris||r.manque) logMvt({t:(info&&info.t)||'sortie', ref:x.ref, nom:x.n, lot:l.lot, per:l.per,
+   q:r.pris, qui:qui||null, detail:r.detail, emprunts:r.emprunts, manque:r.manque,
+   note:(info&&info.note)||'', acte:(info&&info.acte)||null, patient:(info&&info.patient)||null});
+ majEpuise(l); recalcStock(x); return r.pris;
 }
 /* Rendre une quantité au lot d'où elle venait — le lot est recréé s'il a disparu */
-function rendreLot(x,n,q,per){
+function rendreLot(x,n,q,per,qui,info){
  if(!x) return;
  let l=lotDe(x,n);
- if(!l){ l={lot:(n&&n!=='—')?n:null, per:per||x.per||null, q:0}; (x.lots=x.lots||[]).push(l) }
- l.q=Math.max(0,(+l.q||0)+(+q||0));
- recalcStock(x);
+ if(!l){ l={lot:(n&&n!=='—')?n:null, per:per||x.per||null, q:0, p:{}}; (x.lots=x.lots||[]).push(l) }
+ crediterPart(l,q,qui);
+ logMvt({t:(info&&info.t)||'retour', ref:x.ref, nom:x.n, lot:l.lot, per:l.per,
+   q:Math.max(0,+q||0), qui:qui||null, note:(info&&info.note)||'',
+   acte:(info&&info.acte)||null, patient:(info&&info.patient)||null});
+ majEpuise(l); recalcStock(x);
 }
 /* Étiquette d'un lot dans un menu : numéro, péremption, ce qu'il en reste.
    Forme courte pour les menus étroits — c'est le numéro qui identifie, il vient
@@ -2389,7 +2576,31 @@ const lotLabel=(l,court)=>`${l.lot||'sans n° de lot'}${l.per?' · '+DFP(l.per):
 
 /* Ce qu'on peut réellement employer : un lot périmé est physiquement là, mais il
    ne compte pas dans ce qui reste à injecter. */
+/* ==========================================================================
+   Archives : un lot vide ne disparaît pas, il se range
+   --------------------------------------------------------------------------
+   Un lot tombé à zéro reste quelques jours dans la liste — le temps d'une
+   erreur de saisie ou d'un réappro. Passé ce délai il quitte l'écran actif et
+   rejoint les archives, où sa traçabilité reste entière : c'est elle qu'on
+   viendra chercher en cas de rappel, des mois plus tard.
+   ========================================================================== */
+const ARCH_JOURS=21;
+function majEpuise(l){ if(!l) return l;
+ const vide=lotEpuise(l);
+ if(vide&&!l.videLe) l.videLe=TODAYS;
+ if(!vide&&l.videLe) l.videLe=null;
+ return l }
+const lotArchive=l=>!!(l&&l.videLe&&lotEpuise(l)&&days(l.videLe,TODAY)>=ARCH_JOURS);
+const lotsActifs=x=>lotsDe(x).filter(l=>!lotArchive(l));
+const lotsArchives=x=>lotsDe(x).filter(lotArchive);
 const stockUtile=s=>lotsDe(s).filter(l=>!lotPerime(l)).reduce((n,l)=>n+Math.max(0,+l.q||0),0);
+/* Ce qu'une personne a réellement sous la main : sa part et le commun, hors périmés */
+const stockDe=(s,q)=>lotsDe(s).filter(l=>!lotPerime(l)).reduce((n,l)=>n+lotDispo(l,q),0);
+const partDe=(s,q)=>lotsDe(s).filter(l=>!lotPerime(l)).reduce((n,l)=>n+lotPart(l,q),0);
+/* Le seuil par praticien est facultatif : sans lui, on n'alerte que sur le total. */
+const seuilPrat=s=>{const v=s&&s.sp; return (v===undefined||v===null||v==='')?null:+v};
+const sousSeuilPrat=s=>{const t=seuilPrat(s); if(t===null) return [];
+ return PRATICIENS.filter(q=>partDe(s,q)+0<t&&(partDe(s,q)>0||lotsDe(s).some(l=>lotParts(l)&&lotParts(l)[q]!==undefined)))};
 const stockPerime=s=>lotsDe(s).filter(lotPerime).reduce((n,l)=>n+Math.max(0,+l.q||0),0);
 const sst=s=>{const p=days(TODAY,s.per), u=stockUtile(s);
  if(u===0)return{k:'rupture',l:'Rupture',c:'b-crit'};
@@ -2713,16 +2924,51 @@ const gradeBdg=g=>{const G=EFF_GRADE.find(x=>x[0]===g)||EFF_GRADE[0]; return bdg
   const c=a.type?CATALOGUE.find(x=>x.id===a.type):null;
   if(c&&c.conso){ const st=STOCK.find(x=>x.ref===c.conso);
    if(st) CONSO.push({id:'CS-'+n++, acte:a.id, patient:a.patient, ref:st.ref, nom:st.n,
-     lot:st.lot||'—', per:st.per, q:1+(i%2), u:st.u, ts:st0(a.date,'CS'+a.id), par:a.praticien}) }
+     lot:st.lot||'—', per:st.per, q:1+(i%2), u:st.u, ts:st0(a.date,'CS'+a.id), par:a.praticien,
+     qui:a.praticien}) }
   if(i%9===0) CONSO.push({id:'CS-'+n++, acte:a.id, patient:a.patient, ref:'ANE-EML',
     nom:'Crème anesthésiante 30 g', lot:'L-EM2508', per:'2026-08-31', q:1, u:'tube',
-    ts:st0(a.date,'CS2'+a.id), par:a.praticien});
+    ts:st0(a.date,'CS2'+a.id), par:a.praticien, qui:a.praticien});
   if(i%11===3) EFFETS.push({id:'ES-'+m++, acte:a.id, patient:a.patient, date:addD(a.date,2),
     quoi:EFF_TYPES[i%4], grade:i%13===3?'modere':'leger',
     note:'Signalé par la patiente au contrôle téléphonique.', resolu:i%2===1,
     ts:st0(addD(a.date,2),'ES'+a.id), par:a.praticien});
  });
 })();
+/* ==========================================================================
+   Amorce du journal des mouvements
+   --------------------------------------------------------------------------
+   Le registre du jeu de démonstration est reconstitué à l'envers : on connaît
+   ce qui reste et ce qui a été consommé, donc on sait ce qui a été reçu. Les
+   comptes tombent juste — réceptions moins sorties égale le stock affiché —
+   parce qu'un journal qui ne se boucle pas ne sert à rien.
+   ========================================================================== */
+(function(){
+ const conso={};   /* ref → lot → praticien → quantité consommée */
+ CONSO.forEach(c=>{ const k=c.ref+'|'+(c.lot||''), q=c.qui||PART_COMMUN;
+   (conso[k]=conso[k]||{})[q]=(conso[k][q]||0)+Math.max(0,+c.q||0) });
+ const recu=[];
+ STOCK.forEach(x=>lotsDe(x).forEach(l=>{
+  const c=conso[x.ref+'|'+(l.lot||'')]||{};
+  const qui=new Set([...Object.keys(lotParts(l)||{}), ...Object.keys(c)]);
+  qui.forEach(k=>{ const q=lotPart(l,k)+(c[k]||0); if(!q) return;
+   recu.push({t:'reception', ref:x.ref, nom:x.n, lot:l.lot, per:l.per, q, qui:k,
+     ts:st0Journal(x.ref+(l.lot||'')+k), par:(k===PART_COMMUN?PRATICIENS[0]:k),
+     note:'Réception initiale'}) }) }));
+ /* du plus ancien au plus récent : le journal se lit à l'envers, il se construit à l'endroit */
+ const sorties=CONSO.map(c=>({t:'sortie', ref:c.ref, nom:c.nom, lot:(c.lot==='—'?null:c.lot),
+   per:c.per, q:Math.max(0,+c.q||0), qui:c.qui||null, acte:c.acte, patient:c.patient,
+   ts:c.ts, par:c.par, note:(()=>{const a=ACTES.find(x=>x.id===c.acte);
+     return a?`${a.nom} — ${fn(pById(a.patient))}`:'Séance'})()}));
+ [...recu,...sorties].sort((a,b)=>String(a.ts).localeCompare(String(b.ts)))
+   .forEach(m=>logMvt(m));
+})();
+/* une heure stable pour une réception d'amorce : le journal ne doit pas bouger
+   d'un rechargement à l'autre */
+function st0Journal(k){ let h=0; for(const c of String(k)) h=(h*31+c.charCodeAt(0))>>>0;
+ const d=addD(TODAYS,-(30+h%120));
+ return `${d}T${String(8+h%8).padStart(2,'0')}:${String(h%60).padStart(2,'0')}` }
+
 /* amorce : les séances d'appareil portent leurs réglages, en montée progressive —
    la fluence monte séance après séance, comme en épilation réelle */
 (function(){
@@ -5600,36 +5846,400 @@ V.relances=()=>`<div class="head"><div><h1>Relances automatiques</h1><p>Le devis
 
 /* ---------------- Stock ---------------- */
 let sF='tous',lotSel='';
+/* ==========================================================================
+   Réception, sortie, ajustement — les gestes du stock
+   --------------------------------------------------------------------------
+   Trois gestes suffisent à tenir un stock honnête : on reçoit, on sort, et de
+   temps en temps on corrige parce que le comptage physique ne tombe pas juste.
+   Chacun laisse une ligne au journal, avec la personne pour le compte de qui
+   il est fait — sans quoi la répartition entre praticiens ne veut rien dire.
+   ========================================================================== */
+let RC=null;            /* réception en cours */
+let SO=null;            /* sortie manuelle en cours */
+let mvtF={t:'tous',ref:'',qui:'',per:'annee'};
+let stkTab='actif';     /* actif · journal · archives */
+let stkQui='';          /* filtre praticien de la liste */
+
+/* ---- Réception ---- */
+function ouvrirReception(ref,lot){
+ const x=ref?STOCK.find(y=>y.ref===ref):null;
+ RC={ref:(x&&x.ref)||'', lot:lot||'', per:'', seuil:'', sp:'', f:'', n:'', u:'', cat:'Injectable',
+     sfam:'', pu:'', parts:{}, note:'', nouveau:!x, gs1:null};
+ if(x) rcDepuisRef(x);
+ scanCible=rcScan;
+ renderRC();
+}
+/* Reprendre les méta-données d'une référence connue : on ne les ressaisit pas */
+function rcDepuisRef(x){
+ if(!x) return;
+ RC.ref=x.ref; RC.n=x.n; RC.f=x.f||''; RC.u=x.u||''; RC.cat=x.cat||'Injectable';
+ RC.sfam=x.sfam||''; RC.pu=x.pu!=null?x.pu:''; RC.seuil=x.s!=null?x.s:'';
+ RC.sp=(x.sp===undefined||x.sp===null)?'':x.sp; RC.nouveau=false;
+ const l=RC.lot?lotDe(x,RC.lot):null;
+ if(l&&l.per) RC.per=l.per;
+}
+/* Un scan pendant la réception : il remplit le lot, la péremption, et retrouve
+   la référence si l'étiquette porte un code produit déjà rencontré. */
+function rcScan(L){
+ if(!RC||!L) return;
+ if(L.lot) RC.lot=L.lot;
+ if(L.per) RC.per=L.per;
+ RC.gs1=L.gs1?L.brut:null;
+ if(L.gtin){ const x=STOCK.find(y=>y.gtin&&y.gtin===L.gtin);
+   if(x){ rcDepuisRef(x); toast(`Étiquette reconnue · ${x.n}`) }
+   else RC.gtinVu=L.gtin }
+ else if(!RC.ref){ const x=STOCK.find(y=>lotDe(y,L.lot)); if(x) rcDepuisRef(x) }
+ renderRC();
+ if(!RC.ref) toast('Lot lu · choisissez le produit');
+}
+const rcTotal=()=>PARTS_CIBLE().reduce((n,k)=>n+Math.max(0,+RC.parts[k]||0),0);
+const PARTS_CIBLE=()=>[...PRATICIENS,PART_COMMUN];
+function rcSet(k,v){ if(!RC) return; RC[k]=v;
+ if(k==='ref'){ const x=STOCK.find(y=>y.ref===v); x?rcDepuisRef(x):(RC.nouveau=true); }
+ renderRC() }
+function rcPart(k,v){ if(!RC) return; RC.parts[k]=Math.max(0,+v||0); renderRC() }
+function validerReception(){
+ if(!RC) return;
+ const q=rcTotal();
+ if(!RC.ref&&!RC.n) { toast('Indiquez le produit'); return }
+ if(q<=0){ toast('Indiquez au moins une quantité'); return }
+ let x=STOCK.find(y=>y.ref===RC.ref);
+ if(!x){
+  const ref=(RC.ref||('REF-'+(STOCK.length+1))).toUpperCase().replace(/\s+/g,'-');
+  x={ref, n:RC.n||ref, cat:RC.cat||'Injectable', sfam:RC.sfam||RC.cat||'Divers',
+     u:RC.u||'unité', s:Math.max(0,+RC.seuil||0), pu:Math.max(0,+RC.pu||0),
+     f:RC.f||'—', lots:[]};
+  if(RC.sp!=='') x.sp=+RC.sp;
+  if(RC.gtinVu) x.gtin=RC.gtinVu;
+  STOCK.push(x);
+  logMvt({t:'edit', ref:x.ref, nom:x.n, q:0, note:'Référence créée'});
+ } else {
+  if(RC.seuil!=='') x.s=Math.max(0,+RC.seuil||0);
+  if(RC.sp!=='') x.sp=+RC.sp; 
+  if(RC.f) x.f=RC.f;
+  if(RC.pu!=='') x.pu=Math.max(0,+RC.pu||0);
+  if(RC.gtinVu&&!x.gtin) x.gtin=RC.gtinVu;
+ }
+ const nLot=(RC.lot||'').trim()||null;
+ let l=lotDe(x,nLot);
+ const neuf=!l;
+ if(!l){ l={lot:nLot, per:RC.per||null, q:0, p:{}}; x.lots.push(l) }
+ else if(RC.per) l.per=RC.per;
+ PARTS_CIBLE().forEach(k=>{ const v=Math.max(0,+RC.parts[k]||0); if(!v) return;
+  crediterPart(l,v,k);
+  logMvt({t:'reception', ref:x.ref, nom:x.n, lot:l.lot, per:l.per, q:v, qui:k,
+    note:RC.note||(neuf?'Nouveau lot':'Réapprovisionnement')}) });
+ majEpuise(l); recalcStock(x); cfgPlanifier();
+ const det=PARTS_CIBLE().filter(k=>+RC.parts[k]>0)
+   .map(k=>`${k===PART_COMMUN?'commun':k.replace('Dr ','')} +${+RC.parts[k]}`).join(' · ');
+ toast(`${x.n} · lot ${nLot||'sans n°'} — ${det}`);
+ RC=null; scanCible=null; closeAll(); go('stock');
+}
+
+/* ---- Sortie manuelle ---- */
+const SO_MOTIFS=['Casse / flacon perdu','Périmé — retiré du stock','Retour fournisseur',
+ 'Prêt à un confrère','Usage hors séance','Écart d’inventaire'];
+function ouvrirSortie(ref,lot){
+ const x=ref?STOCK.find(y=>y.ref===ref):(STOCK[0]||null);
+ SO={ref:(x&&x.ref)||'', lot:lot||'', q:1, qui:monPrat()||PRATICIENS[0], motif:SO_MOTIFS[0], note:''};
+ if(x&&!SO.lot){ const l=lotFEFO(x); SO.lot=(l&&l.lot)||'' }
+ scanCible=soScan; renderSO();
+}
+function soScan(L){ if(!SO||!L||!L.lot) return;
+ const x=STOCK.find(y=>lotDe(y,L.lot));
+ if(x){ SO.ref=x.ref; SO.lot=L.lot; renderSO(); toast(`Lot ${L.lot} · ${x.n}`) }
+ else toast(`Lot ${L.lot} inconnu au stock`);
+}
+function soSet(k,v){ if(!SO) return; SO[k]=v;
+ if(k==='ref'){ const x=STOCK.find(y=>y.ref===v), l=x?lotFEFO(x):null; SO.lot=(l&&l.lot)||'' }
+ renderSO() }
+function validerSortie(){
+ if(!SO) return;
+ const x=STOCK.find(y=>y.ref===SO.ref); if(!x){ toast('Choisissez un produit'); return }
+ const q=Math.max(1,+SO.q||1);
+ const l=lotDe(x,SO.lot)||lotFEFO(x); if(!l){ toast('Aucun lot à sortir'); return }
+ const dispo=lotDispo(l,SO.qui);
+ const r=retirerPart(l,q,SO.qui);
+ logMvt({t:(SO.motif==='Écart d’inventaire'?'ajust':'sortie'), ref:x.ref, nom:x.n, lot:l.lot,
+   per:l.per, q:r.pris, qui:SO.qui, detail:r.detail, emprunts:r.emprunts, manque:r.manque,
+   note:SO.motif+(SO.note?' — '+SO.note:'')});
+ majEpuise(l); recalcStock(x); cfgPlanifier();
+ toast(r.manque?`${x.n} · ${r.pris} sorti${r.pris>1?'s':''} — il en manquait ${r.manque}`
+              :`${x.n} · ${r.pris} sorti${r.pris>1?'s':''} du lot ${l.lot||'sans n°'}`);
+ SO=null; scanCible=null; closeAll(); go('stock');
+}
+
+/* ---- Les deux modales ---- */
+function ouvrirModale(){ const o=document.getElementById('over');
+ o.classList.add('mini'); o.classList.add('on');
+ document.getElementById('scrim').classList.add('on') }
+function fermerStock(){ RC=null; SO=null; scanCible=null; closeAll() }
+/* Le bandeau de la scannette, présent dans les deux écrans : il dit si l'écoute
+   est active, et ce qu'elle a lu en dernier. */
+const barreScan=(aide)=>`<div class="scanb ${SCANNETTE?'on':''}">
+  <span class="e">${SCANNETTE?'▮▮▮':'▯▯▯'}</span>
+  <div><b>${SCANNETTE?'Scannette active':'Scannette en pause'}</b>
+   <div class="mu" style="font-size:11px">${SCANNETTE?esc(aide):'la saisie se fait au clavier'}${
+    scanDernier?` · dernier scan <span class="mono">${esc(scanDernier.lot||scanDernier.brut||'')}</span>${scanDernier.gs1?' <span class="bdg b-good">GS1</span>':''}`:''}</div></div>
+  <button class="btn xs ${SCANNETTE?'g':'p'}" style="margin-left:auto"
+    onclick="SCANNETTE=!SCANNETTE;${RC?'renderRC':'renderSO'}()">${SCANNETTE?'Mettre en pause':'Activer'}</button></div>`;
+
+function renderRC(){
+ if(!RC) return;
+ const x=STOCK.find(y=>y.ref===RC.ref);
+ const q=rcTotal();
+ const lotExistant=x?lotDe(x,(RC.lot||'').trim()):null;
+ document.getElementById('overh').innerHTML=`
+  <button class="btn g s" onclick="fermerStock()">✕</button>
+  <div><h2>Réception de lot</h2><div class="mu" style="font-size:11.5px">
+    ${lotExistant?`réapprovisionnement du lot ${esc(RC.lot)}`
+      :(x?`nouveau lot pour ${esc(x.n)}`:'nouvelle référence au stock')}</div></div>`;
+ document.getElementById('overb').innerHTML=`
+  ${barreScan('scannez l’étiquette de la boîte : n° de lot et péremption se remplissent seuls')}
+  <div class="grid g2" style="grid-template-columns:1fr 1fr;gap:14px;margin-top:12px">
+   <div>
+    <div class="fld"><label>Produit</label>
+     <select class="inp" onchange="rcSet('ref',this.value)">
+      <option value="">— nouvelle référence —</option>
+      ${FAMS.map(f=>`<optgroup label="${esc(FAM_L[f]||f)}">${STOCK.filter(y=>y.cat===f)
+        .map(y=>`<option value="${y.ref}" ${RC.ref===y.ref?'selected':''}>${esc(y.n)}</option>`).join('')}</optgroup>`).join('')}
+     </select></div>
+    ${x?'':`<div class="fld"><label>Nom du produit</label>
+      <input class="inp" value="${esc(RC.n)}" oninput="RC.n=this.value"
+        placeholder="ex. Acide hyaluronique — volumateur 1 ml"></div>
+     <div class="cadd" style="grid-template-columns:1fr 1fr;margin-bottom:9px">
+      <div class="fld" style="margin:0"><label>Famille</label>
+       <select class="inp" onchange="RC.cat=this.value">${FAMS.map(f=>`<option ${RC.cat===f?'selected':''}>${f}</option>`).join('')}</select></div>
+      <div class="fld" style="margin:0"><label>Unité</label>
+       <input class="inp" value="${esc(RC.u)}" oninput="RC.u=this.value" placeholder="seringue, flacon…"></div>
+     </div>`}
+    <div class="cadd" style="grid-template-columns:1fr 1fr;margin-bottom:9px">
+     <div class="fld" style="margin:0"><label>N° de lot</label>
+      <input class="inp mono" id="rcLot" value="${esc(RC.lot)}" oninput="RC.lot=this.value"
+        placeholder="scannez ou saisissez"></div>
+     <div class="fld" style="margin:0"><label>Péremption</label>
+      <input class="inp" type="date" value="${esc(RC.per)}" onchange="RC.per=this.value"></div>
+    </div>
+    <div class="cadd" style="grid-template-columns:1fr 1fr 1fr">
+     <div class="fld" style="margin:0"><label>Fournisseur</label>
+      <input class="inp" value="${esc(RC.f)}" oninput="RC.f=this.value"></div>
+     <div class="fld" style="margin:0"><label>Prix unitaire</label>
+      <input class="inp" type="number" min="0" value="${RC.pu}" oninput="RC.pu=this.value"></div>
+     <div class="fld" style="margin:0"><label>Seuil cabinet</label>
+      <input class="inp" type="number" min="0" value="${RC.seuil}" oninput="RC.seuil=this.value"></div>
+    </div>
+   </div>
+   <div>
+    <div class="fld"><label>Quantités reçues, par praticien</label>
+     <div class="parts">
+      ${PARTS_CIBLE().map(k=>`<div class="prow ${k===PART_COMMUN?'com':''}">
+        <div class="pn">${esc(partNom(k))}${x?`<small>${partDe(x,k)} en stock</small>`:''}</div>
+        <input class="inp" type="number" min="0" value="${RC.parts[k]||''}" placeholder="0"
+          oninput="rcPart('${esc(k).replace(/'/g,"\\'")}',this.value)"></div>`).join('')}
+     </div>
+     <div class="mu" style="font-size:11.5px;margin-top:7px">
+       Total reçu : <b>${q}</b> ${esc((x&&x.u)||RC.u||'unité')}${q>1?'s':''}${
+       (RC.pu!==''&&q)?` · ${EUR(q*(+RC.pu||0))}`:''}</div></div>
+    <div class="fld"><label>Seuil d’alerte par praticien <span class="mu">— facultatif</span></label>
+     <input class="inp" type="number" min="0" value="${RC.sp}" oninput="RC.sp=this.value"
+       placeholder="aucune alerte individuelle">
+     <div class="mu" style="font-size:11px;margin-top:4px">Prévient dès qu’un praticien passe sous ce nombre, sans attendre que le stock du cabinet soit bas.</div></div>
+    <div class="fld"><label>Note</label>
+     <input class="inp" value="${esc(RC.note)}" oninput="RC.note=this.value"
+       placeholder="n° de commande, remarque…"></div>
+    ${RC.gs1?`<div class="tip"><span class="e">▮</span><div><b>Étiquette GS1 lue.</b>
+      <span class="mono" style="font-size:11px">${esc(RC.gs1)}</span></div></div>`:''}
+   </div></div>`;
+ document.getElementById('overf').innerHTML=`
+  <span class="mu" style="font-size:11.5px">${lotExistant
+    ? `Le lot existe déjà : les quantités s’ajoutent à ce qu’il reste.`
+    : `Chaque quantité entre au nom de son praticien — c’est elle qui sera débitée quand il injectera.`}</span>
+  <div style="margin-left:auto;display:flex;gap:8px">
+   <button class="btn" onclick="fermerStock()">Annuler</button>
+   <button class="btn p" onclick="validerReception()">Enregistrer la réception</button></div>`;
+ ouvrirModale();
+ const f=document.getElementById('rcLot'); if(f&&!RC.lot) f.focus();
+}
+
+function renderSO(){
+ if(!SO) return;
+ const x=STOCK.find(y=>y.ref===SO.ref);
+ const l=x?(lotDe(x,SO.lot)||lotFEFO(x)):null;
+ const dispo=l?lotDispo(l,SO.qui):0;
+ document.getElementById('overh').innerHTML=`
+  <button class="btn g s" onclick="fermerStock()">✕</button>
+  <div><h2>Sortie de stock</h2><div class="mu" style="font-size:11.5px">hors séance — casse, péremption, prêt, écart d’inventaire</div></div>`;
+ document.getElementById('overb').innerHTML=`
+  ${barreScan('scannez la boîte : le produit et le lot se retrouvent seuls')}
+  <div class="grid g2" style="grid-template-columns:1fr 1fr;gap:14px;margin-top:12px">
+   <div>
+    <div class="fld"><label>Produit</label>
+     <select class="inp" onchange="soSet('ref',this.value)">
+      ${FAMS.map(f=>`<optgroup label="${esc(FAM_L[f]||f)}">${STOCK.filter(y=>y.cat===f)
+        .map(y=>`<option value="${y.ref}" ${SO.ref===y.ref?'selected':''}>${esc(y.n)} — ${y.q} en stock</option>`).join('')}</optgroup>`).join('')}
+     </select></div>
+    <div class="fld"><label>Lot</label>
+     <select class="inp" onchange="soSet('lot',this.value)">
+      ${x?lotsActifs(x).map(z=>`<option value="${esc(z.lot||'')}" ${(l&&z===l)?'selected':''}>${esc(lotLabel(z))}</option>`).join('')||'<option>aucun lot</option>':''}
+     </select></div>
+    <div class="cadd" style="grid-template-columns:1fr 1fr">
+     <div class="fld" style="margin:0"><label>Quantité</label>
+      <input class="inp" type="number" min="1" value="${SO.q}" oninput="SO.q=this.value"></div>
+     <div class="fld" style="margin:0"><label>Sur le stock de</label>
+      <select class="inp" onchange="soSet('qui',this.value)">
+       ${[...PRATICIENS,PART_COMMUN].map(k=>`<option value="${esc(k)}" ${SO.qui===k?'selected':''}>${esc(partNom(k))}</option>`).join('')}</select></div>
+    </div>
+   </div>
+   <div>
+    <div class="fld"><label>Motif</label>
+     <select class="inp" onchange="soSet('motif',this.value)">
+      ${SO_MOTIFS.map(m=>`<option ${SO.motif===m?'selected':''}>${esc(m)}</option>`).join('')}</select></div>
+    <div class="fld"><label>Précision</label>
+     <input class="inp" value="${esc(SO.note)}" oninput="SO.note=this.value" placeholder="facultatif"></div>
+    ${l?`<div class="tip"><span class="e">📦</span><div>
+      <b>${esc(l.lot||'sans n° de lot')}</b> — ${esc(partNom(SO.qui))} peut en sortir <b>${dispo}</b>
+      (sa part ${lotPart(l,SO.qui)}${SO.qui!==PART_COMMUN?` + commun ${lotPart(l,PART_COMMUN)}`:''}).
+      ${(+SO.q||0)>dispo?`<br><span style="color:var(--crit);font-weight:620">Au-delà, la sortie ira puiser chez un confrère — le journal le notera.</span>`:''}
+      </div></div>`:''}
+   </div></div>`;
+ document.getElementById('overf').innerHTML=`
+  <span class="mu" style="font-size:11.5px">Une sortie manuelle ne se rattache à aucun patient : elle explique un écart, elle ne trace pas un soin.</span>
+  <div style="margin-left:auto;display:flex;gap:8px">
+   <button class="btn" onclick="fermerStock()">Annuler</button>
+   <button class="btn p" onclick="validerSortie()">Enregistrer la sortie</button></div>`;
+ ouvrirModale();
+}
+
+/* ---- Le journal ---- */
+/* Un mouvement ne se corrige pas : il s'explique. Le registre est donc en
+   lecture seule, filtrable, et exportable — c'est lui qu'on présente. */
+function mvtFiltre(){
+ return MVT.filter(m=>(mvtF.t==='tous'||m.t===mvtF.t)
+  &&(!mvtF.ref||m.ref===mvtF.ref)
+  &&(!mvtF.qui||m.qui===mvtF.qui||(m.detail&&m.detail[mvtF.qui]))
+  &&inPer(String(m.ts||'').slice(0,10),{k:mvtF.per,from:'',to:''}));
+}
+function vueJournal(){
+ const M=mvtFiltre();
+ const somme=t=>M.filter(m=>m.t===t).reduce((n,m)=>n+Math.max(0,+m.q||0),0);
+ return `<div class="grid g4" style="margin-bottom:14px">
+   ${kpi('Mouvements',M.length,'sur la période')}
+   ${kpi('Entrées',somme('reception')+somme('retour'),'unités reçues ou rendues','up')}
+   ${kpi('Sorties',somme('sortie'),'unités consommées')}
+   ${kpi('Ajustements',M.filter(m=>m.t==='ajust').length,'écarts d’inventaire',M.filter(m=>m.t==='ajust').length?'dn':'up')}</div>
+  <div class="fbar"><div class="seg">
+   ${[['tous','Tous'],['reception','Réceptions'],['sortie','Utilisations'],['ajust','Ajustements'],['retour','Retours']]
+     .map(([k,l])=>`<button class="${mvtF.t===k?'on':''}" onclick="mvtF.t='${k}';paint()">${l}</button>`).join('')}</div>
+   <select class="inp" style="max-width:200px" onchange="mvtF.ref=this.value;paint()">
+    <option value="">Tous les produits</option>
+    ${STOCK.map(x=>`<option value="${x.ref}" ${mvtF.ref===x.ref?'selected':''}>${esc(x.n)}</option>`).join('')}</select>
+   <select class="inp" style="max-width:180px" onchange="mvtF.qui=this.value;paint()">
+    <option value="">Tous les praticiens</option>
+    ${[...PRATICIENS,PART_COMMUN].map(k=>`<option value="${esc(k)}" ${mvtF.qui===k?'selected':''}>${esc(partNom(k))}</option>`).join('')}</select>
+   <select class="inp" style="max-width:150px" onchange="mvtF.per=this.value;paint()">
+    ${[['jour','Aujourd’hui'],['semaine','Cette semaine'],['mois','Ce mois'],['annee','Cette année'],['tout','Tout']]
+      .map(([k,l])=>`<option value="${k}" ${mvtF.per===k?'selected':''}>${l}</option>`).join('')}</select>
+   <button class="btn s" style="margin-left:auto" onclick="exportMvt()">Export CSV</button></div>
+  <div class="card"><div class="tw"><table>
+   <thead><tr><th>Date</th><th>Type</th><th>Produit</th><th>Lot</th><th class="num">Qté</th><th>Pour le compte de</th><th>Motif</th><th>Saisi par</th></tr></thead>
+   <tbody>${M.length?M.slice(0,400).map(m=>{const T=MVT_T[m.t]||MVT_T.edit;
+    return `<tr${m.patient?` class="c" onclick="openPatient(${m.patient})"`:''}>
+     <td class="mono" style="font-size:11.5px;white-space:nowrap">${DF(String(m.ts||'').slice(0,10))}
+       <span class="mu">${esc(String(m.ts||'').slice(11,16))}</span></td>
+     <td>${bdg(T.c,T.l)}</td>
+     <td><b>${esc(m.nom||m.ref||'—')}</b></td>
+     <td class="mono" style="font-size:11.5px">${m.lot?esc(m.lot):'<span class="mu">n/a</span>'}</td>
+     <td class="num"><b>${T.s}${Math.max(0,+m.q||0)}</b>${m.manque?`<div class="mu" style="font-size:10px;color:var(--crit)">manquait ${m.manque}</div>`:''}</td>
+     <td>${m.qui?esc(partNom(m.qui)):'<span class="mu">—</span>'}
+       ${(m.emprunts&&m.emprunts.length)?`<div class="mu" style="font-size:10px;color:var(--warn);font-weight:600">pris chez ${m.emprunts.map(x=>esc(x.replace('Dr ',''))).join(', ')}</div>`:''}</td>
+     <td class="mu" style="font-size:11.5px">${esc(m.note||'')}</td>
+     <td class="mu" style="font-size:11.5px;white-space:nowrap">${esc(m.par||'')}</td></tr>`}).join('')
+    :`<tr><td colspan="8" class="mu" style="padding:22px;text-align:center">Aucun mouvement sur cette période.</td></tr>`}
+   </tbody></table></div></div>
+  ${M.length>400?`<div class="mu" style="font-size:11.5px;margin-top:8px">400 lignes affichées sur ${M.length} — affinez les filtres ou exportez.</div>`:''}`;
+}
+function exportMvt(){
+ const M=mvtFiltre();
+ const L=[['Date','Type','Référence','Produit','Lot','Péremption','Quantité','Pour le compte de','Emprunté à','Manquant','Motif','Saisi par']];
+ M.forEach(m=>L.push([String(m.ts||''),(MVT_T[m.t]||{}).l||m.t,m.ref||'',m.nom||'',m.lot||'',m.per||'',
+   Math.max(0,+m.q||0),m.qui?partNom(m.qui):'',(m.emprunts||[]).join(' / '),m.manque||0,m.note||'',m.par||'']));
+ csvTelecharger(`praxis-mouvements-${TODAYS}.csv`,L);
+ toast(`${M.length} mouvement${M.length>1?'s':''} exporté${M.length>1?'s':''}`);
+}
+
+/* ---- Les archives ---- */
+function vueArchives(){
+ const R=[];
+ STOCK.forEach(x=>lotsArchives(x).forEach(l=>R.push({x,l})));
+ R.sort((a,b)=>String(b.l.videLe||'').localeCompare(String(a.l.videLe||'')));
+ return `<div class="tip"><span class="e">🗄</span><div><b>Un lot vide n'est pas effacé.</b>
+   Il reste ${ARCH_JOURS} jours dans la liste active — le temps d'une erreur de saisie — puis il se range ici.
+   Sa traçabilité ne bouge pas : les patients qui l'ont reçu restent retrouvables, des années après.</div></div>
+  <div class="card" style="margin-top:13px"><div class="tw"><table>
+   <thead><tr><th>Produit</th><th>Lot</th><th>Péremption</th><th>Épuisé le</th><th class="num">Patients exposés</th><th></th></tr></thead>
+   <tbody>${R.length?R.map(({x,l})=>{const exp=ACTES.filter(a=>a.lot===l.lot).length;
+    return `<tr><td><b>${esc(x.n)}</b><div class="mu mono" style="font-size:11px">${x.ref}</div></td>
+     <td class="mono">${l.lot?esc(l.lot):'<span class="mu">n/a</span>'}</td>
+     <td class="mono" style="font-size:11.5px">${DFP(l.per)}${lotPerime(l)?' '+bdg('b-neu','périmé'):''}</td>
+     <td class="mono" style="font-size:11.5px">${DF(l.videLe)} <span class="mu">· il y a ${days(l.videLe,TODAY)} j</span></td>
+     <td class="num">${exp?`<b>${exp}</b>`:'<span class="mu">—</span>'}</td>
+     <td><div style="display:flex;gap:5px;justify-content:flex-end">
+       ${exp?`<button class="btn xs" onclick="stkTab='actif';lotSel='${esc(l.lot||'')}';paint()">Traçabilité</button>`:''}
+       <button class="btn xs p" onclick="ouvrirReception('${x.ref}','${esc(l.lot||'').replace(/'/g,"\\'")}')">Réapprovisionner</button></div></td></tr>`}).join('')
+    :`<tr><td colspan="6" class="mu" style="padding:22px;text-align:center">Aucun lot archivé — rien n'est encore tombé à zéro depuis plus de ${ARCH_JOURS} jours.</td></tr>`}
+   </tbody></table></div></div>`;
+}
+
 V.stock=()=>{
- const L=STOCK.filter(s=>sF==='tous'||(sF==='alerte'?['bas','rupture','per'].includes(sst(s).k):s.cat===sF));
+ /* Ce qu'on regarde : le stock actif, le journal, ou ce qui a été archivé. */
+ const L=STOCK.filter(s=>sF==='tous'||(sF==='alerte'?['bas','rupture','per'].includes(sst(s).k)||sousSeuilPrat(s).length:s.cat===sF))
+   .filter(s=>!stkQui||partDe(s,stkQui)>0||lotsDe(s).some(l=>lotParts(l)&&lotParts(l)[stkQui]!==undefined));
  const val=STOCK.reduce((a,s)=>a+s.q*s.pu,0);
- const nLots=STOCK.reduce((n,s)=>n+lotsDe(s).length,0);
- return `<div class="head"><div><h1>Stock &amp; lots</h1><p>${STOCK.length} références · ${nLots} lots · ${EUR(val)} immobilisés</p></div>
+ const nLots=STOCK.reduce((n,s)=>n+lotsActifs(s).length,0);
+ const nArch=STOCK.reduce((n,s)=>n+lotsArchives(s).length,0);
+ const alertesPrat=STOCK.filter(s=>sousSeuilPrat(s).length);
+ const moi=monPrat();
+ const onglet=(k,l,n)=>`<button class="${stkTab===k?'on':''}" onclick="stkTab='${k}';paint()">${l}${n!==undefined&&n!==0?` <span class="mu">${n}</span>`:''}</button>`;
+ return `<div class="head"><div><h1>Stock &amp; lots</h1><p>${STOCK.length} références · ${nLots} lots actifs · ${EUR(val)} immobilisés${nArch?` · ${nArch} archivé${nArch>1?'s':''}`:''}</p></div>
   <div class="r"><button class="btn" onclick="toast('Bon de commande généré')">Bon de commande</button>
-   <button class="btn p" onclick="toast('Entrée de stock')">+ Entrée</button></div></div>
- <div class="tip"><span class="e">📦</span><div><b>Le stock se décrémente tout seul.</b> Chaque zone injectée consomme la quantité correspondante et rattache le n° de lot au patient. Vous ne comptez plus les seringues : vous validez une commande quand le logiciel vous le dit.</div></div>
+   <button class="btn" onclick="ouvrirSortie()">− Sortie</button>
+   <button class="btn p" onclick="ouvrirReception()">+ Réception de lot</button></div></div>
+ <div class="tip"><span class="e">📦</span><div><b>Chaque boîte est à quelqu'un.</b> Un lot se répartit entre praticiens et un pot commun ; l'acte débite celui qui l'a réalisé, en commençant par sa part. Le total du cabinet n'est plus qu'une somme — ce qui compte, c'est qui a de quoi travailler demain.</div></div>
+ <div class="seg" style="margin-bottom:12px">${onglet('actif','Stock actif')}${onglet('journal','Journal des mouvements',MVT.length)}${onglet('archives','Archives',nArch)}</div>
+ ${stkTab==='journal'?vueJournal():stkTab==='archives'?vueArchives():`
  <div class="grid g4" style="margin-bottom:14px">
   ${kpi('Valeur du stock',EUR(val))}
-  ${kpi('Sous le seuil',STOCK.filter(s=>s.q<s.s).length,'à recommander',STOCK.filter(s=>s.q<s.s).length?'dn':'up')}
-  ${kpi('Péremption < 3 mois',STOCK.reduce((n,s)=>n+lotsDe(s).filter(l=>!lotEpuise(l)&&days(TODAY,l.per)<90).length,0),'lots à écouler')}
-  ${kpi('Lots tracés',[...new Set(ACTES.filter(a=>a.lot).map(a=>a.lot))].length,'rappel produit possible en 1 clic')}</div>
+  ${kpi('Sous le seuil cabinet',STOCK.filter(s=>s.q<s.s).length,'à recommander',STOCK.filter(s=>s.q<s.s).length?'dn':'up')}
+  ${kpi('Seuil individuel franchi',alertesPrat.length,alertesPrat.length?`${[...new Set(alertesPrat.flatMap(sousSeuilPrat))].map(q=>q.replace('Dr ','')).join(' · ')} — ${alertesPrat.length} référence${alertesPrat.length>1?'s':''}`:'chacun a de quoi travailler',alertesPrat.length?'dn':'up')}
+  ${kpi('Péremption < 3 mois',STOCK.reduce((n,s)=>n+lotsActifs(s).filter(l=>!lotEpuise(l)&&days(TODAY,l.per)<90).length,0),'lots à écouler')}</div>
  <div class="fbar"><div class="seg">${[['tous','Toutes'],['alerte','⚠ Alertes'],['Injectable','Injectables'],['Topique','Topiques'],['Consommable','Consommables']]
-  .map(([k,l])=>`<button class="${sF===k?'on':''}" onclick="sF='${k}';paint()">${l}</button>`).join('')}</div></div>
+  .map(([k,l])=>`<button class="${sF===k?'on':''}" onclick="sF='${k}';paint()">${l}</button>`).join('')}</div>
+  <select class="inp" style="max-width:210px" onchange="stkQui=this.value;paint()">
+   <option value="">Tout le cabinet</option>
+   ${[...PRATICIENS,PART_COMMUN].map(k=>`<option value="${esc(k)}" ${stkQui===k?'selected':''}>${esc(partNom(k))}</option>`).join('')}</select></div>
  <div class="card" style="margin-bottom:13px"><div class="tw"><table>
-  <thead><tr><th>Référence</th><th class="num">Stock</th><th>Niveau</th><th>Lot</th><th>Péremption</th><th class="num">À commander</th><th>Statut</th><th>Fournisseur</th></tr></thead>
-  <tbody>${L.map(s=>{const st=sst(s),pct=Math.min(100,s.q/(s.s*2)*100),
+  <thead><tr><th>Référence</th><th class="num">Stock</th><th>Niveau</th><th>Répartition</th><th>Lot</th><th>Péremption</th><th class="num">À cder</th><th>Statut</th></tr></thead>
+  <tbody>${L.map(s=>{const st=sst(s),
    col=st.k==='ok'?'var(--good)':(st.k==='surv'||st.k==='per')?'var(--warn)':'var(--crit)',
    pctU=Math.min(100,stockUtile(s)/(s.s*2)*100),
-   per=days(TODAY,s.per),bes=Math.max(0,s.s*2-s.q);
-   return `<tr><td><b>${esc(s.n)}</b><div class="mu mono" style="font-size:11px">${s.ref} · ${EUR(s.pu)}/${s.u}</div></td>
+   bas=sousSeuilPrat(s), sp=seuilPrat(s), A=lotsActifs(s),
+   bes=Math.max(0,s.s*2-s.q);
+   return `<tr><td><b>${esc(s.n)}</b><div class="mu mono" style="font-size:11px">${s.ref} · ${EUR(s.pu)}/${s.u} · ${esc(s.f)}</div></td>
     <td class="num"><b>${s.q}</b> <span class="mu" style="font-size:11px">/ ${s.s}</span>
       ${stockPerime(s)?`<div class="mu" style="font-size:10px;color:var(--crit);font-weight:640">dont ${stockPerime(s)} périmé${stockPerime(s)>1?'s':''}</div>`:''}</td>
     <td><div class="bar"><i style="width:${pctU}%;background:${col}"></i></div></td>
-    <td class="mono" style="font-size:11.5px">${lotsDe(s).map(l=>`<div class="${lotPerime(l)?'lko':lotEpuise(l)?'lvide':''}">${l.lot?esc(l.lot):'<span class="mu">n/a</span>'}</div>`).join('')||'<span class="mu">n/a</span>'}</td>
-    <td class="mono" style="font-size:11.5px">${lotsDe(s).map(l=>{const d=days(TODAY,l.per);
+    <td><div class="pchips">${[...PRATICIENS,PART_COMMUN].map(k=>{const n=partDe(s,k);
+      if(!n&&!(k===moi&&sp!==null)) return '';
+      const cl=bas.includes(k)?'bas':(k===PART_COMMUN?'com':(k===moi?'moi':''));
+      return `<span class="pchip ${cl}" title="${esc(partNom(k))}${sp!==null&&k!==PART_COMMUN?` · seuil ${sp}`:''}">${esc(k===PART_COMMUN?'commun':k.replace('Dr ','').replace(/^([A-Z])\. /,'$1. '))} ${n}</span>`}).join('')||'<span class="mu" style="font-size:11px">—</span>'}</div>
+      ${sp!==null?`<div class="mu" style="font-size:10px;margin-top:2px">seuil individuel ${sp}</div>`:''}</td>
+    <td class="mono" style="font-size:11.5px">${A.map(l=>`<div class="${lotPerime(l)?'lko':lotEpuise(l)?'lvide':''}">${l.lot?esc(l.lot):'<span class="mu">n/a</span>'}</div>`).join('')||'<span class="mu">n/a</span>'}</td>
+    <td class="mono" style="font-size:11.5px">${A.map(l=>{const d=days(TODAY,l.per);
       return `<div class="${lotPerime(l)?'lko':lotEpuise(l)?'lvide':''}" ${(!lotPerime(l)&&d<90)?'style="color:var(--warn);font-weight:620"':''}>${DFP(l.per)} <span class="mu">· ${Math.max(0,+l.q||0)}</span></div>`}).join('')||`<span class="mu">${DFP(s.per)}</span>`}</td>
     <td class="num">${bes?`<b>${bes}</b>`:'<span class="mu">—</span>'}</td>
-    <td>${bdg(st.c,st.l)}</td><td class="mu" style="font-size:11.5px">${esc(s.f)}</td></tr>`}).join('')}
+    <td>${bdg(st.c,st.l)}${bas.length?`<div style="margin-top:3px">${bdg('b-crit',bas.map(q=>q.replace('Dr ','')).join(', ')+' bas')}</div>`:''}
+      <div style="margin-top:4px;display:flex;gap:4px"><button class="btn xs" onclick="ouvrirReception('${s.ref}')">+</button>
+      <button class="btn xs g" onclick="ouvrirSortie('${s.ref}')">−</button></div></td></tr>`}).join('')}
   </tbody></table></div></div>
  <div class="card"><div class="h"><h2>Traçabilité — lot → patients</h2><span class="s">rappel produit / matériovigilance</span>
    <div class="r"><select class="inp" style="box-shadow:none" onchange="lotSel=this.value;paint()">
@@ -5641,7 +6251,7 @@ V.stock=()=>{
    ${R.map(a=>`<tr class="c" onclick="openPatient(${a.patient})"><td class="nm">${esc(fn(pById(a.patient)))}</td>
     <td class="mono">${DF(a.date)}</td><td>${esc(a.nom)}</td><td class="mu">${zoneSummary(a)}</td></tr>`).join('')}</tbody></table></div>
    <div style="margin-top:10px">${bdg('b-info',R.length+' patient(s) exposé(s)')} <button class="btn s" style="margin-left:6px" onclick="toast('${R.length} SMS envoyés')">Notifier par SMS</button></div>`})()
-   :'<div class="mu" style="font-size:12.5px">Sélectionnez un lot pour obtenir la liste des patients exposés — c\'est ce qu\'on vous demandera en cas de rappel produit.</div>'}</div></div>`;
+   :'<div class="mu" style="font-size:12.5px">Sélectionnez un lot pour obtenir la liste des patients exposés — c\'est ce qu\'on vous demandera en cas de rappel produit.</div>'}</div></div>`}`;
 };
 
 /* ---------------- Statistiques ---------------- */
@@ -7162,7 +7772,8 @@ function supprimerActe(id){
    ts:nowStamp(), par:ROLES[role].u,
    quoi:`${a.nom} du ${DF(a.date)} — ${esc(fn(pById(a.patient)))}`};
  /* le stock consommé revient */
- sac.conso.forEach(c=>{const st=STOCK.find(x=>x.ref===c.ref); if(st) rendreLot(st,c.lot,c.q,c.per)});
+ sac.conso.forEach(c=>{const st=STOCK.find(x=>x.ref===c.ref);
+   if(st) rendreLot(st,c.lot,c.q,c.per,c.qui,{note:'Séance supprimée — produit rendu'})});
  sac.devis.forEach(o=>{ if(o.d.acte===id) o.d.acte=null;
    if(o.d.realise===id){ o.d.realise=null; if(o.d.statut==='accepte') o.d.statut='envoye' } });
  ACTES.splice(sac.i,1);
@@ -8528,10 +9139,12 @@ function saveActe(){
     et ce sont eux — et rien d'autre — qui décomptent le stock */
  syncConsoAuto();
  (AS.conso||[]).forEach(l=>{ const st=STOCK.find(x=>x.ref===l.ref); if(!st) return;
+  /* le produit sort du stock de celui qui a fait l'acte, pas d'un pot anonyme */
   CONSO.push({id:'CS-'+(CONSO.length+1+9000), acte:ACTES[0].id, patient:AS.pid, ref:st.ref,
     nom:st.n, lot:(l.lot||st.lot||'—'), per:(l.per||st.per), q:l.q, u:st.u,
-    ts:nowStamp(), par:ROLES[role].u});
-  sortirLot(st, l.lot, l.q) });
+    ts:nowStamp(), par:ROLES[role].u, qui:AS.prat});
+  sortirLot(st, l.lot, l.q, AS.prat, {acte:ACTES[0].id, patient:AS.pid,
+    note:`${acteDef(T[0]||'').n||'Séance'} — ${fn(pById(AS.pid))}`}) });
  closeAll(); pSel=AS.pid; pTab='resume'; go('patients');
  const nCs=(AS.conso||[]).length;
  toast(`${T.map(t=>acteDef(t).n).join(' + ')||'Séance'} enregistré${nCs?` · ${nCs} consommable${nCs>1?'s':''} tracé${nCs>1?'s':''}`:''}${nDoc?` · ${nDoc} document${nDoc>1?'s':''} édité${nDoc>1?'s':''}`:''} · consentement ${AS.consent?'signé':'à faire signer'}`);
@@ -8937,12 +9550,15 @@ function addConso(aid){
  const nLot=(document.getElementById('csLot')||{}).value;
  const lot=lotDe(st,nLot)||lotFEFO(st);
  CONSO.push({id:'CS-'+(CONSO.length+1+9000), acte:a.id, patient:a.patient, ref:st.ref, nom:st.n,
-   lot:(lot&&lot.lot)||'—', per:lot?lot.per:st.per, q, u:st.u, ts:nowStamp(), par:ROLES[role].u});
- sortirLot(st, lot&&lot.lot, q);
+   lot:(lot&&lot.lot)||'—', per:lot?lot.per:st.per, q, u:st.u, ts:nowStamp(), par:ROLES[role].u,
+   qui:a.praticien});
+ sortirLot(st, lot&&lot.lot, q, a.praticien, {acte:a.id, patient:a.patient,
+   note:`${a.nom} — ${fn(pById(a.patient))}`});
  consoAdd=false; toast(`${st.n} × ${q} · lot ${(lot&&lot.lot)||'—'} — stock à ${st.q}`); renderOver();
 }
 function delConso(id){ const i=CONSO.findIndex(x=>x.id===id); if(i<0) return;
- const c=CONSO[i], st=STOCK.find(x=>x.ref===c.ref); if(st) rendreLot(st,c.lot,c.q,c.per);
+ const c=CONSO[i], st=STOCK.find(x=>x.ref===c.ref);
+ if(st) rendreLot(st,c.lot,c.q,c.per,c.qui,{note:'Consommable retiré de l’acte'});
  CONSO.splice(i,1); toast('Consommable retiré · stock recrédité'); renderOver() }
 function secConso(a){
  const L=consoActe(a);
@@ -9136,7 +9752,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='CF';
+const BUILD='CG';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -10263,6 +10879,9 @@ let palIdx=0, palItems=[];
 function openPal(){document.getElementById('pal').classList.add('on');document.getElementById('scrim').classList.add('on');
  const q=document.getElementById('palq');q.value='';q.focus();buildPal('')}
 function closeAll(){['pal','over'].forEach(i=>document.getElementById(i).classList.remove('on'));
+ /* la fenêtre reprend sa taille normale pour le prochain qui l'ouvre */
+ setTimeout(()=>{ const o=document.getElementById('over');
+   if(!o.classList.contains('on')) o.classList.remove('mini') },260);
  document.getElementById('scrim').classList.remove('on')}
 function buildPal(q){
  q=q.toLowerCase().trim(); const it=[];
@@ -10323,7 +10942,9 @@ document.addEventListener('keydown',e=>{
   }
   return;
  }
- if(e.target.matches('input,textarea,select')) return;
+ /* dans le doute sur la cible, on s'abstient : mieux vaut un raccourci perdu
+    qu'une navigation déclenchée au milieu d'une saisie */
+ if(!(e.target&&e.target.matches)||e.target.matches('input,textarea,select')) return;
  const map={a:()=>openActe(),p:()=>go('patients'),d:()=>go('devis'),s:()=>go('stock'),g:()=>go('dash')};
  if(map[e.key.toLowerCase()]){e.preventDefault();map[e.key.toLowerCase()]()}
 });
@@ -10453,7 +11074,10 @@ const CFG={
  zdef:      {l:'Zones du visage',   lit:()=>ZDEF,       ecrit:v=>remplTab(ZDEF,v)},
  bdef:      {l:'Zones du corps',    lit:()=>BDEF,       ecrit:v=>remplTab(BDEF,v)},
  zretire:   {l:'Zones retirées',    lit:()=>ZRETIRE,    ecrit:v=>remplObj(ZRETIRE,v)},
- stock:     {l:'Consommables',      lit:()=>STOCK,      ecrit:v=>remplTab(STOCK,v)},
+ stock:     {l:'Consommables',      lit:()=>STOCK,      ecrit:v=>{ remplTab(STOCK,v);
+   /* un stock repris d'une sauvegarde ne connaît pas forcément la répartition :
+      on la reconstitue, et ce qui n'était à personne devient commun */
+   STOCK.forEach(x=>{ recalcStock(x); lotsDe(x).forEach(majEpuise) }) }},
  praticiens:{l:'Praticiens',        lit:()=>PRATICIENS, ecrit:v=>remplTab(PRATICIENS,v)},
  factu:     {l:'Facturation',       lit:()=>FACTU,      ecrit:v=>{ fondObj(FACTU,v);
    /* une grille de taux se remplace, elle ne se fond pas : un taux qu'on a retiré
