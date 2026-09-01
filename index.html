@@ -1128,7 +1128,7 @@ th.tri.on::after{opacity:1;font-size:10px}
 th.tri.on.asc::after{content:'▲'}
 th.tri.on.desc::after{content:'▼'}
 /* une sous-famille se lit en entier : le libellé prime sur les exemples */
-.sfr{display:grid;grid-template-columns:minmax(160px,1.1fr) minmax(0,1.4fr) auto;
+.sfr{display:grid;grid-template-columns:minmax(150px,1.35fr) minmax(0,1fr) auto;
  gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
 .sfr>.inp{width:100%}
 .sfr .catr-a{display:flex;flex-wrap:wrap;gap:3px;min-width:0}
@@ -1295,6 +1295,9 @@ th.tri.on.desc::after{content:'▼'}
   border-radius:var(--r-m);padding:11px 14px;font-size:12.5px;color:var(--ink-2);display:flex;gap:10px;align-items:flex-start;margin-bottom:14px}
 .tip b{color:var(--ink)}
 .tip .e{font-size:15px;line-height:1}
+/* un avertissement se voit : une date refusée n'est pas une remarque en passant */
+.tip.ko{background:var(--crit-w);border-color:var(--crit)}
+.tip.wa{background:var(--warn-w);border-color:var(--warn)}
 
 /* ============ COMMAND PALETTE ============ */
 .scrim{position:fixed;inset:0;background:rgba(10,11,15,.4);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:.16s;z-index:90}
@@ -2688,10 +2691,49 @@ const seuilPrat=s=>{const v=s&&s.sp; return (v===undefined||v===null||v==='')?nu
 const sousSeuilPrat=s=>{const t=seuilPrat(s); if(t===null) return [];
  return PRATICIENS.filter(q=>partDe(s,q)+0<t&&(partDe(s,q)>0||lotsDe(s).some(l=>lotParts(l)&&lotParts(l)[q]!==undefined)))};
 const stockPerime=s=>lotsDe(s).filter(lotPerime).reduce((n,l)=>n+Math.max(0,+l.q||0),0);
-const sst=s=>{const p=days(TODAY,s.per), u=stockUtile(s);
+/* ==========================================================================
+   Les seuils de péremption
+   --------------------------------------------------------------------------
+   « Trois mois » n'est pas une vérité : un cabinet qui tourne vite écoule un
+   lot en six semaines, un autre garde des consommables trois ans. Le moment
+   où l'on doit s'inquiéter se règle donc, comme le reste.
+   Et une boîte périmée n'entre pas au stock : ce contrôle-là se fait à la
+   porte, à la réception, pas trois semaines plus tard devant un patient.
+   ========================================================================== */
+let PEREMPTION={
+ alerte:90,        /* à ce nombre de jours, un lot est signalé « à écouler » */
+ critique:30,      /* en deçà, il devient urgent */
+ minReception:0,   /* durée de vie exigée d'une livraison ; 0 = simplement pas périmé */
+ bloquer:true,     /* au-dessous, la réception est refusée — sinon seulement signalée */
+};
+const perAlerte=()=>Math.max(0,+PEREMPTION.alerte||0);
+const perCritique=()=>Math.max(0,Math.min(+PEREMPTION.critique||0, perAlerte()));
+const perMin=()=>Math.max(0,+PEREMPTION.minReception||0);
+/* combien de jours il reste à un lot ; null quand la date n'est pas renseignée */
+/* Combien de jours de calendrier séparent aujourd'hui d'une date. On compte à
+   partir de TODAYS — la date du jour — et non de TODAY, qui porte une heure :
+   sinon un produit qui expire aujourd'hui passerait pour périmé dès midi. */
+const joursAvant=d=>d?days(TODAYS,d):null;
+const joursRestants=joursAvant;
+/* le degré d'urgence d'une date : rien, à écouler, urgent, périmé */
+function perNiveau(d){
+ const j=joursRestants(d);
+ if(j===null) return {k:'', j:null};
+ if(j<0) return {k:'perime', j};
+ if(j<perCritique()) return {k:'critique', j};
+ if(j<perAlerte()) return {k:'alerte', j};
+ return {k:'', j};
+}
+/* « moins de 3 mois », « moins de 45 jours » — on écrit ce qui est réglé */
+const perDuree=j=>{ j=Math.max(0,+j||0);
+ if(j%365===0&&j>=365) return (j/365)+' an'+(j>365?'s':'');
+ if(j%30===0&&j>=30) return (j/30)+' mois';
+ return j+' jour'+(j>1?'s':'') };
+const sst=s=>{const p=joursAvant(s.per), u=stockUtile(s);
  if(u===0)return{k:'rupture',l:'Rupture',c:'b-crit'};
  if(u<s.s)return{k:'bas',l:'Sous le seuil',c:'b-crit'};
- if(p<90)return{k:'per',l:'Péremption < 3 mois',c:'b-warn'};
+ if(p<perCritique())return{k:'per',l:'Péremption < '+perDuree(perCritique()),c:'b-crit'};
+ if(p<perAlerte())return{k:'per',l:'Péremption < '+perDuree(perAlerte()),c:'b-warn'};
  if(s.q<s.s*1.4)return{k:'surv',l:'À surveiller',c:'b-warn'};
  return{k:'ok',l:'OK',c:'b-good'}};
 
@@ -3196,7 +3238,7 @@ let PRATS=[
   rcpCie:'AXA', rcpPolice:'RCP-2298104', rcpFin:'2026-10-31'},
 ];
 const pratInfo=n=>PRATS.find(x=>x.nom===n)||PRATS[0];
-const rcpAlerte=x=>days(TODAY,x.rcpFin)<90;
+const rcpAlerte=x=>days(TODAYS,x.rcpFin)<90;
 const VARS=['prenom','nom','cabinet','raison','praticien','rpps','siret','tva','ape','adresse','tel','mail','site','rcp','acte','remise','code','validite','date','montant'];
 let MODELES=[
  {id:'anniv-sms', cat:'Anniversaire', canal:'SMS', nom:'Anniversaire — SMS', actif:true,
@@ -6000,6 +6042,25 @@ const lotsRanges=x=>lotsActifs(x).slice().sort((a,b)=>
 const perProche=x=>{const L=lotsRanges(x).filter(l=>!lotEpuise(l)&&l.per).map(l=>l.per);
  return L[0]||''};
 
+/* Ce que vaut une date de péremption à la porte du stock.
+   Un lot sans date passe : tous les consommables n'en portent pas. */
+function verdictReception(per){
+ if(!per) return {ok:true, k:'sans'};
+ const j=joursAvant(per);
+ if(j<0) return {ok:!PEREMPTION.bloquer, k:'perime', j,
+   msg:`Ce lot est périmé depuis ${-j} jour${-j>1?'s':''} — il n’entre pas au stock.`};
+ if(j<perMin()) return {ok:!PEREMPTION.bloquer, k:'court', j,
+   msg:`Il ne reste que ${j} jour${j>1?'s':''} : le cabinet en exige ${perMin()} à la livraison.`};
+ const N=perNiveau(per);
+ if(j===0) return {ok:true, k:'critique', j,
+   msg:'Ce lot expire aujourd’hui — c’est le dernier jour où il peut servir.'};
+ if(N.k==='critique') return {ok:true, k:'critique', j,
+   msg:`Il reste ${j} jour${j>1?'s':''} — à écouler en priorité.`};
+ if(N.k==='alerte') return {ok:true, k:'alerte', j,
+   msg:`Il reste ${j} jours — pensez à l’employer avant les autres.`};
+ return {ok:true, k:'', j};
+}
+
 /* ---- Réception ---- */
 function ouvrirReception(ref,lot){
  const x=ref?STOCK.find(y=>y.ref===ref):null;
@@ -6044,6 +6105,10 @@ function validerReception(){
  const q=rcTotal();
  if(!RC.ref&&!RC.n) { toast('Indiquez le produit'); return }
  if(q<=0){ toast('Indiquez au moins une quantité'); return }
+ /* une boîte périmée n'entre pas au stock : le contrôle se fait à la porte */
+ const V=verdictReception(RC.per);
+ if(!V.ok){ toast(V.msg); RC.refus=V; renderRC(); return }
+ RC.refus=null;
  let x=STOCK.find(y=>y.ref===RC.ref);
  if(!x){
   const ref=(RC.ref||('REF-'+(STOCK.length+1))).toUpperCase().replace(/\s+/g,'-');
@@ -6235,6 +6300,7 @@ function renderRC(){
  const x=STOCK.find(y=>y.ref===RC.ref);
  const q=rcTotal();
  const lotExistant=x?lotDe(x,(RC.lot||'').trim()):null;
+ const V=verdictReception(RC.per);
  document.getElementById('overh').innerHTML=`
   <button class="btn g s" onclick="fermerStock()">✕</button>
   <div><h2>Réception de lot</h2><div class="mu" style="font-size:11.5px">
@@ -6273,8 +6339,15 @@ function renderRC(){
       <input class="inp mono" id="rcLot" value="${esc(RC.lot)}" oninput="RC.lot=this.value"
         placeholder="scannez ou saisissez"></div>
      <div class="fld" style="margin:0"><label>Péremption</label>
-      <input class="inp" type="date" value="${esc(RC.per)}" onchange="RC.per=this.value"></div>
+      <input class="inp ${(V.k==='perime'||V.k==='court')?'ko':''}" type="date" value="${esc(RC.per)}"
+        onchange="RC.per=this.value;renderRC()"></div>
     </div>
+    ${V.msg?`<div class="tip ${(V.k==='perime'||V.k==='court')?'ko':(V.k==='critique'?'wa':'')}" style="margin:-4px 0 10px">
+      <span class="e">${V.k==='perime'?'⛔':V.k==='court'?'⚠':'⏳'}</span>
+      <div><b>${V.k==='perime'?'Lot périmé':V.k==='court'?'Durée de vie insuffisante':'Péremption proche'}</b> —
+       ${esc(V.msg)}${(!V.ok)?'':''}
+       ${(V.k==='perime'||V.k==='court')?`<div class="mu" style="font-size:11px;margin-top:3px">
+         Corrigez la date, ou assouplissez la règle dans Paramètres → Familles de produits.</div>`:''}</div></div>`:''}
     <div class="cadd" style="grid-template-columns:1fr 1fr 1fr">
      <div class="fld" style="margin:0"><label>Fournisseur</label>
       <input class="inp" value="${esc(RC.f)}" oninput="RC.f=this.value"></div>
@@ -6306,12 +6379,14 @@ function renderRC(){
       <span class="mono" style="font-size:11px">${esc(RC.gs1)}</span></div></div>`:''}
    </div></div>`;
  document.getElementById('overf').innerHTML=`
-  <span class="mu" style="font-size:11.5px">${lotExistant
+  <span class="mu" style="font-size:11.5px">${!V.ok
+    ? `<span style="color:var(--crit);font-weight:620">La réception est refusée tant que la date n’est pas corrigée.</span>`
+    : lotExistant
     ? `Le lot existe déjà : les quantités s’ajoutent à ce qu’il reste.`
     : `Chaque quantité entre au nom de son praticien — c’est elle qui sera débitée quand il injectera.`}</span>
   <div style="margin-left:auto;display:flex;gap:8px">
    <button class="btn" onclick="fermerStock()">Annuler</button>
-   <button class="btn p" onclick="validerReception()">Enregistrer la réception</button></div>`;
+   <button class="btn p" ${V.ok?'':'disabled'} onclick="validerReception()">Enregistrer la réception</button></div>`;
  ouvrirModale();
  const f=document.getElementById('rcLot'); if(f&&!RC.lot) f.focus();
 }
@@ -6571,7 +6646,10 @@ V.stock=()=>{
   ${kpi('Valeur du stock',EUR(val))}
   ${kpi('Sous le seuil cabinet',STOCK.filter(s=>s.q<s.s).length,'à recommander',STOCK.filter(s=>s.q<s.s).length?'dn':'up')}
   ${kpi('Seuil individuel franchi',alertesPrat.length,alertesPrat.length?`${[...new Set(alertesPrat.flatMap(sousSeuilPrat))].map(q=>q.replace('Dr ','')).join(' · ')} — ${alertesPrat.length} référence${alertesPrat.length>1?'s':''}`:'chacun a de quoi travailler',alertesPrat.length?'dn':'up')}
-  ${kpi('Péremption < 3 mois',STOCK.reduce((n,s)=>n+lotsActifs(s).filter(l=>!lotEpuise(l)&&days(TODAY,l.per)<90).length,0),'lots à écouler')}</div>
+  ${(()=>{const urg=STOCK.reduce((n,s)=>n+lotsActifs(s).filter(l=>!lotEpuise(l)&&perNiveau(l.per).k==='critique').length,0);
+    const ecouler=STOCK.reduce((n,s)=>n+lotsActifs(s).filter(l=>!lotEpuise(l)&&['alerte','critique'].includes(perNiveau(l.per).k)).length,0);
+    return kpi('Péremption < '+perDuree(perAlerte()), ecouler,
+      urg?`dont ${urg} à moins de ${perDuree(perCritique())}`:'lots à écouler', urg?'dn':'')})()}</div>
  <div class="fbar"><div class="seg">${[['tous','Toutes'],['alerte','⚠ Alertes'],['Injectable','Injectables'],['Topique','Topiques'],['Consommable','Consommables']]
   .map(([k,l])=>`<button class="${sF===k?'on':''}" onclick="sF='${k}';sfF='';paint()">${l}</button>`).join('')}</div>
   <select class="inp" style="max-width:210px" onchange="stkQui=this.value;paint()">
@@ -6587,7 +6665,7 @@ V.stock=()=>{
     <button class="btn xs g" style="margin-left:auto" onclick="go('params');paramTab='stock';paint()">Gérer les sous-familles</button></div>`})()}
  <div class="card" style="margin-bottom:13px"><div class="tw"><table>
   <thead><tr>${thT('actif','ref','Référence',{aide:'Classer par nom de produit'})}
-   ${thT('actif','q','Stock',{num:1,def:1,aide:'Classer par stock — les plus bas en premier'})}
+   ${thT('actif','q','Stock <span class="mu" style="font-weight:500">/ seuil</span>',{num:1,def:1,aide:'Stock du cabinet sur seuil de réapprovisionnement — classer, les plus bas en premier'})}
    ${thT('actif','niv','Niveau',{def:1,aide:'Classer par niveau de remplissage'})}
    <th>Répartition</th>
    ${thT('actif','lot','Lot',{aide:'Classer par n° de lot'})}
@@ -6619,8 +6697,11 @@ V.stock=()=>{
       return `<span class="pchip ${cl}" title="${esc(partNom(k))}${sp!==null&&k!==PART_COMMUN?` · seuil ${sp}`:''}">${esc(k===PART_COMMUN?'commun':k.replace('Dr ','').replace(/^([A-Z])\. /,'$1. '))} ${n}</span>`}).join('')||'<span class="mu" style="font-size:11px">—</span>'}</div>
       ${sp!==null?`<div class="mu" style="font-size:10px;margin-top:2px">seuil individuel ${sp}</div>`:''}</td>
     <td class="mono" style="font-size:11.5px;white-space:nowrap">${A.map(l=>`<div class="${lotPerime(l)?'lko':lotEpuise(l)?'lvide':''}">${l.lot?esc(l.lot):'<span class="mu">n/a</span>'}</div>`).join('')||'<span class="mu">n/a</span>'}</td>
-    <td class="mono" style="font-size:11.5px;white-space:nowrap">${A.map(l=>{const d=days(TODAY,l.per);
-      return `<div class="${lotPerime(l)?'lko':lotEpuise(l)?'lvide':''}" ${(!lotPerime(l)&&d<90)?'style="color:var(--warn);font-weight:620"':''}>${DFP(l.per)} <span class="mu">· ${Math.max(0,+l.q||0)}</span></div>`}).join('')||`<span class="mu">${DFP(s.per)}</span>`}</td>
+    <td class="mono" style="font-size:11.5px;white-space:nowrap">${A.map(l=>{const N=perNiveau(l.per);
+      const st=lotPerime(l)?'':N.k==='critique'?'style="color:var(--crit);font-weight:660"'
+              :N.k==='alerte'?'style="color:var(--warn);font-weight:620"':'';
+      return `<div class="${lotPerime(l)?'lko':lotEpuise(l)?'lvide':''}" ${st}
+        title="${N.j===null?'':(N.j<0?`périmé depuis ${-N.j} jour${-N.j>1?'s':''}`:`${N.j} jour${N.j>1?'s':''} restants`)}">${DFP(l.per)} <span class="mu">· ${Math.max(0,+l.q||0)}</span></div>`}).join('')||`<span class="mu">${DFP(s.per)}</span>`}</td>
     <td class="num">${bes?`<b>${bes}</b>`:'<span class="mu">—</span>'}</td>
     <td>${bdg(st.c,st.l)}${bas.length?`<div style="margin-top:3px">${bdg('b-crit',bas.map(q=>q.replace('Dr ','')).join(', ')+' bas')}</div>`:''}
       <div style="margin-top:4px;display:flex;gap:4px">
@@ -6998,6 +7079,57 @@ V.params=()=>{
  /* --- Familles et sous-familles du stock --- */
  const body={
   stock:()=>`
+   <div class="card" style="margin-bottom:13px"><div class="h"><h2>Péremption</h2>
+     <span class="s">quand s’inquiéter, et ce qu’on refuse à la livraison</span></div>
+    <div class="b">
+     <div class="tip"><span class="e">⏳</span><div><b>« Trois mois » n’est pas une vérité.</b>
+       Un cabinet qui tourne vite écoule un lot en six semaines ; des compresses tiennent trois ans.
+       Réglez ici le moment où le logiciel doit vous alerter — et ce qu’il refuse de laisser entrer au stock.</div></div>
+     <div class="grid g2" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px">
+      <div class="fld"><label>Signaler « à écouler » à</label>
+       <div style="display:flex;gap:7px;align-items:center">
+        <input class="inp" type="number" min="0" max="1095" style="width:92px" value="${perAlerte()}"
+          onchange="PEREMPTION.alerte=Math.max(0,+this.value||0);cfgPlanifier();paint()">
+        <span class="mu">jours de la péremption</span></div>
+       <div class="mu" style="font-size:11px;margin-top:4px">Soit ${esc(perDuree(perAlerte()))}. Le lot passe en orange dans la liste et compte dans l’indicateur.</div></div>
+      <div class="fld"><label>Devient urgent à</label>
+       <div style="display:flex;gap:7px;align-items:center">
+        <input class="inp" type="number" min="0" max="1095" style="width:92px" value="${PEREMPTION.critique}"
+          onchange="PEREMPTION.critique=Math.max(0,+this.value||0);cfgPlanifier();paint()">
+        <span class="mu">jours</span></div>
+       <div class="mu" style="font-size:11px;margin-top:4px">Soit ${esc(perDuree(perCritique()))} — en rouge.${
+         (+PEREMPTION.critique>perAlerte())?` <span style="color:var(--warn);font-weight:620">Au-delà de l’alerte : ramené à ${perCritique()} j.</span>`:''}</div></div>
+      <div class="fld"><label>Exiger à la livraison</label>
+       <div style="display:flex;gap:7px;align-items:center">
+        <input class="inp" type="number" min="0" max="1095" style="width:92px" value="${PEREMPTION.minReception}"
+          onchange="PEREMPTION.minReception=Math.max(0,+this.value||0);cfgPlanifier();paint()">
+        <span class="mu">jours de vie restants</span></div>
+       <div class="mu" style="font-size:11px;margin-top:4px">${perMin()
+         ?`Un lot arrivant avec moins de ${perMin()} jour${perMin()>1?'s':''} est refusé.`
+         :'À zéro : seul un lot déjà périmé est refusé.'}</div></div>
+      <div class="fld"><label>Lot périmé ou trop court</label>
+       <div class="seg" style="width:fit-content">
+        <button class="${PEREMPTION.bloquer?'on':''}" onclick="PEREMPTION.bloquer=true;cfgPlanifier();paint()">Refuser</button>
+        <button class="${PEREMPTION.bloquer?'':'on'}" onclick="PEREMPTION.bloquer=false;cfgPlanifier();paint()">Seulement signaler</button></div>
+       <div class="mu" style="font-size:11px;margin-top:6px">${PEREMPTION.bloquer
+         ?'La réception est bloquée tant que la date n’est pas corrigée — c’est le réglage prudent.'
+         :'La réception passe, avec un avertissement. Utile pour saisir un inventaire existant.'}</div></div>
+     </div>
+     ${(()=>{const P=[];
+       STOCK.forEach(x=>lotsActifs(x).forEach(l=>{ if(lotEpuise(l)) return;
+         const N=perNiveau(l.per); if(N.k) P.push({x,l,N}) }));
+       if(!P.length) return `<div class="mu" style="font-size:12px;margin-top:11px">Avec ces réglages, aucun lot n’est signalé aujourd’hui.</div>`;
+       P.sort((a,b)=>String(a.l.per).localeCompare(String(b.l.per)));
+       return `<div class="mu" style="font-size:12px;margin-top:13px;margin-bottom:6px">
+         Avec ces réglages, ${P.length} lot${P.length>1?'s sont signalés':' est signalé'} aujourd’hui :</div>
+        <div class="tw"><table><thead><tr><th>Produit</th><th>Lot</th><th>Péremption</th><th class="num">Reste</th><th>Signalé</th><th class="num">Qté</th></tr></thead>
+        <tbody>${P.map(({x,l,N})=>`<tr><td><b>${esc(nomProduit(x))}</b></td>
+          <td class="mono">${esc(l.lot||'sans n°')}</td><td class="mono">${DFP(l.per)}</td>
+          <td class="num">${N.j<0?`<span style="color:var(--crit)">${-N.j} j de retard</span>`:N.j+' j'}</td>
+          <td>${bdg(N.k==='perime'?'b-crit':N.k==='critique'?'b-crit':'b-warn',
+            N.k==='perime'?'Périmé':N.k==='critique'?'Urgent':'À écouler')}</td>
+          <td class="num">${Math.max(0,+l.q||0)}</td></tr>`).join('')}</tbody></table></div>`})()}
+    </div></div>
    <div class="tip"><span class="e">🗂</span><div><b>Deux niveaux, comme pour les actes.</b>
      La famille dit à quoi sert le produit ; la sous-famille dit ce qu'il est. C'est à ce
      second niveau qu'on cherche une seringue un mardi matin — d'où le filtre de l'écran Stock.
@@ -10183,7 +10315,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='CI';
+const BUILD='CJ';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -11506,6 +11638,7 @@ const CFG={
  bdef:      {l:'Zones du corps',    lit:()=>BDEF,       ecrit:v=>remplTab(BDEF,v)},
  zretire:   {l:'Zones retirées',    lit:()=>ZRETIRE,    ecrit:v=>remplObj(ZRETIRE,v)},
  sfams:     {l:'Sous-familles',    lit:()=>SFAMS,      ecrit:v=>{ if(v&&typeof v==='object') SFAMS=v }},
+ peremption:{l:'Seuils de péremption', lit:()=>PEREMPTION, ecrit:v=>fondObj(PEREMPTION,v)},
  stock:     {l:'Consommables',      lit:()=>STOCK,      ecrit:v=>{ remplTab(STOCK,v);
    /* un stock repris d'une sauvegarde ne connaît pas forcément la répartition :
       on la reconstitue, et ce qui n'était à personne devient commun */
