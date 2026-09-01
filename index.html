@@ -1136,6 +1136,23 @@ th.tri.on.desc::after{content:'▼'}
    un nom de produit ne doit pas se lire à travers une meurtrière */
 .over.mini .fld>.inp{width:100%}
 .over.mini .cadd .fld>.inp{width:100%}
+/* la liste des séances auxquelles rattacher un lot */
+.utl{max-height:330px;overflow:auto;border:1px solid var(--line);border-radius:9px;
+ background:var(--panel-2);padding:4px;margin-top:7px}
+.utb{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1.3fr) auto;gap:8px;
+ width:100%;text-align:left;align-items:baseline;padding:6px 8px;border:1px solid transparent;
+ border-radius:7px;background:transparent;cursor:pointer;font:inherit;color:inherit}
+.utb:hover{background:var(--panel-3)}
+.utb.on{background:var(--accent-wash);border-color:var(--accent);color:var(--accent-ink)}
+.utb .nm{font-weight:620;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.utb .ac{font-size:11.5px;color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.utb.on .ac{color:var(--accent-ink);opacity:.75}
+.utb .dt{font-size:11px;color:var(--mu);font-variant-numeric:tabular-nums;white-space:nowrap}
+.utb.on .dt{color:var(--accent-ink)}
+/* une retouche se distingue dans la liste des consommables d'un acte */
+.crow.ret .cn b::after{content:'retouche';margin-left:6px;font-size:9.5px;font-weight:640;
+ letter-spacing:.02em;text-transform:uppercase;padding:1px 5px;border-radius:99px;
+ background:var(--accent-wash);color:var(--accent-ink);vertical-align:1px}
 /* un lot dans la fenêtre de modification : son en-tête puis ses parts */
 .lotb{border:1px solid var(--line);border-radius:9px;padding:8px 9px;margin-bottom:8px;background:var(--panel)}
 .lotb-h{display:flex;align-items:center;gap:8px;margin-bottom:6px}
@@ -6145,6 +6162,73 @@ function validerReception(){
  RC=null; scanCible=null; closeAll(); go('stock');
 }
 
+/* ==========================================================================
+   Utilisation : un lot employé sur un patient
+   --------------------------------------------------------------------------
+   La boîte est dans la main, le patient est en face. C'est le geste le plus
+   fréquent, et le plus important pour la traçabilité : le numéro de lot doit
+   se rattacher à quelqu'un, sinon un rappel produit ne trouve personne.
+   Deux cas, un seul écran : la séance du jour — ou la retouche d'une séance
+   antérieure, qui n'est pas un nouvel acte mais la suite du même soin.
+   ========================================================================== */
+let UT=null;
+const UT_JOURS=60;   /* les séances proposées d'emblée : celles qu'on retouche */
+function ouvrirUtilisation(ref,lot){
+ const x=ref?STOCK.find(y=>y.ref===ref):(STOCK.find(y=>y.q>0)||STOCK[0]);
+ UT={ref:(x&&x.ref)||'', lot:lot||'', q:1, qui:monPrat()||PRATICIENS[0],
+     acte:null, mode:'seance', date:TODAYS, note:'', q7:''};
+ if(x&&!UT.lot){ const l=lotFEFO(x); UT.lot=(l&&l.lot)||'' }
+ scanCible=utScan; renderUT();
+}
+function utScan(L){ if(!UT||!L||!L.lot) return;
+ const x=STOCK.find(y=>lotDe(y,L.lot));
+ if(x){ UT.ref=x.ref; UT.lot=L.lot; renderUT(); toast(`Lot ${L.lot} · ${nomProduit(x)}`) }
+ else toast(`Lot ${L.lot} inconnu au stock`);
+}
+function utSet(k,v){ if(!UT) return; UT[k]=v;
+ if(k==='ref'){ const x=STOCK.find(y=>y.ref===v), l=x?lotFEFO(x):null; UT.lot=(l&&l.lot)||'' }
+ if(k==='acte'){ const a=ACTES.find(z=>z.id===+v); UT.acte=a?a.id:null;
+   /* le produit sort du stock de celui qui a fait la séance */
+   if(a&&a.praticien) UT.qui=a.praticien;
+   if(a&&UT.mode==='retouche'&&UT.date<a.date) UT.date=TODAYS }
+ renderUT() }
+/* Les séances qu'on peut rattacher : les récentes d'abord, toutes si l'on cherche */
+function utSeances(){
+ const t=(UT.q7||'').trim().toLowerCase();
+ const L=ACTES.filter(a=>{
+   if(t){ const p=pById(a.patient);
+     return ((p?fn(p):'')+' '+a.nom+' '+DF(a.date)+' '+(a.praticien||'')).toLowerCase().includes(t) }
+   return days(a.date,TODAYS)<=UT_JOURS && days(a.date,TODAYS)>=0 });
+ return L.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,60);
+}
+const utActe=()=>UT&&UT.acte?ACTES.find(a=>a.id===UT.acte):null;
+function validerUtilisation(){
+ if(!UT) return;
+ const x=STOCK.find(y=>y.ref===UT.ref); if(!x){ toast('Choisissez un produit'); return }
+ const a=utActe(); if(!a){ toast('Rattachez cette utilisation à une séance'); return }
+ const q=Math.max(1,+UT.q||1);
+ const l=lotDe(x,UT.lot)||lotFEFO(x); if(!l){ toast('Aucun lot à sortir'); return }
+ const ret=UT.mode==='retouche';
+ const d=ret?(UT.date||TODAYS):a.date;
+ if(ret&&d<a.date){ toast('Une retouche ne peut pas précéder la séance'); return }
+ const r=retirerPart(l,q,UT.qui);
+ const n=new Date();
+ CONSO.push({id:'CS-'+(CONSO.length+1+9000), acte:a.id, patient:a.patient, ref:x.ref,
+   nom:x.n, lot:l.lot||'—', per:l.per, q:r.pris, u:x.u,
+   ts:`${d}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`,
+   par:ROLES[role].u, qui:UT.qui, retouche:ret, note:(UT.note||'').trim()||null});
+ logMvt({t:'sortie', ref:x.ref, nom:x.n, lot:l.lot, per:l.per, q:r.pris, qui:UT.qui,
+   detail:r.detail, emprunts:r.emprunts, manque:r.manque, acte:a.id, patient:a.patient,
+   ts:`${d}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`,
+   note:`${ret?'Retouche':a.nom} — ${fn(pById(a.patient))}${UT.note?' · '+UT.note.trim():''}`});
+ majEpuise(l); recalcStock(x); cfgPlanifier();
+ const pat=fn(pById(a.patient));
+ toast(r.manque
+   ? `${nomProduit(x)} · ${r.pris} pour ${pat} — il en manquait ${r.manque}`
+   : `${nomProduit(x)} × ${r.pris} · lot ${l.lot||'sans n°'} tracé sur ${pat}${ret?' (retouche)':''}`);
+ UT=null; scanCible=null; closeAll(); go('stock');
+}
+
 /* ---- Modifier une référence ---- */
 /* Une référence vit : elle change de nom commercial, de laboratoire, de prix.
    La modifier ne doit rien coûter — et surtout ne rien casser de ce qui la
@@ -6284,7 +6368,7 @@ function validerSortie(){
 function ouvrirModale(){ const o=document.getElementById('over');
  o.classList.add('mini'); o.classList.add('on');
  document.getElementById('scrim').classList.add('on') }
-function fermerStock(){ RC=null; SO=null; MR=null; scanCible=null; closeAll() }
+function fermerStock(){ RC=null; SO=null; MR=null; UT=null; scanCible=null; closeAll() }
 /* Le bandeau de la scannette, présent dans les deux écrans : il dit si l'écoute
    est active, et ce qu'elle a lu en dernier. */
 const barreScan=(aide)=>`<div class="scanb ${SCANNETTE?'on':''}">
@@ -6293,7 +6377,7 @@ const barreScan=(aide)=>`<div class="scanb ${SCANNETTE?'on':''}">
    <div class="mu" style="font-size:11px">${SCANNETTE?esc(aide):'la saisie se fait au clavier'}${
     scanDernier?` · dernier scan <span class="mono">${esc(scanDernier.lot||scanDernier.brut||'')}</span>${scanDernier.gs1?' <span class="bdg b-good">GS1</span>':''}`:''}</div></div>
   <button class="btn xs ${SCANNETTE?'g':'p'}" style="margin-left:auto"
-    onclick="SCANNETTE=!SCANNETTE;${RC?'renderRC':MR?'renderMR':'renderSO'}()">${SCANNETTE?'Mettre en pause':'Activer'}</button></div>`;
+    onclick="SCANNETTE=!SCANNETTE;${RC?'renderRC':MR?'renderMR':UT?'renderUT':'renderSO'}()">${SCANNETTE?'Mettre en pause':'Activer'}</button></div>`;
 
 function renderRC(){
  if(!RC) return;
@@ -6464,6 +6548,83 @@ function renderMR(){
   <div style="margin-left:auto;display:flex;gap:8px">
    <button class="btn" onclick="fermerStock()">Annuler</button>
    <button class="btn p" onclick="validerModifRef()">Enregistrer</button></div>`;
+ ouvrirModale();
+}
+
+function renderUT(){
+ if(!UT) return;
+ const x=STOCK.find(y=>y.ref===UT.ref);
+ const l=x?(lotDe(x,UT.lot)||lotFEFO(x)):null;
+ const dispo=l?lotDispo(l,UT.qui):0;
+ const a=utActe(), p=a?pById(a.patient):null;
+ const S=utSeances();
+ const ret=UT.mode==='retouche';
+ document.getElementById('overh').innerHTML=`
+  <button class="btn g s" onclick="fermerStock()">✕</button>
+  <div><h2>Utilisation sur un patient</h2><div class="mu" style="font-size:11.5px">
+   le n° de lot se rattache à la séance — c’est lui qu’on cherchera en cas de rappel produit</div></div>`;
+ document.getElementById('overb').innerHTML=`
+  ${barreScan('scannez la boîte : le produit et le lot se retrouvent seuls')}
+  <div class="grid g2" style="grid-template-columns:0.85fr 1.15fr;gap:16px;margin-top:12px">
+   <div>
+    <div class="fld"><label>Produit</label>
+     <select class="inp" onchange="utSet('ref',this.value)">
+      ${FAMS.map(f=>`<optgroup label="${esc(FAM_L[f]||f)}">${STOCK.filter(y=>y.cat===f)
+        .map(y=>`<option value="${y.ref}" ${UT.ref===y.ref?'selected':''}>${esc(nomProduit(y))} — ${y.q} en stock</option>`).join('')}</optgroup>`).join('')}
+     </select></div>
+    <div class="fld"><label>Lot</label>
+     <select class="inp" onchange="utSet('lot',this.value)">
+      ${x?lotsActifs(x).map(z=>`<option value="${esc(z.lot||'')}" ${(l&&z===l)?'selected':''}>${esc(lotLabel(z))}</option>`).join('')||'<option>aucun lot</option>':''}
+     </select></div>
+    <div class="cadd" style="grid-template-columns:1fr 1.3fr">
+     <div class="fld" style="margin:0"><label>Quantité</label>
+      <input class="inp" type="number" min="1" value="${UT.q}" oninput="UT.q=this.value;renderUT()"></div>
+     <div class="fld" style="margin:0"><label>Sur le stock de</label>
+      <select class="inp" onchange="utSet('qui',this.value)">
+       ${[...PRATICIENS,PART_COMMUN].map(k=>`<option value="${esc(k)}" ${UT.qui===k?'selected':''}>${esc(partNom(k))}</option>`).join('')}</select></div>
+    </div>
+    ${l?`<div class="tip ${(+UT.q||0)>dispo?'wa':''}" style="margin-top:2px"><span class="e">📦</span><div>
+      <b>${esc(l.lot||'sans n° de lot')}</b> — ${esc(partNom(UT.qui))} peut en employer <b>${dispo}</b>${
+       UT.qui!==PART_COMMUN?` (sa part ${lotPart(l,UT.qui)} + commun ${lotPart(l,PART_COMMUN)})`:''}.
+      ${lotPerime(l)?'<br><span style="color:var(--crit);font-weight:620">Ce lot est périmé — il ne devrait plus être injecté.</span>':''}
+      ${(+UT.q||0)>dispo&&!lotPerime(l)?`<br><span style="color:var(--warn);font-weight:620">Au-delà, la sortie ira puiser chez un confrère — le journal le notera.</span>`:''}
+      </div></div>`:''}
+   </div>
+   <div>
+    <div class="fld"><label>Rattacher à</label>
+     <div class="seg" style="width:fit-content;margin-bottom:8px">
+      <button class="${ret?'':'on'}" onclick="utSet('mode','seance')">La séance</button>
+      <button class="${ret?'on':''}" onclick="utSet('mode','retouche')">Une retouche</button></div>
+     <input class="inp" id="utQ" placeholder="Chercher un patient, une séance…" value="${esc(UT.q7||'')}"
+       oninput="UT.q7=this.value;renderUT();const e=document.getElementById('utQ');if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length)}">
+     <div class="utl">
+      ${S.length?S.map(z=>{const q=pById(z.patient); const on=UT.acte===z.id;
+        return `<button class="utb ${on?'on':''}" onclick="utSet('acte',${z.id})">
+         <span class="nm">${esc(q?fn(q):'—')}</span>
+         <span class="ac">${esc(z.nom)}</span>
+         <span class="dt">${DFP(z.date)}</span></button>`}).join('')
+       :`<div class="mu" style="font-size:11.5px;padding:10px 4px">Aucune séance ${UT.q7?'ne correspond':`dans les ${UT_JOURS} derniers jours — cherchez par nom`}.</div>`}
+     </div>
+     <div class="mu" style="font-size:11px;margin-top:5px">${UT.q7
+       ? `${S.length} séance${S.length>1?'s':''} trouvée${S.length>1?'s':''}`
+       : `Les séances des ${UT_JOURS} derniers jours ; tapez un nom pour aller plus loin.`}</div></div>
+    ${ret?`<div class="cadd" style="grid-template-columns:150px 1fr">
+      <div class="fld" style="margin:0"><label>Date de la retouche</label>
+       <input class="inp" type="date" value="${esc(UT.date)}" max="${TODAYS}"
+         min="${a?esc(a.date):''}" onchange="UT.date=this.value;renderUT()"></div>
+      <div class="fld" style="margin:0"><label>Note</label>
+       <input class="inp" value="${esc(UT.note)}" oninput="UT.note=this.value"
+         placeholder="ex. reprise du sillon droit"></div>
+     </div>`:''}
+   </div></div>`;
+ document.getElementById('overf').innerHTML=`
+  <span class="mu" style="font-size:11.5px">${a
+   ? `${ret?`Retouche du ${DF(UT.date)} sur la séance`:'Séance'} du ${DF(a.date)} — <b>${esc(fn(p))}</b> · ${esc(a.nom)}${
+       ret?' · le soin n’est pas recompté, seul le produit l’est.':''}`
+   : `<span style="color:var(--warn);font-weight:620">Choisissez la séance à laquelle ce lot se rattache.</span>`}</span>
+  <div style="margin-left:auto;display:flex;gap:8px">
+   <button class="btn" onclick="fermerStock()">Annuler</button>
+   <button class="btn p" ${a?'':'disabled'} onclick="validerUtilisation()">Enregistrer l’utilisation</button></div>`;
  ouvrirModale();
 }
 
@@ -6638,6 +6799,7 @@ V.stock=()=>{
  return `<div class="head"><div><h1>Stock &amp; lots</h1><p>${STOCK.length} références · ${nLots} lots actifs · ${EUR(val)} immobilisés${nArch?` · ${nArch} archivé${nArch>1?'s':''}`:''}</p></div>
   <div class="r"><button class="btn" onclick="toast('Bon de commande généré')">Bon de commande</button>
    <button class="btn" onclick="ouvrirSortie()">− Sortie</button>
+   <button class="btn" onclick="ouvrirUtilisation()">✚ Utilisation</button>
    <button class="btn p" onclick="ouvrirReception()">+ Réception de lot</button></div></div>
  <div class="tip"><span class="e">📦</span><div><b>Chaque boîte est à quelqu'un.</b> Un lot se répartit entre praticiens et un pot commun ; l'acte débite celui qui l'a réalisé, en commençant par sa part. Le total du cabinet n'est plus qu'une somme — ce qui compte, c'est qui a de quoi travailler demain.</div></div>
  <div class="seg" style="margin-bottom:12px">${onglet('actif','Stock actif')}${onglet('journal','Journal des mouvements',MVT.length)}${onglet('archives','Archives',nArch)}</div>
@@ -6707,6 +6869,7 @@ V.stock=()=>{
       <div style="margin-top:4px;display:flex;gap:4px">
       <button class="btn xs" title="Réception sur cette référence" onclick="ouvrirReception('${s.ref}')">＋</button>
       <button class="btn xs g" title="Sortie de stock" onclick="ouvrirSortie('${s.ref}')">－</button>
+      <button class="btn xs g" title="Utilisation sur un patient — rattachée à une séance" onclick="ouvrirUtilisation('${s.ref}')">✚</button>
       <button class="btn xs g" title="Modifier la référence, ses seuils et la répartition de ses lots" onclick="ouvrirModifRef('${s.ref}')">⚙</button></div></td></tr>`}).join('')}
   </tbody></table></div></div>
  <div class="card"><div class="h"><h2>Traçabilité — lot → patients</h2><span class="s">rappel produit / matériovigilance</span>
@@ -10117,12 +10280,20 @@ function addConso(aid){
    qui:a.praticien});
  sortirLot(st, lot&&lot.lot, q, a.praticien, {acte:a.id, patient:a.patient,
    note:`${a.nom} — ${fn(pById(a.patient))}`});
- consoAdd=false; toast(`${st.n} × ${q} · lot ${(lot&&lot.lot)||'—'} — stock à ${st.q}`); renderOver();
+ consoAdd=false; toast(`${st.n} × ${q} · lot ${(lot&&lot.lot)||'—'} — stock à ${st.q}`); rafraichirConso();
+}
+/* Depuis que le stock sait tracer une utilisation, une ligne de consommable
+   n'appartient plus à la seule fenêtre de saisie d'acte : on redessine ce qui
+   est ouvert, pas ce qu'on suppose ouvert. */
+function rafraichirConso(){
+ const over=document.getElementById('over');
+ if(over&&over.classList.contains('on')&&!over.classList.contains('mini')&&AS) renderOver();
+ else paint();
 }
 function delConso(id){ const i=CONSO.findIndex(x=>x.id===id); if(i<0) return;
  const c=CONSO[i], st=STOCK.find(x=>x.ref===c.ref);
  if(st) rendreLot(st,c.lot,c.q,c.per,c.qui,{note:'Consommable retiré de l’acte'});
- CONSO.splice(i,1); toast('Consommable retiré · stock recrédité'); renderOver() }
+ CONSO.splice(i,1); toast('Consommable retiré · stock recrédité'); rafraichirConso() }
 function secConso(a){
  const L=consoActe(a);
  const perime=d=>d&&d<TODAYS;
@@ -10139,8 +10310,9 @@ function secConso(a){
           ||'<option value="">sans lot</option>'}</select>`})()}
     <div class="mu" style="font-size:11px;grid-column:1/-1">La péremption suit le lot choisi, et la quantité en est décomptée. Le lot proposé est celui qui périme le plus tôt.</div>
    </div>`:''}
-  ${L.length?`<div class="ctab">${L.map(c=>`<div class="crow">
-     <div class="cn"><b>${esc(c.nom)}</b><small>${esc(c.par)} · ${DTS(c.ts)}</small></div>
+  ${L.length?`<div class="ctab">${L.map(c=>`<div class="crow ${c.retouche?'ret':''}">
+     <div class="cn"><b>${esc(c.nom)}</b><small>${esc(c.par)} · ${DTS(c.ts)}${
+       c.qui?' · stock de '+esc(partNom(c.qui)):''}${c.note?' · '+esc(c.note):''}</small></div>
      <div class="clot"><span class="mono">${esc(c.lot)}</span>
        <small class="${perime(c.per)?'per':''}">${perime(c.per)?'⚠ périmé le ':'exp. '}${DFP(c.per)}</small></div>
      <div class="cq">${c.q} <small>${esc(c.u)}${c.q>1?'s':''}</small></div>
@@ -10315,7 +10487,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='CJ';
+const BUILD='CK';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
