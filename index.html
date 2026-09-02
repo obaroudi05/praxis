@@ -1221,6 +1221,17 @@ th.tri.on.desc::after{content:'▼'}
 .eadd{display:grid;grid-template-columns:1fr auto auto;gap:6px;
   background:var(--accent-wash);border:1px solid var(--accent);border-radius:11px;padding:8px}
 .eadd .inp{height:30px;background:var(--panel)}
+/* Le formulaire de retouche vit dans une colonne étroite : ses champs
+   s'empilent au lieu de se disputer une largeur qu'ils n'ont pas. */
+.radd{display:grid;grid-template-columns:1fr 1fr;gap:7px;align-items:center;
+  background:var(--accent-wash);border:1px solid var(--accent);border-radius:11px;padding:9px}
+.radd .inp{height:30px;background:var(--panel);width:100%;min-width:0}
+.radd .full{grid-column:1/-1;min-width:0}
+.radd .lbl{grid-column:1/-1;font-size:10px;font-weight:660;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--mu);margin:3px 0 -2px}
+.radd .seg{width:100%;box-sizing:border-box}
+.radd .seg button{flex:1;text-align:center;white-space:nowrap}
+.radd .note{font-size:11px;color:var(--mu);grid-column:1/-1;line-height:1.4}
 .erow{border:1px solid var(--line);border-radius:11px;background:var(--panel-2);padding:8px 10px}
 .erow.ok{opacity:.62}
 .erow .eh{display:flex;align-items:center;gap:7px;font-size:12.5px}
@@ -3053,6 +3064,22 @@ function dernierReglage(pid,t,mid,saufActe){
    (traçabilité des lots, obligation réglementaire), ce que le patient a
    ressenti après, et les pièces qu'on y accroche. */
 const CONSO=[];      /* {id, acte, patient, ref, nom, lot, per, q, u, ts, par} */
+/* ==========================================================================
+   Les retouches
+   --------------------------------------------------------------------------
+   Une retouche n'est pas un acte de plus : c'est la suite du même soin, trois
+   semaines plus tard, pour reprendre ce qui n'a pas tenu. Elle ne se facture
+   généralement pas et ne doit donc pas gonfler les statistiques — mais elle
+   doit se tracer, parce qu'un geste a été fait sur un patient à une date.
+   Elle consomme parfois un produit, souvent rien du tout : une reprise au
+   massage, une correction d'asymétrie. Le cas « sans produit » est le plus
+   courant, c'est donc lui qui doit être le plus simple à saisir.
+   ========================================================================== */
+const RETOUCHES=[];  /* {id, acte, patient, date, prat, note, conso, ts, par} */
+const retouchesActe=a=>RETOUCHES.filter(r=>r.acte===(a&&a.id))
+  .sort((x,y)=>String(x.date).localeCompare(String(y.date)));
+const retouchesPatient=pid=>RETOUCHES.filter(r=>r.patient===pid);
+const consoDeRetouche=r=>r&&r.conso?CONSO.find(c=>c.id===r.conso):null;
 const EFFETS=[];     /* {id, acte, patient, date, quoi, grade, note, resolu, ts, par} */
 const FICHIERS=[];   /* {id, acte, patient, nom, ext, ko, date, par} */
 
@@ -6213,10 +6240,17 @@ function validerUtilisation(){
  if(ret&&d<a.date){ toast('Une retouche ne peut pas précéder la séance'); return }
  const r=retirerPart(l,q,UT.qui);
  const n=new Date();
- CONSO.push({id:'CS-'+(CONSO.length+1+9000), acte:a.id, patient:a.patient, ref:x.ref,
+ const csId='CS-'+(CONSO.length+1+9000);
+ CONSO.push({id:csId, acte:a.id, patient:a.patient, ref:x.ref,
    nom:x.n, lot:l.lot||'—', per:l.per, q:r.pris, u:x.u,
    ts:`${d}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`,
    par:ROLES[role].u, qui:UT.qui, retouche:ret, note:(UT.note||'').trim()||null});
+ /* une retouche saisie ici est la même chose qu'une retouche saisie dans la
+    fiche : elle s'enregistre au même endroit, et s'y relit */
+ if(ret) RETOUCHES.push({id:'RT-'+(RETOUCHES.length+1+9000), acte:a.id, patient:a.patient,
+   date:d, prat:UT.qui, note:(UT.note||'').trim(), conso:csId,
+   ts:`${d}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`,
+   par:ROLES[role].u});
  logMvt({t:'sortie', ref:x.ref, nom:x.n, lot:l.lot, per:l.per, q:r.pris, qui:UT.qui,
    detail:r.detail, emprunts:r.emprunts, manque:r.manque, acte:a.id, patient:a.patient,
    ts:`${d}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`,
@@ -8500,6 +8534,8 @@ function supprimerActe(id){
  /* le stock consommé revient */
  sac.conso.forEach(c=>{const st=STOCK.find(x=>x.ref===c.ref);
    if(st) rendreLot(st,c.lot,c.q,c.per,c.qui,{note:'Séance supprimée — produit rendu'})});
+ sac.retouches=RETOUCHES.filter(r=>r.acte===id);
+ sac.retouches.forEach(r=>{const j=RETOUCHES.indexOf(r); if(j>=0) RETOUCHES.splice(j,1)});
  sac.devis.forEach(o=>{ if(o.d.acte===id) o.d.acte=null;
    if(o.d.realise===id){ o.d.realise=null; if(o.d.statut==='accepte') o.d.statut='envoye' } });
  ACTES.splice(sac.i,1);
@@ -8603,6 +8639,7 @@ function retablirActe(){
    toast('Consentement rétabli'); paint&&paint(); if(AS) renderOver(); return }
  ACTES.splice(Math.min(sac.i,ACTES.length),0,sac.acte);
  sac.conso.forEach(c=>{const st=STOCK.find(x=>x.ref===c.ref); if(st) st.q=Math.max(0,st.q-c.q); CONSO.push(c)});
+ (sac.retouches||[]).forEach(x=>RETOUCHES.push(x));
  sac.effets.forEach(x=>EFFETS.push(x)); sac.fichiers.forEach(x=>FICHIERS.push(x));
  sac.photos.forEach(x=>PHOTOS.push(x)); sac.docadd.forEach(x=>DOCADD.push(x));
  sac.ord.forEach(x=>ORDONNANCES.push(x));
@@ -10216,18 +10253,20 @@ function toggleDocHist(id){docOpen=docOpen===id?null:id;renderOver()}
    arrive après : l'ordonnance oubliée, la photo de contrôle à J+15,
    l'ecchymose signalée au téléphone, la facture. */
 let actSec='documents', consoAdd=false, effetAdd=false, factAdd=false;
-function setActSec(k){ actSec=k; docAdd=consoAdd=effetAdd=factAdd=false; renderOver() }
+function setActSec(k){ actSec=k; docAdd=consoAdd=effetAdd=factAdd=retAdd=false; RT=null; renderOver() }
 const SECTIONS=[['documents','📄','Documents'],['photos','📷','Photos'],
-                ['conso','📦','Consommables'],['effets','⚠','Effets secondaires'],
-                ['fichiers','📁','Fichiers']];
+                ['conso','📦','Consommables'],['retouches','↻','Retouches'],
+                ['effets','⚠','Effets secondaires'],['fichiers','📁','Fichiers']];
 const secCount=(k,a)=>k==='documents'?docsActe(a).length:k==='photos'?photosActe(a).length
-  :k==='conso'?consoActe(a).length:k==='effets'?effetsActe(a).length:fichiersActe(a).length;
+  :k==='conso'?consoActe(a).length:k==='retouches'?retouchesActe(a).length
+  :k==='effets'?effetsActe(a).length:fichiersActe(a).length;
 
 function actePane(a){
  if(!a) return '';
  if(!SECTIONS.some(x=>x[0]===actSec)) actSec='documents';
  const corps=actSec==='documents'?secDocuments(a):actSec==='photos'?secPhotos(a)
-   :actSec==='conso'?secConso(a):actSec==='effets'?secEffets(a):secFichiers(a);
+   :actSec==='conso'?secConso(a):actSec==='retouches'?secRetouche(a)
+   :actSec==='effets'?secEffets(a):secFichiers(a);
  return `<div class="apane">
   <div class="apane-t">${SECTIONS.map(([k,i,l])=>{const n=secCount(k,a);
     return `<button class="asec ${actSec===k?'on':''}" onclick="setActSec('${k}')" title="${esc(l)}">
@@ -10293,7 +10332,11 @@ function rafraichirConso(){
 function delConso(id){ const i=CONSO.findIndex(x=>x.id===id); if(i<0) return;
  const c=CONSO[i], st=STOCK.find(x=>x.ref===c.ref);
  if(st) rendreLot(st,c.lot,c.q,c.per,c.qui,{note:'Consommable retiré de l’acte'});
- CONSO.splice(i,1); toast('Consommable retiré · stock recrédité'); rafraichirConso() }
+ CONSO.splice(i,1);
+ /* la retouche qui portait ce produit devient une retouche sans produit :
+    le geste a bien eu lieu, on ne l'efface pas avec la seringue */
+ const r=RETOUCHES.find(z=>z.conso===id); if(r) r.conso=null;
+ toast('Consommable retiré · stock recrédité'); rafraichirConso() }
 function secConso(a){
  const L=consoActe(a);
  const perime=d=>d&&d<TODAYS;
@@ -10320,6 +10363,118 @@ function secConso(a){
    </div>`).join('')}</div>`
    :`<div class="empty" style="padding:20px">Aucun consommable tracé.<br>
       <span class="mu" style="font-size:11.5px">Le numéro de lot est ce qu'on vous demandera en cas de rappel produit.</span></div>`}`;
+}
+
+/* ---------------- Retouches ---------------- */
+let retAdd=false, RT=null;
+function toggleRetouche(aid){
+ const a=ACTES.find(x=>x.id===aid); if(!a) return;
+ retAdd=!retAdd;
+ RT=retAdd?{date:TODAYS, prat:a.praticien||PRATICIENS[0], note:'',
+   avecProduit:false, ref:'', lot:'', q:1, qui:a.praticien||PRATICIENS[0]}:null;
+ renderOver();
+}
+function rtSet(k,v){ if(!RT) return; RT[k]=v;
+ if(k==='avecProduit'&&v&&!RT.ref){ const x=STOCK.find(y=>y.q>0)||STOCK[0];
+   if(x){ RT.ref=x.ref; const l=lotFEFO(x); RT.lot=(l&&l.lot)||'' } }
+ if(k==='ref'){ const x=STOCK.find(y=>y.ref===v), l=x?lotFEFO(x):null; RT.lot=(l&&l.lot)||'' }
+ if(k==='prat'&&!RT.quiTouche) RT.qui=v;
+ renderOver() }
+/* Enregistrer une retouche. Le produit est facultatif : sans lui, on trace le
+   geste et rien d'autre — ce qui est le cas le plus fréquent. */
+function addRetouche(aid){
+ const a=ACTES.find(x=>x.id===aid); if(!a||!RT) return;
+ const d=RT.date||TODAYS;
+ if(d<a.date){ toast('Une retouche ne peut pas précéder la séance'); return }
+ if(d>TODAYS){ toast('Une retouche ne se saisit pas à l’avance'); return }
+ const n=new Date();
+ const ts=`${d}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+ let csId=null, resume='';
+ if(RT.avecProduit){
+  const x=STOCK.find(y=>y.ref===RT.ref);
+  if(!x){ toast('Choisissez le produit, ou décochez « avec produit »'); return }
+  const l=lotDe(x,RT.lot)||lotFEFO(x);
+  if(!l){ toast('Aucun lot disponible sur cette référence'); return }
+  const q=Math.max(1,+RT.q||1);
+  const r=retirerPart(l,q,RT.qui);
+  csId='CS-'+(CONSO.length+1+9000);
+  CONSO.push({id:csId, acte:a.id, patient:a.patient, ref:x.ref, nom:x.n,
+    lot:l.lot||'—', per:l.per, q:r.pris, u:x.u, ts, par:ROLES[role].u,
+    qui:RT.qui, retouche:true, note:(RT.note||'').trim()||null});
+  logMvt({t:'sortie', ref:x.ref, nom:x.n, lot:l.lot, per:l.per, q:r.pris, qui:RT.qui,
+    detail:r.detail, emprunts:r.emprunts, manque:r.manque, acte:a.id, patient:a.patient, ts,
+    note:`Retouche — ${fn(pById(a.patient))}${RT.note?' · '+RT.note.trim():''}`});
+  majEpuise(l); recalcStock(x); cfgPlanifier();
+  resume=` · ${nomProduit(x)} × ${r.pris}${l.lot?' (lot '+l.lot+')':''}`;
+ }
+ RETOUCHES.push({id:'RT-'+(RETOUCHES.length+1+9000), acte:a.id, patient:a.patient,
+   date:d, prat:RT.prat, note:(RT.note||'').trim(), conso:csId, ts, par:ROLES[role].u});
+ retAdd=false; RT=null;
+ toast(`Retouche du ${DF(d)} tracée${resume||' · aucun produit consommé'}`);
+ renderOver();
+}
+/* Supprimer une retouche rend le produit à qui il appartenait — sinon le stock
+   mentirait sur ce qui reste. */
+function delRetouche(id){
+ const i=RETOUCHES.findIndex(r=>r.id===id); if(i<0) return;
+ const r=RETOUCHES[i], c=consoDeRetouche(r);
+ if(c){ const st=STOCK.find(x=>x.ref===c.ref);
+   if(st) rendreLot(st,c.lot,c.q,c.per,c.qui,{note:'Retouche supprimée — produit rendu'});
+   const j=CONSO.findIndex(x=>x.id===c.id); if(j>=0) CONSO.splice(j,1); }
+ RETOUCHES.splice(i,1);
+ toast(c?'Retouche supprimée · stock recrédité':'Retouche supprimée');
+ renderOver();
+}
+function secRetouche(a){
+ const L=retouchesActe(a);
+ const x=RT&&RT.ref?STOCK.find(y=>y.ref===RT.ref):null;
+ const l=x?(lotDe(x,RT.lot)||lotFEFO(x)):null;
+ return `<div class="dpane-h"><div style="min-width:0"><h3>Retouches</h3>
+   <div class="mu" style="font-size:11px">${L.length
+     ? `${L.length} retouche${L.length>1?'s':''} · ${L.filter(r=>r.conso).length} avec produit`
+     : 'aucune retouche sur cette séance'}</div></div>
+   <div class="r"><button class="btn xs ${retAdd?'g':'p'}" onclick="toggleRetouche(${a.id})">${retAdd?'✕':'＋ Retouche'}</button></div></div>
+  ${retAdd&&RT?`<div class="radd">
+    <div class="lbl full">Quand, et par qui</div>
+    <input class="inp" type="date" value="${esc(RT.date)}" min="${esc(a.date)}" max="${TODAYS}"
+      onchange="rtSet('date',this.value)">
+    <select class="inp" onchange="rtSet('prat',this.value)">
+      ${PRATICIENS.map(k=>`<option value="${esc(k)}" ${RT.prat===k?'selected':''}>${esc(k)}</option>`).join('')}</select>
+    <input class="inp full" value="${esc(RT.note)}" oninput="RT.note=this.value"
+      placeholder="ce qui a été repris — ex. asymétrie du sillon droit">
+    <div class="lbl full">A-t-elle consommé un produit ?</div>
+    <div class="seg full">
+      <button class="${RT.avecProduit?'':'on'}" onclick="rtSet('avecProduit',false)">Sans produit</button>
+      <button class="${RT.avecProduit?'on':''}" onclick="rtSet('avecProduit',true)">Avec produit</button></div>
+    ${RT.avecProduit?`
+     <select class="inp full" onchange="rtSet('ref',this.value)">
+      ${FAMS.map(f=>`<optgroup label="${esc(FAM_L[f]||f)}">${STOCK.filter(y=>y.cat===f)
+        .map(y=>`<option value="${y.ref}" ${RT.ref===y.ref?'selected':''}>${esc(nomProduit(y))} — ${y.q} en stock</option>`).join('')}</optgroup>`).join('')}
+     </select>
+     <select class="inp full" onchange="rtSet('lot',this.value)">
+      ${x?lotsActifs(x).map(z=>`<option value="${esc(z.lot||'')}" ${(l&&z===l)?'selected':''}>Lot ${esc(lotLabel(z))}</option>`).join('')||'<option>aucun lot</option>':''}
+     </select>
+     <input class="inp" type="number" min="1" value="${RT.q}" oninput="RT.q=this.value" title="Quantité employée">
+     <select class="inp" onchange="RT.qui=this.value;RT.quiTouche=1;renderOver()" title="Sur quel stock la prendre">
+      ${[...PRATICIENS,PART_COMMUN].map(k=>`<option value="${esc(k)}" ${RT.qui===k?'selected':''}>${esc(partNom(k))}</option>`).join('')}</select>
+     ${l&&lotPerime(l)?`<div class="note" style="color:var(--crit);font-weight:620">Ce lot est périmé — il ne devrait plus être injecté.</div>`
+       :`<div class="note">Quantité, puis le stock sur lequel la prendre.</div>`}
+    `:`<div class="note">Rien ne sera décompté du stock : on trace le geste, sa date et son auteur — c’est le cas le plus fréquent.</div>`}
+    <button class="btn xs p full" onclick="addRetouche(${a.id})">Enregistrer la retouche</button>
+   </div>`:''}
+  ${L.length?L.map(r=>{const c=consoDeRetouche(r);
+    return `<div class="erow">
+     <div class="eh"><b>Retouche du ${DFS(r.date)}</b>
+       ${c?bdg('b-info','avec produit'):bdg('b-neu','sans produit')}
+       <span class="mu" style="margin-left:auto;font-size:11px">${esc(r.prat)}</span></div>
+     ${r.note?`<div class="en">${esc(r.note)}</div>`:''}
+     ${c?`<div class="en mono" style="font-size:11.5px">${esc(c.nom)} × ${c.q} ${esc(c.u)}${c.q>1?'s':''}
+       · lot ${esc(c.lot)}${c.per?` · exp. ${DFP(c.per)}`:''}${c.qui?` · stock de ${esc(partNom(c.qui))}`:''}</div>`:''}
+     <div class="ef"><span class="mu">saisi par ${esc(r.par)} · ${DTS(r.ts)}</span>
+       <button class="btn xs g" onclick="delRetouche('${r.id}')" title="${c?'le produit sera rendu au stock':'retirer cette retouche'}">Supprimer</button></div>
+   </div>`}).join('')
+   :`<div class="empty" style="padding:20px">Aucune retouche.<br>
+      <span class="mu" style="font-size:11.5px">Une retouche ne recompte pas le soin — elle atteste qu’un geste a été fait, avec ou sans produit.</span></div>`}`;
 }
 
 /* ---------------- Effets secondaires ---------------- */
@@ -10487,7 +10642,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='CK';
+const BUILD='CL';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
