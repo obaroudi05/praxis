@@ -1357,6 +1357,28 @@ th.tri.on.desc::after{content:'▼'}
 .ds-b{padding:3px 15px 14px;line-height:1.65;color:var(--ink-2);min-height:52px}
 .ds-f{padding:9px 15px;border-top:1px solid var(--line);font-size:10.5px;line-height:1.5;color:var(--ink-3);background:var(--panel-3)}
 .msgprev{border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:var(--panel-2);font-size:13px;line-height:1.6}
+/* Rappel d'un patient perdu de vue : son passé de soins à gauche, le message
+   déjà écrit à droite. Rien à composer, tout à relire. */
+.rap{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:18px}
+.rap-l{border:1px solid var(--line);border-radius:11px;background:var(--panel-2);
+ max-height:min(290px,32vh);overflow:auto}
+.rap-a{display:flex;gap:10px;align-items:flex-start;padding:9px 11px;border-bottom:1px solid var(--line)}
+.rap-a:last-child{border-bottom:none}
+.rap-d{font:600 11px var(--sans);font-variant-numeric:tabular-nums;color:var(--ink-3);flex:none;padding-top:1px;white-space:nowrap}
+.rap-n{font-weight:600;font-size:12.5px}
+.rap-z{margin-top:3px;display:flex;flex-wrap:wrap;gap:4px}
+.rap-p{margin-left:auto;font-size:10.5px;color:var(--ink-3);flex:none;white-space:nowrap}
+.rap-f{display:flex;gap:8px;margin-top:11px;flex-wrap:wrap}
+.rap-s{flex:1 1 96px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--panel-2)}
+.rap-s b{display:block;font-size:15px;font-variant-numeric:tabular-nums}
+.rap-s span{font-size:10.5px;color:var(--ink-3);line-height:1.3;display:block;margin-top:1px}
+.rap-t{display:flex;gap:6px;flex-wrap:wrap}
+.rap #rapprev{max-height:min(190px,24vh);overflow:auto}
+.rap-c{font:580 12px var(--sans);border:1px solid var(--line);background:var(--panel-2);
+ border-radius:8px;padding:6px 10px;color:var(--ink-2);transition:.12s}
+.rap-c:hover{border-color:var(--line-2);color:var(--ink)}
+.rap-c.on{background:var(--accent);border-color:var(--accent);color:#fff}
+@media (max-width:980px){.rap{grid-template-columns:1fr}}
 .vars{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
 .varchip{font:600 11px var(--sans);border:1px solid var(--line);background:var(--panel-2);border-radius:7px;padding:3px 7px;color:var(--ink-2)}
 .varchip:hover{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-wash)}
@@ -1665,7 +1687,9 @@ th.tri.on.desc::after{content:'▼'}
 .tl .ic{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;flex:none;font-size:12px}
 .tl .t{font-weight:600;font-size:12.5px}
 .tl .d{font-size:11.5px;color:var(--ink-3)}
-.tl .a{margin-left:auto}
+.tl .a{margin-left:auto;display:flex;gap:6px;align-items:center;flex:none}
+.tl.c{cursor:pointer;border-radius:9px;margin:0 -7px;padding-left:7px;padding-right:7px;transition:.11s}
+.tl.c:hover{background:var(--panel-2)}
 .sw{position:relative;width:36px;height:20px;border-radius:999px;background:var(--line-2);flex:none;transition:.16s}
 .sw.on{background:var(--good)}
 .sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.16s}
@@ -3781,7 +3805,11 @@ V.dash=()=>{
  RDUE.forEach(r=>todo.push({i:'↻',b:'var(--warn-w)',c:'#8a6100',
    t:`Relance ${r.r.c} — ${fn(pById(r.d.patient))}`,
    d:`${r.d.id}${CAN('compta')?' · '+EUR(r.d.montant):''} · envoyé il y a ${days(r.d.envoye,TODAY)} j`,
-   a:`<button class="btn s p" onclick="sendRel('${r.d.id}')">Envoyer</button>`}));
+   /* on ne relance pas un devis sans l'avoir sous les yeux : la ligne entière
+      l'ouvre, et le bouton le dit pour ceux qui ne devinent pas le clic */
+   cl:'c', go:`apercuDevis('${r.d.id}')`, ti:'Voir le devis',
+   a:`<button class="btn s" onclick="event.stopPropagation();apercuDevis('${r.d.id}')">◉ Aperçu</button>
+      <button class="btn s p" onclick="event.stopPropagation();sendRel('${r.d.id}')">Envoyer</button>`}));
  ALERTES.forEach(s=>todo.push({i:'▧',b:'var(--crit-w)',c:'#a52a2a',t:`${sst(s).l} — ${s.n}`,
    d:`${s.q} ${s.u} en stock · seuil ${s.s} · ${s.f}`,
    a:`<button class="btn s" onclick="toast('Bon de commande préparé pour ${esc(s.f)}')">Commander</button>`}));
@@ -3826,8 +3854,9 @@ V.dash=()=>{
   <div class="card"><div class="h"><h2>À traiter</h2><span class="s">tout se règle depuis cet écran</span>
     ${RDUE.length?`<div class="r"><button class="btn s" onclick="allRel()">Tout envoyer</button></div>`:''}</div>
    <div class="b" style="max-height:320px;overflow:auto;padding-top:4px">
-    ${todo.length?todo.map(t=>`<div class="tl"><div class="ic" style="background:${t.b};color:${t.c}">${t.i}</div>
-      <div><div class="t">${esc(t.t)}</div><div class="d">${esc(t.d)}</div></div><div class="a">${t.a}</div></div>`).join('')
+    ${todo.length?todo.map(t=>`<div class="tl ${t.cl||''}" ${t.go?`onclick="${t.go}" title="${esc(t.ti||'')}"`:''}>
+      <div class="ic" style="background:${t.b};color:${t.c}">${t.i}</div>
+      <div style="min-width:0"><div class="t">${esc(t.t)}</div><div class="d">${esc(t.d)}</div></div><div class="a">${t.a}</div></div>`).join('')
       :'<div class="empty">Rien à traiter. 🎉</div>'}
    </div></div>
   ${CAN('compta')
@@ -3845,9 +3874,9 @@ function reactCard(){
  if(!tot) return '<div class="empty">Aucun patient à réactiver. 🎉</div>';
  return L.map(x=>`<div class="tl c" onclick="openPatient(${x.p.id})">
    <div class="pav">${esc(ini(x.p))}</div>
-   <div><div class="t">${esc(x.p.nom)} ${esc(x.p.prenom)}</div>
-     <div class="d">${x.st.n} acte${x.st.n>1?'s':''} · dernier le ${DF(x.st.last)} — il y a ${x.st.rec} mois</div></div>
-   <div class="a"><button class="btn s" onclick="event.stopPropagation();openMsg('fid-dormant',${x.p.id})">✉ Relancer</button></div>
+   <div style="min-width:0"><div class="t">${esc(x.p.nom)} ${esc(x.p.prenom)}</div>
+     <div class="d">${x.st.n} acte${x.st.n>1?'s':''} · dernier le ${DF(x.st.last)} — il y a ${x.st.rec} mois${(r=>r?` · <b style="color:var(--good)">relancé le ${DF(r.d)}</b>`:'')(rapDernier(x.p.id))}</div></div>
+   <div class="a"><button class="btn s" onclick="event.stopPropagation();openRappel(${x.p.id})">${rapDernier(x.p.id)?'↻ Relancer à nouveau':'✉ Relancer'}</button></div>
   </div>`).join('')
   +(tot>L.length?`<div class="tl" style="justify-content:center"><a onclick="go('patients');pView='reactiver';paint()">+ ${tot-L.length} autre(s) — voir la liste complète →</a></div>`:'');
 }
@@ -3860,8 +3889,12 @@ function toggleHero(){heroOpen=!heroOpen;refreshHero()}
 function zoneBadges(a,max){
  if(!a.zones) return `<span class="mu" style="font-size:11.5px">${noZoneTxt(a)}</span>`;
  const e=zonesOf(a), sh=e.slice(0,max||4);
- return sh.map(([z,q])=>{const Z=zoneDef(z);
-   return `<span class="bdg ${Z.p==='tox'?'b-info':'b-warn'}">${esc(zoneNom(z))} ${fmtQ(q,Z.p)}</span>`}).join('')
+ /* L'unité vient de l'acte pratiqué sur la zone, pas du produit habituel de
+    cette zone : un laser sur la lèvre ne se compte pas en millilitres.
+    Un acte sans unité (laser, peeling, radiofréquence) n'affiche que la zone. */
+ const uniteDe=z=>{const t=(a.zt&&a.zt[z])||a.type; return t?acteDef(t).unite:'ml'};
+ return sh.map(([z,q])=>{const Z=zoneDef(z), u=uniteDe(z);
+   return `<span class="bdg ${Z.p==='tox'?'b-info':'b-warn'}">${esc(zoneNom(z))}${u?' '+nb(q)+' '+u:''}</span>`}).join('')
    +(e.length>sh.length?`<span class="bdg b-neu">+${e.length-sh.length}</span>`:'');
 }
 function heroRows(q){
@@ -4998,7 +5031,7 @@ function pReactiver(){
     <td class="mu">${der?esc(der.nom):'—'}</td>
     <td class="mu" style="font-size:11.5px">${esc(x.p.tel||'—')}<div>${esc(x.p.mail||'')}</div></td>
     ${cpt?`<td class="num">${EUR(x.st.ca)}</td>`:''}
-    <td class="num"><button class="btn xs" onclick="event.stopPropagation();openMsg('fid-dormant',${x.p.id})">✉ Relancer</button></td></tr>`}).join('')}
+    <td class="num" style="white-space:nowrap">${(r=>r?`<span class="bdg b-good" title="Relancé par ${esc(r.canal)}">↻ ${DF(r.d)}</span> `:'')(rapDernier(x.p.id))}<button class="btn xs" onclick="event.stopPropagation();openRappel(${x.p.id})">✉ Relancer</button></td></tr>`}).join('')}
   </tbody></table>${L.length?'':'<div class="empty">Aucun patient à réactiver avec ces critères. 🎉</div>'}</div></div>`;
 }
 
@@ -5045,7 +5078,7 @@ function pFideles(){
      <td class="nm">${esc(p.nom)} ${esc(p.prenom)}</td><td class="num">${ACTES.filter(a=>a.patient===p.id).length}</td>
      <td class="num">${EUR(FACTURES.filter(f=>f.patient===p.id).reduce((s,f)=>s+f.paye,0))}</td>
      <td class="mono">${st.last?DF(st.last):'—'} <span class="mu">(${st.rec} mois)</span></td>
-     <td class="num"><button class="btn xs" onclick="event.stopPropagation();openMsg('fid-dormant',${p.id})">✉ Relancer</button></td></tr>`}).join('')}
+     <td class="num"><button class="btn xs" onclick="event.stopPropagation();openRappel(${p.id})">✉ Relancer</button></td></tr>`}).join('')}
    </tbody></table></div></div>`:''}`;
 }
 
@@ -6392,7 +6425,8 @@ V.relances=()=>`<div class="head"><div><h1>Relances automatiques</h1><p>Le devis
    <tbody>${RELS.map(r=>`<tr class="c" onclick="go('devis','${r.d.id}')"><td class="mono">${DF(r.e)}</td>
     <td class="nm">${esc(fn(pById(r.d.patient)))}</td><td class="num">${EUR(r.d.montant)}</td><td>${r.r.c}</td>
     <td>${r.du?bdg('b-crit','⚠ Échue'):bdg('b-info','Programmée')}</td>
-    <td class="num">${r.du?`<button class="btn xs p" onclick="event.stopPropagation();sendRel('${r.d.id}')">Envoyer</button>`:''}</td></tr>`).join('')}</tbody></table>
+    <td class="num" style="white-space:nowrap"><button class="btn xs" onclick="event.stopPropagation();apercuDevis('${r.d.id}')">◉ Aperçu</button>
+     ${r.du?`<button class="btn xs p" onclick="event.stopPropagation();sendRel('${r.d.id}')">Envoyer</button>`:''}</td></tr>`).join('')}</tbody></table>
     ${RELS.length?'':'<div class="empty">Rien en attente.</div>'}</div>
    <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">Sur les ${ATT.length} devis en attente (${EUR(MATT)}), une relance structurée récupère typiquement 15 à 25 % de plus qu'une relance manuelle irrégulière — soit <b style="color:var(--ink)">${EUR(Math.round(MATT*.2))}</b> par cycle.</div></div></div>
  </div>`;
@@ -11027,7 +11061,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='CQ';
+const BUILD='CR';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -12242,6 +12276,136 @@ function allRel(){const n=RDUE.length; if(!n){toast('Aucune relance échue');ret
  RDUE.length=0; RELS.filter(r=>r.du).forEach(r=>RDUE.push(r));
  paint(); toast(n+' relance'+(n>1?'s envoyées':' envoyée'));}
 function openPatient(id){pSel=id;pTab='resume';PE=null;pHist=null;closeAll();go('patients')}
+
+/* ==========================================================================
+   Rappeler un patient perdu de vue
+   --------------------------------------------------------------------------
+   Relancer quelqu'un qu'on n'a pas vu depuis deux ans, ce n'est pas envoyer
+   un message type : c'est d'abord se rappeler ce qu'on lui a fait. L'écran
+   met donc son passé de soins à côté du message — et le message est déjà
+   écrit, déjà personnalisé, sur le bon canal. Il n'y a qu'à l'envoyer.
+   ========================================================================== */
+let RAP=null;
+const RAPPELS=[];   /* trace : on ne relance pas deux fois la même personne */
+const rapActes=pid=>ACTES.filter(a=>a.patient===pid).sort((a,b)=>b.date.localeCompare(a.date));
+const rapDernier=pid=>RAPPELS.filter(r=>r.pid===pid).sort((a,b)=>b.ts.localeCompare(a.ts))[0]||null;
+/* Son rythme, mesuré sur ses propres visites — « elle venait tous les 5 mois »
+   dit plus qu'une durée théorique de produit, et c'est vérifiable. */
+function rapRythme(pid){
+ const d=rapActes(pid).map(a=>a.date).sort();
+ if(d.length<2) return null;
+ let s=0; for(let i=1;i<d.length;i++) s+=days(d[i-1],d[i]);
+ const m=Math.round(s/(d.length-1)/30.44);
+ return m>0?m:null;
+}
+/* Trois formulations, pas trente. Aucune ne suppose le genre du patient :
+   « nous n'avons pas eu le plaisir de vous recevoir » vaut pour tout le monde. */
+const RAP_TONS=[
+ {id:'simple', l:'Simple',
+  sms:"Bonjour {{prenom}}, cela fait {{mois}} mois que nous n'avons pas eu le plaisir de vous recevoir au {{cabinet}}. Souhaitez-vous que nous fassions le point sur votre suivi ? À très vite.",
+  mail:"Bonjour {{prenom}},\n\nCela fait {{mois}} mois que nous n'avons pas eu le plaisir de vous recevoir au {{cabinet}}.\n\nSi vous souhaitez refaire le point sur votre suivi, nous vous réservons volontiers un créneau.\n\nBien à vous,\n{{praticien}}"},
+ {id:'soin', l:'Rappeler son dernier soin',
+  sms:"Bonjour {{prenom}}, votre {{acte}} du {{dateActe}} remonte à {{mois}} mois. Si vous souhaitez en refaire le point, nous vous réservons un créneau. {{cabinet}}",
+  mail:"Bonjour {{prenom}},\n\nVotre {{acte}} du {{dateActe}} remonte maintenant à {{mois}} mois.\n\nSi vous souhaitez en refaire le point, nous vous réservons volontiers un créneau.\n\nBien à vous,\n{{praticien}}"},
+ {id:'geste', l:'Avec un geste',
+  sms:"Bonjour {{prenom}}, nous serions ravis de vous revoir au {{cabinet}} : {{remise}} sur votre prochaine consultation, jusqu'au {{validite}}. Code {{code}}.",
+  mail:"Bonjour {{prenom}},\n\nNous serions ravis de vous revoir au {{cabinet}}.\n\nPour vous y encourager, nous vous offrons {{remise}} sur votre prochaine consultation, valable jusqu'au {{validite}} (code {{code}}).\n\nBien à vous,\n{{praticien}}"},
+];
+/* les variables du message tirent du dossier réel : dernier soin, date, ancienneté */
+function rapCtx(p){
+ const der=rapActes(p.id)[0], st=reactStats(p);
+ return tplCtx(p,{acte:der?der.nom.toLowerCase():'soin', dateActe:der?DF(der.date):'—',
+   mois:st.rec>=900?'—':st.rec});
+}
+const rapModele=()=>{const t=RAP_TONS.find(x=>x.id===RAP.ton)||RAP_TONS[1];
+ return RAP.canal==='SMS'?t.sms:t.mail};
+const rapDest=()=>destDe(pById(RAP.pid),RAP.canal);
+/* « ce que Anne » ne s'écrit pas : élision devant voyelle ou h muet */
+const quEl=n=>(/^[aeiouyàâäéèêëîïôöûüh]/i.test(String(n||''))?'qu’':'que ')+n;
+const rapVide=d=>!d||d==='—';
+function openRappel(pid){
+ const p=pById(pid); if(!p) return;
+ /* le canal se choisit tout seul : un patient sans mail reçoit un SMS */
+ const canal=rapVide(p.mail)?'SMS':(rapVide(p.tel)?'E-mail':(canalDe(p)==='SMS'?'SMS':'E-mail'));
+ RAP={pid, canal, ton:rapActes(pid).length?'soin':'simple', texte:''};
+ RAP.texte=rapModele();
+ renderRappel();
+ const o=document.getElementById('over'); o.classList.add('mini'); o.classList.add('on');
+ document.getElementById('scrim').classList.add('on');
+}
+function rapTon(id){ if(!RAP) return; RAP.ton=id; RAP.texte=rapModele(); renderRappel() }
+function rapCanal(c){ if(!RAP||RAP.canal===c) return; RAP.canal=c; RAP.texte=rapModele(); renderRappel() }
+function rapSaisie(v){ if(!RAP) return; RAP.texte=v;
+ const e=document.getElementById('rapprev');
+ if(e) e.innerHTML=esc(fillTpl(v,rapCtx(pById(RAP.pid)))).replace(/\n/g,'<br>');
+ const c=document.getElementById('rapcnt'); if(c) c.textContent=rapCompte();
+}
+function rapCompte(){ if(!RAP) return '';
+ const t=fillTpl(RAP.texte,rapCtx(pById(RAP.pid)));
+ return RAP.canal==='SMS'?`${t.length} caractères · ${Math.ceil(t.length/160)||1} SMS`:`${t.length} caractères`;
+}
+function rapEnvoyer(){
+ if(!RAP) return;
+ const p=pById(RAP.pid), c=RAP.canal, d=rapDest();
+ if(rapVide(d)){ toast(`Aucun ${c==='SMS'?'numéro':'e-mail'} au dossier de ${fn(p)}`); return }
+ RAPPELS.push({pid:p.id, d:TODAYS, ts:nowStamp(), canal:c, dest:d,
+   ton:RAP.ton, texte:fillTpl(RAP.texte,rapCtx(p)), par:ROLES[role].u});
+ RAP=null; closeAll(); paint();
+ toast(`Rappel envoyé à ${fn(p)} · ${c}`);
+}
+function renderRappel(){
+ if(!RAP) return;
+ const p=pById(RAP.pid), A=rapActes(p.id), st=reactStats(p), ry=rapRythme(p.id);
+ const dej=rapDernier(p.id), dest=rapDest(), sms=RAP.canal==='SMS';
+ const prix=CAN('prix');
+ document.getElementById('overh').innerHTML=`
+  <button class="btn g s" onclick="closeAll()">✕</button>
+  <div class="rowline"><div class="pav">${esc(ini(p))}</div>
+   <div><h2>Rappeler ${esc(fn(p))}</h2>
+    <div class="mu" style="font-size:11.5px">${ageTxt(p)} · ${st.n} acte${st.n>1?'s':''} · dernier le ${DF(st.last)} — il y a ${st.rec} mois</div></div></div>
+  <div style="margin-left:auto"><button class="btn s" onclick="closeAll();openPatient(${p.id})">Ouvrir le dossier →</button></div>`;
+
+ const soins=A.length?A.map(a=>`<div class="rap-a">
+    <div class="rap-d">${DF(a.date)}</div>
+    <div style="min-width:0"><div class="rap-n">${esc(a.nom)}</div>
+     <div class="rap-z">${zoneBadges(a,3)}</div></div>
+    <div class="rap-p">${esc((a.praticien||p.prat||'').replace(/^Dr /,'Dr '))}</div>
+   </div>`).join('')
+  :'<div class="empty" style="padding:14px">Aucun acte enregistré.</div>';
+
+ document.getElementById('overb').innerHTML=`
+  <div class="rap">
+   <div>
+    <div class="fld"><label>Ce ${quEl(esc(p.prenom))} a fait chez vous — ${A.length} acte${A.length>1?'s':''}</label>
+     <div class="rap-l">${soins}</div></div>
+    <div class="rap-f">
+     ${ry?`<div class="rap-s"><b>${ry} mois</b><span>rythme habituel entre deux venues</span></div>`:''}
+     <div class="rap-s"><b>${st.rec} mois</b><span>sans venir</span></div>
+     ${prix?`<div class="rap-s"><b>${EUR(st.ca)}</b><span>réglés depuis ${DF(p.depuis||st.last)}</span></div>`:''}
+    </div>
+    ${ry&&st.rec>=ry*2?`<div class="tip" style="margin-top:11px"><span class="e">↻</span><div>${esc(p.prenom)} venait <b>tous les ${ry} mois</b> en moyenne — cela fait <b>${st.rec} mois</b>.</div></div>`:''}
+   </div>
+   <div>
+    <div class="fld"><label>Canal</label>
+     <div class="seg">${['SMS','E-mail'].map(c=>{const v=destDe(p,c);
+       return `<button class="${RAP.canal===c?'on':''}" ${rapVide(v)?'disabled title="Aucun contact de ce type au dossier"':''} onclick="rapCanal('${c}')">${c}</button>`}).join('')}</div>
+     <div class="mu" style="font-size:11.5px;margin-top:5px">${rapVide(dest)?'<span style="color:var(--crit)">Aucun contact au dossier</span>':'→ '+esc(dest)}</div></div>
+    <div class="fld"><label>Formulation</label>
+     <div class="rap-t">${RAP_TONS.map(t=>`<button class="rap-c ${RAP.ton===t.id?'on':''}" onclick="rapTon('${t.id}')">${esc(t.l)}</button>`).join('')}</div></div>
+    <div class="fld"><label>Message <span class="mu" style="font-weight:500">— modifiable, les {{variables}} sont remplies à l'envoi</span></label>
+     <textarea class="note" id="raptxt" style="min-height:${sms?'90px':'clamp(96px,15vh,150px)'}" oninput="rapSaisie(this.value)">${esc(RAP.texte)}</textarea></div>
+    <div class="fld"><label>Ce ${quEl(esc(p.prenom))} recevra <span class="mu" id="rapcnt" style="font-weight:500">${rapCompte()}</span></label>
+     <div class="msgprev" id="rapprev">${esc(fillTpl(RAP.texte,rapCtx(p))).replace(/\n/g,'<br>')}</div></div>
+   </div>
+  </div>`;
+
+ document.getElementById('overf').innerHTML=`
+  <span class="mu" style="font-size:11.5px">${dej?`Déjà relancé le ${DF(dej.d)} par ${esc(dej.canal)}`:'Trace conservée dans la fiche du patient'}</span>
+  <div style="margin-left:auto;display:flex;gap:8px">
+   <button class="btn" onclick="closeAll()">Annuler</button>
+   <button class="btn p" ${rapVide(dest)?'disabled':''} onclick="rapEnvoyer()">Envoyer ${sms?'le SMS':'l’e-mail'} à ${esc(p.prenom)}</button></div>`;
+}
+
 
 /* ==========================================================================
    Commande vocale
