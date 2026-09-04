@@ -1140,7 +1140,16 @@ th.tri.on.desc::after{content:'▼'}
    yeux. Ce qui a été entendu s'affiche en gros — c'est la pièce à conviction
    quand la transcription se trompe.
    ========================================================================== */
-.vxb{margin-top:-4px}
+.cmdrow{display:flex;gap:6px;margin-bottom:14px}
+.cmdrow .cmdk{margin-bottom:0;min-width:0}
+.vxb{width:36px;height:36px;flex:none;display:grid;place-items:center;position:relative;
+ border-radius:var(--r-s);background:var(--panel);border:1px solid var(--line);color:var(--ink-3);
+ box-shadow:var(--sh-1);cursor:pointer;transition:.15s}
+.vxb:hover{border-color:var(--accent);color:var(--accent)}
+.vxb.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.vxb.on::after{content:"";position:absolute;inset:-3px;border-radius:12px;border:2px solid var(--accent);
+ animation:vxpulse 1.5s ease-out infinite;pointer-events:none}
+@keyframes vxpulse{0%{transform:scale(.9);opacity:.6}100%{transform:scale(1.2);opacity:0}}
 .voix{position:fixed;right:18px;bottom:18px;width:min(430px,calc(100vw - 36px));max-height:min(78vh,760px);
  background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh-3);
  z-index:98;display:none;flex-direction:column;overflow:hidden}
@@ -1684,15 +1693,18 @@ th.tri.on.desc::after{content:'▼'}
       <div class="m">Px</div>
       <div><b>PRAXIS</b><span>Cabinet Dr Baroudi</span></div>
     </div>
-    <button class="cmdk" onclick="openPal()">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
-      Rechercher ou agir…<kbd>⌘K</kbd>
-    </button>
-    <button class="cmdk vxb" onclick="voixOuvrir()" title="Commande vocale — ⌘⇧V">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-        <rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>
-      Commande vocale<kbd>⌘⇧V</kbd>
-    </button>
+    <div class="cmdrow">
+      <button class="cmdk" onclick="openPal()" title="Rechercher un patient, un devis, un lot — ou lancer une action  (⌘K)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+        Rechercher…<kbd>⌘K</kbd>
+      </button>
+      <button class="vxb" id="vxb" onclick="voixOuvrir()" aria-label="Commande vocale"
+              title="Dicter — commande ou consultation  (⌘⇧V)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"
+             stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      </button>
+    </div>
     <nav id="nav">
       <div class="sgroup">Pilotage</div>
       <a data-v="dash" class="on"><span class="i">◈</span>Tableau de bord</a>
@@ -11015,7 +11027,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='CP';
+const BUILD='CQ';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -12150,6 +12162,7 @@ function buildPal(q){
  q=q.toLowerCase().trim(); const it=[];
  const ACT=[
   {t:'Nouvel acte + schéma de visage',s:'saisir une séance d’injection',ic:'✚',k:'Action',go:()=>{closeAll();openActe()}},
+  {t:'Commande vocale / dictée de consultation',s:'parler plutôt que cliquer — ⌘⇧V',ic:'◉',k:'Action',go:()=>{closeAll();voixOuvrir()}},
   {t:'Envoyer toutes les relances échues',s:RDUE.length+' devis',ic:'↻',k:'Action',go:()=>{closeAll();allRel()}},
   {t:'Bon de commande fournisseurs',s:ALERTES.length+' références sous le seuil',ic:'▧',k:'Action',go:()=>{closeAll();toast('Bon de commande généré')}},
   {t:'Tableau de bord',s:'',ic:'◈',k:'Aller à',go:()=>{closeAll();go('dash')}},
@@ -12544,7 +12557,12 @@ const vxGardees=()=>((VX&&VX.lignes)||[]).filter(l=>!l.retiree);
 /* L'écran d'écoute. Il montre ce qu'il a entendu avant de faire quoi que ce
    soit — c'est la seule façon de rendre une erreur de transcription visible
    plutôt que subie. */
+/* le bouton de la barre latérale dit, sans ouvrir le panneau, si le micro
+   est ouvert : c'est le seul témoin visible quand on travaille ailleurs */
+function vxBouton(){ const b=document.getElementById('vxb');
+ if(b) b.classList.toggle('on', !!(VX&&VX.on)) }
 function renderVoix(){
+ vxBouton();
  const n=document.getElementById('voix'); if(!n) return;
  if(!VX){ n.classList.remove('on'); document.getElementById('scrim').classList.remove('on'); return }
  const it=VX.intention, er=VX.erreur&&VOIX_MSG[VX.erreur];
@@ -12616,7 +12634,7 @@ function voixEssayer(t){
  VX.intention=voixIntention(t);
  if(VX.intention.ok&&!VX.intention.sur) voixExecuter(); else renderVoix();
 }
-function voixFermer(){ voixArreter(); VX=null;
+function voixFermer(){ voixArreter(); VX=null; vxBouton();
  const n=document.getElementById('voix'); if(n) n.classList.remove('on');
  document.getElementById('scrim').classList.remove('on') }
 function voixArreter(){ if(vxMoteur){ try{ vxMoteur.onend=null; vxMoteur.stop() }catch(e){} vxMoteur=null }
