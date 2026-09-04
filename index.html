@@ -1133,6 +1133,56 @@ th.tri.on.desc::after{content:'▼'}
    un nom de produit ne doit pas se lire à travers une meurtrière */
 .over.mini .fld>.inp{width:100%}
 .over.mini .cadd .fld>.inp{width:100%}
+/* ==========================================================================
+   La commande vocale
+   --------------------------------------------------------------------------
+   Un panneau, pas une fenêtre pleine : on parle en gardant l'écran sous les
+   yeux. Ce qui a été entendu s'affiche en gros — c'est la pièce à conviction
+   quand la transcription se trompe.
+   ========================================================================== */
+.vxb{margin-top:-4px}
+.voix{position:fixed;right:18px;bottom:18px;width:min(430px,calc(100vw - 36px));max-height:min(78vh,760px);
+ background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh-3);
+ z-index:98;display:none;flex-direction:column;overflow:hidden}
+.voix.on{display:flex}
+.vx-h{display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:1px solid var(--line);flex:none}
+.vx-h b{font-size:13.5px}
+.vx-b{flex:1;min-height:0;overflow:auto;padding:12px 13px}
+.vx-f{display:flex;align-items:center;gap:9px;padding:9px 13px;border-top:1px solid var(--line);
+ background:var(--panel-2);flex:none}
+/* trois barres qui bougent tant que le micro est ouvert */
+.vx-p{display:inline-flex;align-items:flex-end;gap:2px;height:18px;flex:none}
+.vx-p i{width:3px;height:5px;border-radius:2px;background:var(--line-2);display:block}
+.vx-p.on i{background:var(--crit);animation:vxp .9s ease-in-out infinite}
+.vx-p.on i:nth-child(2){animation-delay:.15s}
+.vx-p.on i:nth-child(3){animation-delay:.3s}
+@keyframes vxp{0%,100%{height:5px}50%{height:16px}}
+@media (prefers-reduced-motion:reduce){ .vx-p.on i{animation:none;height:11px} }
+.vx-t{font-size:15px;line-height:1.4;font-weight:560;margin-bottom:11px}
+.vx-t.flou{color:var(--mu);font-weight:460}
+.vx-ok{border:1px solid var(--accent);background:var(--accent-wash);border-radius:11px;padding:11px 12px}
+.vx-q{font-size:13.5px}
+.vx-ex{margin-top:12px;display:flex;flex-direction:column;gap:7px}
+.vx-g{display:flex;flex-wrap:wrap;gap:4px;align-items:baseline}
+.vx-gl{font-size:10px;font-weight:660;letter-spacing:.05em;text-transform:uppercase;color:var(--mu);
+ width:100%;margin-bottom:1px}
+.vx-c{font-size:11px;padding:3px 8px;border-radius:99px;border:1px solid var(--line);
+ background:var(--panel-2);color:var(--ink-2);cursor:pointer;font-family:inherit}
+.vx-c:hover{background:var(--accent-wash);border-color:var(--accent);color:var(--accent-ink)}
+.vx-hist{margin-top:13px;padding-top:10px;border-top:1px solid var(--line);font-size:11.5px;
+ display:flex;flex-direction:column;gap:3px}
+.vx-seg{padding:9px 13px 0;flex:none}
+.vx-seg .seg{width:100%}
+.vx-seg .seg button{flex:1;text-align:center}
+/* la dictée telle qu'elle a été entendue : la pièce à conviction */
+.vx-d{font-size:12.5px;line-height:1.55;background:var(--panel-2);border:1px solid var(--line);
+ border-radius:10px;padding:9px 11px;max-height:150px;overflow:auto;margin-bottom:11px}
+.vx-rl{display:flex;flex-direction:column;gap:5px}
+.vx-r{display:flex;align-items:center;gap:9px;padding:7px 9px;border:1px solid var(--line);
+ border-radius:9px;background:var(--panel);font-size:12.5px}
+.vx-r.off{opacity:.42}
+.vx-r.off b{text-decoration:line-through}
+.vx-r .rm{margin-left:auto;flex:none}
 /* sous la date d'un cliché : la séance dont il vient */
 .gvs{padding:0 8px 4px;font-size:10.5px;color:var(--ink-3);overflow:hidden;
  text-overflow:ellipsis;white-space:nowrap}
@@ -1638,6 +1688,11 @@ th.tri.on.desc::after{content:'▼'}
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
       Rechercher ou agir…<kbd>⌘K</kbd>
     </button>
+    <button class="cmdk vxb" onclick="voixOuvrir()" title="Commande vocale — ⌘⇧V">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>
+      Commande vocale<kbd>⌘⇧V</kbd>
+    </button>
     <nav id="nav">
       <div class="sgroup">Pilotage</div>
       <a data-v="dash" class="on"><span class="i">◈</span>Tableau de bord</a>
@@ -1678,6 +1733,7 @@ th.tri.on.desc::after{content:'▼'}
   <input id="palq" placeholder="Patient, devis, lot… ou une action (« nouvel acte », « relancer »)" autocomplete="off">
   <div class="list" id="palist"></div>
 </div>
+<div class="voix" id="voix"></div>
 <div class="over" id="over"><div class="oh" id="overh"></div><div class="ob" id="overb"></div><div class="of" id="overf"></div></div>
 <div id="pdfv"><div class="pv-bar" id="pvbar"></div><div class="pv-sc" id="pvsc"></div></div>
 <div id="sigv"><div class="sig-box">
@@ -10959,7 +11015,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='CO';
+const BUILD='CP';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -12085,7 +12141,7 @@ function renderDevis(){
 let palIdx=0, palItems=[];
 function openPal(){document.getElementById('pal').classList.add('on');document.getElementById('scrim').classList.add('on');
  const q=document.getElementById('palq');q.value='';q.focus();buildPal('')}
-function closeAll(){['pal','over'].forEach(i=>document.getElementById(i).classList.remove('on'));
+function closeAll(){['pal','over','voix'].forEach(i=>document.getElementById(i).classList.remove('on'));
  /* la fenêtre reprend sa taille normale pour le prochain qui l'ouvre */
  setTimeout(()=>{ const o=document.getElementById('over');
    if(!o.classList.contains('on')) o.classList.remove('mini') },260);
@@ -12127,7 +12183,9 @@ document.getElementById('palq').addEventListener('input',e=>buildPal(e.target.va
 document.addEventListener('keydown',e=>{
  const palOn=document.getElementById('pal').classList.contains('on');
  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();palOn?closeAll():openPal();return}
- if(e.key==='Escape'){ if(GAL&&GAL.grand){GAL.grand=false;paint();return}
+ if((e.metaKey||e.ctrlKey)&&e.shiftKey&&e.key.toLowerCase()==='v'){e.preventDefault();VX?voixFermer():voixOuvrir();return}
+ if(e.key==='Escape'){ if(VX){voixFermer();return}
+   if(GAL&&GAL.grand){GAL.grand=false;paint();return}
    if(PV){fermerPdf();return}
    const fc=document.getElementById('famchoix'); if(fc){fc.remove();return} closeAll();return}
  if(palOn){
@@ -12171,6 +12229,447 @@ function allRel(){const n=RDUE.length; if(!n){toast('Aucune relance échue');ret
  RDUE.length=0; RELS.filter(r=>r.du).forEach(r=>RDUE.push(r));
  paint(); toast(n+' relance'+(n>1?'s envoyées':' envoyée'));}
 function openPatient(id){pSel=id;pTab='resume';PE=null;pHist=null;closeAll();go('patients')}
+
+/* ==========================================================================
+   Commande vocale
+   --------------------------------------------------------------------------
+   Les mains sont prises : gantées, occupées par une seringue, un appareil.
+   Dire « ajoute un consentement » vaut mieux que reposer ce qu'on tient.
+   Deux règles qui gouvernent tout le reste :
+   — On n'écoute que lorsqu'on l'a demandé. Aucun micro ouvert en permanence.
+   — Une phrase mal comprise ne doit rien écrire. Naviguer est sans
+     conséquence et part tout seul ; tout ce qui crée, modifie ou envoie
+     s'affiche d'abord et attend un accord. La reconnaissance se trompe ;
+     le dossier d'un patient, non.
+   ========================================================================== */
+const VOIX_OK=typeof window!=='undefined'&&!!(window.SpeechRecognition||window.webkitSpeechRecognition);
+let VX=null;          /* l'écoute en cours : {on, texte, partiel, intention, erreur} */
+let vxMoteur=null;
+const VOIX_HIST=[];   /* ce qui a été dit et fait, pour s'y retrouver */
+/* Le relevé devient un devis : les lignes sont déjà remplies, il reste à
+   vérifier et à envoyer. Rien n'est enregistré ici — le devis s'ouvre en
+   composition, comme si on l'avait saisi à la main. */
+function voixVersDevis(){
+ const p=vxDossier(); if(!p){ toast('Ouvrez d’abord un dossier patient'); return }
+ const L=vxGardees(); if(!L.length){ toast('Rien à reprendre dans le relevé'); return }
+ const note=VX.dictee;
+ voixFermer();
+ openDevis(p.id,'esth');
+ DV.lignes=L.map(l=>({type:l.type, libre:null, reg:l.reg, z:{...l.z}, com:'',
+   seances:l.seances, prix:null, remise:0, remiseType:'%'}));
+ DV.note=note;
+ dvLigne=DV.lignes.length-1; dvPlie=DV.lignes.length>1;
+ renderDevis();
+ toast(`Devis en préparation · ${L.length} prestation${L.length>1?'s':''} relevée${L.length>1?'s':''}`);
+}
+/* ou une consultation : le composeur s'ouvre sur le patient, la dictée en note */
+function voixVersActe(){
+ const p=vxDossier(); if(!p){ toast('Ouvrez d’abord un dossier patient'); return }
+ const note=VX.dictee, n=vxGardees().length;
+ voixFermer();
+ openActe(p.id);
+ if(typeof AS==='object'&&AS) AS.note=note;
+ toast(n?`Consultation ouverte · ${n} prestation${n>1?'s':''} dictée${n>1?'s':''} en note`
+        :'Consultation ouverte · dictée reportée en note');
+}
+const VOIX_MSG={
+ absent:{t:'Ce navigateur ne sait pas écouter',
+   d:'La reconnaissance vocale demande Chrome, Edge ou Safari. Les commandes restent accessibles au clavier et à la souris.'},
+ refus:{t:'Le micro n’est pas autorisé',
+   d:'Autorisez le microphone pour ce site dans la barre d’adresse, puis réessayez. Depuis un fichier ouvert en local, le navigateur refuse souvent : passez par l’adresse en ligne.'},
+ silence:{t:'Rien n’a été entendu', d:'Rapprochez-vous du micro et reprenez.'},
+ micro:{t:'Aucun micro disponible', d:'Vérifiez l’entrée audio de l’ordinateur.'},
+ reseau:{t:'La transcription n’a pas abouti',
+   d:'Chrome fait transcrire la parole par un service en ligne : sans réseau, il ne peut rien rendre.'},
+ erreur:{t:'L’écoute s’est interrompue', d:'Reprenez, ou tapez la commande.'},
+};
+/* quelques exemples, groupés comme on les emploie */
+const VOIX_EX=[
+ ['Naviguer', ['va au stock','ouvre les patients','statistiques','facturation']],
+ ['Un dossier', ['ouvre le dossier de Martin Claire','photos','documents']],
+ ['Agir', ['nouvel acte','ajoute un consentement','ajoute une ordonnance','ajoute une photo','ajoute une retouche']],
+ ['Le stock', ['réception de lot','sortie de stock','utilisation']],
+];
+
+/* le texte tel qu'on peut le comparer : sans accent, sans ponctuation */
+const vxNorm=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+  .toLowerCase().replace(/['’]/g,' ').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+
+/* Chercher un patient par ce qui a été entendu : un nom, un prénom, les deux.
+   On ne retient que ce qui est franchement plus proche que le reste. */
+function vxPatient(mots){
+ const q=vxNorm(mots); if(q.length<3) return null;
+ const parts=q.split(' ').filter(w=>w.length>2);
+ if(!parts.length) return null;
+ const score=p=>{ const nom=vxNorm(p.nom), pre=vxNorm(p.prenom);
+   let n=0;
+   parts.forEach(w=>{ if(nom===w||pre===w) n+=3;
+     else if(nom.startsWith(w)||pre.startsWith(w)) n+=2;
+     else if(nom.includes(w)||pre.includes(w)) n+=1 });
+   return n };
+ const L=PATIENTS.map(p=>({p,n:score(p)})).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
+ if(!L.length) return null;
+ if(L.length>1&&L[1].n===L[0].n) return {ambigu:L.filter(x=>x.n===L[0].n).slice(0,4).map(x=>x.p)};
+ return {p:L[0].p};
+}
+const vxDossier=()=>view==='patients'&&pSel?pById(pSel):null;
+const vxActeOuvert=()=>(AS&&AS.aid)?ACTES.find(a=>a.id===AS.aid):null;
+
+/* ---- La grammaire ----
+   Chaque règle dit ce qu'elle a compris et ce qu'elle ferait. « sur » marque
+   les actions qui écrivent : elles attendent un accord. */
+const VOIX_REGLES=[
+ /* --- naviguer : sans conséquence, part tout seul --- */
+ {re:/^(?:va (?:a|au|aux|vers) |ouvre |affiche |montre |aller (?:a|au) )?(?:le |la |les |l )?(tableau de bord|accueil)$/,
+  quoi:()=>'Tableau de bord', run:()=>go('dash')},
+ {re:/^(?:va (?:a|au|aux|vers) |ouvre |affiche |montre )?(?:les |la |le )?(statistiques?|stats)$/,
+  quoi:()=>'Statistiques', run:()=>go('stats')},
+ {re:/^(?:va (?:a|au|aux|vers) |ouvre |affiche |montre )?(?:le |la |les )?(patients?|liste des patients)$/,
+  quoi:()=>'Liste des patients', run:()=>{pSel=null;go('patients')}},
+ {re:/^(?:va (?:a|au|aux|vers) |ouvre |affiche |montre )?(?:le |la |les )?(suivi des actes|actes)$/,
+  quoi:()=>'Suivi des actes', run:()=>go('actes')},
+ {re:/^(?:va (?:a|au|aux|vers) |ouvre |affiche |montre )?(?:le |la |les )?(stocks?|stock et lots)$/,
+  quoi:()=>'Stock & lots', run:()=>go('stock')},
+ {re:/^(?:va (?:a|au|aux|vers) |ouvre |affiche |montre )?(?:la |le |les )?(facturations?|caisse|facturation et caisse)$/,
+  quoi:()=>'Facturation & caisse', run:()=>go('encaiss')},
+ {re:/^(?:va (?:a|au|aux|vers) |ouvre |affiche |montre )?(?:les |le |la )?(devis|conversions)$/,
+  quoi:()=>'Devis et conversions', run:()=>go('devis')},
+ {re:/^(?:va (?:a|au|aux|vers) |ouvre |affiche |montre )?(?:les |le |la )?(relances?)(?: auto\w*)?$/,
+  quoi:()=>'Relances auto', run:()=>go('relances')},
+ {re:/^(?:va (?:a|au|aux|vers) |ouvre |affiche |montre )?(?:les |le |la )?(envois?|envois et remises)$/,
+  quoi:()=>'Envois & remises', run:()=>go('envois')},
+ {re:/^(?:va (?:a|au|aux|vers) |ouvre |affiche |montre )?(?:les |le |la )?(parametres?|reglages?)$/,
+  quoi:()=>'Paramètres', run:()=>go('params')},
+ /* --- ouvrir un dossier --- */
+ {re:/^(?:ouvre |affiche |montre |va (?:a|au|vers) )?(?:le )?(?:dossier|patient|fiche)(?: de| du| d)? (.+)$/,
+  cible:m=>vxPatient(m[1]),
+  quoi:(m,c)=>c&&c.p?`Dossier de ${fn(c.p)}`:null,
+  run:(m,c)=>openPatient(c.p.id)},
+ /* --- les onglets du dossier ouvert --- */
+ {re:/^(?:ouvre |affiche |montre |va (?:a|aux|au) )?(?:les |la |le )?(photos?(?: a a)?|resume|schema(?: cumule)?|documents?|facturation|envois)$/,
+  besoinDossier:1,
+  quoi:m=>({photo:'Photos A/A',resum:'Résumé',schem:'Schéma cumulé',docum:'Documents',factu:'Facturation',envoi:'Envois'})[m[1].slice(0,5)],
+  run:m=>{ pTab={photo:'photos',resum:'resume',schem:'schema',docum:'docs',factu:'factu',envoi:'envois'}[m[1].slice(0,5)];
+    go('patients') }},
+ /* --- ce qui écrit : on montre, on attend l'accord --- */
+ {re:/^(?:cree |creer |commence |demarre |nouvel? |saisir? |saisis )?(?:un |une )?(?:nouvel |nouvelle )?(acte|consultation|seance)$/,
+  sur:1, quoi:(m,c)=>{const p=vxDossier(); return 'Nouvelle consultation'+(p?` — ${fn(p)}`:'')},
+  run:()=>{const p=vxDossier(); closeAll(); p?openActe(p.id):openActe()}},
+ {re:/^(?:cree |creer |etablis |fais |nouveau |nouvel )?(?:un |une )?(devis)$/,
+  sur:1, besoinDossier:1, quoi:()=>{const p=vxDossier(); return `Devis — ${fn(p)}`},
+  run:()=>{const p=vxDossier(); dvChoix(p.id)}},
+ {re:/^(?:ajoute|ajouter|joins|joindre|rajoute|rajouter|cree|creer|edite|editer|fais|nouveau|nouvelle)? ?(?:un |une |le |la )?(consentement)$/,
+  sur:1, besoinDossier:1, quoi:()=>{const p=vxDossier(); return `Consentement à faire signer — ${fn(p)}`},
+  run:()=>{const p=vxDossier(); ouvrirDocLib(p.id,'consentement')}},
+ {re:/^(?:ajoute|ajouter|joins|joindre|rajoute|rajouter|cree|creer|edite|editer|fais|nouvelle?)? ?(?:un |une |le |la )?(ordonnance|prescription)$/,
+  sur:1, besoinDossier:1, quoi:()=>{const p=vxDossier(); return `Ordonnance — ${fn(p)}`},
+  run:()=>{const p=vxDossier(); ouvrirDocLib(p.id,'ordonnance')}},
+ {re:/^(?:ajoute|ajouter|joins|joindre|rajoute|rajouter|nouveau|nouvelle)? ?(?:un |une |le |la )?(document|piece)$/,
+  sur:1, besoinDossier:1, quoi:()=>{const p=vxDossier(); return `Document au dossier — ${fn(p)}`},
+  run:()=>{const p=vxDossier(); pTab='docs'; go('patients')}},
+ {re:/^(?:ajoute|ajouter|prends|prendre|rajoute|rajouter|nouvelle?)? ?(?:un |une |le |la )?(photo|cliche)$/,
+  sur:1, quoi:()=>{const a=vxActeOuvert(); return a?`Cliché sur la séance du ${DF(a.date)}`:'Photos du dossier'},
+  run:()=>{const a=vxActeOuvert();
+    if(a){ setActSec('photos'); addPhotoActe(a.id) } else { pTab='photos'; go('patients') }}},
+ {re:/^(?:ajoute|ajouter|saisis|saisir|rajoute|rajouter|nouvelle?)? ?(?:une |la )?(retouche)$/,
+  sur:1, quoi:()=>{const a=vxActeOuvert(); return a?`Retouche sur la séance du ${DF(a.date)}`:null},
+  run:()=>{const a=vxActeOuvert(); setActSec('retouches'); if(!retAdd) toggleRetouche(a.id)}},
+ /* --- le stock --- */
+ {re:/^(?:ouvre |fais |saisis |nouvelle? )?(?:une |la |un )?(reception(?: de lot)?)$/,
+  sur:1, quoi:()=>'Réception de lot', run:()=>{go('stock'); ouvrirReception()}},
+ {re:/^(?:ouvre |fais |saisis |nouvelle? )?(?:une |la |un )?(sortie(?: de stock)?)$/,
+  sur:1, quoi:()=>'Sortie de stock', run:()=>{go('stock'); ouvrirSortie()}},
+ {re:/^(?:ouvre |fais |saisis |nouvelle? )?(?:une |la |un )?(utilisation)(?: sur un patient)?$/,
+  sur:1, quoi:()=>'Utilisation sur un patient', run:()=>{go('stock'); ouvrirUtilisation()}},
+];
+
+/* Ce que la phrase veut dire. Rien d'inventé : sans règle qui corresponde,
+   on le dit plutôt que de choisir au hasard. */
+function voixIntention(texte){
+ const t=vxNorm(texte);
+ if(!t) return {ok:false, raison:'vide'};
+ for(const r of VOIX_REGLES){
+  const m=t.match(r.re); if(!m) continue;
+  const c=r.cible?r.cible(m):null;
+  if(r.cible&&!c) return {ok:false, raison:'patient', texte, quoi:`Aucun patient ne correspond à « ${m[1]} »`};
+  if(c&&c.ambigu) return {ok:false, raison:'ambigu', texte, choix:c.ambigu,
+    quoi:`Plusieurs patients correspondent`};
+  if(r.besoinDossier&&!vxDossier()) return {ok:false, raison:'dossier', texte,
+    quoi:'Ouvrez d’abord un dossier patient'};
+  const q=r.quoi?r.quoi(m,c):null;
+  if(!q) return {ok:false, raison:'contexte', texte,
+    quoi:'Cette action demande une séance ouverte'};
+  return {ok:true, texte, quoi:q, sur:!!r.sur, run:()=>r.run(m,c)};
+ }
+ return {ok:false, raison:'inconnu', texte, quoi:'Commande non reconnue'};
+}
+
+/* ==========================================================================
+   La dictée de consultation
+   --------------------------------------------------------------------------
+   On parle en soignant : « un millilitre d'acide hyaluronique dans le sillon
+   nasogénien droit, puis vingt unités de toxine dans la glabelle ». Le
+   logiciel écoute, relève ce qu'il reconnaît, et le tient prêt — sans rien
+   écrire. À la fin de la consultation, un bouton en fait un devis ou une
+   séance, avec les lignes déjà remplies.
+   Le vocabulaire n'est pas une liste figée : il se déduit du catalogue et des
+   zones du cabinet. Ajouter un acte, c'est le rendre dictable.
+   ========================================================================== */
+const VX_NOMBRES={un:1,une:1,deux:2,trois:3,quatre:4,cinq:5,six:6,sept:7,huit:8,neuf:9,dix:10,
+ onze:11,douze:12,treize:13,quatorze:14,quinze:15,seize:16,vingt:20,trente:30,quarante:40,
+ cinquante:50,soixante:60,demi:0.5,'demie':0.5};
+/* « vingt-cinq », « trente unités » — on lit les nombres écrits en toutes lettres */
+function vxNombre(t){
+ const m=String(t).match(/(\d+(?:[.,]\d+)?)/); if(m) return parseFloat(m[1].replace(',','.'));
+ const mots=vxNorm(t).split(' ');
+ let n=null;
+ for(let i=0;i<mots.length;i++){
+  const v=VX_NOMBRES[mots[i]]; if(v===undefined) continue;
+  if(n===null) n=v;
+  else if(v<10&&n>=20) n+=v;          /* vingt cinq */
+  else n=v;
+ }
+ return n;
+}
+/* Les synonymes qu'on emploie à l'oral, en plus du nom du catalogue. */
+const VX_SYN={AH:['acide hyaluronique','hyaluronique','ah','acide'],
+ BTX:['toxine','toxine botulique','botox','botulique','tox'],
+ SKB:['skinbooster','skin booster','booster'],
+ MESO:['mesotherapie','meso'],
+ PEEL:['peeling','peel']};
+/* le vocabulaire des actes : ce que dit le catalogue, plus les synonymes */
+function vxActes(){
+ const L=[];
+ CATALOGUE.forEach(c=>{
+  const noms=[c.n, ...(VX_SYN[c.id]||[])].map(vxNorm).filter(Boolean);
+  [...new Set(noms)].forEach(n=>L.push({id:c.id, mot:n, n:c.n, unite:c.unite}));
+ });
+ return L.sort((a,b)=>b.mot.length-a.mot.length);   /* le plus long d'abord */
+}
+/* le vocabulaire des zones : leur libellé court, leur libellé long, leur côté */
+function vxZones(reg){
+ const L=[];
+ ZONES.filter(z=>!reg||z.r===reg).forEach(z=>{
+  const base=vxNorm(String(z.n).split('—')[0]);
+  const court=vxNorm(z.k.replace(/ [DG]$/,''));
+  [...new Set([base,court])].filter(x=>x.length>2).forEach(mot=>L.push({id:z.id, mot, side:z.side, k:z.k, d:z.d}));
+ });
+ return L.sort((a,b)=>b.mot.length-a.mot.length);
+}
+/* Une phrase dictée → une prestation, quand on y reconnaît un acte.
+   Rien n'est deviné : sans acte nommé, on ne retient rien. */
+function vxLigne(phrase){
+ const t=vxNorm(phrase); if(!t) return null;
+ /* pour les nombres, on garde la virgule et le point : « 0,5 ml » n'est pas
+    « 0 5 ml ». La normalisation dure sert à comparer des mots, pas à compter. */
+ const tn=String(phrase).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+ const A=vxActes().find(a=>t.includes(a.mot)); if(!A) return null;
+ const cat=CATALOGUE.find(c=>c.id===A.id)||{};
+ const reg=/(?:jambe|aisselle|maillot|dos|torse|bras|ventre)/.test(t)?'corps':'visage';
+ /* le côté, s'il est dit */
+ const droite=/\bdroit\w*\b/.test(t), gauche=/\bgauche\w*\b/.test(t);
+ const deux=/\b(?:des deux cotes|bilateral\w*|les deux)\b/.test(t);
+ /* la dose : un nombre suivi de son unité */
+ const md=tn.match(/((?:\d+(?:[.,]\d+)?)|(?:un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|quinze|vingt|trente|quarante|cinquante)(?:[\s-]+(?:et\s+)?(?:demie?|un|deux|trois|quatre|cinq))?)\s*(millilitres?|ml|unites?|u)\b(\s+et\s+demie?)?/);
+ let dose=md?vxNombre(md[1]):null;
+ /* « un millilitre et demi » : le demi se dit après l'unité aussi souvent qu'avant */
+ if(md&&(/demie?\b/.test(md[1])||md[3])) dose=Math.floor(dose||0)+0.5;
+ /* le nombre de séances */
+ const ms=tn.match(/(\d+|un|une|deux|trois|quatre|cinq|six|huit|dix)\s+seances?\b/);
+ const seances=ms?Math.max(1,vxNombre(ms[1])||1):1;
+ /* les zones nommées */
+ const z={};
+ const zones=vxZones(reg).filter(zz=>t.includes(zz.mot));
+ /* deux libellés peuvent se recouvrir (« lèvres » et « sous-lèvre ») : on ne
+    garde que le plus précis, celui dont le mot est le plus long. */
+ const retenus=zones.filter(zz=>!zones.some(y=>y.mot!==zz.mot&&y.mot.includes(zz.mot)));
+ [...new Set(retenus.map(x=>x.mot))].forEach(mot=>{
+  const cands=retenus.filter(x=>x.mot===mot);
+  const lat=cands.filter(x=>x.side);
+  let pris;
+  if(!lat.length) pris=cands.slice(0,1);
+  else if(droite&&!gauche&&!deux) pris=lat.filter(x=>x.side==='D');
+  else if(gauche&&!droite&&!deux) pris=lat.filter(x=>x.side==='G');
+  /* sans côté nommé, une zone latérale se traite des deux côtés : c'est le
+     cas courant, et le praticien retire une ligne plus vite qu'il n'en ajoute */
+  else pris=lat;
+  pris.forEach(x=>{ z[x.id]=cat.unite?(dose!=null?dose:(x.d||1)):1 });
+ });
+ return {type:A.id, nom:cat.n||A.n, libre:null, reg, z, seances,
+         prix:null, remise:0, remiseType:'%',
+         dose, unite:cat.unite||null, phrase:String(phrase).trim(),
+         zonesDites:Object.keys(z).map(id=>(zoneById(id)||{}).k||id)};
+}
+/* Une dictée se découpe là où le praticien reprend son souffle : « puis »,
+   « ensuite », « et après », un point. */
+function vxDecouper(texte){
+ return String(texte||'')
+  .split(/(?:[.;!?\n]|\b(?:puis|ensuite|apres quoi|et apres|deuxiemement|troisiemement)\b)/i)
+  .map(x=>x.trim()).filter(x=>x.length>3);
+}
+function vxRelever(texte){
+ const L=[];
+ vxDecouper(texte).forEach(ph=>{ const l=vxLigne(ph); if(l) L.push(l) });
+ return L;
+}
+
+/* ---- Le moteur ---- */
+function voixOuvrir(){
+ if(!VOIX_OK){ VX={on:false, erreur:'absent'}; renderVoix(); return }
+ VX={on:false, mode:'commande', texte:'', partiel:'', intention:null, erreur:null,
+     dictee:'', lignes:[]};
+ renderVoix(); voixEcouter();
+}
+/* Passer de la commande à la dictée : deux façons d'écouter très différentes.
+   Une commande se dit en trois mots et déclenche ; une consultation se parle
+   plusieurs minutes et ne déclenche rien tant qu'on n'a pas relu. */
+function voixMode(m){
+ if(!VX) return;
+ voixArreter();
+ VX.mode=m; VX.texte=''; VX.partiel=''; VX.intention=null; VX.erreur=null;
+ if(m==='commande'){ VX.dictee=''; VX.lignes=[] }
+ renderVoix();
+ if(m==='consultation') voixEcouter();
+}
+/* le relevé se recalcule sur tout ce qui a été dit : une phrase reprise
+   plus loin corrige la précédente sans qu'on ait à défaire quoi que ce soit */
+function vxMajReleve(){
+ if(!VX) return;
+ const gardes=new Set((VX.lignes||[]).filter(l=>l.retiree).map(l=>l.phrase));
+ VX.lignes=vxRelever(VX.dictee).map(l=>({...l, retiree:gardes.has(l.phrase)}));
+}
+function vxRetirer(i){ if(!VX||!VX.lignes[i]) return;
+ VX.lignes[i].retiree=!VX.lignes[i].retiree; renderVoix() }
+const vxGardees=()=>((VX&&VX.lignes)||[]).filter(l=>!l.retiree);
+/* L'écran d'écoute. Il montre ce qu'il a entendu avant de faire quoi que ce
+   soit — c'est la seule façon de rendre une erreur de transcription visible
+   plutôt que subie. */
+function renderVoix(){
+ const n=document.getElementById('voix'); if(!n) return;
+ if(!VX){ n.classList.remove('on'); document.getElementById('scrim').classList.remove('on'); return }
+ const it=VX.intention, er=VX.erreur&&VOIX_MSG[VX.erreur];
+ const p=vxDossier(), dic=VX.mode==='consultation';
+ n.innerHTML=`
+  <div class="vx-h">
+    <span class="vx-p ${VX.on?'on':''}"><i></i><i></i><i></i></span>
+    <div style="min-width:0"><b>${VX.on?(dic?'Dictée en cours…':'Je vous écoute…'):(it&&it.ok?'Compris':er?'Écoute interrompue':'Commande vocale')}</b>
+      <div class="mu" style="font-size:11.5px">${p?`dossier ouvert : ${esc(fn(p))}`:'aucun dossier ouvert'}</div></div>
+    <button class="btn g s" style="margin-left:auto" onclick="voixFermer()">✕</button>
+  </div>
+  <div class="vx-seg"><div class="seg">
+    <button class="${dic?'':'on'}" onclick="voixMode('commande')">Commande</button>
+    <button class="${dic?'on':''}" onclick="voixMode('consultation')">Dictée de consultation</button>
+  </div></div>
+  <div class="vx-b">
+   ${(VX.partiel||VX.texte)?`<div class="vx-t ${VX.partiel?'flou':''}">« ${esc(VX.partiel||VX.texte)} »</div>`:''}
+   ${er?`<div class="tip ko"><span class="e">⚠</span><div><b>${esc(er.t)}</b><br>
+     <span class="mu">${esc(er.d)}</span></div></div>`:''}
+   ${(it&&it.ok)?`<div class="vx-ok">
+     <div class="vx-q"><span class="bdg b-info">à confirmer</span> <b>${esc(it.quoi)}</b></div>
+     <div class="mu" style="font-size:11.5px;margin-top:4px">Cette action écrit dans le dossier : rien ne part sans votre accord.</div>
+     <div style="display:flex;gap:8px;margin-top:11px">
+       <button class="btn p" onclick="voixExecuter()">Confirmer</button>
+       <button class="btn" onclick="voixEcouter()">Redire</button>
+       <button class="btn g" onclick="voixFermer()">Annuler</button></div></div>`:''}
+   ${(it&&!it.ok)?`<div class="tip wa"><span class="e">?</span><div><b>${esc(it.quoi||'Non compris')}</b>
+     ${it.choix?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px">
+       ${it.choix.map(q=>`<button class="btn xs" onclick="voixFermer();openPatient(${q.id})">${esc(fn(q))}</button>`).join('')}</div>`
+      :`<br><span class="mu">Reprenez, ou choisissez ci-dessous.</span>`}</div></div>`:''}
+   ${(!dic&&!VX.on&&!it&&!er)?'<div class="mu" style="font-size:12px">Appuyez sur Écouter et dites votre commande.</div>':''}
+   ${dic?(()=>{const L=VX.lignes||[], G=vxGardees();
+     return `${VX.dictee?`<div class="vx-d">${esc(VX.dictee)}${VX.partiel?` <span class="mu">${esc(VX.partiel)}</span>`:''}</div>`
+       :`<div class="mu" style="font-size:12px">Parlez normalement pendant la consultation. Ce qui ressemble à une prestation est relevé au fil de l’eau ; rien n’est enregistré tant que vous ne l’avez pas demandé.</div>`}
+      ${L.length?`<div class="vx-rl"><span class="vx-gl">Relevé — ${G.length} prestation${G.length>1?'s':''} retenue${G.length>1?'s':''}</span>
+        ${L.map((l,i)=>`<div class="vx-r ${l.retiree?'off':''}">
+          <div style="min-width:0"><b>${esc(l.nom)}</b>${l.dose!=null?` <span class="mu">${l.dose} ${esc(l.unite||'')}</span>`:''}
+            ${l.seances>1?` <span class="mu">· ${l.seances} séances</span>`:''}
+            <div class="mu" style="font-size:11px">${l.zonesDites.length?esc(l.zonesDites.join(' · ')):'sans zone précisée'}</div></div>
+          <button class="rm" onclick="vxRetirer(${i})" title="${l.retiree?'reprendre cette ligne':'écarter cette ligne'}">${l.retiree?'↺':'✕'}</button>
+        </div>`).join('')}</div>`:''}
+      ${G.length?`<div style="display:flex;gap:8px;margin-top:11px;flex-wrap:wrap">
+        <button class="btn p" onclick="voixVersDevis()" ${p?'':'disabled'}>Créer le devis</button>
+        <button class="btn" onclick="voixVersActe()" ${p?'':'disabled'}>Saisir la consultation</button>
+        ${VX.dictee?`<button class="btn g" onclick="VX.dictee='';VX.lignes=[];renderVoix()">Effacer</button>`:''}
+      </div>${p?'':'<div class="mu" style="font-size:11px;margin-top:6px">Ouvrez un dossier patient pour reprendre le relevé.</div>'}`:''}`})()
+    :`<div class="vx-ex">
+    ${VOIX_EX.map(([g,L])=>`<div class="vx-g"><span class="vx-gl">${esc(g)}</span>
+      ${L.map(x=>`<button class="vx-c" onclick="voixEssayer('${esc(x).replace(/'/g,"\\'")}')" title="Essayer sans parler">« ${esc(x)} »</button>`).join('')}</div>`).join('')}
+   </div>`}
+   ${VOIX_HIST.length?`<div class="vx-hist"><span class="mu">Dernières commandes</span>
+     ${VOIX_HIST.slice(0,4).map(h=>`<div><b>${esc(h.quoi)}</b> <span class="mu">« ${esc(h.texte)} » · ${esc(String(h.ts).slice(11,16))}</span></div>`).join('')}</div>`:''}
+  </div>
+  <div class="vx-f">
+   <span class="mu" style="font-size:11px">${VOIX_OK
+     ? 'Chrome fait transcrire la parole par un service en ligne — ne dictez pas d’informations que vous ne confieriez pas à un tiers.'
+     : 'Reconnaissance vocale indisponible sur ce navigateur.'}</span>
+   <div style="margin-left:auto;display:flex;gap:8px">
+    ${VX.on?`<button class="btn g" onclick="voixArreter();renderVoix()">Arrêter</button>`
+      :`<button class="btn p" ${VOIX_OK?'':'disabled'} onclick="voixEcouter()">🎙 ${dic?'Reprendre la dictée':'Écouter'}</button>`}</div>
+  </div>`;
+ n.classList.add('on'); document.getElementById('scrim').classList.add('on');
+}
+/* essayer une commande sans micro — utile pour vérifier ce que le logiciel
+   comprend, et pour s'en servir quand on ne peut pas parler */
+function voixEssayer(t){
+ if(!VX) VX={on:false, texte:'', partiel:'', intention:null, erreur:null};
+ voixArreter(); VX.texte=t; VX.partiel=''; VX.erreur=null;
+ VX.intention=voixIntention(t);
+ if(VX.intention.ok&&!VX.intention.sur) voixExecuter(); else renderVoix();
+}
+function voixFermer(){ voixArreter(); VX=null;
+ const n=document.getElementById('voix'); if(n) n.classList.remove('on');
+ document.getElementById('scrim').classList.remove('on') }
+function voixArreter(){ if(vxMoteur){ try{ vxMoteur.onend=null; vxMoteur.stop() }catch(e){} vxMoteur=null }
+ if(VX) VX.on=false }
+function voixEcouter(){
+ if(!VOIX_OK||!VX) return;
+ voixArreter();
+ const R=window.SpeechRecognition||window.webkitSpeechRecognition;
+ const m=new R();
+ const dictee=VX.mode==='consultation';
+ m.lang='fr-FR'; m.interimResults=true; m.continuous=dictee; m.maxAlternatives=dictee?1:3;
+ m.onstart=()=>{ VX.on=true; VX.erreur=null; VX.partiel=''; renderVoix() };
+ m.onresult=e=>{
+   let fini='', partiel='';
+   for(let i=e.resultIndex;i<e.results.length;i++){
+     const r=e.results[i];
+     if(r.isFinal) fini+=r[0].transcript; else partiel+=r[0].transcript }
+   if(partiel){ VX.partiel=partiel; renderVoix() }
+   if(fini&&VX.mode==='consultation'){
+     VX.dictee=(VX.dictee?VX.dictee+' ':'')+fini.trim();
+     VX.partiel=''; vxMajReleve(); renderVoix(); return }
+   if(fini){ VX.texte=fini.trim(); VX.partiel='';
+     /* on essaie les autres transcriptions si la première ne veut rien dire */
+     let it=voixIntention(VX.texte);
+     if(!it.ok&&it.raison==='inconnu'){
+       const der=e.results[e.results.length-1];
+       for(let k=1;k<der.length;k++){ const alt=voixIntention(der[k].transcript);
+         if(alt.ok){ it=alt; VX.texte=der[k].transcript.trim(); break } } }
+     VX.intention=it;
+     /* naviguer est sans conséquence : on y va. Écrire attend un accord. */
+     if(it.ok&&!it.sur){ voixExecuter() } else renderVoix() }
+ };
+ m.onerror=e=>{ VX.on=false;
+   VX.erreur=({'not-allowed':'refus','service-not-allowed':'refus','no-speech':'silence',
+     'audio-capture':'micro','network':'reseau'})[e.error]||'erreur';
+   renderVoix() };
+ m.onend=()=>{ if(!VX) return;
+   /* en consultation, le moteur se coupe tout seul après un silence : on le
+      relance tant que le praticien n'a pas dit d'arrêter */
+   if(VX.on&&VX.mode==='consultation'&&!VX.erreur){ try{ m.start(); return }catch(e){} }
+   if(VX.on){ VX.on=false; renderVoix() } };
+ vxMoteur=m;
+ try{ m.start() }catch(e){ VX.erreur='erreur'; renderVoix() }
+}
+function voixExecuter(){
+ if(!VX||!VX.intention||!VX.intention.ok) return;
+ const it=VX.intention;
+ VOIX_HIST.unshift({texte:it.texte, quoi:it.quoi, ts:nowStamp(), par:ROLES[role].u});
+ if(VOIX_HIST.length>10) VOIX_HIST.length=10;
+ voixFermer();
+ try{ it.run(); toast('🎙 '+it.quoi) }
+ catch(e){ toast('Action impossible : '+e.message) }
+}
 function ph(l,h,s){const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480">
  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="hsl(${h},30%,${86-s}%)"/>
  <stop offset="1" stop-color="hsl(${h+18},26%,${70-s}%)"/></linearGradient></defs>
