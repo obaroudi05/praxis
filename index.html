@@ -2024,6 +2024,26 @@ const zoneTitre=id=>zoneRetiree(id)
 const zoneLibre=id=>String(id).startsWith('~');
 const zoneLabel=id=>zoneLibre(id)?String(id).slice(1):((zoneDef(id)||{}).k||String(id));
 const zonePas=id=>{const z=zoneDef(id); return z?z.s:1};
+/* Un soin replié doit se lire d'un coup d'œil : « 2 zones » n'apprend rien,
+   « Tempes · Pommettes » dit ce qui a été traité. Les deux côtés d'une même
+   zone se réunissent au pluriel — « Tempe D » et « Tempe G » deviennent
+   « Tempes » — et seul le premier mot prend la marque, pour que « Patte d'oie »
+   donne « Pattes d'oie » et non « Patte d'oies ». */
+const plurFR=n=>String(n).replace(/^(\S+)/,w=>/[sxz]$/i.test(w)?w:w+'s');
+function zonesResume(Z,max){
+ const par={}, ordre=[];
+ (Z||[]).forEach(z=>{
+   const l=zoneNom(z), base=l.replace(/\s+[DG]$/,'');
+   if(!par[base]){ par[base]={n:0, cotes:new Set()}; ordre.push(base) }
+   par[base].n++;
+   const m=l.match(/\s+([DG])$/); if(m) par[base].cotes.add(m[1]);
+ });
+ const noms=ordre.map(b=>{const o=par[b];
+   return (o.cotes.size>1)?plurFR(b):(o.cotes.size===1?b+' '+[...o.cotes][0]:b)});
+ const M=max||3;
+ return {texte:noms.slice(0,M).join(' · ')+(noms.length>M?` +${noms.length-M}`:''),
+         complet:noms.join(' · '), n:(Z||[]).length};
+}
 /* la clé d'une zone saisie au clavier : celle du schéma si le nom correspond, sinon libre */
 function zoneCle(txt){
  const t=String(txt||'').trim(); if(!t) return null;
@@ -2849,6 +2869,82 @@ function logMvt(o){
 }
 /* Sortir une quantité d'un lot donné — c'est là, et nulle part ailleurs, que le
    stock bouge. On ne descend jamais sous zéro : ce qui manque est simplement noté. */
+/* ==========================================================================
+   Ce que la séance fera au stock — avant de l'enregistrer
+   --------------------------------------------------------------------------
+   L'aperçu doit refaire exactement le trajet de sortirLot : le lot désigné
+   s'il existe encore, sinon celui que le FEFO entamera ; puis la part du
+   praticien, le pot commun, et enfin celles des autres. Un aperçu qui ne suit
+   pas le même chemin que l'enregistrement finit toujours par mentir — et il
+   mentait : il retranchait la quantité du total de la référence, tous lots et
+   tous praticiens confondus, ce qui donnait « reste 3 » sur un lot qui n'en
+   contenait qu'un, appartenant à quelqu'un d'autre.
+   Rien n'est modifié ici : on travaille sur une copie des parts.
+   ========================================================================== */
+function prevConso(l,qui){
+ const x=l&&STOCK.find(s=>s.ref===l.ref); if(!x) return null;
+ const vise=lotDe(x,(l.lot||x.lot||''));
+ const lot=vise||lotFEFO(x);
+ const q=Math.max(0,+l.q||0);
+ const P={};
+ if(lot){ const parts=lotParts(lot);
+   if(parts) Object.keys(parts).forEach(k=>{const v=Math.max(0,+parts[k]||0); if(v) P[k]=v});
+   else P[PART_COMMUN]=Math.max(0,+lot.q||0); }
+ const avantLot=Object.keys(P).reduce((n,k)=>n+P[k],0);
+ let reste=q; const pris={};
+ const prendre=k=>{ if(reste<=0||!k) return; const d=Math.min(P[k]||0,reste);
+   if(d<=0) return; P[k]-=d; reste-=d; pris[k]=(pris[k]||0)+d };
+ if(qui) prendre(qui);
+ prendre(PART_COMMUN);
+ if(reste>0) Object.keys(P)
+   .sort((a,b)=>(a===PART_COMMUN)-(b===PART_COMMUN)||a.localeCompare(b)).forEach(prendre);
+ const apresLot=Object.keys(P).reduce((n,k)=>n+Math.max(0,P[k]),0);
+ return {ref:x, lot, lotNom:lot?lotCle(lot):'', vise:!!vise, q,
+   pris:q-reste, manque:reste, detail:pris,
+   emprunts:Object.keys(pris).filter(k=>k!==qui&&k!==PART_COMMUN),
+   avantLot, apresLot, maPart:qui?Math.max(0,P[qui]||0):null,
+   apresRef:Math.max(0,(+x.q||0)-(q-reste)),
+   perime:lot?lotPerime(lot):false};
+}
+/* La phrase que lit le praticien : ce qui reste du lot qu'il entame, et à qui
+   il emprunte si sa part n'y suffit pas. Le total de la référence est dans
+   l'infobulle — c'est le lot qu'il ira chercher dans le tiroir. */
+/* La ligne d'état complète — péremption comprise. La même fonction sert au
+   rendu et au rafraîchissement, pour que les deux ne puissent pas diverger. */
+function consoEtatHtml(l,qui){
+ const st=STOCK.find(x=>x.ref===l.ref)||{};
+ const per=l.per||st.per||'';
+ const perime=!!(per&&per<TODAYS), proche=!!(per&&!perime&&per<addD(TODAYS,90));
+ const P=prevConsoTxt(l,qui);
+ return {html:(perime?'<span style="color:var(--crit);font-weight:700">⚠ périmé</span> · '
+   :proche?'<span style="color:var(--warn-ink,#8a6100);font-weight:600">périme bientôt</span> · ':'')+P.txt,
+  titre:P.titre};
+}
+/* La quantité change, le lot change : ce qui restera change aussi. Sans ce
+   rafraîchissement, la ligne gardait le chiffre du premier rendu — le
+   praticien lisait « reste 3 » quoi qu'il fasse. */
+function majConsoEtat(){
+ if(!AS||!AS.conso) return;
+ const rows=document.querySelectorAll('#over .crow.c-s');
+ AS.conso.forEach((l,i)=>{ const e=rows[i]&&rows[i].querySelector('.cetat'); if(!e) return;
+   const E=consoEtatHtml(l,AS.prat); e.innerHTML=E.html; e.title=E.titre });
+}
+function prevConsoTxt(l,qui){
+ const P=prevConso(l,qui);
+ if(!P) return {txt:'<span class="mu">référence inconnue du stock</span>', titre:''};
+ const u=n=>`${NUM(n)} ${plu(n,P.ref.u||'')}`.trim();
+ const T=[];
+ T.push(`Lot ${P.lotNom||'—'} : ${u(P.avantLot)} avant, ${u(P.apresLot)} après.`);
+ if(P.maPart!==null) T.push(`Votre part sur ce lot après la séance : ${u(P.maPart)}.`);
+ T.push(`Toutes références confondues, il restera ${u(P.apresRef)} de ${P.ref.n}.`);
+ if(!P.vise&&P.lot) T.push(`Le lot saisi n’est plus au stock : c’est ${P.lotNom} qui sera entamé.`);
+ const titre=T.join(' ');
+ if(!P.lot) return {txt:'<span style="color:var(--crit);font-weight:600">aucun lot en stock</span>', titre};
+ if(P.manque>0) return {txt:`<span style="color:var(--crit);font-weight:600">il manque ${NUM(P.manque)} sur le lot ${esc(P.lotNom)}</span>`, titre};
+ if(!P.vise) return {txt:`<span style="color:var(--crit);font-weight:600">lot inconnu au stock</span> · ${esc(P.lotNom)} sera entamé, reste ${NUM(P.apresLot)}`, titre};
+ if(P.emprunts.length) return {txt:`reste ${NUM(P.apresLot)} sur ce lot · <span style="color:var(--warn-ink,#8a6100);font-weight:600">${NUM(P.emprunts.reduce((n,k)=>n+P.detail[k],0))} pris sur la part de ${esc(P.emprunts.map(partNom).join(', '))}</span>`, titre};
+ return {txt:`reste ${NUM(P.apresLot)} sur ce lot`, titre};
+}
 function sortirLot(x,n,q,qui,info){
  if(!x) return 0;
  const l=lotDe(x,n)||lotFEFO(x);
@@ -9151,7 +9247,7 @@ function majLot(i,k,v,el){ const l=(AS.conso||[])[i]; if(!l) return;
    if(iso===null){ toast('Péremption : indiquez jj/mm/aa, par exemple 27/05/26');
      if(el){ el.value=DFP(l.per||''); el.focus(); el.select() } return }
    v=iso }
- l[k]=v; l.auto=false; if(k==='per') renderOver() }
+ l[k]=v; l.auto=false; if(k==='per') renderOver(); else majConsoEtat() }
 
 /* Choisir, parmi les lots réellement en stock, celui qu'on a employé : la
    péremption suit le lot, c'est tout l'intérêt d'avoir à la choisir. */
@@ -9165,7 +9261,9 @@ function choisirLot(i,n){
  renderOver();
 }
 function majConsoSaisie(i,d,v){ const l=(AS.conso||[])[i]; if(!l) return;
- l.q=Math.max(1, v!=null?(+v||1):(l.q+d)); l.auto=false; majActe() }
+ l.q=Math.max(1, v!=null?(+v||1):(l.q+d)); l.auto=false;
+ const e=document.querySelectorAll('#over .crow.c-s .qin')[i]; if(e&&+e.value!==l.q) e.value=l.q;
+ majActe(); majConsoEtat() }
 function rmConsoSaisie(i){ const l=(AS.conso||[])[i]; if(!l) return;
  AS.consoOff=AS.consoOff||[]; if(l.auto&&!AS.consoOff.includes(l.ref)) AS.consoOff.push(l.ref);
  AS.conso.splice(i,1); renderOver() }
@@ -9713,7 +9811,11 @@ function renderOver(){
        const dose=Z.reduce((s2,z)=>s2+(+AS.z[z]||0),0);
        const tot=prixUnSoin(x);
        const encours=!AS.ro&&x.sid!=null&&x.sid===sidCourant;
-       const ouvert=(AS.openSoin==null?i===0:AS.openSoin===i);
+       /* Composer un nouveau soin et garder le précédent grand ouvert donnait
+          deux éditeurs de même taille l'un sous l'autre. Tant qu'un brouillon
+          est en cours, les soins déjà confirmés se replient : c'est le
+          brouillon qu'on est en train de remplir. */
+       const ouvert=!draftActif()&&(AS.openSoin==null?i===0:AS.openSoin===i);
        const nz=x.t?Z.length:0, rr=remUnSoin(x);
        return `<div class="soinc ${encours?'cur':''} ${x.t?'':'libre'} ${ouvert?'':'plie'}" data-i="${i}"
           ${AS.ro?'':`onclick="ouvrirSoin(${i})" title="${ouvert?'Les zones cliquées sur le schéma iront à ce soin':'Déplier ce soin'}"`}>
@@ -9726,10 +9828,12 @@ function renderOver(){
                 onclick="event.stopPropagation()" oninput="majLibre(${i},'libre',this.value)">
               ${CAN('prix')?`<input class="inp sc-px" type="number" min="0" step="5" placeholder="0"
                 value="${x.prix==null?'':x.prix}" onclick="event.stopPropagation()" oninput="majLibre(${i},'prix',this.value)"><span class="mu">€</span>`:''}`)}
-          ${ouvert?'':`<span class="sc-min">${[nz?`${nz} zone${nz>1?'s':''}`:(x.t?'sans zone':''),
+          ${ouvert?'':(()=>{const RZ=zonesResume(Z,3);
+            return `<span class="sc-min" title="${esc(nz?`${nz} zone${nz>1?'s':''} — ${RZ.complet}`:'')}">${
+            [nz?esc(RZ.texte):(x.t?'sans zone':''),
             q>1?`× ${q}`:'', (EUROS&&rr)?`− ${EUR(rr)}`:'',
             x.mat?esc(paramsTexte(x)||matById(x.mat).n):'', (x.com||'').trim()?esc(x.com.trim()):'']
-            .filter(Boolean).join(' · ')||'à compléter'}</span>`}
+            .filter(Boolean).join(' · ')||'à compléter'}</span>`})()}
           ${EUROS?`<b class="sc-tot">${EUR(tot)}</b>`:''}
           ${AS.ro?'':`<button class="rm" onclick="event.stopPropagation();rmSoin(${i})" title="Retirer ce soin de la séance">✕</button>`}
         </div>
@@ -9913,7 +10017,7 @@ function consultPane(prix){
       </div></div>`})():''}
    ${!AS.csOpen?'':(CS.length?`<div class="ctab" style="margin-bottom:4px">${CS.map((l,i)=>{
      const st=STOCK.find(x=>x.ref===l.ref)||{};
-     const reste=(st.q||0)-l.q, per=l.per||st.per||'';
+     const PV2=consoEtatHtml(l,AS.prat), per=l.per||st.per||'';
      const perime=per&&per<TODAYS, proche=per&&!perime&&per<addD(TODAYS,90);
      /* Le nom du produit tient sa propre ligne, sur toute la largeur : tronqué,
         « Acide hyaluronique — volumateur » et « — comblement profond » se
@@ -9945,9 +10049,7 @@ function consultPane(prix){
          <input class="qin" type="number" min="1" value="${l.q}" onchange="majConsoSaisie(${i},0,this.value)">
          <button onclick="majConsoSaisie(${i},1)">+</button></div>
        <button class="rm" title="Retirer" onclick="rmConsoSaisie(${i})">✕</button>
-       <small class="cetat">${perime?'<span style="color:var(--crit);font-weight:700">⚠ périmé</span> · '
-               :proche?'<span style="color:var(--warn-ink,#8a6100);font-weight:600">périme bientôt</span> · ':''
-       }${reste<0?'<span style="color:var(--crit);font-weight:600">stock insuffisant</span>':'reste '+reste+' après la séance'}</small></div>`}).join('')}</div>
+       <small class="cetat" title="${esc(PV2.titre)}">${PV2.html}</small></div>`}).join('')}</div>
      <div class="mu" style="font-size:11px;padding:0 2px 4px">Le stock sera décompté à l'enregistrement, lot et péremption compris.</div>`
     :`<div class="mu" style="font-size:11px;padding:2px 2px 6px">Les produits appelés par les soins s'ajoutent d'eux-mêmes. Vous pouvez en ajouter d'autres.</div>`)}
 
@@ -11399,7 +11501,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='CV';
+const BUILD='CW';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
