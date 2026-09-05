@@ -439,6 +439,11 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
 .apc .dot{width:9px;height:9px;border-radius:3px;flex:none}
 .apc small{font-weight:450;color:var(--ink-3);font-size:10.5px;margin-left:2px}
 .apc.on small{color:var(--accent-ink);opacity:.8}
+/* la croix de l'acte retenu : elle dit qu'un second clic le repose */
+.apx{margin-left:5px;font-size:10px;opacity:.55;font-weight:700}
+.apc.on:hover .apx{opacity:1}
+.apc.on:hover{border-color:var(--crit);color:var(--crit)}
+.apc.on:hover .dot{opacity:.5}
 /* récapitulatif de l'acte en cours */
 .famchoix{position:fixed;inset:0;z-index:500;display:grid;place-content:center;gap:8px;
   background:rgba(11,11,11,.42);backdrop-filter:blur(3px);opacity:0;transition:.18s;padding:24px}
@@ -11394,7 +11399,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='CU';
+const BUILD='CV';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -12175,8 +12180,22 @@ function dvMajFam(){
  DV.fam=f;
  if(DV.validite===avant) DV.validite=trame(f).validiteJours;
 }
+/* Reprendre son choix. Recliquer l'acte déjà retenu le retire et rend la liste
+   entière — sans ça, une prestation gardait à vie le premier acte cliqué, et
+   la seule issue était de supprimer la prestation, impossible s'il n'y en a
+   qu'une. Les zones déjà posées restent : un clic malheureux ne doit pas
+   effacer un schéma, et le prochain acte les reprendra ou les videra selon
+   son unité. « Effacer les zones » est là pour ça, et lui seul. */
+function dvRetirerActe(i){
+ const l=(i!=null?DV.lignes[i]:dvL()); if(!l) return;
+ const av=l.type; if(av===null&&l.libre===null) return;
+ l.type=null; l.libre=null; l.prix=null;
+ dvMajFam(); dvPlie=false; renderDevis();
+ toast(av?`${acteDef(av).n} retiré — choisissez un autre acte`:'Prestation libre retirée');
+}
 function dvSetActe(t){ dvPlie=false;
  const l=dvL(), av=acteDef(l.type), ap=acteDef(t);
+ if(l.type===t) return dvRetirerActe();     /* le même acte : on le repose */
  l.type=t; l.prix=null;
  if(av.unite!==ap.unite) Object.keys(l.z).forEach(z=>l.z[z]=null);
  if(!regionsDe(t).includes(l.reg)){ l.reg=regionDef(t); l.z={} }
@@ -12390,14 +12409,19 @@ function renderDevis(){
    <div class="ap-t">1 · Prestation ${dvLigne+1} sur ${DV.lignes.length}</div>
    ${VIDE?`<div class="ap-vide"><span class="mu">Aucun acte choisi pour cette prestation.</span>
       <button class="btn xs" onclick="dvLibreIci(${dvLigne})">✎ Écrire une prestation libre</button>
-      <span class="mu">ou choisissez un acte du catalogue :</span></div>`:''}
+      <span class="mu">ou choisissez un acte du catalogue :</span></div>`
+    :(L.type!==null?`<div class="ap-vide"><span class="mu">Acte retenu : <b style="color:var(--ink)">${esc(acteDef(L.type).n)}</b> —</span>
+      <button class="btn xs" onclick="dvRetirerActe(${dvLigne})">✕ Retirer l’acte</button>
+      <span class="mu">ou cliquez-en un autre ci-dessous</span></div>`:'')}
    ${LIB?`<div class="ap-libre"><input class="inp" id="dvLibre" placeholder="Intitulé de la prestation — « Forfait 3 séances », « Consultation »…" value="${esc(L.libre||'')}"
       oninput="dvSetLibre(${dvLigne},this.value)" onchange="renderDevis()">
       <button class="btn xs" onclick="dvReprendreActe(${dvLigne})">↩ Reprendre un acte du catalogue</button></div>`
     :`<div class="ap-l">${catsUtilisees().map(k=>{const G=actesDeCat(k);
-       return G.length?`<div class="ap-g"><span class="ap-c">${esc(k)}</span>${G.map(c=>`<button class="apc ${L.type===c.id?'on':''}" onclick="dvSetActe('${c.id}')">
+       return G.length?`<div class="ap-g"><span class="ap-c">${esc(k)}</span>${G.map(c=>{const on=L.type===c.id;
+        return `<button class="apc ${on?'on':''}" onclick="dvSetActe('${c.id}')"
+        title="${on?'Retirer cet acte et revenir à la liste':'Choisir '+esc(c.n)}">
      <span class="dot" style="background:var(--${c.col||'accent'})"></span>${esc(c.n)}
-     <small>${CAN('prix')&&c.prix?EUR(c.prix):'à l’unité'}</small></button>`).join('')}</div>`:''}).join('')}</div>`}
+     <small>${CAN('prix')&&c.prix?EUR(c.prix):'à l’unité'}</small>${on?'<span class="apx">✕</span>':''}</button>`}).join('')}</div>`:''}).join('')}</div>`}
   </div>
   ${C.zoned?`<div class="modebar">
     <div class="ap-t" style="width:100%;margin:0 0 2px">2 · Où ? <span class="mu" style="text-transform:none;letter-spacing:0;font-weight:500">— facultatif</span></div>
