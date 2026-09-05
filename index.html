@@ -1370,6 +1370,30 @@ th.tri.on.desc::after{content:'▼'}
 .msgprev{border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:var(--panel-2);font-size:13px;line-height:1.6}
 /* Rappel d'un patient perdu de vue : son passé de soins à gauche, le message
    déjà écrit à droite. Rien à composer, tout à relire. */
+/* Le rappel de ce que le patient a déjà eu : un jeton dans la barre, un
+   panneau au survol, épinglé au clic. Il se lit sans quitter le composeur. */
+.hpat{position:relative;display:inline-flex}
+.hp-c{white-space:nowrap}
+.hpat.on .hp-c{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-wash)}
+.hp-p{position:absolute;top:calc(100% + 6px);right:0;left:auto;z-index:60;width:min(430px,86vw);
+ background:var(--panel);border:1px solid var(--line-2);border-radius:12px;box-shadow:var(--sh-3);
+ padding:11px 13px;display:none;max-height:min(60vh,430px);overflow:auto}
+.hpat:hover .hp-p,.hpat.on .hp-p{display:block}
+.hpat.gauche .hp-p{left:0;right:auto}
+.hp-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.hp-h b{font-size:13px}
+.hp-h .mu{font-size:11px}
+.hp-l{display:flex;flex-direction:column;gap:7px}
+.hp-r{border-left:2px solid var(--line);padding-left:9px}
+.hp-r.prop{border-left-color:var(--accent)}
+.hp-n{font-weight:640;font-size:12.5px;display:flex;align-items:center;gap:6px}
+.hp-b{font:650 9.5px var(--sans);letter-spacing:.05em;text-transform:uppercase;
+ background:var(--accent-wash);color:var(--accent-ink);border-radius:5px;padding:1px 5px}
+.hp-d{font-size:11.5px;color:var(--ink-3);line-height:1.4}
+.hp-d b{color:var(--ink-2);font-weight:600}
+.hp-d b.hp-w{color:var(--warn-ink,#8a6100)}
+.hp-z{font-size:11px;color:var(--ink-3);margin-top:1px}
+.hp-f{margin-top:9px;padding-top:8px;border-top:1px solid var(--line);font-size:11px;color:var(--ink-3);line-height:1.45}
 .rap{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:18px}
 .rap-l{border:1px solid var(--line);border-radius:11px;background:var(--panel-2);
  max-height:min(290px,32vh);overflow:auto}
@@ -9705,6 +9729,7 @@ function renderOver(){
     <input class="inp" type="date" value="${AS.date}" onchange="AS.date=this.value">
     <select class="inp" onchange="AS.prat=this.value">${PRATICIENS.map(x=>`<option ${AS.prat===x?'selected':''}>${x}</option>`).join('')}</select>
     <select class="inp" onchange="AS.oper=this.value"><option value="">Sans opérateur</option>${OPERATEURS.map(x=>`<option ${AS.oper===x?'selected':''}>${x}</option>`).join('')}</select>
+    ${AS.np?'':histoHtml(AS.pid, [...actesSaisis(), (AS.draft||{}).t])}
     <div class="seg but" style="margin-left:auto">${BUTS.map(([k,l,t])=>
       `<button class="${AS.but===k?'on':''}" title="${esc(t)}" onclick="setBut('${k}')">${l}</button>`).join('')}</div>
    </div>`}
@@ -9953,6 +9978,7 @@ function renderOver(){
          <button class="btn p" id="btnActe" onclick="saveActe()">✚ Enregistrer la consultation</button>`
       : `<button class="btn" id="btnActe" onclick="saveActe()">✚ Plutôt une consultation</button>
          <button class="btn p" id="btnDevis" onclick="saveDevis()">📄 Enregistrer le devis${CAN('prix')&&prix>0?' · '+EUR(dvNetActe(prix).net):''}</button>`}</div>`;
+ histoPlace();
 }
 const dvNetActe=prix=>{const brut=prix;                    /* le montant porte déjà la quantité */
  const rem=AS.remiseType==='%'?Math.round(brut*(AS.remise||0)/100):(AS.remise||0);
@@ -11501,7 +11527,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='CW';
+const BUILD='CX';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -12492,6 +12518,98 @@ function dvEnregistrer(envoyer){
  toast(envoyer?`Devis ${num} envoyé par ${ca} à ${fn(p)} · ${EUR(net)}`:`Devis ${num} enregistré en brouillon · ${EUR(net)}`);
 }
 
+/* ==========================================================================
+   Ce que le patient a déjà eu
+   --------------------------------------------------------------------------
+   Proposer un devis à quelqu'un qu'on suit depuis trois ans sans avoir sous
+   les yeux ce qu'on lui a déjà fait, c'est se fier à sa mémoire. Ce résumé
+   ne juge rien — il n'existe pas de protocole universel — il rappelle des
+   faits : combien de séances, quand la dernière, combien de produit, où, et
+   à quel rythme ce patient-là revenait. Le praticien tranche.
+   ========================================================================== */
+function histoActes(pid){
+ const H={};
+ actesPatient(pid).forEach(a=>{
+  const zs=zonesOf(a), parType={};
+  if(zs.length) zs.forEach(([z,q])=>{
+    const t=(a.zt&&a.zt[z])||a.type||'—';
+    const o=parType[t]=parType[t]||{z:[],dose:0};
+    o.z.push(z); if(+q>0) o.dose+=+q });
+  else parType[a.type||'—']={z:[],dose:0};
+  Object.keys(parType).forEach(t=>{
+   const o=parType[t];
+   const h=H[t]=H[t]||{t, n:0, dates:[], dose:0, zones:{}};
+   h.n++; h.dates.push(a.date); h.dose+=o.dose;
+   o.z.forEach(z=>{ h.zones[z]=h.zones[z]||{d:a.date, q:0}; if(a.date>h.zones[z].d) h.zones[z].d=a.date;
+     h.zones[z].q+=(+(a.zones&&a.zones[z])||0) });
+  });
+ });
+ return Object.keys(H).map(t=>{
+  const h=H[t]; h.dates.sort();
+  const der=h.dates[h.dates.length-1];
+  let interv=null;
+  if(h.dates.length>1){ let s=0;
+    for(let i=1;i<h.dates.length;i++) s+=days(h.dates[i-1],h.dates[i]);
+    interv=Math.round(s/(h.dates.length-1)/30.44)||null }
+  return {t, n:h.n, der, mois:der?Math.round(days(der,TODAY)/30.44):null,
+    dose:h.dose, unite:(t==='—'?null:acteDef(t).unite), interv,
+    zones:Object.keys(h.zones), zoneDate:h.zones,
+    nom:(t==='—'?'Séance':acteDef(t).n)};
+ }).sort((a,b)=>String(b.der||'').localeCompare(String(a.der||'')));
+}
+/* le raccourci qui tient sur une ligne, au-dessus du composeur */
+function histoResume(pid){
+ const A=actesPatient(pid);
+ if(!A.length) return null;
+ const der=A[0].date, m=Math.round(days(der,TODAY)/30.44);
+ return {n:A.length, der, mois:m,
+   txt:`${NUM(A.length)} acte${A.length>1?'s':''} · dernier ${m<=0?'aujourd’hui':m===1?'il y a 1 mois':'il y a '+m+' mois'}`};
+}
+let histoPin=false;
+/* Le panneau s'ouvre vers la gauche depuis le jeton — sauf si le jeton est
+   lui-même trop près du bord gauche, auquel cas il repart vers la droite.
+   Mesuré après le rendu : c'est la seule façon de savoir où le jeton est tombé. */
+function histoPlace(){
+ document.querySelectorAll('.hpat').forEach(n=>{
+   const r=n.getBoundingClientRect();
+   n.classList.toggle('gauche', r.right<440);
+ });
+}
+function histoBascule(){ histoPin=!histoPin;
+ const n=document.querySelector('.hpat'); if(n) n.classList.toggle('on',histoPin) }
+/* `proposes` : les actes du devis en cours. Ceux-là passent en tête et
+   portent le rappel de leur dernière séance — c'est la comparaison qui
+   intéresse le praticien au moment où il propose. */
+function histoHtml(pid,proposes){
+ const R=histoResume(pid);
+ if(!R) return '';
+ const H=histoActes(pid), P=[...new Set((proposes||[]).filter(Boolean))];
+ const rang=x=>P.includes(x.t)?0:1;
+ const L=H.slice().sort((a,b)=>rang(a)-rang(b)||String(b.der||'').localeCompare(String(a.der||'')));
+ const p=pById(pid);
+ const dejaVu=P.filter(t=>H.some(h=>h.t===t));
+ const ligne=x=>{
+  const prop=P.includes(x.t);
+  const recent=prop&&x.interv&&x.mois!==null&&x.mois<x.interv;
+  return `<div class="hp-r ${prop?'prop':''}">
+   <div class="hp-n">${esc(x.nom)}${prop?'<span class="hp-b">proposé</span>':''}</div>
+   <div class="hp-d">${NUM(x.n)} séance${x.n>1?'s':''} · dernière ${DFT(x.der)}
+     <b class="${recent?'hp-w':''}">${x.mois<=0?'ce mois-ci':x.mois===1?'il y a 1 mois':'il y a '+x.mois+' mois'}</b>${
+     x.interv?` · rythme ${x.interv} mois`:''}${
+     (x.dose&&x.unite)?` · ${NUM(Math.round(x.dose*100)/100)} ${x.unite} au total`:''}</div>
+   ${x.zones.length?`<div class="hp-z">${esc(zonesResume(x.zones,4).texte)}</div>`:''}
+  </div>`};
+ return `<div class="hpat ${histoPin?'on':''}">
+   <button class="chip xs hp-c" onclick="event.stopPropagation();histoBascule()"
+     title="Ce que ${esc(p?p.prenom:'ce patient')} a déjà eu — cliquez pour garder ouvert">◷ ${esc(R.txt)}</button>
+   <div class="hp-p" onclick="event.stopPropagation()">
+    <div class="hp-h"><b>Ce que ${esc(p?p.prenom:'le patient')} a déjà eu</b>
+      <span class="mu">${NUM(R.n)} acte${R.n>1?'s':''} depuis ${DFT(actesPatient(pid).slice(-1)[0].date)}</span></div>
+    <div class="hp-l">${L.map(ligne).join('')}</div>
+    ${dejaVu.length?`<div class="hp-f">${dejaVu.length===1?'L’acte proposé a déjà été fait':'Les actes proposés ont déjà été faits'} — les dates et les rythmes ci-dessus sont ceux de ${esc(p?p.prenom:'ce patient')}, pas une règle : c’est à vous d’en juger.</div>`
+      :`<div class="hp-f">Aucun des actes proposés n’a encore été fait chez ce patient.</div>`}
+   </div></div>`;
+}
 function renderDevis(){
  const p=pById(DV.pid), L=dvL(), LIB=L.type===null&&L.libre!=null, VIDE=L.type===null&&L.libre==null,
    C=(LIB||VIDE)?CNUL:acteDef(L.type), U=C.unite, T=dvNet();
@@ -12506,6 +12624,7 @@ function renderDevis(){
    <select class="inp" onchange="DV.pid=+this.value;renderDevis()">${PATIENTS.map(x=>`<option value="${x.id}" ${x.id===DV.pid?'selected':''}>${esc(fn(x))}</option>`).join('')}</select>
    <input class="inp" type="date" value="${DV.date}" onchange="DV.date=this.value">
    <select class="inp" onchange="DV.prat=this.value">${PRATICIENS.map(x=>`<option ${DV.prat===x?'selected':''}>${x}</option>`).join('')}</select>
+   ${histoHtml(DV.pid, DV.lignes.map(l=>l.type))}
   </div>
   <div class="actepick" onkeydown="dvKey(event)">
    <div class="ap-t">1 · Prestation ${dvLigne+1} sur ${DV.lignes.length}</div>
@@ -12639,6 +12758,7 @@ function renderDevis(){
    <button class="btn" onclick="apercuBrouillon()">◫ Aperçu PDF</button>
    <button class="btn" onclick="dvEnregistrer(false)">Enregistrer en brouillon</button>
    <button class="btn p" onclick="dvEnregistrer(true)">✉ ${DV.id&&(DEVIS.find(x=>x.id===DV.id)||{}).statut!=='brouillon'?'Corriger et renvoyer':'Enregistrer et envoyer'}${CAN('prix')?' · '+EUR(T.net):''}</button></div>`;
+ histoPlace();
 }
 /* ==========================================================================
    Command palette / navigation
