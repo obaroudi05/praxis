@@ -1372,6 +1372,44 @@ th.tri.on.desc::after{content:'▼'}
    déjà écrit à droite. Rien à composer, tout à relire. */
 /* Le rappel de ce que le patient a déjà eu : un jeton dans la barre, un
    panneau au survol, épinglé au clic. Il se lit sans quitter le composeur. */
+/* La fenêtre des séances passées : elle se pose au-dessus du composeur, qui
+   reste intact dessous. Au-dessus de .over (96), sous l'aperçu PDF (600). */
+#hfen{position:fixed;inset:0;z-index:500;background:rgba(24,24,27,.62);backdrop-filter:blur(4px);
+ display:none;align-items:center;justify-content:center;padding:22px}
+#hfen.on{display:flex}
+.hf-p{background:var(--panel);border:1px solid var(--line-2);border-radius:16px;box-shadow:var(--sh-3);
+ width:min(780px,96vw);max-height:min(86vh,880px);display:flex;flex-direction:column;overflow:hidden}
+.hf-h{display:flex;align-items:center;gap:11px;padding:12px 15px;border-bottom:1px solid var(--line);flex:none}
+.hf-h h2{margin:0;font-size:14.5px;font-weight:670;letter-spacing:-.02em}
+.hf-h .dot{width:11px;height:11px;border-radius:4px;flex:none}
+.hf-b{flex:1;min-height:0;overflow:auto;padding:12px 15px;display:flex;flex-direction:column;gap:10px}
+.hf-f2{padding:9px 15px;border-top:1px solid var(--line);background:var(--panel-2);flex:none;font-size:11.5px}
+.hf-a{border:1px solid var(--line);border-radius:12px;background:var(--panel-2);overflow:hidden;flex:none}
+.hf-ah{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding:9px 12px;border-bottom:1px solid var(--line)}
+.hf-ah b{font-size:13px}
+.hf-ah .mu{font-size:11.5px}
+.hf-d{margin-left:auto;font-weight:700;font-size:12.5px;font-variant-numeric:tabular-nums}
+.hf-w{flex-basis:100%}
+.hf-ab{display:flex;gap:12px;padding:10px 12px;align-items:flex-start}
+.hf-f{width:64px;flex:none;display:flex;justify-content:center;align-items:flex-start}
+.hf-f .minif{width:64px;height:auto;aspect-ratio:400/568}
+.hf-f .minif.corps{aspect-ratio:400/900;width:44px}
+.hf-z{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.hf-zr{display:flex;align-items:center;gap:7px;font-size:12.5px}
+.hf-zr .zd{width:8px;height:8px;border-radius:3px;flex:none}
+.hf-zr .zn{flex:1;min-width:0}
+.hf-zr b{font-variant-numeric:tabular-nums;font-size:12px}
+.hf-x{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+.hf-x span{font-size:10.5px;color:var(--ink-3);border:1px solid var(--line);border-radius:6px;padding:1px 6px;background:var(--panel)}
+.hf-n{font-size:11.5px;color:var(--ink-2);margin-top:5px;line-height:1.45}
+.hf-n b{color:var(--ink-3);font-weight:650;margin-right:4px}
+/* la ligne d'historique devient cliquable : elle doit le dire */
+.hp-r.clic{cursor:pointer;border-radius:0 8px 8px 0;margin-right:-4px;padding-right:4px;transition:.11s}
+.hp-r.clic:hover{background:var(--panel-2)}
+.hp-r.clic:hover .hp-n{color:var(--accent-ink)}
+.hp-go{margin-left:auto;font-size:11px;color:var(--ink-3);opacity:0;transition:.11s;white-space:nowrap}
+.hp-r.clic:hover .hp-go{opacity:1}
+@media(max-width:620px){.hf-f{display:none}}
 .hpat{position:relative;display:inline-flex}
 .hp-c{white-space:nowrap}
 .hpat.on .hp-c{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-wash)}
@@ -1810,6 +1848,7 @@ th.tri.on.desc::after{content:'▼'}
 </div>
 <div class="voix" id="voix"></div>
 <div class="over" id="over"><div class="oh" id="overh"></div><div class="ob" id="overb"></div><div class="of" id="overf"></div></div>
+<div id="hfen" onclick="histoFermerFen()"></div>
 <div id="pdfv"><div class="pv-bar" id="pvbar"></div><div class="pv-sc" id="pvsc"></div></div>
 <div id="sigv"><div class="sig-box">
   <div class="sig-h"><div><b id="sigT">Signature</b><small id="sigS"></small></div>
@@ -3797,7 +3836,7 @@ function miniFace(zones,zt){
  if(K.some(z=>z.bar)){ const B=baremeById(K[0].r);   /* un barème se résume en clair */
    return `<span class="mu" style="font-size:11.5px;white-space:nowrap">${B?esc(B.i)+' ':''}${K.length} zone${K.length>1?'s':''}</span>` }
  const corps=K[0].r==='corps';
- return `<svg class="minif" viewBox="${corps?'0 0 400 900':'0 0 400 568'}">
+ return `<svg class="minif${corps?' corps':''}" viewBox="${corps?'0 0 400 900':'0 0 400 568'}">
  ${corps?'<ellipse class="mo" cx="200" cy="58" rx="34" ry="42"/><rect class="mo" x="122" y="130" width="156" height="290" rx="46"/><rect class="mo" x="158" y="420" width="36" height="430" rx="18"/><rect class="mo" x="206" y="420" width="36" height="430" rx="18"/>'
         :'<ellipse class="mo" cx="200" cy="282" rx="120" ry="208"/>'}
  ${K.filter(z=>!z.post).map(z=>{const t=zt&&zt[z.id];
@@ -11527,7 +11566,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='CX';
+const BUILD='CY';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -12591,8 +12630,10 @@ function histoHtml(pid,proposes){
  const ligne=x=>{
   const prop=P.includes(x.t);
   const recent=prop&&x.interv&&x.mois!==null&&x.mois<x.interv;
-  return `<div class="hp-r ${prop?'prop':''}">
-   <div class="hp-n">${esc(x.nom)}${prop?'<span class="hp-b">proposé</span>':''}</div>
+  return `<div class="hp-r ${prop?'prop':''} clic" onclick="event.stopPropagation();histoOuvrir(${pid},'${esc(String(x.t).replace(/'/g,'\\\''))}')"
+     title="Voir les ${x.n} séance${x.n>1?'s':''} de ${esc(x.nom)}">
+   <div class="hp-n">${esc(x.nom)}${prop?'<span class="hp-b">proposé</span>':''}
+     <span class="hp-go">voir les séances →</span></div>
    <div class="hp-d">${NUM(x.n)} séance${x.n>1?'s':''} · dernière ${DFT(x.der)}
      <b class="${recent?'hp-w':''}">${x.mois<=0?'ce mois-ci':x.mois===1?'il y a 1 mois':'il y a '+x.mois+' mois'}</b>${
      x.interv?` · rythme ${x.interv} mois`:''}${
@@ -12609,6 +12650,83 @@ function histoHtml(pid,proposes){
     ${dejaVu.length?`<div class="hp-f">${dejaVu.length===1?'L’acte proposé a déjà été fait':'Les actes proposés ont déjà été faits'} — les dates et les rythmes ci-dessus sont ceux de ${esc(p?p.prenom:'ce patient')}, pas une règle : c’est à vous d’en juger.</div>`
       :`<div class="hp-f">Aucun des actes proposés n’a encore été fait chez ce patient.</div>`}
    </div></div>`;
+}
+/* ==========================================================================
+   Les séances passées d'un acte, sans quitter ce qu'on est en train d'écrire
+   --------------------------------------------------------------------------
+   Le résumé dit « 5 séances d'acide hyaluronique, la dernière il y a un mois ».
+   La question suivante est toujours la même : où, et combien ? Cette fenêtre y
+   répond en se posant PAR-DESSUS le composeur — le devis en cours n'est ni
+   fermé ni enregistré, on le retrouve intact en refermant. C'est pour ça
+   qu'elle n'est pas un onglet du navigateur : un onglet repartirait d'une
+   application vierge, sans le devis qu'on est en train de composer.
+   Rien ne s'y modifie : c'est une lecture.
+   ========================================================================== */
+let HFEN=null;   /* {pid, t} */
+function histoSeances(pid,t){
+ return actesPatient(pid).filter(a=>{
+   const zs=zonesOf(a);
+   return zs.length?zs.some(([z])=>((a.zt&&a.zt[z])||a.type)===t):(a.type||'—')===t;
+ });
+}
+function histoOuvrir(pid,t){
+ if(!histoSeances(pid,t).length) return;
+ HFEN={pid,t}; renderHFen();
+ document.getElementById('hfen').classList.add('on');
+}
+function histoFermerFen(){ HFEN=null;
+ const n=document.getElementById('hfen'); if(n) n.classList.remove('on') }
+function renderHFen(){
+ if(!HFEN) return;
+ const {pid,t}=HFEN, p=pById(pid), L=histoSeances(pid,t);
+ const nom=(t==='—')?'Séance':acteDef(t).n, U=(t==='—')?null:acteDef(t).unite;
+ /* on ne montre que les zones traitées par CET acte : une séance mixte ne
+    doit pas faire croire que la toxine est allée dans les sillons */
+ const zonesDe=a=>zonesOf(a).filter(([z])=>((a.zt&&a.zt[z])||a.type)===t);
+ const cumul=L.reduce((s,a)=>s+zonesDe(a).reduce((x,[,q])=>x+(+q||0),0),0);
+ const carte=a=>{
+  const Z=zonesDe(a), dose=Z.reduce((s2,[,q])=>s2+(+q||0),0);
+  const m=Math.round(days(a.date,TODAY)/30.44);
+  const cs=consoActe(a), rt=retouchesActe(a), ph=photosActe(a);
+  return `<div class="hf-a">
+   <div class="hf-ah">
+     <b>${DF(a.date)}</b>
+     <span class="mu">${m<=0?'ce mois-ci':m===1?'il y a 1 mois':'il y a '+m+' mois'}</span>
+     <span class="mu">· ${esc(a.praticien||'')}${a.operateur?' · '+esc(a.operateur):''}</span>
+     ${(dose&&U)?`<span class="hf-d">${NUM(Math.round(dose*100)/100)} ${esc(U)}</span>`:''}
+     ${a.nom&&a.nom!==nom?`<span class="mu hf-w">séance : ${esc(a.nom)}</span>`:''}
+   </div>
+   <div class="hf-ab">
+    <div class="hf-f">${miniFace(Object.fromEntries(Z), a.zt)}</div>
+    <div class="hf-z">
+     ${Z.length?Z.map(([z,q])=>`<div class="hf-zr"><span class="zd" style="background:${colActe(t)}"></span>
+        <span class="zn">${esc(zoneNom(z))}</span>
+        <b>${q>0?`${NUM(Math.round(q*100)/100)}${U?' '+esc(U):''}`:'<span class="mu">dose non notée</span>'}</b></div>`).join('')
+      :'<div class="mu" style="font-size:11.5px">acte sans zone</div>'}
+     <div class="hf-x">
+      ${a.lot?`<span title="Numéro de lot employé">lot ${esc(a.lot)}</span>`:''}
+      ${cs.length?`<span title="${esc(cs.map(c=>`${c.nom} × ${c.q} · lot ${c.lot||'—'}`).join(' | '))}">${NUM(cs.length)} consommable${cs.length>1?'s':''}</span>`:''}
+      ${rt.length?`<span>${NUM(rt.length)} retouche${rt.length>1?'s':''}</span>`:''}
+      ${ph.length?`<span>${NUM(ph.length)} photo${ph.length>1?'s':''}</span>`:''}
+      ${a.consent?'<span>consentement signé</span>':''}
+     </div>
+     ${(a.note||'').trim()?`<div class="hf-n"><b>Note</b> ${esc(a.note.trim())}</div>`:''}
+     ${(a.effets||'').trim()?`<div class="hf-n"><b>Suites</b> ${esc(a.effets.trim())}</div>`:''}
+    </div>
+   </div></div>`;
+ };
+ document.getElementById('hfen').innerHTML=`
+  <div class="hf-p" onclick="event.stopPropagation()">
+   <div class="hf-h">
+     <span class="dot" style="background:${t==='—'?'var(--ink-3)':colActe(t)}"></span>
+     <div><h2>${esc(nom)} — ${esc(fn(p))}</h2>
+       <div class="mu" style="font-size:11.5px">${NUM(L.length)} séance${L.length>1?'s':''}${
+         (cumul&&U)?` · ${NUM(Math.round(cumul*100)/100)} ${esc(U)} au total`:''} · lecture seule</div></div>
+     <button class="btn g s" style="margin-left:auto" onclick="histoFermerFen()">✕ Fermer</button>
+   </div>
+   <div class="hf-b">${L.map(carte).join('')}</div>
+   <div class="hf-f2"><span class="mu">Votre ${AS&&!AS.ro?'saisie':'devis'} en cours n’a pas bougé — fermez cette fenêtre pour y revenir. Échap referme aussi.</span></div>
+  </div>`;
 }
 function renderDevis(){
  const p=pById(DV.pid), L=dvL(), LIB=L.type===null&&L.libre!=null, VIDE=L.type===null&&L.libre==null,
@@ -12810,7 +12928,8 @@ document.addEventListener('keydown',e=>{
  const palOn=document.getElementById('pal').classList.contains('on');
  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();palOn?closeAll():openPal();return}
  if((e.metaKey||e.ctrlKey)&&e.shiftKey&&e.key.toLowerCase()==='v'){e.preventDefault();VX?voixFermer():voixOuvrir();return}
- if(e.key==='Escape'){ if(VX){voixFermer();return}
+ if(e.key==='Escape'){ if(HFEN){histoFermerFen();return}
+   if(VX){voixFermer();return}
    if(GAL&&GAL.grand){GAL.grand=false;paint();return}
    if(PV){fermerPdf();return}
    const fc=document.getElementById('famchoix'); if(fc){fc.remove();return} closeAll();return}
