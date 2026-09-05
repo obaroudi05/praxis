@@ -7530,6 +7530,25 @@ V.stock=()=>{
    seconde relève du suivi comptable. Chacune a son droit. */
 let perS={k:'annee',from:'',to:''};
 function setPerS(p){ perS={...perS,...p}; paint() }
+/* ==========================================================================
+   Le coût produit d'un acte
+   --------------------------------------------------------------------------
+   Le stock sait ce qui est sorti, la caisse sait ce qui est rentré ; seul le
+   numéro d'acte relie les deux. On s'en sert ici, et nulle part ailleurs, pour
+   dire ce qu'un soin a coûté en produit par rapport à ce qu'il a rapporté.
+   Rien n'est recalculé : on relit le journal des mouvements.
+   ========================================================================== */
+function coutParActe(){
+ const m={};
+ MVT.forEach(x=>{ if(x.t!=='sortie'||!x.acte) return;
+   m[x.acte]=(m[x.acte]||0)+Math.max(0,+x.q||0)*cnsPu(x.ref) });
+ return m;
+}
+/* Aller voir le détail dans le stock en gardant la période — c'est la même
+   question, posée depuis l'autre bout. */
+function versConso(){
+ go('stock'); stkTab='conso'; cnsPer={...perS}; cnsQui=filtrePrat()||''; cnsCat=''; paint();
+}
 V.stats=()=>{
  const acte=ROLES[role].v.includes('stats'), sous=CAN('compta');
  if(!acte&&!sous) return `<div class="head"><div><h1>Statistiques</h1></div></div><div class="empty">🔒 Les statistiques ne sont pas ouvertes au rôle « ${ROLES[role].l} ». Ce droit se règle dans Équipe &amp; droits.</div>`;
@@ -7556,6 +7575,30 @@ V.stats=()=>{
  const serA=B.map(b=>({k:b.from,label:b.label,v:A.filter(a=>a.date>=b.from&&a.date<=b.to).length}));
  const serC=B.map(b=>({k:b.from,label:b.label,v:F.filter(f=>f.date>=b.from&&f.date<=b.to).reduce((s,f)=>s+f.paye,0)}));
  const perso=sous&&!!filtrePrat();
+ /* le coût matière ne se montre qu'à qui a le droit de voir les montants
+    du cabinet ET les prix d'achat du stock */
+ const coutOk=sous&&CAN('prix');
+ const COUT=coutParActe(), coutA=a=>COUT[a.id]||0;
+ const AV=AM.filter(a=>montantActe(a)!=null);      /* les actes qui portent un montant */
+ const valA=AV.reduce((s,a)=>s+montantActe(a),0);
+ const coutTot=AM.reduce((s,a)=>s+coutA(a),0);     /* tout le produit sorti pour ces actes */
+ const coutVal=AV.reduce((s,a)=>s+coutA(a),0);     /* la part comparable à un chiffre d'affaires */
+ const margeP=valA?Math.round((valA-coutVal)/valA*100):null;
+ const rentab=CATS.map(c=>{
+   const V=AV.filter(a=>a.cat===c);
+   const val=V.reduce((x,a)=>x+montantActe(a),0), co=V.reduce((x,a)=>x+coutA(a),0);
+   return {c, n:V.length, tous:AM.filter(a=>a.cat===c).length, val, co,
+           marge:val?(val-co)/val*100:null};
+  }).filter(r=>r.n).sort((x,y)=>y.val-x.val||y.n-x.n);
+ const coutPrat=PRATICIENS.map(pr=>{
+   const V=A.filter(a=>a.praticien===pr&&montantActe(a)!=null);
+   return {pr, n:V.length, tous:A.filter(a=>a.praticien===pr).length,
+           co:V.reduce((x,a)=>x+coutA(a),0), val:V.reduce((x,a)=>x+montantActe(a),0)};
+  }).filter(r=>r.tous);
+ /* ce qui reste dehors : un acte sans montant (forfait, retouche offerte, prix
+    non saisi) consomme quand même du produit — on ne l'efface pas, on le dit */
+ const horsVal=AM.filter(a=>montantActe(a)==null);
+ const coutHors=horsVal.reduce((x,a)=>x+coutA(a),0);
  const dvAcc=DV.filter(d=>d.statut==='accepte').length;
  const dvDec=DV.filter(d=>['accepte','refuse','expire'].includes(d.statut)).length;
  const dvAtt=DV.filter(d=>['envoye','relance1','relance2'].includes(d.statut));
@@ -7573,9 +7616,13 @@ V.stats=()=>{
   ${sous?kpi('Panier moyen',(()=>{const P=AM.filter(a=>montantActe(a)!=null);
      return P.length?EUR(Math.round(P.reduce((s,a)=>s+montantActe(a),0)/P.length)):'—'})(),perso?'sur vos actes':''):''}
   ${acte?kpi('Patients fidélisés',fid+' / '+(pat.length||1),pat.length?Math.round(fid/pat.length*100)+' % ont ≥ 2 actes':'—','up'):''}
-  ${acte?kpi('Actes par patient',pat.length?(A.length/pat.length).toFixed(1):'—'):''}
+  ${acte?kpi('Actes par patient',pat.length?NUM(Math.round(A.length/pat.length*10)/10):'—'):''}
   ${sous?kpi(perso?'Votre CA encaissé':'CA encaissé',EUR(F.reduce((s,f)=>s+f.paye,0)),perso?esc(monPrat()):''):''}
-  ${(acte&&CAN('volumes'))?kpi('Produit injecté',`${NUM(tox)} U`,`et ${ah.toFixed(1)} ml d'acide hyaluronique`):''}</div>
+  ${(acte&&CAN('volumes'))?kpi('Produit injecté',`${NUM(tox)} U`,`et ${NUM(Math.round(ah*10)/10)} ml d'acide hyaluronique`):''}
+  ${coutOk?kpi('Coût produit',EUR(Math.round(coutTot)),
+     valA?`${Math.round(coutVal/valA*100)} % de la valeur des actes`:'sorti du stock pour ces actes'):''}
+  ${(coutOk&&margeP!==null)?kpi('Marge sur produit',EUR(Math.round(valA-coutVal)),
+     `${margeP} % — avant loyer, salaires et charges`,margeP>=70?'up':margeP<50?'dn':''):''}</div>
  <div class="grid g2" style="margin-bottom:13px">
   ${sous?`<div class="card"><div class="h"><h2>${perso?'Votre CA encaissé':'CA encaissé'}</h2><span class="s">sur la période</span></div><div class="b">${bars(serC)}</div></div>`:''}
   ${acte?`<div class="card"><div class="h"><h2>Nombre d'actes</h2><span class="s">sur la période</span></div><div class="b">${bars(serA,{fmt:NUM})}</div></div>`:''}</div>
@@ -7595,7 +7642,61 @@ V.stats=()=>{
     <div class="rtb"><div class="rtb-p" style="width:${dvDec?Math.round(dvAcc/dvDec*100):0}%"></div></div>
     <div class="mu" style="font-size:11.5px;margin-top:8px">Le nombre de devis et le taux d'acceptation portent sur tout le cabinet.${
       perso?` Le montant en attente, lui, est le vôtre.`:''}</div>
-   </div></div>`:''}</div>`;
+   </div></div>`:''}</div>
+ ${coutOk&&rentab.length?`
+ <div class="grid ${coutPrat.length>1&&!perso?'g2':''}" style="margin-top:13px">
+  <div class="card"><div class="h"><h2>Coût produit par catégorie</h2>
+    <span class="s">${perLabel(perS)}</span>
+    <div class="r"><button class="btn s" onclick="versConso()">Détail par produit →</button></div></div>
+   <div class="tw"><table>
+    <thead><tr><th>Catégorie</th><th class="num">Actes</th><th class="num">Valeur</th>
+     <th class="num">Produit</th><th class="num">Par acte</th><th class="num">Marge</th></tr></thead>
+    <tbody>${rentab.map(r=>`<tr>
+      <td class="nm">${esc(r.c)}</td>
+      <td class="num" title="${r.tous>r.n?`${r.tous} actes en tout, ${r.tous-r.n} sans montant`:''}">${NUM(r.n)}${r.tous>r.n?`<span class="mu"> / ${NUM(r.tous)}</span>`:''}</td>
+      <td class="num">${r.val?EUR(Math.round(r.val)):'<span class="mu">—</span>'}</td>
+      <td class="num">${r.co?EUR(Math.round(r.co)):'<span class="mu">aucun</span>'}</td>
+      <td class="num">${r.co&&r.n?EUR(Math.round(r.co/r.n)):'<span class="mu">—</span>'}</td>
+      <td class="num">${r.marge===null?'<span class="mu">—</span>'
+        :`<span class="bdg ${r.marge>=70?'b-good':r.marge>=50?'b-warn':'b-crit'}">${Math.round(r.marge)} %</span>`}</td></tr>`).join('')}
+     <tr style="border-top:2px solid var(--line-2);font-weight:650">
+      <td class="nm">Ensemble</td>
+      <td class="num">${NUM(AV.length)}${AM.length>AV.length?`<span class="mu"> / ${NUM(AM.length)}</span>`:''}</td>
+      <td class="num">${EUR(Math.round(valA))}</td><td class="num">${EUR(Math.round(coutVal))}</td>
+      <td class="num">${AV.length?EUR(Math.round(coutVal/AV.length)):'—'}</td>
+      <td class="num">${margeP===null?'—':`<span class="bdg ${margeP>=70?'b-good':margeP>=50?'b-warn':'b-crit'}">${margeP} %</span>`}</td></tr>
+    </tbody></table></div>
+   <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">
+    La <b>valeur</b> est celle des actes de la période — facturée quand elle l'est, tarif de l'acte sinon.
+    Le <b>produit</b> est ce que le journal du stock a sorti pour ces mêmes actes, au prix d'achat.
+    La marge est donc une <b>marge sur coût matière</b> : elle ne retire ni le temps passé, ni le loyer, ni les charges.
+    ${(()=>{const Z=rentab.filter(r=>!r.co).map(r=>r.c);
+      return Z.length?` ${Z.length>1?'Les catégories':'La catégorie'} <b>${Z.map(esc).join(', ')}</b> ne consomme${Z.length>1?'nt':''} aucun produit du stock : ${Z.length>1?'leurs marges matière sont':'sa marge matière est'} mécaniquement de 100 %.`:''})()}
+    ${horsVal.length?`<div style="margin-top:6px">${NUM(horsVal.length)} acte${horsVal.length>1?'s':''} de la période ne porte${horsVal.length>1?'nt':''} aucun montant — forfait, retouche offerte ou prix non saisi. ${horsVal.length>1?'Ils sont exclus':'Il est exclu'} du calcul${coutHors?` et représente${horsVal.length>1?'nt':''} <b style="color:var(--ink)">${EUR(Math.round(coutHors))}</b> de produit`:''}.</div>`:''}</div></div>
+  </div>
+  ${coutPrat.length>1&&!perso?`<div class="card"><div class="h"><h2>Coût produit par praticien</h2>
+    <span class="s">sur ses propres actes</span></div>
+   <div class="b">${hbars(coutPrat.map(r=>({label:r.pr,v:Math.round(r.co)})))}</div>
+   <div class="tw"><table>
+    <thead><tr><th>Praticien</th><th class="num">Actes</th><th class="num">Valeur</th>
+     <th class="num">Produit</th><th class="num">Par acte</th><th class="num">Marge</th></tr></thead>
+    <tbody>${coutPrat.map(r=>{const mg=r.val?Math.round((r.val-r.co)/r.val*100):null; return `<tr>
+      <td class="nm">${esc(r.pr)}</td>
+      <td class="num" title="${r.tous>r.n?`${r.tous} actes en tout, ${r.tous-r.n} sans montant`:''}">${NUM(r.n)}${r.tous>r.n?`<span class="mu"> / ${NUM(r.tous)}</span>`:''}</td>
+      <td class="num">${r.val?EUR(Math.round(r.val)):'<span class="mu">—</span>'}</td>
+      <td class="num">${r.co?EUR(Math.round(r.co)):'<span class="mu">aucun</span>'}</td>
+      <td class="num">${r.co&&r.n?EUR(Math.round(r.co/r.n)):'<span class="mu">—</span>'}</td>
+      <td class="num">${mg===null?'<span class="mu">—</span>'
+        :`<span class="bdg ${mg>=70?'b-good':mg>=50?'b-warn':'b-crit'}">${mg} %</span>`}</td></tr>`}).join('')}
+    </tbody></table></div>
+   <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">
+    ${(()=>{const E=coutPrat.filter(r=>r.n&&r.co);
+      if(E.length<2) return 'Un seul praticien a exercé sur la période.';
+      const pa=E.map(r=>r.co/r.n), ec=Math.max(...pa)-Math.min(...pa);
+      return ec>=15?`<b style="color:var(--ink)">${EUR(Math.round(ec))}</b> d'écart de produit par acte entre le plus économe et le plus dépensier. Ce n'est pas un reproche : cela peut tenir aux actes pratiqués autant qu'aux dosages — le <a onclick="versConso()">détail par produit</a> le dira.`
+        :'Les praticiens consomment sensiblement autant par acte.'})()}</div></div>
+  </div>`:''}
+ </div>`:''}`;
 };
 
 /* ---------- protocoles paramétrables ---------- */
@@ -11251,7 +11352,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='CS';
+const BUILD='CT';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
