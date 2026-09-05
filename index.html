@@ -1575,6 +1575,10 @@ th.tri.on.desc::after{content:'▼'}
 .ch .cbar:hover{opacity:.78}
 .ch .vl{fill:var(--ink-2);font-size:10.5px;font-variant-numeric:tabular-nums;font-weight:600}
 .hb{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+/* la part de chaque référence dans la consommation, lue d'un coup d'œil */
+.cbar-l{display:inline-block;vertical-align:middle;width:44px;height:5px;border-radius:3px;
+ background:var(--grid);overflow:hidden;margin-right:6px}
+.cbar-l i{display:block;height:100%;border-radius:3px;background:var(--accent)}
 .hb .l{width:170px;font-size:12.2px;color:var(--ink-2)}
 .hb .t{flex:1;background:var(--grid);border-radius:5px;height:15px;overflow:hidden}
 .hb .t i{display:block;height:100%;background:var(--series-1);border-radius:5px}
@@ -6444,7 +6448,7 @@ let sF='tous',lotSel='';
 let RC=null;            /* réception en cours */
 let SO=null;            /* sortie manuelle en cours */
 let mvtF={t:'tous',ref:'',qui:'',per:'annee'};
-let stkTab='actif';     /* actif · journal · archives */
+let stkTab='actif';     /* actif · journal · conso · archives */
 let stkQui='';          /* filtre praticien de la liste */
 let sfF='';             /* sous-famille retenue, dans la famille courante */
 /* ==========================================================================
@@ -7199,6 +7203,190 @@ function exportMvt(){
  toast(`${M.length} mouvement${M.length>1?'s':''} exporté${M.length>1?'s':''}`);
 }
 
+/* ==========================================================================
+   Consommation des produits
+   --------------------------------------------------------------------------
+   Le journal dit ce qui s'est passé, mouvement par mouvement. Cet écran dit
+   ce que ça coûte et à qui : combien de produit part, sur combien de séances,
+   et ce que ça fait par séance — praticien par praticien. C'est le rapport
+   qu'on sort quand une boîte se vide plus vite qu'ailleurs.
+   Tout se calcule sur le journal : réceptions − sorties = stock, toujours.
+   ========================================================================== */
+let cnsPer={k:'annee',from:'',to:''};
+let cnsQui='';   /* filtre praticien */
+let cnsCat='';   /* filtre catégorie de produit */
+function setCnsPer(p){
+ /* sans droit comptable, l'horizon reste celui du reste du logiciel */
+ if(!CAN('compta')){
+  const [a,b]=perRange(p);
+  if(days(a,b)+1>HORIZON_SANS_COMPTA){
+   p={k:'perso',from:addD(b,-(HORIZON_SANS_COMPTA-1)),to:b};
+   toast(`Période ramenée à ${HORIZON_SANS_COMPTA} jours — au-delà, il faut le suivi comptable`);
+  }
+ }
+ cnsPer=p; paint();
+}
+/* les sorties de la période : c'est la seule source: pas de compteur parallèle */
+function cnsSorties(per,qui,cat){
+ const P=per||cnsPer;
+ return MVT.filter(m=>m.t==='sortie'
+  && inPer(String(m.ts||'').slice(0,10),P)
+  && (qui===undefined?!cnsQui||m.qui===cnsQui:(!qui||m.qui===qui))
+  && (cat===undefined?!cnsCat||cnsCatDe(m)===cnsCat:(!cat||cnsCatDe(m)===cat)));
+}
+const cnsRef=r=>STOCK.find(x=>x.ref===r)||null;
+const cnsCatDe=m=>{const x=cnsRef(m.ref); return x?x.cat:''};
+const cnsPu=r=>{const x=cnsRef(r); return x?+x.pu||0:0};
+const cnsUnite=r=>{const x=cnsRef(r); return x?x.u:''};
+const cnsNom=(r,f)=>{const x=cnsRef(r); return x?nomProduit(x):(f||r)};
+/* « 2 seringues », « 1 boîte 100 » : seul le premier mot prend la marque du pluriel */
+const plu=(n,u)=>!u?'':String(u).replace(/^(\S+)/,w=>n>1?w+'s':w);
+const cnsQte=m=>Math.max(0,+m.q||0);
+/* Regrouper les sorties selon une clé — produit, praticien, mois… La valeur
+   se calcule au prix unitaire du produit : c'est le seul dénominateur commun
+   entre une seringue, un flacon et un tube. */
+function cnsGrouper(M,cle){
+ const g={};
+ M.forEach(m=>{
+  const k=cle(m); if(k===null||k===undefined) return;
+  const o=g[k]=g[k]||{k, q:0, n:0, val:0, actes:new Set(), refs:new Set(), qui:{}, lots:new Set()};
+  const q=cnsQte(m);
+  o.q+=q; o.n++; o.val+=q*cnsPu(m.ref);
+  if(m.acte) o.actes.add(m.acte);
+  o.refs.add(m.ref);
+  if(m.lot) o.lots.add(m.lot);
+  const w=m.qui||'—'; o.qui[w]=(o.qui[w]||0)+q;
+ });
+ return Object.values(g).map(o=>({...o, actes:o.actes.size, refs:o.refs.size, lots:o.lots.size}));
+}
+const cnsTotal=M=>M.reduce((a,m)=>a+cnsQte(m)*cnsPu(m.ref),0);
+const cnsUnites=M=>M.reduce((a,m)=>a+cnsQte(m),0);
+const cnsActes=M=>new Set(M.filter(m=>m.acte).map(m=>m.acte)).size;
+/* les catégories réellement représentées dans le stock — pas une liste figée */
+const cnsCats=()=>[...new Set(STOCK.map(x=>x.cat))].filter(Boolean).sort();
+
+function exportCns(){
+ const M=cnsSorties();
+ const L=[['Date','Référence','Produit','Catégorie','Lot','Quantité','Unité','Prix unitaire','Valeur','Praticien','Acte','Patient','Motif']];
+ M.slice().sort((a,b)=>String(a.ts).localeCompare(String(b.ts))).forEach(m=>{
+  const q=cnsQte(m);
+  L.push([String(m.ts||''), m.ref||'', cnsNom(m.ref,m.nom), cnsCatDe(m), m.lot||'', q, cnsUnite(m.ref),
+    cnsPu(m.ref), +(q*cnsPu(m.ref)).toFixed(2), m.qui?partNom(m.qui):'',
+    m.acte||'', m.patient?fn(pById(m.patient)):'', m.note||'']);
+ });
+ csvTelecharger(`praxis-consommation-${TODAYS}.csv`,L);
+ toast(`${M.length} sortie${M.length>1?'s':''} exportée${M.length>1?'s':''}`);
+}
+
+function vueConso(){
+ const prix=CAN('prix');
+ const M=cnsSorties();
+ const prec=perPrev(cnsPer);
+ const MP=cnsSorties(prec);
+ const val=cnsTotal(M), valP=cnsTotal(MP);
+ const nA=cnsActes(M), nU=cnsUnites(M);
+ /* Comparer à une période précédente presque vide donne « +6292 % », ce qui
+    n'apprend rien. On ne montre l'écart que s'il y a de quoi comparer, et on
+    dit le montant plutôt qu'un multiple absurde quand l'écart explose. */
+ const cmp=(()=>{
+  if(MP.length<3||!valP) return {t:perLabel(cnsPer), c:''};
+  const e=Math.round((val-valP)/valP*100);
+  if(Math.abs(e)>200) return {t:`contre ${EUR(valP)} sur la période précédente`, c:e>0?'dn':'up'};
+  return {t:`${e>=0?'▲ +':'▼ '}${e} % vs période précédente`, c:e>0?'dn':'up'};
+ })();
+ const parRef=cnsGrouper(M,m=>m.ref).sort((a,b)=>b.val-a.val||b.q-a.q);
+ /* la liste arrive déjà classée : la flèche de l'en-tête doit le montrer,
+    sinon le tableau paraît trié par hasard */
+ if(!TRI.conso||!TRI.conso.c) TRI.conso={c:prix?'val':'q', d:-1};
+ /* la comparaison entre praticiens ignore volontairement le filtre praticien :
+    une colonne seule ne se compare à rien */
+ const parPrat=cnsGrouper(cnsSorties(cnsPer,'',undefined),m=>m.qui||'—')
+   .sort((a,b)=>b.val-a.val||b.q-a.q);
+ const B=perBuckets(cnsPer);
+ const serie=B.map(b=>({label:b.label,
+   v:cnsTotal(M.filter(m=>{const d=String(m.ts).slice(0,10); return d>=b.from&&d<=b.to}))}));
+ const serieU=B.map((b,i)=>({label:b.label,
+   v:cnsUnites(M.filter(m=>{const d=String(m.ts).slice(0,10); return d>=b.from&&d<=b.to}))}));
+ const dormantes=STOCK.filter(x=>!M.some(m=>m.ref===x.ref));
+ const qFiltre=cnsQui||cnsCat;
+
+ return `${periodBar(cnsPer,'setCnsPer',`${M.length} sortie${M.length>1?'s':''}`,PRESETS_STD,1)}
+ <div class="fbar">
+  <select class="inp" style="max-width:200px" onchange="cnsQui=this.value;paint()">
+   <option value="">Tous les praticiens</option>
+   ${[...PRATICIENS,PART_COMMUN].map(k=>`<option value="${esc(k)}" ${cnsQui===k?'selected':''}>${esc(partNom(k))}</option>`).join('')}</select>
+  <div class="seg"><button class="${cnsCat?'':'on'}" onclick="cnsCat='';paint()">Toutes catégories</button>
+   ${cnsCats().map(c=>`<button class="${cnsCat===c?'on':''}" onclick="cnsCat=${JSON.stringify(c).replace(/"/g,'&quot;')};paint()">${esc(c)}s</button>`).join('')}</div>
+  ${qFiltre?`<button class="btn s" onclick="cnsQui='';cnsCat='';paint()">✕ Retirer les filtres</button>`:''}
+  <button class="btn s" style="margin-left:auto" onclick="exportCns()">Export CSV</button></div>
+
+ ${!M.length?`<div class="empty">Aucune sortie de produit ${perLabel(cnsPer)}${qFiltre?' avec ces filtres':''}.</div>`:`
+ <div class="grid g4" style="margin-bottom:14px">
+  ${prix?kpi('Produit consommé',EUR(val),cmp.t,cmp.c)
+        :kpi('Unités sorties',NUM(nU),'toutes références confondues')}
+  ${kpi('Séances approvisionnées',NUM(nA),`${NUM(parRef.length)} référence${parRef.length>1?'s':''} mobilisée${parRef.length>1?'s':''}`)}
+  ${prix?kpi('Coût produit par séance',nA?EUR(Math.round(val/nA)):'—','moyenne sur la période')
+        :kpi('Unités par séance',nA?NUM(Math.round(nU/nA*10)/10):'—','moyenne sur la période')}
+  ${kpi('Références sans sortie',dormantes.length,
+     dormantes.length?dormantes.slice(0,2).map(x=>nomProduit(x)).join(' · ')+(dormantes.length>2?` +${dormantes.length-2}`:''):'tout le catalogue tourne',
+     dormantes.length?'dn':'up')}</div>
+
+ <div class="grid g2" style="margin-bottom:14px">
+  <div class="card"><div class="h"><h2>Évolution</h2><span class="s">${prix?'valeur du produit sorti':'unités sorties'}</span></div>
+   <div class="b">${bars(prix?serie:serieU,{h:190,fmt:prix?EUR:NUM})}</div></div>
+  <div class="card"><div class="h"><h2>Par praticien</h2><span class="s">sur la période${cnsCat?' · '+esc(cnsCat)+'s':''}</span></div>
+   <div class="b">
+    ${parPrat.length?hbars(parPrat.map(o=>({label:partNom(o.k),v:prix?o.val:o.q})),{fmt:prix?EUR:NUM}):'<div class="empty">Aucune sortie.</div>'}
+    <div class="tw" style="margin-top:12px"><table>
+     <thead><tr><th>Praticien</th><th class="num">Séances</th><th class="num">Unités</th>
+      ${prix?'<th class="num">Valeur</th><th class="num">Par séance</th>':'<th class="num">Par séance</th>'}</tr></thead>
+     <tbody>${parPrat.map(o=>`<tr${cnsQui===o.k?' style="background:var(--accent-wash)"':''}>
+       <td class="nm">${esc(partNom(o.k))}</td>
+       <td class="num">${NUM(o.actes)}</td>
+       <td class="num">${NUM(o.q)}</td>
+       ${prix?`<td class="num">${EUR(o.val)}</td><td class="num">${o.actes?EUR(Math.round(o.val/o.actes)):'—'}</td>`
+             :`<td class="num">${o.actes?NUM(Math.round(o.q/o.actes*10)/10):'—'}</td>`}</tr>`).join('')}
+     </tbody></table></div>
+    ${parPrat.length>1&&prix?(()=>{const A=parPrat.filter(o=>o.actes), 
+       ecart=A.length>1?Math.max(...A.map(o=>o.val/o.actes))-Math.min(...A.map(o=>o.val/o.actes)):0;
+      return ecart>=15?`<div class="mu" style="font-size:11.5px;margin-top:9px">Écart de <b style="color:var(--ink)">${EUR(Math.round(ecart))}</b> de produit par séance entre le praticien le plus économe et le plus dépensier — dosages, actes pratiqués ou pertes, cela vaut le coup d'être regardé.</div>`:''})():''}
+   </div></div>
+ </div>
+
+ <div class="card"><div class="h"><h2>Par produit</h2>
+   <span class="s">${parRef.length} référence${parRef.length>1?'s':''} sortie${parRef.length>1?'s':''} ${perLabel(cnsPer)}${cnsQui?' · '+esc(partNom(cnsQui)):''}</span></div>
+  <div class="tw"><table>
+   <thead><tr>${thT('conso','nom','Produit')}
+    ${thT('conso','cat','Catégorie')}
+    ${thT('conso','q','Sorti',{num:1,def:-1,aide:'Classer par quantité sortie — la plus grande en premier'})}
+    ${thT('conso','actes','Séances',{num:1,def:-1,aide:'Classer par nombre de séances'})}
+    ${thT('conso','moy','Par séance',{num:1,def:-1,aide:'Classer par consommation moyenne par séance'})}
+    ${prix?thT('conso','val','Valeur',{num:1,def:-1,aide:'Classer par valeur du produit sorti'}):''}
+    ${cnsQui?'':'<th>Répartition</th>'}
+    ${thT('conso','part','Part',{num:1,def:-1,aide:'Part de la consommation totale'})}</tr></thead>
+   <tbody>${triApplique('conso',parRef,{
+     nom:o=>cnsNom(o.k), cat:o=>cnsCatDe({ref:o.k}), q:o=>o.q, actes:o=>o.actes,
+     moy:o=>o.actes?o.q/o.actes:0, val:o=>o.val, part:o=>prix?o.val:o.q,
+    }).map(o=>{const x=cnsRef(o.k), part=(prix?(val?o.val/val:0):(nU?o.q/nU:0))*100;
+    return `<tr class="c" onclick="stkTab='journal';mvtF.t='sortie';mvtF.ref='${esc(o.k)}';mvtF.qui='${esc(cnsQui)}';mvtF.per='${['jour','semaine','mois','annee','tout'].includes(cnsPer.k)?cnsPer.k:'tout'}';paint()"
+      title="Voir les mouvements de ce produit dans le journal">
+     <td><div class="nm">${esc(cnsNom(o.k))}</div>
+       <div class="mu" style="font-size:11.5px">${esc(o.k)}${o.lots?` · ${o.lots} lot${o.lots>1?'s':''}`:''}</div></td>
+     <td class="mu">${esc(cnsCatDe({ref:o.k}))}${x&&x.sfam?`<div class="mu" style="font-size:11.5px">${esc(x.sfam)}</div>`:''}</td>
+     <td class="num"><b>${NUM(o.q)}</b> <span class="mu">${esc(plu(o.q,cnsUnite(o.k)))}</span></td>
+     <td class="num">${NUM(o.actes)}</td>
+     <td class="num">${o.actes?NUM(Math.round(o.q/o.actes*100)/100):'—'}</td>
+     ${prix?`<td class="num">${EUR(o.val)}</td>`:''}
+     ${cnsQui?'':`<td>${Object.entries(o.qui).sort((a,b)=>b[1]-a[1])
+       .map(([k,q])=>`<span class="bdg ${k===PRATICIENS[0]?'b-info':'b-neu'}" title="${esc(partNom(k))}">${esc(String(partNom(k)).replace(/^Dr /,''))} ${NUM(q)}</span>`).join(' ')}</td>`}
+     <td class="num"><div class="cbar-l"><i style="width:${part.toFixed(1)}%"></i></div><span class="mu">${part.toFixed(0)} %</span></td>
+    </tr>`}).join('')}</tbody></table></div>
+  <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">
+   Tout vient du journal des mouvements : ${M.length} sortie${M.length>1?'s':''} enregistrée${M.length>1?'s':''} ${perLabel(cnsPer)}. Cliquez une ligne pour retrouver ses mouvements.
+   ${prix?' Les valeurs sont calculées au prix d’achat unitaire de chaque référence, hors remise fournisseur.':''}</div></div>
+ </div>`}`;
+}
+
 /* ---- Les archives ---- */
 function vueArchives(){
  const R=[];
@@ -7245,16 +7433,18 @@ V.stock=()=>{
  const alertesPrat=STOCK.filter(s=>sousSeuilPrat(s).length);
  const moi=monPrat();
  const onglet=(k,l,n)=>`<button class="${stkTab===k?'on':''}" onclick="stkTab='${k}';paint()">${l}${n!==undefined&&n!==0?` <span class="mu">${n}</span>`:''}</button>`;
- return `<div class="head"><div><h1>Stock &amp; lots</h1><p>${STOCK.length} références · ${nLots} lots actifs · ${EUR(val)} immobilisés${nArch?` · ${nArch} archivé${nArch>1?'s':''}`:''}</p></div>
+ const prixOk=CAN('prix');   /* sans ce droit, le stock se compte en boîtes */
+ return `<div class="head"><div><h1>Stock &amp; lots</h1><p>${STOCK.length} références · ${nLots} lots actifs${prixOk?` · ${EUR(val)} immobilisés`:''}${nArch?` · ${nArch} archivé${nArch>1?'s':''}`:''}</p></div>
   <div class="r"><button class="btn" onclick="toast('Bon de commande généré')">Bon de commande</button>
    <button class="btn" onclick="ouvrirSortie()">− Sortie</button>
    <button class="btn" onclick="ouvrirUtilisation()">✚ Utilisation</button>
    <button class="btn p" onclick="ouvrirReception()">+ Réception de lot</button></div></div>
  <div class="tip"><span class="e">📦</span><div><b>Chaque boîte est à quelqu'un.</b> Un lot se répartit entre praticiens et un pot commun ; l'acte débite celui qui l'a réalisé, en commençant par sa part. Le total du cabinet n'est plus qu'une somme — ce qui compte, c'est qui a de quoi travailler demain.</div></div>
- <div class="seg" style="margin-bottom:12px">${onglet('actif','Stock actif')}${onglet('journal','Journal des mouvements',MVT.length)}${onglet('archives','Archives',nArch)}</div>
- ${stkTab==='journal'?vueJournal():stkTab==='archives'?vueArchives():`
+ <div class="seg" style="margin-bottom:12px">${onglet('actif','Stock actif')}${onglet('journal','Journal des mouvements',MVT.length)}${onglet('conso','Consommation')}${onglet('archives','Archives',nArch)}</div>
+ ${stkTab==='journal'?vueJournal():stkTab==='conso'?vueConso():stkTab==='archives'?vueArchives():`
  <div class="grid g4" style="margin-bottom:14px">
-  ${kpi('Valeur du stock',EUR(val))}
+  ${prixOk?kpi('Valeur du stock',EUR(val))
+         :kpi('Lots actifs',NUM(nLots),`sur ${NUM(STOCK.length)} références`)}
   ${kpi('Sous le seuil cabinet',STOCK.filter(s=>s.q<s.s).length,'à recommander',STOCK.filter(s=>s.q<s.s).length?'dn':'up')}
   ${kpi('Seuil individuel franchi',alertesPrat.length,alertesPrat.length?`${[...new Set(alertesPrat.flatMap(sousSeuilPrat))].map(q=>q.replace('Dr ','')).join(' · ')} — ${alertesPrat.length} référence${alertesPrat.length>1?'s':''}`:'chacun a de quoi travailler',alertesPrat.length?'dn':'up')}
   ${(()=>{const urg=STOCK.reduce((n,s)=>n+lotsActifs(s).filter(l=>!lotEpuise(l)&&perNiveau(l.per).k==='critique').length,0);
@@ -7298,7 +7488,7 @@ V.stock=()=>{
    bes=Math.max(0,s.s*2-s.q);
    return `<tr><td><b>${esc(nomProduit(s))}</b>
     ${sousTitre(s)?`<div class="mu" style="font-size:11.5px">${esc(sousTitre(s))}</div>`:''}
-    <div class="mu mono" style="font-size:11px">${s.ref} · ${esc(sfamDe(s))} · ${EUR(s.pu)}/${s.u} · ${esc(s.f)}</div></td>
+    <div class="mu mono" style="font-size:11px">${s.ref} · ${esc(sfamDe(s))}${CAN('prix')?` · ${EUR(s.pu)}/${s.u}`:''} · ${esc(s.f)}</div></td>
     <td class="num"><b>${s.q}</b> <span class="mu" style="font-size:11px">/ ${s.s}</span>
       ${stockPerime(s)?`<div class="mu" style="font-size:10px;color:var(--crit);font-weight:640;white-space:nowrap">dont ${stockPerime(s)} périmé${stockPerime(s)>1?'s':''}</div>`:''}</td>
     <td><div class="bar"><i style="width:${pctU}%;background:${col}"></i></div></td>
@@ -11061,7 +11251,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='CR';
+const BUILD='CS';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
