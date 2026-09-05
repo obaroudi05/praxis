@@ -425,7 +425,13 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
 /* choix de l'acte, en tête de la saisie */
 .actepick{border:1px solid var(--line);border-radius:13px;background:var(--panel-2);padding:10px 11px;margin-bottom:11px}
 .ap-t{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);font-weight:700;margin-bottom:7px}
-.ap-l{display:flex;flex-wrap:wrap;gap:6px}
+.ap-l{display:flex;flex-wrap:wrap;gap:7px 15px;align-items:center}
+/* le catalogue entier tient sur quelques lignes : la catégorie sert de repère
+   dans le flux, pas de cloison. Chaque groupe se replie sur lui-même pour que
+   son libellé ne finisse jamais seul en bout de ligne. */
+.ap-g{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.ap-c{font-size:10px;font-weight:650;letter-spacing:.08em;text-transform:uppercase;
+ color:var(--ink-3);white-space:nowrap}
 .apc{display:flex;align-items:center;gap:7px;padding:7px 12px;border-radius:10px;border:1px solid var(--line);
   background:var(--panel);font-size:12.5px;font-weight:600;color:var(--ink);cursor:pointer;transition:.13s;line-height:1.15}
 .apc:hover{border-color:var(--accent);color:var(--accent-ink)}
@@ -5920,7 +5926,24 @@ V.actes=()=>{
 };
 
 /* ---------------- Devis ---------------- */
-let dF='tous',dSel=null,devFam='esth',perD={k:'mois',from:'',to:''},perE={k:'mois',from:'',to:''};
+let dF='tous',dSel=null,perD={k:'mois',from:'',to:''},perE={k:'mois',from:'',to:''};
+/* Un devis ne se range plus par famille : ce qui compte est ce qu'il propose.
+   dCat filtre sur la catégorie d'acte, dActe sur l'acte lui-même. */
+let dCat='', dActe='';
+/* les actes qu'un devis propose — la trame reste ce qu'elle est, on lit
+   les prestations, et à défaut les lignes enregistrées */
+const devTypes=d=>{
+ const src=(d&&d.prest&&d.prest.length)?d.prest.map(x=>x&&x.type)
+   :((d&&d.lignes)||[]).map(l=>Array.isArray(l)?l[0]:null);
+ return [...new Set(src.filter(Boolean))];
+};
+const devCats=d=>[...new Set(devTypes(d).map(t=>acteDef(t).cat))];
+const devMatch=d=>(!dCat||devCats(d).includes(dCat))&&(!dActe||devTypes(d).includes(dActe));
+/* choisir une catégorie relâche un acte qui n'en fait pas partie */
+function setDCat(v){ dCat=v; if(dActe&&dCat&&acteDef(dActe).cat!==dCat) dActe=''; paint() }
+/* choisir un acte cale la catégorie sur la sienne : les deux listes restent vraies */
+function setDActe(v){ dActe=v; if(v) dCat=acteDef(v).cat; paint() }
+const devSansFiltre=()=>!dCat&&!dActe;
 V.devis=()=>{
  if(dSel){const d=DEVIS.find(x=>x.id===dSel),p=pById(d.patient);
   const h=[]; if(d.envoye)h.push([d.envoye,'Devis envoyé par e-mail','✉']);
@@ -5966,7 +5989,7 @@ V.devis=()=>{
  const inP=d=>inPer(d.date,perD);
  const base=DEVIS.filter(inP);
  const L=base.filter(d=>dF==='tous'||(dF==='attente'?['envoye','relance1','relance2'].includes(d.statut):d.statut===dF))
-   .filter(d=>(d.fam||'esth')===devFam)
+   .filter(devMatch)
    .sort((a,b)=>b.date.localeCompare(a.date));
  const att=base.filter(d=>['envoye','relance1','relance2'].includes(d.statut));
  const matt=att.reduce((s,d)=>s+d.montant,0);
@@ -5977,10 +6000,7 @@ V.devis=()=>{
  return `<div class="head">
   <div><h1>Devis et conversions</h1><p>${base.length} devis sur la période · ${EUR(matt)} en attente de réponse</p></div>
   <div class="r"><button class="btn" onclick="go('relances')">Régler les relances</button>
-   <button class="btn p" onclick="openDevis(null,devFam)">+ ${esc(trame(devFam).titre)}</button></div></div>
- <div class="fbar" style="margin-bottom:12px"><div class="seg">${FAMILLES.map(f=>{
-   const n=DEVIS.filter(d=>(d.fam||'esth')===f.id).length;
-   return `<button class="${devFam===f.id?'on':''}" onclick="devFam='${f.id}';paint()">${f.i} ${f.n} · ${n}</button>`}).join('')}</div></div>
+   <button class="btn p" onclick="openDevis(null)" title="La trame s’ajuste toute seule à l’acte choisi">+ Nouveau devis</button></div></div>
  ${periodBar(perD,'setPerD',`${base.length} devis`,PRESETS_STD,1)}
  <div class="grid g4" style="margin-bottom:14px">
   ${kpi('Taux d’acceptation',dec.length?tx+' %':'—',dec.length?`${base.filter(d=>d.statut==='accepte').length} sur ${dec.length} devis décidés`:'aucun devis décidé',tx>=60?'up':'dn')}
@@ -5988,14 +6008,35 @@ V.devis=()=>{
   ${kpi('Relances échues',rdue.length,rdue.length?'à envoyer':'à jour',rdue.length?'dn':'up')}
   ${kpi('Perdus',EUR(perdus),base.filter(d=>['refuse','expire'].includes(d.statut)).length+' refusés ou expirés')}</div>
  <div class="fbar"><div class="seg">${[['tous','Tous'],['attente','En attente'],['accepte','Acceptés'],['refuse','Refusés'],['expire','Expirés'],['brouillon','Brouillons']]
-  .map(([k,l])=>`<button class="${dF===k?'on':''}" onclick="dF='${k}';paint()">${l}</button>`).join('')}</div></div>
+  .map(([k,l])=>`<button class="${dF===k?'on':''}" onclick="dF='${k}';paint()">${l}</button>`).join('')}</div>
+  ${(()=>{ /* on ne propose que des catégories et des actes réellement devisés
+              sur la période : une liste qui ne renvoie rien ne sert personne */
+   const nCat=c=>base.filter(d=>devCats(d).includes(c)).length;
+   const cats=[...new Set(base.flatMap(devCats))].filter(Boolean).sort();
+   const actes=CATALOGUE.filter(c=>base.some(d=>devTypes(d).includes(c.id))&&(!dCat||c.cat===dCat));
+   const nAct=t=>base.filter(d=>devTypes(d).includes(t)).length;
+   return `<select class="inp" style="max-width:200px" title="Filtrer sur une catégorie d’actes"
+      onchange="setDCat(this.value)">
+      <option value="">Toutes les catégories</option>
+      ${cats.map(c=>`<option value="${esc(c)}" ${dCat===c?'selected':''}>${esc(c)} · ${nCat(c)}</option>`).join('')}</select>
+    <select class="inp" style="max-width:220px" title="Filtrer sur un acte précis"
+      onchange="setDActe(this.value)">
+      <option value="">${dCat?`Tous les actes · ${esc(dCat)}`:'Tous les actes'}</option>
+      ${actes.map(c=>`<option value="${esc(c.id)}" ${dActe===c.id?'selected':''}>${esc(c.n)} · ${nAct(c.id)}</option>`).join('')}</select>
+    ${devSansFiltre()?'':`<button class="btn s" onclick="dCat='';dActe='';paint()">✕ Retirer les filtres</button>`}
+    ${devSansFiltre()?'':`<span class="mu" style="font-size:11.5px">${L.length} devis sur ${base.length}</span>`}`})()}</div>
  <div class="card"><div class="tw"><table>
   <thead><tr><th>N°</th><th>Patient</th><th>Date</th><th class="num">Montant</th><th>Statut</th><th>Âge</th><th>Prochaine action</th><th></th></tr></thead>
   <tbody>${L.map(d=>{const nx=RELS.find(r=>r.d.id===d.id),ag=d.envoye?days(d.envoye,TODAY):null;
-   return `<tr class="c" onclick="dSel='${d.id}';paint()"><td class="mono">${d.id}</td>
-    <td class="nm">${esc(fn(pById(d.patient)))}</td><td class="mono">${DF(d.date)}</td>
+   return `<tr class="c" onclick="dSel='${d.id}';paint()"><td class="mono" style="white-space:nowrap">${d.id}</td>
+    <td><div class="nm">${esc(fn(pById(d.patient)))}</div>
+      <div class="mu" style="font-size:11.5px">${(()=>{const T=devTypes(d);
+        if(!T.length) return '<i>prestation libre</i>';
+        const v=T.slice(0,3).map(t=>esc(acteDef(t).n)).join(' · ');
+        return v+(T.length>3?` <span class="mu">+${T.length-3}</span>`:'')})()}</div></td>
+    <td class="mono">${DF(d.date)}</td>
     <td class="num">${EUR(d.montant)}</td><td>${bdgDevis(d)}</td>
-    <td class="mono" ${ag>21?'style="color:var(--crit);font-weight:620"':'class="mono mu"'}>${ag!==null?ag+' j':'—'}</td>
+    <td class="mono" style="white-space:nowrap${ag>21?';color:var(--crit);font-weight:620':''}" ${ag>21?'':'class="mono mu"'}>${ag!==null?ag+' j':'—'}</td>
     <td>${nx?(nx.du?bdg('b-crit','⚠ '+nx.r.c+' échu'):bdg('b-info',nx.r.c+' le '+DFS(nx.e))):'<span class="mu">—</span>'}</td>
     <td class="num" style="white-space:nowrap">
       ${d.statut==='accepte'?(signOf(d.id)?`<span class="bdg b-good" title="${esc(signTxt(signOf(d.id)))}">✎ Signé</span>`:'')
@@ -6008,7 +6049,8 @@ V.devis=()=>{
       ${(d.realise||['refuse','expire'].includes(d.statut))?'':`<button class="btn xs" title="Reprendre ces soins pour la consultation d’aujourd’hui"
         onclick="event.stopPropagation();realiserDevis('${d.id}')">✚ Réaliser</button>`}
       ${btnSuppDevis(d)}</td></tr>${confirmSuppDevis(d,8)}`}).join('')}
-  </tbody></table>${L.length?'':'<div class="empty">Aucun devis sur cette période.</div>'}</div></div>`;
+  </tbody></table>${L.length?'':`<div class="empty">Aucun devis ${devSansFiltre()?'sur cette période':'ne correspond à ces filtres'}.${
+    devSansFiltre()?'':' <a onclick="dCat=\'\';dActe=\'\';paint()">Retirer les filtres →</a>'}</div>`}</div></div>`;
 };
 
 /* ---------------- Encaissements ---------------- */
@@ -11352,7 +11394,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='CT';
+const BUILD='CU';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -12068,20 +12110,10 @@ let DV=null, dvLigne=0;
 /* une prestation confirmée se replie dans la liste : le devis reste lisible
    quand il compte plusieurs lignes */
 let dvPlie=false;
-/* choix de la famille avant d'ouvrir le composeur, quand on part du résumé */
-function dvChoix(pid){
- const o=document.getElementById('famchoix');
- if(o) o.remove();
- const d=document.createElement('div');
- d.id='famchoix'; d.className='famchoix';
- d.innerHTML=`<div class="fc-t">Quel devis établir pour ce patient ?</div>
-  ${FAMILLES.map(f=>`<button class="fc-b" onclick="document.getElementById('famchoix').remove();openDevis(${pid},'${f.id}')">
-    <span class="fc-i">${f.i}</span><div><b>${esc(trame(f.id).titre)}</b><small>${f.id==='epil'?'aisselles, maillot, jambes… sur le schéma corporel':'injections, peeling, laser, radiofréquence'}</small></div></button>`).join('')}
-  <button class="fc-x" onclick="document.getElementById('famchoix').remove()">Annuler</button>`;
- d.onclick=e=>{if(e.target===d) d.remove()};      /* un clic à côté referme */
- document.body.appendChild(d);
- setTimeout(()=>d.classList.add('on'),10);
-}
+/* On ne demande plus « quel type de devis ? » avant d'ouvrir : la question
+   n'avait de sens que tant que le catalogue était cloisonné. Le compositeur
+   propose tous les actes, et la trame du document se déduit d'eux. */
+const dvChoix=pid=>openDevis(pid);
 function openDevis(pid,fam,did){
  const d=did?DEVIS.find(x=>x.id===did):null;
  const f=fam||(d?d.fam:'esth')||'esth';
@@ -12125,18 +12157,30 @@ function dvSel(i){ dvLigne=i; dvPlie=false; renderDevis() }
 function dvSetLibre(i,v){ DV.lignes[i].libre=v }
 function dvReprendreActe(i){ dvPlie=false; const l=DV.lignes[i]; l.libre=null; l.type=null;
   l.prix=null; l.z={}; l.reg='visage'; renderDevis() }
+/* La trame du document suit les actes proposés — c'est elle, et non un onglet
+   choisi d'avance, qui décide du titre et des mentions. Règle : la famille de
+   la majorité des prestations, à égalité celle de la première. On se garde du
+   montant exprès : un prix corrigé ne doit pas faire changer le document de
+   nature. Une validité saisie à la main n'est jamais écrasée. */
+function dvMajFam(){
+ if(!DV) return;
+ const T=DV.lignes.map(l=>l&&l.type).filter(Boolean);
+ if(!T.length) return;
+ const famDe=t=>acteDef(t).fam||'esth';
+ const n={}; T.forEach(t=>{const f=famDe(t); n[f]=(n[f]||0)+1});
+ const prem=famDe(T[0]);
+ const f=Object.keys(n).sort((a,b)=>n[b]-n[a]||(a===prem?-1:(b===prem?1:0)))[0];
+ if(DV.fam===f) return;
+ const avant=trame(DV.fam).validiteJours;
+ DV.fam=f;
+ if(DV.validite===avant) DV.validite=trame(f).validiteJours;
+}
 function dvSetActe(t){ dvPlie=false;
  const l=dvL(), av=acteDef(l.type), ap=acteDef(t);
  l.type=t; l.prix=null;
  if(av.unite!==ap.unite) Object.keys(l.z).forEach(z=>l.z[z]=null);
  if(!regionsDe(t).includes(l.reg)){ l.reg=regionDef(t); l.z={} }
- renderDevis();
-}
-function dvSetFam(f){ dvPlie=false;
- if(DV.fam===f) return;
- DV.fam=f; DV.validite=trame(f).validiteJours; const L=actesDe(f);
- DV.lignes.forEach(l=>{ if(l.type===null) return;          /* une ligne encore vierge le reste */
-   if(!L.some(c=>c.id===l.type)){ l.type=null; l.z={}; l.prix=null; l.reg='visage' } });
+ dvMajFam();
  renderDevis();
 }
 function dvSetReg(r){ dvPlie=false; const l=dvL(); if(l.reg===r) return; l.reg=r; l.z={}; l.prix=null; renderDevis() }
@@ -12177,7 +12221,7 @@ function dvActeZone(id,t){ dvPlie=false;
  const l=dvL(); if(!l) return;
  l.type=t; l.prix=null;
  if(!regionsDe(t).includes(l.reg)){ l.reg=regionDef(t); l.z={} }
- if(DV.fam!==(acteDef(t).fam||'esth')){ DV.fam=acteDef(t).fam||'esth'; DV.validite=trame(DV.fam).validiteJours }
+ dvMajFam();
  dvZone(null,id,1);
 }
 /* poser une zone invalide le montant calculé — mais pas celui d'une ligne libre,
@@ -12222,7 +12266,7 @@ function dvBarGroupe(gi,poser){ dvPlie=false; const l=dvL(), B=baremeById(l&&l.r
 function dvProto(i){
  const P=PROTOS[i]; if(!P||!DV) return;
  const L=dvL();
- if(DV.fam!=='esth'||(L&&estBareme(L.reg))){toast('Les protocoles sont définis sur le visage');return}
+ if(!L||L.reg!=='visage'||estBareme(L.reg)){toast('Les protocoles sont définis sur le visage');return}
  const T=protoActes(P);
  if(!T.length){toast(`Le protocole « ${P.n} » ne contient aucune zone`);return}
  let cible=dvLigne;
@@ -12282,7 +12326,7 @@ function dvKey(e){
  if(id.indexOf('dvz')===0) return;
  e.preventDefault(); dvConfirmer();
 }
-function dvDel(i){ if(DV.lignes.length<2){toast('Un devis comporte au moins une prestation');return} DV.lignes.splice(i,1); dvLigne=Math.max(0,dvLigne-(i<=dvLigne?1:0)); renderDevis() }
+function dvDel(i){ if(DV.lignes.length<2){toast('Un devis comporte au moins une prestation');return} DV.lignes.splice(i,1); dvLigne=Math.max(0,dvLigne-(i<=dvLigne?1:0)); dvMajFam(); renderDevis() }
 function dvSeances(i,d,v){ const l=DV.lignes[i]; l.seances=Math.max(1, v!=null?v:((l.seances||1)+d)); l.prix=null; renderDevis() }
 function dvCom(i,v){ DV.lignes[i].com=v }
 function dvPrixSet(i,v){ DV.lignes[i].prix=(v===''||v==null)?null:+v; renderDevis() }
@@ -12323,7 +12367,7 @@ function dvEnregistrer(envoyer){
    infos:DV.infosOn?infosPatient(prest[0].z):null,note:DV.note||''});
  logDoc(num,'Devis établi');
  if(envoyer) logDoc(num,'Devis envoyé par '+ca);
- closeAll(); dF='tous'; devFam=DV.fam; go('devis',num);
+ closeAll(); dF='tous'; dCat=''; dActe=''; go('devis',num);
  toast(envoyer?`Devis ${num} envoyé par ${ca} à ${fn(p)} · ${EUR(net)}`:`Devis ${num} enregistré en brouillon · ${EUR(net)}`);
 }
 
@@ -12333,7 +12377,7 @@ function renderDevis(){
  document.getElementById('overh').innerHTML=`
   <button class="btn g s" onclick="closeAll()">✕</button>
   <div><h2>${DV.id?'Devis '+DV.id:'Nouveau devis'} — ${esc(fn(p))}</h2>
-   <div class="mu" style="font-size:11.5px">${famById(DV.fam).n} · ${DV.lignes.length} prestation${DV.lignes.length>1?'s':''} · aucun acte n'est enregistré</div></div>
+   <div class="mu" style="font-size:11.5px">${esc(trame(DV.fam).titre)} · ${DV.lignes.length} prestation${DV.lignes.length>1?'s':''} · aucun acte n'est enregistré</div></div>
   <div style="margin-left:auto"><button class="btn s" onclick="openPatient(${p.id})">Fiche complète</button></div>`;
 
  document.getElementById('overb').innerHTML=`
@@ -12343,26 +12387,24 @@ function renderDevis(){
    <select class="inp" onchange="DV.prat=this.value">${PRATICIENS.map(x=>`<option ${DV.prat===x?'selected':''}>${x}</option>`).join('')}</select>
   </div>
   <div class="actepick" onkeydown="dvKey(event)">
-   <div class="ap-t">1 · Type de devis</div>
-   <div class="seg" style="margin-bottom:8px">${FAMILLES.map(f=>
-     `<button class="${DV.fam===f.id?'on':''}" onclick="dvSetFam('${f.id}')">${f.i} ${esc(trame(f.id).titre)}</button>`).join('')}</div>
-   <div class="ap-t">2 · Prestation ${dvLigne+1} sur ${DV.lignes.length}</div>
+   <div class="ap-t">1 · Prestation ${dvLigne+1} sur ${DV.lignes.length}</div>
    ${VIDE?`<div class="ap-vide"><span class="mu">Aucun acte choisi pour cette prestation.</span>
       <button class="btn xs" onclick="dvLibreIci(${dvLigne})">✎ Écrire une prestation libre</button>
       <span class="mu">ou choisissez un acte du catalogue :</span></div>`:''}
    ${LIB?`<div class="ap-libre"><input class="inp" id="dvLibre" placeholder="Intitulé de la prestation — « Forfait 3 séances », « Consultation »…" value="${esc(L.libre||'')}"
       oninput="dvSetLibre(${dvLigne},this.value)" onchange="renderDevis()">
       <button class="btn xs" onclick="dvReprendreActe(${dvLigne})">↩ Reprendre un acte du catalogue</button></div>`
-    :`<div class="ap-l">${actesDe(DV.fam).map(c=>`<button class="apc ${L.type===c.id?'on':''}" onclick="dvSetActe('${c.id}')">
+    :`<div class="ap-l">${catsUtilisees().map(k=>{const G=actesDeCat(k);
+       return G.length?`<div class="ap-g"><span class="ap-c">${esc(k)}</span>${G.map(c=>`<button class="apc ${L.type===c.id?'on':''}" onclick="dvSetActe('${c.id}')">
      <span class="dot" style="background:var(--${c.col||'accent'})"></span>${esc(c.n)}
-     <small>${CAN('prix')&&c.prix?EUR(c.prix):'à l’unité'}</small></button>`).join('')}</div>`}
+     <small>${CAN('prix')&&c.prix?EUR(c.prix):'à l’unité'}</small></button>`).join('')}</div>`:''}).join('')}</div>`}
   </div>
   ${C.zoned?`<div class="modebar">
-    <div class="ap-t" style="width:100%;margin:0 0 2px">3 · Où ? <span class="mu" style="text-transform:none;letter-spacing:0;font-weight:500">— facultatif</span></div>
+    <div class="ap-t" style="width:100%;margin:0 0 2px">2 · Où ? <span class="mu" style="text-transform:none;letter-spacing:0;font-weight:500">— facultatif</span></div>
     ${regionsDe(L.type).length>1?`<div class="seg">${regionsDe(L.type).map(r=>{const R=regDef(r);
       return `<button class="${L.reg===r?'on':''}" onclick="dvSetReg('${r}')" title="${esc(R.n)}">${R.i} ${esc(R.court||R.n)}</button>`}).join('')}</div>`:''}
     ${estBareme(L.reg)?'<span class="mu" style="font-size:11.5px">tarifs à la séance</span>':''}
-    ${(estBareme(L.reg)||L.reg!=='visage'||DV.fam!=='esth')?'':`<div class="preset dvproto">
+    ${(estBareme(L.reg)||L.reg!=='visage')?'':`<div class="preset dvproto">
       <span class="mu" style="font-size:11px;align-self:center;margin-right:2px">Protocole :</span>
       ${PROTOS.map((x,i)=>`<button class="chip" onclick="dvProto(${i})" title="${esc(protoResume(x))}">${esc(x.n)}</button>`).join('')}
       <button class="chip" onclick="dvMirror()">⇄ Symétriser</button></div>`}
@@ -12380,7 +12422,7 @@ function renderDevis(){
    <div>
     ${C.zoned?'':`<div class="tip" style="margin-bottom:11px"><span class="e">ℹ️</span><div><b>${esc(C.n)}</b> ne se localise pas : indiquez la quantité et le montant.</div></div>`}
     <div class="recap" onkeydown="dvKey(event)">
-     <div class="rc-h">📄 Devis ${famById(DV.fam).n.toLowerCase()}</div>
+     <div class="rc-h">📄 ${esc(trame(DV.fam).titre)}<small class="mu" style="font-weight:500;margin-left:6px">— la trame suit les actes</small></div>
      <div class="rc-l">
      ${DV.lignes.map((l,i)=>{const lb=l.type===null&&l.libre!=null, vd=l.type===null&&l.libre==null;
        const c=(lb||vd)?CNUL:acteDef(l.type), zs=Object.keys(l.z||{}).length;
@@ -13092,7 +13134,9 @@ function voixEssayer(t){
 function voixFermer(){ voixArreter(); VX=null; vxBouton();
  const n=document.getElementById('voix'); if(n) n.classList.remove('on');
  document.getElementById('scrim').classList.remove('on') }
-function voixArreter(){ if(vxMoteur){ try{ vxMoteur.onend=null; vxMoteur.stop() }catch(e){} vxMoteur=null }
+function voixArreter(){ if(vxMoteur){
+  try{ vxMoteur.onend=vxMoteur.onerror=vxMoteur.onresult=vxMoteur.onstart=null; vxMoteur.stop() }catch(e){}
+  vxMoteur=null }
  if(VX) VX.on=false }
 function voixEcouter(){
  if(!VOIX_OK||!VX) return;
@@ -13101,8 +13145,11 @@ function voixEcouter(){
  const m=new R();
  const dictee=VX.mode==='consultation';
  m.lang='fr-FR'; m.interimResults=true; m.continuous=dictee; m.maxAlternatives=dictee?1:3;
- m.onstart=()=>{ VX.on=true; VX.erreur=null; VX.partiel=''; renderVoix() };
+ /* le moteur répond de façon asynchrone : le panneau a pu être refermé
+    entre-temps, et il n'y a plus rien à mettre à jour */
+ m.onstart=()=>{ if(!VX) return; VX.on=true; VX.erreur=null; VX.partiel=''; renderVoix() };
  m.onresult=e=>{
+   if(!VX) return;
    let fini='', partiel='';
    for(let i=e.resultIndex;i<e.results.length;i++){
      const r=e.results[i];
@@ -13122,7 +13169,7 @@ function voixEcouter(){
      /* naviguer est sans conséquence : on y va. Écrire attend un accord. */
      if(it.ok&&!it.sur){ voixExecuter() } else renderVoix() }
  };
- m.onerror=e=>{ VX.on=false;
+ m.onerror=e=>{ if(!VX) return; VX.on=false;
    VX.erreur=({'not-allowed':'refus','service-not-allowed':'refus','no-speech':'silence',
      'audio-capture':'micro','network':'reseau'})[e.error]||'erreur';
    renderVoix() };
