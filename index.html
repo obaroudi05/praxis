@@ -8315,6 +8315,7 @@ V.params=()=>{
         </div></div>`).join('')}
      </div></div>
    </div>
+   ${carteClasseur()}
    ${carteSauvegarde()}`;
   },
 
@@ -11566,7 +11567,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='CY';
+const BUILD='CZ';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -13609,6 +13610,7 @@ function paint(){
  document.getElementById('main').innerHTML=(V[view]||V.dash)();
  bindBA(); bindGZ(); calerCumul();
  if(typeof cfgPlanifier==='function') cfgPlanifier();
+ if(typeof clPlanifier==='function') clPlanifier();
 }
 /* Le schéma cumulé prend la hauteur qui reste réellement sous lui : l'en-tête
    du patient passe sur deux lignes quand la fenêtre se resserre, une hauteur
@@ -13645,8 +13647,8 @@ document.querySelectorAll('#nav a[data-v]').forEach(a=>a.onclick=()=>{
    Le catalogue, les catégories, les protocoles, les zones du schéma, les
    consommables, l'identité du cabinet et les règles de facturation sont
    enregistrés dans ce navigateur et rechargés à l'ouverture : une nouvelle
-   version du logiciel ne les efface plus. Le jeu de démonstration — patients,
-   séances, factures — reste fictif et se régénère à chaque ouverture.
+   version du logiciel ne les efface plus. Les dossiers eux-mêmes — patients,
+   séances, devis, factures — sont conservés à part, dans le classeur.
    ========================================================================== */
 const CFG_CLE='praxis.reglages.v1';
 let cfgQuand=null, cfgEtat='', cfgActif=false;
@@ -13795,8 +13797,9 @@ function carteSauvegarde(){
        <b>Exportez-les</b> pour ne rien perdre.</div></div>`
      :`<div class="mu" style="font-size:11.5px;margin-bottom:10px">Le catalogue, les catégories, les protocoles, les zones du schéma,
        les consommables, les modèles et les règles de facturation sont conservés dans <b>ce navigateur</b> et rechargés à l’ouverture :
-       <b>une mise à jour du logiciel ne les efface plus</b>. Les patients, séances et factures de démonstration restent fictifs et se régénèrent à chaque ouverture.
-       L’export produit un fichier qui rejoue votre configuration sur un autre poste.</div>`}
+       <b>une mise à jour du logiciel ne les efface plus</b>. Les patients, séances et factures sont conservés à part, dans <b>votre classeur</b>, juste au-dessus.
+       L’export produit un fichier qui rejoue votre configuration sur un autre poste ; pour tout emporter, réglages <i>et</i> dossiers,
+       utilisez la sauvegarde du classeur.</div>`}
     <div style="display:flex;flex-wrap:wrap;gap:5px">${D.map(x=>
       `<span class="bdg b-neu">${esc(x.l)} · ${x.n}</span>`).join('')}</div>
     ${cfgRAZ?`<div class="suppb" style="margin-top:11px"><span class="e">⚠</span>
@@ -13808,10 +13811,225 @@ function carteSauvegarde(){
     <div class="mu" style="font-size:11px;margin-top:9px">Sauvegarde ${poids} Ko · clé <span class="mono">${CFG_CLE}</span></div>
    </div></div>`;
 }
-cfgCharger();
-cfgActif=true;
-paint();
-initVersion();
+/* ==========================================================================
+   Votre classeur
+   --------------------------------------------------------------------------
+   Les réglages étaient déjà conservés. Les dossiers, eux, se régénéraient à
+   chaque ouverture : ce qu'on saisissait le lundi n'existait plus le mardi.
+   Ils sont désormais écrits dans ce navigateur, dans une base locale qui
+   accepte le poids des photos — ce qu'un simple stockage de clés ne peut pas.
+
+   Ce que cela veut dire, et il faut le dire clairement : le classeur vit dans
+   CE navigateur, sur CE poste. Il ne part nulle part, personne d'autre ne le
+   voit, et il disparaît avec le profil du navigateur. C'est pour cela que la
+   sauvegarde vers un fichier n'est pas un ornement mais la seule chose qui
+   protège vraiment ce qui est saisi.
+   ========================================================================== */
+const CL_BASE='praxis', CL_MAG='classeur', CL_CLE='v1';
+let clB=null, clQuand=null, clEtat='', clActif=false, clDernier='', clOccupe=false;
+
+const CLA={
+ patients:  {l:'Patients',    lit:()=>PATIENTS,    ecrit:v=>remplTab(PATIENTS,v)},
+ actes:     {l:'Séances',     lit:()=>ACTES,       ecrit:v=>remplTab(ACTES,v)},
+ devis:     {l:'Devis',       lit:()=>DEVIS,       ecrit:v=>remplTab(DEVIS,v)},
+ factures:  {l:'Factures',    lit:()=>FACTURES,    ecrit:v=>remplTab(FACTURES,v)},
+ avoirs:    {l:'Avoirs',      lit:()=>AVOIRS,      ecrit:v=>remplTab(AVOIRS,v)},
+ photos:    {l:'Photos',      lit:()=>PHOTOS,      ecrit:v=>remplTab(PHOTOS,v)},
+ retouches: {l:'Retouches',   lit:()=>RETOUCHES,   ecrit:v=>remplTab(RETOUCHES,v)},
+ docs:      {l:'Documents',   lit:()=>AUTRES_DOCS, ecrit:v=>remplTab(AUTRES_DOCS,v)},
+ envois:    {l:'Envois',      lit:()=>ENVOIS,      ecrit:v=>remplTab(ENVOIS,v)},
+ liens:     {l:'Liens de signature', lit:()=>LIENS, ecrit:v=>remplTab(LIENS,v)},
+ signatures:{l:'Signatures',  lit:()=>SIGNS,       ecrit:v=>{ if(v&&typeof v==='object') SIGNS=v }},
+ conso:     {l:'Consommations',lit:()=>CONSO,      ecrit:v=>remplTab(CONSO,v)},
+ mouvements:{l:'Mouvements de stock', lit:()=>MVT, ecrit:v=>remplTab(MVT,v)},
+ rappels:   {l:'Rappels envoyés', lit:()=>RAPPELS, ecrit:v=>remplTab(RAPPELS,v)},
+};
+/* L'empreinte sert à savoir si le classeur a bougé. Elle exclut l'horodatage,
+   qui change à chaque appel : sans cela on réécrirait la base toutes les
+   secondes en croyant détecter un changement. */
+const clSignature=o=>{ const c={...o}; delete c._le; delete c._build; return JSON.stringify(c) };
+const clPaquet=()=>{ const o={_v:1,_build:BUILD,_le:new Date().toISOString()};
+  Object.keys(CLA).forEach(k=>{ try{ o[k]=JSON.parse(JSON.stringify(CLA[k].lit())) }catch(e){ o[k]=null } });
+  return o };
+function clAppliquer(o){
+ if(!o||typeof o!=='object') return false;
+ let pris=0;
+ Object.keys(CLA).forEach(k=>{ if(o[k]!==undefined&&o[k]!==null){ try{ CLA[k].ecrit(o[k]); pris++ }catch(e){} } });
+ return pris>0;
+}
+
+/* Ouvrir la base. En navigation privée, ou si le poste bloque le stockage,
+   on n'insiste pas : on le dit et on continue sans mémoire, plutôt que de
+   laisser croire que le travail est gardé. */
+function clOuvrir(){ return new Promise(fini=>{
+ let rq; try{ rq=indexedDB.open(CL_BASE,1) }catch(e){ clEtat='refus'; return fini(false) }
+ rq.onupgradeneeded=()=>{ const b=rq.result;
+   if(!b.objectStoreNames.contains(CL_MAG)) b.createObjectStore(CL_MAG) };
+ rq.onsuccess=()=>{ clB=rq.result; fini(true) };
+ rq.onerror=()=>{ clEtat='refus'; fini(false) };
+ rq.onblocked=()=>{ clEtat='refus'; fini(false) };
+ setTimeout(()=>{ if(!clB&&!clEtat){ clEtat='refus'; fini(false) } },4000);
+})}
+function clLire(){ return new Promise(fini=>{
+ if(!clB) return fini(null);
+ let t; try{ t=clB.transaction(CL_MAG,'readonly') }catch(e){ return fini(null) }
+ const rq=t.objectStore(CL_MAG).get(CL_CLE);
+ rq.onsuccess=()=>fini(rq.result||null);
+ rq.onerror=()=>fini(null);
+})}
+function clEcrire(o){ return new Promise(fini=>{
+ if(!clB){ clEtat=clEtat||'refus'; return fini(false) }
+ let t; try{ t=clB.transaction(CL_MAG,'readwrite') }catch(e){ clEtat='refus'; return fini(false) }
+ t.objectStore(CL_MAG).put(o,CL_CLE);
+ t.oncomplete=()=>{ clQuand=new Date(); clEtat=''; fini(true) };
+ t.onerror=()=>{ const n=String(t.error&&t.error.name);
+   clEtat=/quota/i.test(n)?'plein':'refus'; fini(false) };
+ t.onabort=()=>{ const n=String(t.error&&t.error.name);
+   clEtat=/quota/i.test(n)?'plein':'refus'; fini(false) };
+})}
+function clVider(){ return new Promise(fini=>{
+ if(!clB) return fini(false);
+ let t; try{ t=clB.transaction(CL_MAG,'readwrite') }catch(e){ return fini(false) }
+ t.objectStore(CL_MAG).delete(CL_CLE);
+ t.oncomplete=()=>fini(true); t.onerror=()=>fini(false);
+})}
+
+/* On n'écrit pas à chaque frappe, et on n'écrit pas non plus pour rien : si
+   le classeur n'a pas bougé depuis la dernière écriture, on ne réécrit pas. */
+let clT=null;
+function clPlanifier(){ if(!clActif) return;
+ if(clT) clearTimeout(clT);
+ clT=setTimeout(async()=>{ clT=null; if(clOccupe) return clPlanifier();
+   let o,t; try{ o=clPaquet(); t=clSignature(o) }catch(e){ return }
+   if(t===clDernier) return;
+   clOccupe=true; const ok=await clEcrire(o); clOccupe=false;
+   if(ok) clDernier=t;
+   majEtatClasseur();
+ },900) }
+/* La carte du classeur est visible dans les réglages : quand l'état change,
+   on ne repeint que là, pas tout l'écran. */
+function majEtatClasseur(){
+ const e=document.getElementById('cl-etat'); if(!e) return;
+ e.textContent=clEtat?'non enregistré':'enregistré '+clQuandTxt();
+ e.style.color=clEtat?'var(--warn)':'';
+}
+const clQuandTxt=()=>{ if(!clQuand) return 'pas encore enregistré';
+ const j=clQuand.toISOString().slice(0,10);
+ const h=String(clQuand.getHours()).padStart(2,'0')+'h'+String(clQuand.getMinutes()).padStart(2,'0');
+ return (j===TODAYS?'aujourd’hui':'le '+DF(j))+' à '+h };
+
+/* --------------------------------------------------------------------------
+   La sauvegarde complète : réglages ET dossiers dans un seul fichier.
+   C'est ce fichier, et lui seul, qui survit à un poste changé, un profil de
+   navigateur effacé, un disque qui lâche.
+   -------------------------------------------------------------------------- */
+function sauvegardeTotale(){
+ return {_v:1,_build:BUILD,_le:new Date().toISOString(),_quoi:'praxis-sauvegarde',
+         reglages:cfgPaquet(), classeur:clPaquet()};
+}
+function svExporter(){
+ const t=JSON.stringify(sauvegardeTotale());
+ const a=document.createElement('a');
+ a.href=URL.createObjectURL(new Blob([t],{type:'application/json'}));
+ a.download='praxis-sauvegarde-'+TODAYS+'.json';
+ document.body.appendChild(a); a.click();
+ setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove() },400);
+ try{ localStorage.setItem('praxis.derniere.sauvegarde',new Date().toISOString()) }catch(e){}
+ toast('Sauvegarde complète exportée · réglages et dossiers');
+ paint();
+}
+/* Un import accepte les deux formes : la sauvegarde complète, et l'ancien
+   export de réglages seuls. Refuser le second aurait cassé ce qui marchait. */
+function svImporter(inp){
+ const f=inp&&inp.files&&inp.files[0]; if(!f) return;
+ const r=new FileReader();
+ r.onload=async()=>{ let o=null;
+   try{ o=JSON.parse(String(r.result)) }catch(e){ toast('Ce fichier n’est pas une sauvegarde PRAXIS'); return }
+   let n=0;
+   if(o&&o.classeur&&clAppliquer(o.classeur)) n++;
+   if(o&&o.reglages&&cfgAppliquer(o.reglages)) n++;
+   if(!n&&cfgAppliquer(o)) n++;                    /* ancien export de réglages */
+   if(!n&&clAppliquer(o)) n++;
+   if(!n){ toast('Ce fichier ne contient rien de reconnaissable'); return }
+   cfgEcrire();
+   const p=clPaquet(); await clEcrire(p); clDernier=clSignature(p);
+   paint();
+   toast(`Sauvegarde reprise · ${PATIENTS.length} patients, ${ACTES.length} séances, ${DEVIS.length} devis`) };
+ r.onerror=()=>toast('Fichier illisible');
+ r.readAsText(f); inp.value='';
+}
+let clRAZ=false;
+async function clOublier(ok){
+ if(!ok){ clRAZ=true; paint(); return }
+ clActif=false; await clVider(); location.reload();
+}
+const CL_EMPECHE={
+ refus:'Ce navigateur refuse le stockage local — navigation privée, ou stockage bloqué par une règle du poste. <b>Rien de ce que vous saisissez ne sera conservé.</b>',
+ plein:'L’espace de stockage de ce navigateur est saturé : le classeur n’a pas pu être enregistré.',
+};
+/* Depuis combien de jours la dernière sauvegarde vers un fichier ? Un classeur
+   qui n'existe qu'ici n'est pas sauvegardé, il est simplement pas encore perdu. */
+function svAge(){
+ let t=null; try{ t=localStorage.getItem('praxis.derniere.sauvegarde') }catch(e){}
+ if(!t) return null;
+ return Math.floor((Date.now()-new Date(t).getTime())/86400000);
+}
+function carteClasseur(){
+ const D=Object.keys(CLA).map(k=>{ const v=CLA[k].lit();
+   return {l:CLA[k].l, n:Array.isArray(v)?v.length:Object.keys(v||{}).length} }).filter(x=>x.n);
+ let poids=0; try{ poids=Math.round(JSON.stringify(clPaquet()).length/1024) }catch(e){}
+ const age=svAge();
+ const alerte=clEtat?CL_EMPECHE[clEtat]
+   :(age===null?'Ce classeur n’a <b>jamais</b> été sauvegardé vers un fichier. Il n’existe que dans ce navigateur, sur ce poste.'
+   :(age>=7?`Dernière sauvegarde vers un fichier il y a <b>${age} jours</b>.`:''));
+ return `<div class="card" style="margin-top:13px"><div class="h"><h2>Votre classeur</h2>
+    <span class="s" id="cl-etat"${clEtat?' style="color:var(--warn)"':''}>${clEtat?'non enregistré':'enregistré '+clQuandTxt()}</span>
+    <div class="r">
+      <button class="btn xs p" onclick="svExporter()">⭳ Sauvegarder</button>
+      <button class="btn xs" onclick="document.getElementById('svf').click()">⭱ Restaurer</button>
+      <input type="file" id="svf" accept=".json,application/json" style="display:none" onchange="svImporter(this)">
+      <button class="btn xs" onclick="clOublier(false)">Repartir de la démonstration</button></div></div>
+   <div class="b">
+    ${alerte?`<div class="tip" style="margin-bottom:10px"><span class="e">⚠️</span><div>${alerte}
+       ${clEtat?'':'<b>Sauvegardez</b> : c’est le seul fichier qui survivrait à un poste changé ou à un profil de navigateur effacé.'}</div></div>`
+     :`<div class="mu" style="font-size:11.5px;margin-bottom:10px">Vos patients, séances, devis, factures et photos sont conservés dans
+       <b>ce navigateur</b>, sur <b>ce poste</b>, et rechargés à l’ouverture. Ils ne partent nulle part et personne d’autre n’y accède —
+       mais ils disparaîtraient avec le profil du navigateur. La sauvegarde produit un fichier unique qui contient
+       <b>les réglages et les dossiers</b>, et qui les rejoue ailleurs.</div>`}
+    <div style="display:flex;flex-wrap:wrap;gap:5px">${D.length?D.map(x=>
+      `<span class="bdg b-neu">${esc(x.l)} · ${x.n}</span>`).join(''):'<span class="mu">Classeur vide</span>'}</div>
+    ${clRAZ?`<div class="suppb" style="margin-top:11px"><span class="e">⚠</span>
+      <div style="flex:1;min-width:0"><b>Effacer le classeur et reprendre la démonstration ?</b>
+       <div class="mu">Vos ${PATIENTS.length} patients, ${ACTES.length} séances et ${DEVIS.length} devis seront remplacés par le jeu fictif.
+        <b>Sauvegardez d’abord</b> si vous voulez pouvoir y revenir : c’est sans retour.</div></div>
+      <button class="btn xs g" onclick="clRAZ=false;paint()">Annuler</button>
+      <button class="btn xs crit" onclick="clOublier(true)">Effacer</button></div>`:''}
+    <div class="mu" style="font-size:11px;margin-top:9px">Classeur ${poids} Ko${age!==null?' · dernière sauvegarde '+(age?'il y a '+age+' j':'aujourd’hui'):''}</div>
+   </div></div>`;
+}
+
+/* --------------------------------------------------------------------------
+   Démarrage. On lit le classeur avant de peindre : ouvrir le logiciel sur la
+   démonstration puis la voir remplacée sous les yeux serait déroutant.
+   -------------------------------------------------------------------------- */
+(async()=>{
+ cfgCharger();
+ cfgActif=true;
+ if(await clOuvrir()){
+   const o=await clLire();
+   if(o&&clAppliquer(o)){
+     clQuand=o._le?new Date(o._le):null;
+     try{ clDernier=clSignature(clPaquet()) }catch(e){}
+   }
+   /* Demander au navigateur de ne pas évincer ces données quand il fait de
+      la place. Il peut refuser ; on ne le lui reproche pas, on le note. */
+   try{ if(navigator.storage&&navigator.storage.persist) await navigator.storage.persist() }catch(e){}
+ }
+ clActif=true;
+ paint();
+ initVersion();
+})();
+
 </script>
 </body>
 </html>
