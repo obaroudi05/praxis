@@ -1357,6 +1357,10 @@ th.tri.on.desc::after{content:'▼'}
 .dtog.lock{cursor:default;opacity:.72}
 .prc{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:9px;background:var(--panel-2)}
 .prc.warn{border-color:rgba(250,178,25,.5);background:var(--warn-w)}
+/* Une fiche de praticien parti reste lisible, mais s'efface visuellement :
+   elle est là pour l'historique, pas pour le travail du jour. */
+.prc.parti{opacity:.62;background:var(--panel)}
+.prc.parti .prc-g{filter:grayscale(.35)}
 /* --- l'écran de connexion : sobre, centré, sans rien qui distraie --- */
 body.en-connexion #nav,body.en-connexion aside .who,body.en-connexion aside .av,
 body.en-connexion .rolebtn{display:none!important}
@@ -2221,6 +2225,13 @@ const protoActes=P=>[...new Set(Object.keys(P.z).map(z=>protoActe(P,z))
   .concat(protoTousSup(P).map(x=>x.t)))];
 
 /* ---------- Référentiels ---------- */
+/* La liste des praticiens en exercice. Elle était figée ici, à côté des
+   fiches praticien des paramètres — si bien qu'ajouter une fiche ne rendait
+   personne sélectionnable nulle part. Elle se déduit désormais des fiches :
+   une fiche ajoutée apparaît dans les listes, une fiche dont le praticien
+   est parti en disparaît.
+   Le tableau reste le même objet (une quinzaine d'écrans le référencent) :
+   on remplace son contenu, jamais le tableau lui-même. */
 const PRATICIENS=['Dr O. Baroudi','Dr A. Merlin'];
 /* Le pot commun : ce que le cabinet achète pour tout le monde. Il n'appartient
    à personne en particulier, et c'est là qu'on puise quand sa propre part
@@ -3806,6 +3817,134 @@ let PRATS=[
 ];
 const pratInfo=n=>PRATS.find(x=>x.nom===n)||PRATS[0];
 const rcpAlerte=x=>days(TODAYS,x.rcpFin)<90;
+
+/* --------------------------------------------------------------------------
+   Qui exerce ici, aujourd'hui
+   --------------------------------------------------------------------------
+   Une fiche porte « parti » quand le praticien a quitté la structure. Il sort
+   alors des listes de saisie — on ne lui attribue plus de séance — mais son
+   nom reste sur tout ce qu'il a fait. C'est la seule façon honnête : une
+   facture doit continuer de désigner celui qui a soigné.
+   -------------------------------------------------------------------------- */
+const pratActif = x => x && !x.parti && String(x.nom||'').trim();
+function majPraticiens(){
+ const noms = PRATS.filter(pratActif).map(x=>x.nom);
+ /* Jamais vide : sans praticien, on ne pourrait plus rien saisir. Si tout le
+    monde est parti, on garde le premier de la liste plutôt que de casser
+    l'application. */
+ const L = noms.length ? noms : (PRATS.length ? [PRATS[0].nom] : ['Praticien']);
+ PRATICIENS.length = 0; L.forEach(n => PRATICIENS.push(n));
+}
+
+/* --------------------------------------------------------------------------
+   Ce qu'un praticien laisse derrière lui
+   --------------------------------------------------------------------------
+   On ne demande pas « voulez-vous supprimer ? » sans dire ce que cela touche.
+   Le bilan sert à trancher entre deux situations qui n'ont rien à voir :
+
+     · une fiche créée par erreur, qui n'a jamais rien porté — elle s'efface ;
+     · un praticien qui a exercé — il ne s'efface PAS. Ses actes, ses factures
+       et ses mouvements de stock restent à son nom, parce qu'un dossier
+       médical et une pièce comptable doivent continuer de désigner celui qui
+       les a faits. Il quitte les listes de saisie, c'est tout.
+   -------------------------------------------------------------------------- */
+function bilanPrat(nom){
+ const A = (typeof ACTES!=='undefined'?ACTES:[]).filter(a=>a.praticien===nom).length;
+ const F = (typeof FACTURES!=='undefined'?FACTURES:[]).filter(f=>f.praticien===nom).length;
+ const D = (typeof DEVIS!=='undefined'?DEVIS:[]).filter(d=>d.praticien===nom).length;
+ const P = (typeof PATIENTS!=='undefined'?PATIENTS:[]).filter(p=>p.prat===nom).length;
+ const M = (typeof MVT!=='undefined'?MVT:[]).filter(m=>m.par===nom||m.qui===nom).length;
+ /* Le stock à son nom : c'est le point qu'on oublie. Des flacons attribués à
+    quelqu'un qui n'est plus là ne sont comptés nulle part — ni à lui, ni au
+    cabinet. Ils doivent revenir au pot commun. */
+ let flacons = 0, refs = 0;
+ (typeof STOCK!=='undefined'?STOCK:[]).forEach(x=>{
+   let n = 0;
+   lotsDe(x).forEach(l=>{ n += lotPart(l, nom) });
+   if(n>0){ flacons += n; refs++ }
+ });
+ return {actes:A, factures:F, devis:D, patients:P, mouvements:M,
+         stock:+flacons.toFixed(2), stockRefs:refs,
+         vierge: !A && !F && !D && !P && !M && !flacons};
+}
+
+/* --------------------------------------------------------------------------
+   Le départ
+   --------------------------------------------------------------------------
+   Trois choses à faire, et la deuxième est celle qu'on oublie :
+     1. marquer la fiche « parti », avec la date ;
+     2. rendre au pot commun les produits qui étaient à son nom ;
+     3. réattribuer ses patients à quelqu'un qui exerce encore.
+   -------------------------------------------------------------------------- */
+function partirPraticien(nom, repreneur){
+ const i = PRATS.findIndex(x=>x.nom===nom);
+ if(i<0) return;
+ let rendus = 0;
+ (typeof STOCK!=='undefined'?STOCK:[]).forEach(x=>{
+   lotsDe(x).forEach(l=>{
+     const q = lotPart(l, nom);
+     if(q>0){
+       normLot(l);
+       l.p[PART_COMMUN] = (+l.p[PART_COMMUN]||0) + q;
+       delete l.p[nom];
+       rendus += q;
+       /* Le mouvement est écrit : un produit qui change de main sans trace,
+          c'est un stock qu'on ne saura plus expliquer. */
+       if(typeof MVT!=='undefined') MVT.unshift({
+         id:'MV-'+(MVT.length+1), ts:new Date().toISOString().slice(0,16),
+         par:monPrat(), t:'transfert', ref:x.ref, nom:x.n, lot:l.lot||'', per:l.per,
+         q, qui:PART_COMMUN, acte:null, patient:null,
+         note:`Départ de ${nom} — parts rendues au pot commun`});
+     }
+   });
+   recalcStock(x);
+ });
+
+ let reattribues = 0;
+ if(repreneur && typeof PATIENTS!=='undefined')
+   PATIENTS.forEach(p=>{ if(p.prat===nom){ p.prat=repreneur; reattribues++ } });
+
+ PRATS[i].parti = TODAYS;
+ majPraticiens();
+ paint();
+ const bouts=[];
+ if(rendus) bouts.push(`${NUM(rendus)} unité(s) rendues au pot commun`);
+ if(reattribues) bouts.push(`${reattribues} patient(s) confiés à ${repreneur}`);
+ toast(`${nom} ne fait plus partie de l’équipe${bouts.length?' · '+bouts.join(' · '):''}`);
+}
+
+function reintegrerPraticien(nom){
+ const i = PRATS.findIndex(x=>x.nom===nom);
+ if(i<0) return;
+ delete PRATS[i].parti;
+ majPraticiens(); paint();
+ toast(`${nom} est de nouveau dans l’équipe`);
+}
+
+/* Une fiche qui n'a jamais rien porté s'efface pour de bon : c'est une erreur
+   de saisie, pas un praticien. */
+function effacerFichePrat(nom){
+ const i = PRATS.findIndex(x=>x.nom===nom);
+ if(i<0) return;
+ if(!bilanPrat(nom).vierge){ toast('Cette fiche porte des données : elle se retire, elle ne s’efface pas'); return }
+ PRATS.splice(i,1);
+ majPraticiens(); paint();
+ toast('Fiche supprimée');
+}
+
+let pratRetrait = null;   /* la fiche dont on est en train de confirmer le retrait */
+
+/* Pour les FILTRES et l'historique, c'est l'inverse : il faut aussi les
+   praticiens partis, sinon on ne pourrait plus retrouver ce qu'ils ont fait.
+   On prend donc ceux qui exercent, plus ceux qui apparaissent dans les
+   données — un praticien effacé des fiches mais présent sur cent actes doit
+   rester filtrable. */
+function pratsFiltre(){
+ const vus = new Set(PRATICIENS);
+ (typeof ACTES!=='undefined'?ACTES:[]).forEach(a=>{ if(a.praticien) vus.add(a.praticien) });
+ (typeof FACTURES!=='undefined'?FACTURES:[]).forEach(f=>{ if(f.praticien) vus.add(f.praticien) });
+ return [...vus];
+}
 const VARS=['prenom','nom','cabinet','raison','praticien','rpps','siret','tva','ape','adresse','tel','mail','site','rcp','acte','remise','code','validite','date','montant'];
 let MODELES=[
  {id:'anniv-sms', cat:'Anniversaire', canal:'SMS', nom:'Anniversaire — SMS', actif:true,
@@ -5195,7 +5334,7 @@ function pListe(){
      <input class="inp" style="flex:1;box-shadow:none" placeholder="Nom, e-mail, téléphone…" value="${esc(pq)}"
        oninput="pq=this.value;paint();const e=document.querySelector('.md .inp');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
      <select class="inp" style="box-shadow:none;width:130px" onchange="pPrat=this.value;paint()">
-       <option value="">Tous</option>${PRATICIENS.map(x=>`<option ${pPrat===x?'selected':''}>${x}</option>`).join('')}</select>
+       <option value="">Tous</option>${pratsFiltre().map(x=>`<option ${pPrat===x?'selected':''}>${x}</option>`).join('')}</select>
    </div>
    <div class="tw"><table>
     <thead><tr>${thPat('nom')}${thPat('actes','num')}${thPat('dernier')}${thPat('prat')}<th>Contact</th><th></th></tr></thead>
@@ -6112,7 +6251,7 @@ V.actes=()=>{
   <div class="seg"><button class="${!aCat?'on':''}" onclick="aCat='';paint()">Tout</button>
    ${CATS.map(c=>`<button class="${aCat===c?'on':''}" onclick="aCat='${c}';paint()">${c}</button>`).join('')}</div>
   <select class="inp" onchange="aPrat=this.value;paint()"><option value="">Tous praticiens</option>
-   ${PRATICIENS.map(x=>`<option ${aPrat===x?'selected':''}>${x}</option>`).join('')}</select>
+   ${pratsFiltre().map(x=>`<option ${aPrat===x?'selected':''}>${x}</option>`).join('')}</select>
  </div>
  ${periodBar(perA,'setPerA',`${L.length} acte${L.length>1?'s':''}`,PRESETS_STD,1)}
  <div class="card"><div class="tw"><table>
@@ -6271,7 +6410,7 @@ function choixRetro(){
  return `<span class="relx"><span class="mu">Relevé de</span>
    <select class="inp" title="Le praticien à qui le relevé sera transmis"
      onchange="setRetroPrat(this.value)">
-     ${PRATICIENS.map(x=>`<option value="${esc(x)}" ${q===x?'selected':''}>${esc(x)}</option>`).join('')}
+     ${pratsFiltre().map(x=>`<option value="${esc(x)}" ${q===x?'selected':''}>${esc(x)}</option>`).join('')}
      <option value="" ${q===''?'selected':''}>Tous les praticiens</option></select>
    <button class="btn" onclick="releveRetro(retroQui())">⭳ Exporter le relevé</button></span>`;
 }
@@ -6395,7 +6534,7 @@ function barreFiltres(){
    ${[['tous','Tous statuts'],['solde','Soldées'],['reste','Avec reste dû'],['avoir','Avec avoir'],['annulee','Annulées']]
      .map(([k,l])=>`<option value="${k}" ${fStatut===k?'selected':''}>${l}</option>`).join('')}</select>
   <select class="inp" onchange="fPrat=this.value;paint()"><option value="">Tous praticiens</option>
-   ${PRATICIENS.map(x=>`<option ${fPrat===x?'selected':''}>${x}</option>`).join('')}</select>
+   ${pratsFiltre().map(x=>`<option ${fPrat===x?'selected':''}>${x}</option>`).join('')}</select>
   <select class="inp" onchange="fCat=this.value;paint()"><option value="">Toutes catégories</option>
    ${CATS.map(x=>`<option ${fCat===x?'selected':''}>${x}</option>`).join('')}</select>
   ${(fq||fMoyen!=='tous'||fStatut!=='tous'||fPrat||fCat)?`<button class="chip" onclick="fq='';fMoyen='tous';fStatut='tous';fPrat='';fCat='';paint()">✕ Effacer</button>`:''}
@@ -8338,11 +8477,44 @@ V.params=()=>{
         <div class="mu" style="font-size:11.5px;margin-top:6px">Modifiable en détail dans l’onglet <b>Modèles de document</b>.</div></div>
     </div></div>
     <div class="card"><div class="h"><h2>Praticiens</h2><span class="s">identifiants et assurance</span>
-      <div class="r"><button class="btn xs p" onclick="PRATS.push({nom:'Nouveau praticien',specialite:'Médecine esthétique',rpps:'',adeli:'',ordre:'',siret:'',tva:'',rcpCie:'',rcpPolice:'',rcpFin:''});paint()">+</button></div></div>
+      <div class="r"><button class="btn xs p" onclick="PRATS.push({nom:'Nouveau praticien',specialite:'Médecine esthétique',rpps:'',adeli:'',ordre:'',siret:'',tva:'',rcpCie:'',rcpPolice:'',rcpFin:''});majPraticiens();paint()">+</button></div></div>
      <div class="b">
-      ${PRATS.map((x,i)=>`<div class="prc ${rcpAlerte(x)?'warn':''}">
-        <div class="prc-h"><input class="inp" style="flex:1;font-weight:650" value="${esc(x.nom)}" onchange="PRATS[${i}].nom=this.value;paint()">
-          ${rcpAlerte(x)?`<span class="bdg b-warn">⚠ RCP expire le ${DF(x.rcpFin)}</span>`:`<span class="bdg b-good">RCP à jour</span>`}</div>
+      ${PRATS.map((x,i)=>{ const B=bilanPrat(x.nom), parti=!!x.parti; return `<div class="prc ${parti?'parti':(rcpAlerte(x)?'warn':'')}">
+        <div class="prc-h"><input class="inp" style="flex:1;font-weight:650" value="${esc(x.nom)}" onchange="PRATS[${i}].nom=this.value;majPraticiens();paint()">
+          ${parti ? `<span class="bdg b-neu">Parti le ${DF(x.parti)}</span>
+             <button class="btn xs" onclick="reintegrerPraticien(${JSON.stringify(x.nom).replace(/"/g,'&quot;')})">Réintégrer</button>`
+           : `${rcpAlerte(x)?`<span class="bdg b-warn">⚠ RCP expire le ${DF(x.rcpFin)}</span>`:`<span class="bdg b-good">RCP à jour</span>`}
+             <button class="btn xs" title="${B.vierge?'Fiche vide : elle peut être supprimée':'Ce praticien a exercé : sa fiche se retire, elle ne s’efface pas'}"
+               onclick="pratRetrait=${JSON.stringify(x.nom).replace(/"/g,'&quot;')};paint()">${B.vierge?'Supprimer':'Ne travaille plus ici'}</button>`}</div>
+
+        ${pratRetrait===x.nom ? (B.vierge ? `<div class="suppb" style="margin:0 0 10px"><span class="e">⚠</span>
+            <div style="flex:1;min-width:0"><b>Supprimer cette fiche ?</b>
+              <div class="mu">Elle ne porte aucune séance, aucune facture, aucun patient ni produit. Rien ne sera perdu.</div></div>
+            <button class="btn xs g" onclick="pratRetrait=null;paint()">Annuler</button>
+            <button class="btn xs crit" onclick="pratRetrait=null;effacerFichePrat(${JSON.stringify(x.nom).replace(/"/g,'&quot;')})">Supprimer</button></div>`
+          : `<div class="suppb" style="margin:0 0 10px;align-items:flex-start"><span class="e">⚠</span>
+            <div style="flex:1;min-width:0"><b>${esc(x.nom)} ne travaille plus dans la structure ?</b>
+              <div class="mu" style="margin:3px 0 7px">Sa fiche <b>n’est pas supprimée</b> : ses actes, ses factures et ses mouvements de
+                stock doivent continuer à porter son nom. Il sort simplement des listes de saisie.</div>
+              <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">
+                ${B.actes?`<span class="bdg b-neu">${B.actes} séance${B.actes>1?'s':''}</span>`:''}
+                ${B.factures?`<span class="bdg b-neu">${B.factures} facture${B.factures>1?'s':''}</span>`:''}
+                ${B.devis?`<span class="bdg b-neu">${B.devis} devis</span>`:''}
+                ${B.mouvements?`<span class="bdg b-neu">${B.mouvements} mouvement${B.mouvements>1?'s':''} de stock</span>`:''}
+                ${B.patients?`<span class="bdg b-warn">${B.patients} patient${B.patients>1?'s':''} à confier</span>`:''}
+                ${B.stock?`<span class="bdg b-warn">${NUM(B.stock)} unité${B.stock>1?'s':''} à son nom sur ${B.stockRefs} référence${B.stockRefs>1?'s':''}</span>`:''}
+              </div>
+              ${B.stock?`<div class="mu" style="font-size:11.5px;margin-bottom:7px">Les produits à son nom reviendront au
+                <b>pot commun</b>, avec un mouvement de stock pour la trace — sinon ils ne seraient plus comptés nulle part.</div>`:''}
+              ${B.patients?`<label style="font-size:11.5px;color:var(--mu);display:block;margin-bottom:7px">Confier ses ${B.patients} patients à
+                <select class="inp" id="prat-repreneur" style="margin-top:3px">
+                  ${PRATS.filter(y=>pratActif(y)&&y.nom!==x.nom).map(y=>`<option value="${esc(y.nom)}">${esc(y.nom)}</option>`).join('')
+                    || '<option value="">— aucun autre praticien —</option>'}</select></label>`:''}
+            </div>
+            <button class="btn xs g" onclick="pratRetrait=null;paint()">Annuler</button>
+            <button class="btn xs crit" onclick="(function(){const s=document.getElementById('prat-repreneur');
+              pratRetrait=null; partirPraticien(${JSON.stringify(x.nom).replace(/"/g,'&quot;')}, s?s.value:null)})()">Confirmer le départ</button></div>`) : ''}
+
         <div class="prc-g">
           <label>Spécialité<input class="inp" value="${esc(x.specialite)}" onchange="PRATS[${i}].specialite=this.value"></label>
           <label>N° RPPS<input class="inp" value="${esc(x.rpps)}" onchange="PRATS[${i}].rpps=this.value;paint()"></label>
@@ -8353,7 +8525,7 @@ V.params=()=>{
           <label>Assureur RCP<input class="inp" value="${esc(x.rcpCie)}" onchange="PRATS[${i}].rcpCie=this.value;paint()"></label>
           <label>N° de police<input class="inp" value="${esc(x.rcpPolice)}" onchange="PRATS[${i}].rcpPolice=this.value;paint()"></label>
           <label>Échéance RCP<input class="inp" type="date" value="${x.rcpFin}" onchange="PRATS[${i}].rcpFin=this.value;paint()"></label>
-        </div></div>`).join('')}
+        </div></div>`}).join('')}
      </div></div>
    </div>
    ${carteBanc()}
@@ -11609,7 +11781,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DB';
+const BUILD='DC';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -13777,7 +13949,7 @@ const CFG={
  cabinet:   {l:'Cabinet',           lit:()=>CABINET,    ecrit:v=>fondObj(CABINET,v)},
  expediteur:{l:'Expéditeur',        lit:()=>EXPEDITEUR, ecrit:v=>fondObj(EXPEDITEUR,v)},
  droits:    {l:'Droits',            lit:()=>droitsDiff(), ecrit:v=>appliqueDroits(v)},
- prats:     {l:'Fiches praticien',  lit:()=>PRATS,      ecrit:v=>remplTab(PRATS,v)},
+ prats:     {l:'Fiches praticien',  lit:()=>PRATS,      ecrit:v=>{ remplTab(PRATS,v); majPraticiens() }},
  materiels: {l:'Matériels',         lit:()=>MATERIELS,  ecrit:v=>remplTab(MATERIELS,v)},
  modeles:   {l:'Modèles de message',lit:()=>MODELES,    ecrit:v=>remplTab(MODELES,v)},
  docmod:    {l:'Modèles de document',lit:()=>DOCMOD,    ecrit:v=>remplTab(DOCMOD,v)},
@@ -14526,6 +14698,7 @@ function srvAppliquerDroits(d, moi){
 
 (async()=>{
  cfgCharger();
+ majPraticiens();      /* les fiches font foi, y compris celles reprises d'une sauvegarde */
  cfgActif=true;
 
  /* 1 · Y a-t-il un serveur ? La question se pose avant tout le reste, parce
