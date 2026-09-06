@@ -3200,6 +3200,22 @@ const monPrat=()=>ROLES[role].u;
    Une assistante n'en a pas — ce qui la protège, c'est de ne pas avoir l'écran. */
 const estPraticien=()=>PRATICIENS.includes(monPrat());
 const filtrePrat=()=>(!caGlobal()&&estPraticien())?monPrat():null;
+/* --------------------------------------------------------------------------
+   Les praticiens dont j'ai le droit de voir les MONTANTS
+   --------------------------------------------------------------------------
+   mesFact() filtre des factures ; celle-ci filtre des COLONNES. Sans elle, un
+   écran qui boucle sur les praticiens pour afficher un taux ou une part
+   montre ceux des confrères — et l'on n'aurait rien gagné à filtrer les
+   lignes si les en-têtes disent tout.
+
+   Le taux de rétrocession est le cas exemplaire : ce n'est pas une donnée
+   patient, c'est une clause entre le titulaire et chaque praticien. Elle ne
+   regarde qu'eux deux.
+   -------------------------------------------------------------------------- */
+const pratsArgent=()=>{ const moi=filtrePrat(); return moi?[moi]:pratsFiltre() };
+/* Voir son taux, oui. Le changer, non : une rétrocession se convient, elle ne
+   se sert pas soi-même. Seul le titulaire du cabinet en dispose. */
+const peutReglerRetro=()=>caGlobal();
 const mesFact=L=>{const p=filtrePrat(); return p?L.filter(f=>f.praticien===p):L};
 const mesDevis=L=>{const p=filtrePrat(); return p?L.filter(d=>d.praticien===p):L};
 const EST_ADMIN=()=>role==='admin';
@@ -6410,8 +6426,8 @@ function choixRetro(){
  return `<span class="relx"><span class="mu">Relevé de</span>
    <select class="inp" title="Le praticien à qui le relevé sera transmis"
      onchange="setRetroPrat(this.value)">
-     ${pratsFiltre().map(x=>`<option value="${esc(x)}" ${q===x?'selected':''}>${esc(x)}</option>`).join('')}
-     <option value="" ${q===''?'selected':''}>Tous les praticiens</option></select>
+     ${pratsArgent().map(x=>`<option value="${esc(x)}" ${q===x?'selected':''}>${esc(x)}</option>`).join('')}
+     ${caGlobal()?`<option value="" ${q===''?'selected':''}>Tous les praticiens</option>`:''}</select>
    <button class="btn" onclick="releveRetro(retroQui())">⭳ Exporter le relevé</button></span>`;
 }
 const ENCV=[['detail','Facturations détaillées'],['jours','Totaux journaliers'],
@@ -6456,6 +6472,14 @@ function retroLignes(f){
    il s'agit, le détail justifie le total, le total se recolle au détail. */
 function releveRetro(prat){
  if(!CAN('compta')||!FACTU.double){ toast('Le relevé de rétrocession relève du suivi comptable'); return }
+ /* L'export est la porte par laquelle les données sortent pour de bon : on la
+    ferme ici aussi, et pas seulement à l'écran. Sans « CA du cabinet », on
+    n'édite que son propre relevé — et un relevé « de tous » devient le sien. */
+ if(!caGlobal()){
+   const moi=monPrat();
+   if(prat && prat!==moi){ toast('Le relevé d’un confrère relève du droit « CA du cabinet »'); return }
+   prat = moi;
+ }
  const L=factRetro(perE,prat);
  if(!L.length){ toast(`Aucune facturation ${prat?'de '+prat+' ':''}sur ${perLabel(perE)}`); return }
  const [ra,rb]=perRange(perE);
@@ -6534,7 +6558,7 @@ function barreFiltres(){
    ${[['tous','Tous statuts'],['solde','Soldées'],['reste','Avec reste dû'],['avoir','Avec avoir'],['annulee','Annulées']]
      .map(([k,l])=>`<option value="${k}" ${fStatut===k?'selected':''}>${l}</option>`).join('')}</select>
   <select class="inp" onchange="fPrat=this.value;paint()"><option value="">Tous praticiens</option>
-   ${pratsFiltre().map(x=>`<option ${fPrat===x?'selected':''}>${x}</option>`).join('')}</select>
+   ${pratsArgent().map(x=>`<option ${fPrat===x?'selected':''}>${x}</option>`).join('')}</select>
   <select class="inp" onchange="fCat=this.value;paint()"><option value="">Toutes catégories</option>
    ${CATS.map(x=>`<option ${fCat===x?'selected':''}>${x}</option>`).join('')}</select>
   ${(fq||fMoyen!=='tous'||fStatut!=='tous'||fPrat||fCat)?`<button class="chip" onclick="fq='';fMoyen='tous';fStatut='tous';fPrat='';fCat='';paint()">✕ Effacer</button>`:''}
@@ -6605,7 +6629,8 @@ let retroCat='';                       /* filtre de catégorie de la grille */
 function grilleRetro(){
  const L=CATALOGUE.filter(c=>!retroCat||(c.cat||'Divers')===retroCat);
  const cats=catsUtilisees().filter(k=>actesDeCat(k).length);
- const n=PRATICIENS.reduce((t,pr)=>t+Object.keys((FACTU.retroActe&&FACTU.retroActe[pr])||{})
+ const PA=pratsArgent(), reglable=peutReglerRetro();
+ const n=PA.reduce((t,pr)=>t+Object.keys((FACTU.retroActe&&FACTU.retroActe[pr])||{})
    .filter(k=>catById(k)).length,0);
  return `<div class="card" style="margin-top:13px"><div class="h"><h2>Rétrocession acte par acte</h2>
    <span class="s">${n?`${n} taux particulier${n>1?'s':''}`:'aucun taux particulier'} · ${CATALOGUE.length} actes</span>
@@ -6613,24 +6638,25 @@ function grilleRetro(){
      ${cats.map(k=>`<button class="${retroCat===k?'on':''}" onclick="retroCat=${JSON.stringify(k).replace(/"/g,'&quot;')};paint()">${esc(k)}</button>`).join('')}</div></div></div>
   <div class="b" style="padding:0 0 4px">
    <div class="mu" style="font-size:11.5px;padding:11px 13px 9px">Fixez ici la part revenant au praticien <b>pour un acte donné</b> — une épilation laser
-    ne se partage pas comme une injection. Une case vide suit le taux général : ${PRATICIENS.map(pr=>`<b>${esc(pr)} ${tauxGen(pr)} %</b>`).join(' · ')}.
-    C'est ce taux qui est appliqué à la facturation, au relevé de rétrocession et aux totaux journaliers.</div>
+    ne se partage pas comme une injection. Une case vide suit le taux général : ${PA.map(pr=>`<b>${esc(pr)} ${tauxGen(pr)} %</b>`).join(' · ')}.
+    C'est ce taux qui est appliqué à la facturation, au relevé de rétrocession et aux totaux journaliers.
+    ${reglable?'':'<br><b>Vous voyez votre taux, vous ne le modifiez pas</b> : une rétrocession se convient avec le titulaire du cabinet.'}</div>
    <div class="tw"><table class="tcomp rgr">
     <thead><tr><th>Acte</th><th>Catégorie</th><th class="num">Tarif</th>
-      ${PRATICIENS.map(pr=>`<th class="num" title="Part conservée par ${esc(pr)}">${esc(pr)}</th>`).join('')}
+      ${PA.map(pr=>`<th class="num" title="Part conservée par ${esc(pr)}">${esc(pr)}</th>`).join('')}
       <th class="num" title="Ce que le centre conserve, au tarif affiché">Part centre</th></tr></thead>
     <tbody>${L.map(c=>`<tr>
       <td class="el" style="max-width:200px" title="${esc(c.n)}"><span class="nm">${esc(c.n)}</span></td>
       <td class="mu el" style="max-width:120px">${esc(c.cat||'Divers')}</td>
       <td class="num mu nw">${c.prix?EUR(c.prix):'—'}</td>
-      ${PRATICIENS.map(pr=>{const v=tauxActe(pr,c.id), t=tauxRetro(pr,c.id);
+      ${PA.map(pr=>{const v=tauxActe(pr,c.id), t=tauxRetro(pr,c.id);
         return `<td class="num nw"><span class="rcell ${v===null?'herite':''}">
           <input class="inp" type="number" min="0" max="100" step="5" value="${v===null?'':v}"
             placeholder="${tauxGen(pr)}" title="${v===null?`Suit le taux général de ${pr} (${tauxGen(pr)} %)`:`Taux propre à cet acte`}"
-            onchange="setRetroActe(${JSON.stringify(pr).replace(/"/g,'&quot;')},'${c.id}',this.value)">
+            ${reglable?`onchange="setRetroActe(${JSON.stringify(pr).replace(/"/g,'&quot;')},'${c.id}',this.value)"`:'readonly'}>
           <span class="mu">%</span>
           ${c.prix?`<small>${EUR(Math.round(c.prix*t/100))}</small>`:''}</span></td>`}).join('')}
-      <td class="num mu nw">${c.prix?PRATICIENS.map(pr=>EUR(c.prix-Math.round(c.prix*tauxRetro(pr,c.id)/100))).join(' · '):'—'}</td>
+      <td class="num mu nw">${c.prix?PA.map(pr=>EUR(c.prix-Math.round(c.prix*tauxRetro(pr,c.id)/100))).join(' · '):'—'}</td>
     </tr>`).join('')}</tbody></table>
     ${L.length?'':'<div class="empty">Aucun acte dans cette catégorie.</div>'}</div>
    <div class="mu" style="font-size:11px;padding:9px 13px 4px">Videz une case pour revenir au taux général. Les montants indiqués sous chaque taux
@@ -6643,7 +6669,12 @@ function eRetro(){
  if(!CAN('compta')||!FACTU.double) return bandeauCompta();
  const L=factRetro(perE, fPrat||null);
  const [ra,rb]=perRange(perE);
+ /* Les praticiens dont on peut montrer les comptes. Sans « CA du cabinet »,
+    c'est soi et personne d'autre : la carte d'un confrère afficherait son taux
+    et sa part, même si les factures ont déjà été filtrées. */
+ const PA=pratsArgent(), global=caGlobal();
  const prats=[...new Set(FACTURES.filter(f=>f.statut==='ok'&&inPer(f.date,perE)).map(f=>f.praticien))]
+   .filter(p=>PA.includes(p))
    .sort((a,b)=>a.localeCompare(b));
  const T=p=>{const F=factRetro(perE,p);
    return {n:F.length, ttc:F.reduce((s,f)=>s+fTTC(f),0), pp:F.reduce((s,f)=>s+partPrat(f),0),
@@ -6653,16 +6684,21 @@ function eRetro(){
      propres:[...new Set(F.map(f=>f.type).filter(t=>tauxActe(p,t)!==null))].length}};
  const G=T(null);
  return `<div class="head" style="margin-bottom:12px">
-   <div><h1>Rétrocession</h1><p>${G.n} facturation${G.n>1?'s':''} · ${EUR(G.pp)} à reverser · ${perLabel(perE)}</p></div>
-   <div class="r"><button class="btn p" onclick="releveRetro('')">⭳ Relevé de tous les praticiens</button></div></div>
+   <div><h1>Rétrocession</h1><p>${G.n} facturation${G.n>1?'s':''} · ${EUR(G.pp)} ${global?'à reverser':'qui vous revient'} · ${perLabel(perE)}</p></div>
+   ${global?`<div class="r"><button class="btn p" onclick="releveRetro('')">⭳ Relevé de tous les praticiens</button></div>`
+     :`<div class="r"><button class="btn p" onclick="releveRetro(${JSON.stringify(monPrat()).replace(/"/g,'&quot;')})">⭳ Mon relevé</button></div>`}</div>
  ${periodBar(perE,'setPerE',`${G.n} facture${G.n>1?'s':''}`,presetsFactu(),1)}
  <div class="tip"><span class="e">🧾</span><div>${FACTU.modele==='split'
    ? `<b>Facturation séparée</b> — pour chaque acte, ${esc(FACTU.centre.nom)} facture la part structure et le praticien ses honoraires. Le relevé récapitule ce que chacun a émis.`
    : `<b>Rétrocession</b> — ${esc(FACTU.centre.nom)} encaisse la totalité puis reverse à chaque praticien sa part. Le relevé détaille facture par facture ce qui compose le montant reversé, pour être transmis en fin de mois.`}
    Les taux se règlent dans <a onclick="go('params');paramTab='facturation';paint()">Paramètres → Facturation &amp; rétrocession</a>.</div></div>
+ ${global?'':`<div class="tip"><span class="e">€</span><div><b>Vous voyez votre rétrocession</b> — ${esc(monPrat())}.
+   Celle de vos confrères, comme le chiffre d’affaires du cabinet, relève du droit <b>« CA du cabinet »</b> :
+   un taux de rétrocession est une clause entre chaque praticien et le titulaire, elle ne regarde qu’eux deux.</div></div>`}
  <div class="grid g4" style="margin-bottom:13px">
   ${kpi('Facturé TTC',EUR(G.ttc),`${G.n} facture(s) sur la période`)}
-  ${kpi('Part praticiens',EUR(G.pp),`${prats.length} praticien(s)`)}
+  ${kpi(global?'Part praticiens':'Votre part',EUR(G.pp),
+        global?`${prats.length} praticien(s)`:`${tauxGen(monPrat())} % général`)}
   ${kpi('Part centre',EUR(G.pc),G.ttc?Math.round(G.pc/G.ttc*100)+' % du facturé':'—')}
   ${kpi('Acquis au règlement',EUR(G.acquis),G.du?`${EUR(G.du)} encore dû par les patients`:'tout est encaissé',G.du?'dn':'up')}</div>
  <div class="grid g2" style="margin-bottom:13px;align-items:start">
@@ -9022,9 +9058,12 @@ V.params=()=>{
 
   facturation:()=>{
    if(!CAN('compta')) return '<div class="empty">🔒 Réservé au praticien.</div>';
-   const FP=FACTURES.filter(f=>inPer(f.date,perE)&&f.statut==='ok');
+   /* mesFact : sans « CA du cabinet », la simulation ne porte que sur ses
+      propres facturations. Sans cela, la comparaison des parts révélerait le
+      chiffre des confrères aussi sûrement qu'un tableau. */
+   const FP=mesFact(FACTURES).filter(f=>inPer(f.date,perE)&&f.statut==='ok');
    const ttc=FP.reduce((s,f)=>s+fTTC(f),0);
-   const parPrat=PRATICIENS.map(pr=>{const L=FP.filter(f=>f.praticien===pr);
+   const parPrat=pratsArgent().map(pr=>{const L=FP.filter(f=>f.praticien===pr);
      return {pr, ttc:L.reduce((s,f)=>s+fTTC(f),0), pp:L.reduce((s,f)=>s+partPrat(f),0), pc:L.reduce((s,f)=>s+partCentre(f),0), n:L.length}});
    return `<div class="tip"><span class="e">🧾</span><div>Ces réglages pilotent les colonnes <b>Part centre</b> et <b>Part praticien</b> des facturations détaillées et des totaux journaliers. La simulation ci-dessous porte sur la période sélectionnée dans Facturation &amp; caisse (${perLabel(perE)}).</div></div>
    <div class="grid g2">
@@ -9043,11 +9082,11 @@ V.params=()=>{
        <div class="fld"><label>SIRET</label><input class="inp" style="width:100%" value="${esc(FACTU.centre.siret)}" onchange="FACTU.centre.siret=this.value;paint()"></div></div>
       <div style="margin-top:6px;padding-top:12px;border-top:1px solid var(--line)">
        <div class="fld"><label>Taux général — part conservée par le praticien</label>
-        ${PRATICIENS.map(pr=>`<div class="zrow">
+        ${pratsArgent().map(pr=>`<div class="zrow">
           <div class="zn">${esc(pr)}<small>le centre conserve ${100-tauxGen(pr)} %</small></div>
           <div style="display:flex;align-items:center;gap:6px">
             <input class="inp" style="width:74px;text-align:right" type="number" min="0" max="100" value="${tauxGen(pr)}"
-              onchange="setRetroGen('${pr}',this.value)">
+              ${peutReglerRetro()?`onchange="setRetroGen('${pr}',this.value)"`:'readonly title="Votre taux se convient avec le titulaire du cabinet"'}>
             <span class="mu">%</span></div></div>`).join('')}
         <div class="mu" style="font-size:11.5px;margin-top:7px">Ce taux s'applique à tout acte pour lequel rien de particulier n'a été convenu.
           Le tableau ci-dessous permet d'en fixer un, acte par acte.</div></div></div>
@@ -11781,7 +11820,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DC';
+const BUILD='DD';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
