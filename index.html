@@ -2653,6 +2653,20 @@ const fHT =f=>Math.round(fTTC(f)/(1+tauxTVA(f.type)/100)*100)/100;
 const fTVA=f=>Math.round((fTTC(f)-fHT(f))*100)/100;
 const partPrat=f=>Math.round(fTTC(f)*tauxRetro(f.praticien,f.type)/100);
 const partCentre=f=>fTTC(f)-partPrat(f);
+/* --------------------------------------------------------------------------
+   Facturé n'est pas encaissé
+   --------------------------------------------------------------------------
+   partCentre() porte sur ce qui a été FACTURÉ au patient. Tant que le patient
+   n'a pas réglé, cette part n'existe que sur le papier : personne ne l'a
+   touchée. La distinction n'est pas comptable pour la beauté du geste — elle
+   décide de ce qu'on peut reverser sans avancer l'argent de sa poche.
+
+   Sur chaque euro effectivement encaissé, le praticien acquiert son taux et
+   le centre garde le reste. C'est cette part-là qui est réellement au centre.
+   -------------------------------------------------------------------------- */
+const pratAcquis  =f=>Math.round(f.paye*tauxRetro(f.praticien,f.type)/100);
+const centreAcquis=f=>f.statut==='annulee'?0:Math.max(0,f.paye-pratAcquis(f));
+const centreAttente=f=>Math.max(0,partCentre(f)-centreAcquis(f));
 
 /* ---------- Ordonnances (générées à partir des actes) ---------- */
 const ORDO_TPL={
@@ -6664,6 +6678,94 @@ function grilleRetro(){
   </div></div>`;
 }
 
+/* --------------------------------------------------------------------------
+   Le relevé du centre
+   --------------------------------------------------------------------------
+   L'écran de rétrocession est écrit du point de vue du praticien : ce qu'on
+   lui doit. Le centre y apparaissait comme un reste, une ligne dans un coin.
+
+   Cette carte le retourne : voici ce que la structure garde, praticien par
+   praticien, avec la distinction qui compte en fin de mois — ce qui est DANS
+   LA CAISSE, et ce qui n'y est pas encore parce que le patient n'a pas réglé.
+   Reverser sur du facturé non encaissé, c'est avancer l'argent de sa poche.
+   -------------------------------------------------------------------------- */
+function carteCentre(prats, T){
+ const G=T(null);
+ if(!G.n) return '';
+ const pct=(v,t)=>t?Math.round(v/t*1000)/10:0;
+ return `<div class="card" style="margin-bottom:13px"><div class="h">
+    <h2>Ce qui revient au centre</h2>
+    <span class="s">${esc(FACTU.centre.nom||'la structure')} · ${perLabel(perE)}</span>
+    <div class="r"><button class="btn xs p" onclick="releveCentre()">⭳ Relevé du centre</button></div></div>
+  <div class="b">
+   <div class="grid g3" style="margin-bottom:12px">
+     ${kpi('Part centre facturée',EUR(G.pc),`${pct(G.pc,G.ttc)} % de ${EUR(G.ttc)} facturés`)}
+     ${kpi('Déjà dans la caisse',EUR(G.pcAcquis),
+        G.pc?`${pct(G.pcAcquis,G.pc)} % de la part centre`:'—','up')}
+     ${kpi('En attente de règlement',EUR(G.pcAttente),
+        G.pcAttente?`sur ${EUR(G.du)} encore dus par les patients`:'tout est encaissé',
+        G.pcAttente?'dn':'up')}
+   </div>
+   <div class="tw"><table class="tcomp">
+    <thead><tr><th>Praticien</th><th class="num">Taux praticien</th><th class="num">Facturé TTC</th>
+      <th class="num" title="Ce que le praticien conserve">Lui revient</th>
+      <th class="num" title="Ce que la structure garde">Revient au centre</th>
+      <th class="num" title="Part centre déjà encaissée">Dans la caisse</th>
+      <th class="num" title="Part centre en attente du règlement patient">En attente</th></tr></thead>
+    <tbody>${prats.map(p=>{const t=T(p); const eff=t.ttc?pct(t.pp,t.ttc):tauxGen(p);
+      return `<tr><td><b>${esc(p)}</b></td>
+        <td class="num mu nw">${eff} %</td>
+        <td class="num nw">${EUR(t.ttc)}</td>
+        <td class="num mu nw">${EUR(t.pp)}</td>
+        <td class="num nw"><b>${EUR(t.pc)}</b></td>
+        <td class="num nw">${EUR(t.pcAcquis)}</td>
+        <td class="num nw ${t.pcAttente?'dn':'mu'}">${t.pcAttente?EUR(t.pcAttente):'—'}</td></tr>`}).join('')}
+    </tbody>
+    <tfoot><tr><th>Total</th><th class="num">${pct(G.pc,G.ttc)} %</th>
+      <th class="num">${EUR(G.ttc)}</th><th class="num">${EUR(G.pp)}</th>
+      <th class="num">${EUR(G.pc)}</th><th class="num">${EUR(G.pcAcquis)}</th>
+      <th class="num">${G.pcAttente?EUR(G.pcAttente):'—'}</th></tr></tfoot></table></div>
+   <div class="mu" style="font-size:11.5px;margin-top:10px">
+     <b>Revient au centre</b> se calcule sur le montant <b>facturé</b>, avoir déduit.
+     <b>Dans la caisse</b> se calcule sur ce que les patients ont <b>réellement réglé</b> :
+     sur chaque euro encaissé, le praticien acquiert son taux et le reste est au centre.
+     La différence est ce que la structure attend encore — reverser dessus reviendrait à
+     avancer l’argent.</div>
+  </div></div>`;
+}
+
+/* L'export du relevé du centre : le pendant de celui des praticiens, dans
+   l'autre sens. C'est la pièce qu'on garde pour sa propre comptabilité. */
+function releveCentre(){
+ if(!caGlobal()){ toast('Le relevé du centre relève du droit « CA du cabinet »'); return }
+ if(!CAN('compta')||!FACTU.double){ toast('Le relevé du centre relève du suivi comptable'); return }
+ const L=factRetro(perE,null);
+ if(!L.length){ toast(`Aucune facturation sur ${perLabel(perE)}`); return }
+ const [ra,rb]=perRange(perE);
+ const prats=[...new Set(L.map(f=>f.praticien))].sort();
+ const R=[['Relevé du centre — '+(FACTU.centre.nom||'structure')],
+          ['Période', DF(ra)+' au '+DF(rb)],[],
+          ['Praticien','Factures','Facturé TTC','Part praticien','Revient au centre',
+           'Part centre encaissée','Part centre en attente']];
+ const som=k=>L.reduce((s,f)=>s+k(f),0);
+ prats.forEach(p=>{ const F=L.filter(f=>f.praticien===p);
+   R.push([p, F.length, nbFR(F.reduce((s,f)=>s+fTTC(f),0)),
+     nbFR(F.reduce((s,f)=>s+partPrat(f),0)), nbFR(F.reduce((s,f)=>s+partCentre(f),0)),
+     nbFR(F.reduce((s,f)=>s+centreAcquis(f),0)), nbFR(F.reduce((s,f)=>s+centreAttente(f),0))]) });
+ R.push(['TOTAL', L.length, nbFR(som(fTTC)), nbFR(som(partPrat)), nbFR(som(partCentre)),
+         nbFR(som(centreAcquis)), nbFR(som(centreAttente))]);
+ R.push([]);
+ R.push(['Détail facture par facture']);
+ R.push(['N°','Date','Patient','Praticien','TTC','Taux praticien','Part praticien',
+         'Revient au centre','Encaissé','Part centre encaissée','Reste dû']);
+ L.forEach(f=>{ const p=pById(f.patient);
+   R.push([f.id, DF(f.date), p?fn(p):'', f.praticien, nbFR(fTTC(f)),
+     tauxRetro(f.praticien,f.type)+' %', nbFR(partPrat(f)), nbFR(partCentre(f)),
+     nbFR(f.paye), nbFR(centreAcquis(f)), nbFR(rdu(f))]) });
+ csvTelecharger('releve-centre-'+ra+'-'+rb+'.csv', R);
+ toast(`Relevé du centre exporté · ${EUR(som(partCentre))} dont ${EUR(som(centreAcquis))} encaissés`);
+}
+
 /* ---------- Rétrocession : ce qu'on transmet à chaque praticien ---------- */
 function eRetro(){
  if(!CAN('compta')||!FACTU.double) return bandeauCompta();
@@ -6680,7 +6782,11 @@ function eRetro(){
    return {n:F.length, ttc:F.reduce((s,f)=>s+fTTC(f),0), pp:F.reduce((s,f)=>s+partPrat(f),0),
      pc:F.reduce((s,f)=>s+partCentre(f),0), enc:F.reduce((s,f)=>s+f.paye,0),
      du:F.reduce((s,f)=>s+rdu(f),0),
-     acquis:F.reduce((s,f)=>s+Math.round(f.paye*tauxRetro(f.praticien,f.type)/100),0),
+     acquis:F.reduce((s,f)=>s+pratAcquis(f),0),
+     /* les deux faces de la part centre : celle qui est dans la caisse, et
+        celle qui attend que le patient règle */
+     pcAcquis:F.reduce((s,f)=>s+centreAcquis(f),0),
+     pcAttente:F.reduce((s,f)=>s+centreAttente(f),0),
      propres:[...new Set(F.map(f=>f.type).filter(t=>tauxActe(p,t)!==null))].length}};
  const G=T(null);
  return `<div class="head" style="margin-bottom:12px">
@@ -6716,6 +6822,7 @@ function eRetro(){
        ?` — ${EUR(t.du)} restent dus, soit ${EUR(t.pp-t.acquis)} de part non encore acquise`:` — part entièrement acquise`}.</div>
     </div></div>`}).join('')||'<div class="empty" style="grid-column:1/-1">Aucune facturation sur cette période.</div>'}
  </div>
+ ${global?carteCentre(prats, T):''}
  <div class="card"><div class="h"><h2>Détail des facturations</h2>
    <span class="s">${L.length} ligne${L.length>1?'s':''}${fPrat?' · '+esc(fPrat):''}</span>
    <div class="r"><select class="inp" onchange="fPrat=this.value;paint()"><option value="">Tous praticiens</option>
@@ -11820,7 +11927,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DD';
+const BUILD='DE';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
