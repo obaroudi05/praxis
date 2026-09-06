@@ -1357,6 +1357,35 @@ th.tri.on.desc::after{content:'▼'}
 .dtog.lock{cursor:default;opacity:.72}
 .prc{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:9px;background:var(--panel-2)}
 .prc.warn{border-color:rgba(250,178,25,.5);background:var(--warn-w)}
+/* --- l'écran de connexion : sobre, centré, sans rien qui distraie --- */
+body.en-connexion #nav,body.en-connexion aside .who,body.en-connexion aside .av,
+body.en-connexion .rolebtn{display:none!important}
+body.en-connexion aside{display:none}
+.cnx-fond{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  background:var(--bg);padding:24px;z-index:50}
+.cnx-carte{width:100%;max-width:390px;background:var(--card);border:1px solid var(--bd);
+  border-radius:14px;padding:30px 28px 22px;box-shadow:0 8px 34px rgba(0,0,0,.10)}
+.cnx-tete{margin-bottom:20px}
+.cnx-logo{font-size:19px;font-weight:650;letter-spacing:-.01em}
+.cnx-sous{font-size:12.5px;color:var(--mu);margin-top:5px;line-height:1.45}
+.cnx-l{display:block;font-size:11.5px;color:var(--mu);margin-bottom:13px;font-weight:500}
+.cnx-l .inp{width:100%;margin-top:5px;font-size:14px;padding:9px 11px}
+.cnx-code{letter-spacing:.35em;font-size:19px!important;text-align:center;font-variant-numeric:tabular-nums}
+.cnx-btn{width:100%;justify-content:center;margin-top:6px;padding:10px;font-size:13.5px}
+.cnx-retour{width:100%;justify-content:center;margin-top:9px;font-size:12px}
+.cnx-err{display:flex;gap:9px;align-items:flex-start;background:var(--crit-w);
+  border:1px solid rgba(232,78,78,.34);border-radius:9px;padding:10px 12px;margin-bottom:16px;
+  font-size:12.5px;line-height:1.45}
+.cnx-pied{font-size:11px;color:var(--mu);margin-top:18px;line-height:1.5;
+  border-top:1px solid var(--bd);padding-top:13px}
+/* Le bandeau qui dit d'où viennent les données. Il vit DANS le panneau
+   principal — .app est une grille à deux colonnes, un frère de .main y
+   prendrait une cellule et déplacerait tout l'écran. */
+.bandeau{display:flex;align-items:flex-start;gap:8px;font-size:11.5px;line-height:1.45;
+  padding:7px 22px;margin:-18px -22px 16px;border-bottom:1px solid var(--bd);
+  background:var(--good-w);color:var(--tx);position:sticky;top:-18px;z-index:6}
+.bandeau b{font-weight:600}
+.bandeau>span{line-height:1.35;opacity:.75}
 .prc-h{display:flex;align-items:center;gap:9px;margin-bottom:9px}
 .prc-g{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
 .prc-g label{font-size:10.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em;font-weight:600;display:flex;flex-direction:column;gap:3px}
@@ -1829,7 +1858,8 @@ th.tri.on.desc::after{content:'▼'}
     <div class="side-foot">
       <div class="av" id="avat">OB</div>
       <div class="who" id="who">Dr O. Baroudi<small>Praticien</small></div>
-      <button class="rolebtn" onclick="cycleRole()" title="Changer de rôle (voir les droits)">⇄</button>
+      <button class="rolebtn" id="btn-role" onclick="cycleRole()" title="Changer de rôle (voir les droits)">⇄</button>
+      <button class="rolebtn" id="btn-sortir" onclick="srvDeconnecter()" title="Se déconnecter" style="display:none">⏻</button>
       <button class="rolebtn" onclick="toggleTheme()" title="Thème clair / sombre">◐</button>
     </div>
   </aside>
@@ -11567,7 +11597,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='CZ';
+const BUILD='DA';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -13605,12 +13635,41 @@ function paint(){
  [['n-devis',ATT.length],['n-rel',RDUE.length],['n-stock',ALERTES.length],
   ['n-env',ENVOIS.filter(e=>e.statut==='echec').length]].forEach(([i,v])=>{
   const e=document.getElementById(i); e.textContent=v; e.style.display=v?'':'none'});
+ /* Le sélecteur de rôle est un outil de démonstration : il n'a pas de sens
+    quand l'identité vient d'une session. On le décide ICI plutôt qu'au
+    démarrage — sinon entrer par le formulaire de connexion le laisserait en
+    place, ce qui est exactement ce qui est arrivé. */
+ const br=document.getElementById('btn-role');   if(br) br.style.display=CONNECTE()?'none':'';
+ const bs=document.getElementById('btn-sortir'); if(bs) bs.style.display=CONNECTE()?'':'none';
  document.getElementById('avat').textContent=ROLES[role].i;
  document.getElementById('who').innerHTML=`${ROLES[role].u}<small>${ROLES[role].l}</small>`;
- document.getElementById('main').innerHTML=(V[view]||V.dash)();
+ document.getElementById('main').innerHTML=bandeauHTML()+(V[view]||V.dash)();
  bindBA(); bindGZ(); calerCumul();
  if(typeof cfgPlanifier==='function') cfgPlanifier();
- if(typeof clPlanifier==='function') clPlanifier();
+ /* En mode connecté, le classeur local ne doit PAS enregistrer : il écraserait
+    au rechargement suivant ce que le serveur fait autorité à dire. */
+ if(typeof clPlanifier==='function' && !CONNECTE()) clPlanifier();
+}
+
+/* --------------------------------------------------------------------------
+   Dire d'où viennent les données, tout le temps
+   --------------------------------------------------------------------------
+   Un logiciel qui ne dit pas s'il travaille sur des données réelles ou sur une
+   démonstration finit par faire prendre l'une pour l'autre. Le bandeau n'est
+   pas décoratif : c'est ce qui empêche de saisir une vraie séance dans le jeu
+   fictif, et de la croire enregistrée.
+   -------------------------------------------------------------------------- */
+function bandeauHTML(){
+ /* En mode autonome sur la démonstration publique, le bandeau serait un
+    bruit permanent : le fichier n'a jamais rien fait d'autre. On ne le montre
+    donc que lorsqu'il apprend quelque chose — un serveur, ou une lecture
+    seule qu'il faut savoir. */
+ if(!CONNECTE()) return '';
+ return `<div class="bandeau srv"><span>●</span><div><b>${esc(SRV.moi.nom)}</b> · ${esc(ROLES[role]?ROLES[role].l:role)}
+   — dossiers du cabinet, sur le serveur.`
+   + (SRV.lecture ? ` <b>Lecture seule</b> : ce que vous modifiez ici n’est pas encore renvoyé
+      au serveur. N’y saisissez pas de dossier réel tant que l’écriture n’est pas posée.` : '')
+   + `</div></div>`;
 }
 /* Le schéma cumulé prend la hauteur qui reste réellement sous lui : l'en-tête
    du patient passe sur deux lignes quand la fenêtre se resserre, une hauteur
@@ -14012,9 +14071,326 @@ function carteClasseur(){
    Démarrage. On lit le classeur avant de peindre : ouvrir le logiciel sur la
    démonstration puis la voir remplacée sous les yeux serait déroutant.
    -------------------------------------------------------------------------- */
+/* ==========================================================================
+   Le serveur
+   --------------------------------------------------------------------------
+   Lot 04. Jusqu'ici ce fichier se suffisait à lui-même : ses données vivaient
+   dans le navigateur, et deux praticiens n'auraient jamais vu les mêmes
+   dossiers. Il sait désormais parler à un serveur.
+
+   UN PRINCIPE, et il commande tout ce qui suit :
+
+       LE MÊME FICHIER DOIT CONTINUER À TOURNER SEUL.
+
+   La démonstration publique n'a pas de serveur. Si ce fichier cessait de
+   fonctionner sans lui, on perdrait la possibilité d'essayer une idée avant
+   de la déployer — c'est-à-dire la façon dont ce logiciel a été construit.
+
+   Deux modes, donc, et l'écran dit toujours lequel :
+
+     · CONNECTÉ    un serveur répond. L'identité, les droits et les dossiers
+                   viennent de lui. Le rôle n'est plus une variable qu'on
+                   change dans la console : c'est une session.
+
+     · AUTONOME    aucun serveur. Le classeur local reprend la main, avec ses
+                   données de démonstration. C'est le mode d'aujourd'hui, et
+                   il ne bouge pas.
+
+   Le mode se déduit — on ne le règle pas. Un logiciel qui demande à
+   l'utilisateur s'il est connecté a déjà perdu.
+   ========================================================================== */
+const SRV = {
+  base: null,          /* l'adresse du serveur, quand il y en a un */
+  moi: null,           /* qui je suis, selon le serveur */
+  droits: null,        /* ce que j'ai le droit de faire, selon le serveur */
+  mode: 'autonome',    /* 'autonome' | 'connecte' */
+  lecture: true,       /* le lot 04 lit ; l'écriture traversante vient ensuite */
+};
+const CONNECTE = () => SRV.mode === 'connecte';
+
+/* Où chercher le serveur. Sur un poste du cabinet, l'interface est servie par
+   le serveur lui-même : la même origine suffit. On laisse la possibilité de
+   pointer ailleurs pour les essais, jamais pour l'exploitation. */
+function adresseServeur(){
+ try{
+   const p = new URLSearchParams(location.search).get('serveur');
+   if(p) return p.replace(/\/+$/,'');
+ }catch(e){}
+ /* Un fichier ouvert depuis le disque n'a pas d'origine utilisable. */
+ if(location.protocol === 'file:') return null;
+ /* GitHub Pages : c'est la démonstration, il n'y a pas de serveur derrière. */
+ if(/\.github\.io$/.test(location.hostname)) return null;
+ return location.origin;
+}
+
+async function srvAppel(methode, chemin, corps){
+ if(!SRV.base) throw new Error('hors ligne');
+ const r = await fetch(SRV.base + chemin, {
+   method: methode,
+   headers: {'content-type':'application/json'},
+   credentials: 'include',
+   body: corps === undefined ? undefined : JSON.stringify(corps),
+ });
+ let j = null; try{ j = await r.json() }catch(e){}
+ return {code: r.status, corps: j};
+}
+
+/* --------------------------------------------------------------------------
+   Reconnaître un serveur
+   --------------------------------------------------------------------------
+   On ne bloque pas l'ouverture du logiciel là-dessus : si rien ne répond vite,
+   on passe en autonome et on continue. Un cabinet dont le réseau hoquette doit
+   pouvoir ouvrir ses écrans, pas regarder une roue tourner.
+   -------------------------------------------------------------------------- */
+async function srvChercher(){
+ const base = adresseServeur();
+ if(!base) return false;
+ try{
+   const course = await Promise.race([
+     fetch(base + '/api/etat', {credentials:'include'}).then(r => r.ok ? r.json() : null),
+     new Promise(r => setTimeout(() => r('trop-long'), 2500)),
+   ]);
+   if(course === 'trop-long' || !course || course.service !== 'praxis') return false;
+   SRV.base = base;
+   return true;
+ }catch(e){ return false }
+}
+
+/* Ai-je déjà une session ouverte ? */
+async function srvMoi(){
+ const r = await srvAppel('GET','/api/espace');
+ if(r.code !== 200) return false;
+ SRV.moi = r.corps.moi;
+ SRV.droits = r.corps.droits;
+ SRV.mode = 'connecte';
+ srvAppliquerModele(r.corps.modele);
+ srvAppliquerDroits(r.corps.droits, r.corps.moi);
+ return true;
+}
+
+/* ==========================================================================
+   L'ÉCRAN DE CONNEXION
+   --------------------------------------------------------------------------
+   Le lot 02 a construit les points d'entrée ; rien ne les appelait. Voici ce
+   qui les appelle.
+
+   Deux choix qui ne sont pas cosmétiques :
+
+     · On n'annonce jamais qu'un identifiant existe. Le serveur rend le même
+       message dans tous les cas de refus ; l'écran ne fait rien pour le
+       contredire, sans quoi tout le travail fait côté serveur serait défait
+       par une phrase d'interface trop serviable.
+
+     · Le champ du second facteur n'apparaît QUE si le serveur l'a demandé.
+       Le montrer d'emblée dirait à qui essaie quels comptes en sont pourvus.
+   ========================================================================== */
+let CNX = {identifiant:'', motdepasse:'', code:'', totp:false, erreur:'', occupe:false};
+
+function ecranConnexion(){
+ return `<div class="cnx-fond"><div class="cnx-carte">
+   <div class="cnx-tete">
+     <div class="cnx-logo">${esc(CABINET.nom||'PRAXIS')}</div>
+     <div class="cnx-sous">${CNX.totp?'Code de votre application d’authentification':'Identifiez-vous pour ouvrir les dossiers'}</div>
+   </div>
+   ${CNX.erreur?`<div class="cnx-err"><span class="e">⚠</span><div>${esc(CNX.erreur)}</div></div>`:''}
+   <form onsubmit="cnxEnvoyer(event)" autocomplete="on">
+     ${CNX.totp?`
+       <label class="cnx-l">Code à six chiffres
+         <input class="inp cnx-code" id="cnx-code" inputmode="numeric" autocomplete="one-time-code"
+                maxlength="6" pattern="[0-9]{6}" value="${esc(CNX.code)}"
+                oninput="CNX.code=this.value" autofocus></label>
+       <div class="mu" style="font-size:11.5px;margin:8px 0 2px">Vérifiez l’heure de votre téléphone si le code est refusé.</div>
+     `:`
+       <label class="cnx-l">Identifiant
+         <input class="inp" id="cnx-id" autocomplete="username" value="${esc(CNX.identifiant)}"
+                oninput="CNX.identifiant=this.value" autofocus></label>
+       <label class="cnx-l">Mot de passe
+         <input class="inp" id="cnx-mdp" type="password" autocomplete="current-password"
+                oninput="CNX.motdepasse=this.value"></label>
+     `}
+     <button class="btn p cnx-btn" type="submit" ${CNX.occupe?'disabled':''}>
+       ${CNX.occupe?'Un instant…':(CNX.totp?'Valider le code':'Se connecter')}</button>
+   </form>
+   ${CNX.totp?`<button class="btn g cnx-retour" onclick="CNX={identifiant:'',motdepasse:'',code:'',totp:false,erreur:'',occupe:false};peindreConnexion()">Recommencer</button>`:''}
+   <div class="cnx-pied">Mot de passe oublié : demandez un lien à l’administrateur du cabinet.
+     Personne ne peut choisir votre mot de passe à votre place.</div>
+ </div></div>`;
+}
+
+async function cnxEnvoyer(ev){
+ if(ev) ev.preventDefault();
+ if(CNX.occupe) return;
+ /* on relit les champs : un gestionnaire de mots de passe remplit sans
+    déclencher « oninput », et l'utilisateur se verrait refuser sa saisie */
+ const g=id=>{ const e=document.getElementById(id); return e?e.value:'' };
+ if(!CNX.totp){ CNX.identifiant=g('cnx-id')||CNX.identifiant;
+                CNX.motdepasse =g('cnx-mdp')||CNX.motdepasse }
+ else CNX.code=g('cnx-code')||CNX.code;
+
+ CNX.occupe=true; CNX.erreur=''; peindreConnexion();
+ let r;
+ try{
+   r = await srvAppel('POST','/api/connexion',
+     {identifiant:CNX.identifiant, motdepasse:CNX.motdepasse,
+      ...(CNX.totp?{code:CNX.code}:{})});
+ }catch(e){
+   CNX.occupe=false; CNX.erreur='Le serveur ne répond pas.'; peindreConnexion(); return;
+ }
+ CNX.occupe=false;
+ if(r.code===200){
+   CNX = {identifiant:'',motdepasse:'',code:'',totp:false,erreur:'',occupe:false};
+   await srvMoi();
+   document.body.classList.remove('en-connexion');
+   paint();
+   toast(`Bonjour ${SRV.moi.nom}`);
+   return;
+ }
+ if(r.corps && r.corps.detail && r.corps.detail.code_requis){
+   CNX.totp=true; CNX.erreur=''; CNX.code=''; peindreConnexion();
+   setTimeout(()=>{const e=document.getElementById('cnx-code'); if(e) e.focus()},50);
+   return;
+ }
+ CNX.erreur = (r.corps && r.corps.erreur) || 'Connexion impossible.';
+ if(CNX.totp) CNX.code='';
+ peindreConnexion();
+}
+
+function peindreConnexion(){
+ document.body.classList.add('en-connexion');
+ document.getElementById('main').innerHTML = ecranConnexion();
+ const p=document.getElementById('cnx-mdp'); if(p) p.value=CNX.motdepasse;
+}
+
+/* --------------------------------------------------------------------------
+   Poser son mot de passe, par le lien reçu de l'administrateur
+   -------------------------------------------------------------------------- */
+let ENR = {jeton:'', qui:null, mdp:'', mdp2:'', erreur:'', occupe:false, fait:false};
+
+function ecranEnrolement(){
+ if(ENR.fait) return `<div class="cnx-fond"><div class="cnx-carte">
+   <div class="cnx-tete"><div class="cnx-logo">Mot de passe enregistré</div>
+   <div class="cnx-sous">Vous pouvez maintenant vous connecter.</div></div>
+   <button class="btn p cnx-btn" onclick="location.href=location.pathname">Se connecter</button>
+ </div></div>`;
+ if(!ENR.qui) return `<div class="cnx-fond"><div class="cnx-carte">
+   <div class="cnx-tete"><div class="cnx-logo">Lien invalide</div></div>
+   <div class="cnx-err"><span class="e">⚠</span><div>${esc(ENR.erreur||'Ce lien n’est plus valable.')}</div></div>
+   <div class="cnx-pied">Demandez un nouveau lien à l’administrateur du cabinet.</div>
+ </div></div>`;
+ return `<div class="cnx-fond"><div class="cnx-carte">
+   <div class="cnx-tete">
+     <div class="cnx-logo">Bonjour ${esc(ENR.qui.nom)}</div>
+     <div class="cnx-sous">Choisissez votre mot de passe. Vous seul le connaîtrez.</div>
+   </div>
+   ${ENR.erreur?`<div class="cnx-err"><span class="e">⚠</span><div>${esc(ENR.erreur)}</div></div>`:''}
+   <form onsubmit="enrEnvoyer(event)">
+     <label class="cnx-l">Mot de passe
+       <input class="inp" id="enr-a" type="password" autocomplete="new-password"
+              oninput="ENR.mdp=this.value" autofocus></label>
+     <label class="cnx-l">Répétez-le
+       <input class="inp" id="enr-b" type="password" autocomplete="new-password"
+              oninput="ENR.mdp2=this.value"></label>
+     <div class="mu" style="font-size:11.5px;margin:9px 0 2px">
+       Au moins <b>${ENR.qui.longueur_min||12} caractères</b>. Une phrase dont vous vous souvenez
+       protège mieux qu’un mot court avec des symboles.</div>
+     <button class="btn p cnx-btn" type="submit" ${ENR.occupe?'disabled':''}>
+       ${ENR.occupe?'Un instant…':'Enregistrer'}</button>
+   </form>
+ </div></div>`;
+}
+async function enrEnvoyer(ev){
+ if(ev) ev.preventDefault();
+ const g=id=>{const e=document.getElementById(id); return e?e.value:''};
+ ENR.mdp=g('enr-a')||ENR.mdp; ENR.mdp2=g('enr-b')||ENR.mdp2;
+ if(ENR.mdp!==ENR.mdp2){ ENR.erreur='Les deux saisies diffèrent.'; peindreEnrolement(); return }
+ ENR.occupe=true; ENR.erreur=''; peindreEnrolement();
+ const r = await srvAppel('POST','/api/enrolement',{jeton:ENR.jeton, motdepasse:ENR.mdp});
+ ENR.occupe=false;
+ if(r.code===200){ ENR.fait=true; peindreEnrolement(); return }
+ ENR.erreur = (r.corps && r.corps.erreur) || 'Enregistrement impossible.';
+ peindreEnrolement();
+}
+function peindreEnrolement(){
+ document.body.classList.add('en-connexion');
+ document.getElementById('main').innerHTML = ecranEnrolement();
+}
+
+async function srvDeconnecter(){
+ try{ await srvAppel('POST','/api/deconnexion') }catch(e){}
+ location.reload();
+}
+
+/* --------------------------------------------------------------------------
+   Poser ce que le serveur a rendu dans le modèle de l'interface
+   --------------------------------------------------------------------------
+   L'espace arrive à la forme exacte que ces écrans attendent — c'est tout
+   l'objet du pont construit au lot 01. On remplace, on ne fusionne pas : ce
+   que le serveur dit fait autorité, et un reliquat de démonstration mêlé à de
+   vrais dossiers serait pire que pas de données du tout.
+   -------------------------------------------------------------------------- */
+function srvAppliquerModele(m){
+ if(!m) return;
+ const poser = (cible, valeur) => { if(Array.isArray(valeur)) remplTab(cible, valeur) };
+ poser(PATIENTS, m.patients);
+ poser(ACTES,    m.actes);
+ poser(DEVIS,    m.devis);
+ poser(FACTURES, m.factures);
+ poser(MVT,      m.mouvements);
+ poser(CONSO,    m.conso);
+ if(Array.isArray(m.stock)){
+   remplTab(STOCK, m.stock);
+   STOCK.forEach(x=>{ recalcStock(x); lotsDe(x).forEach(majEpuise) });
+ }
+}
+
+/* Les droits ne sont plus une ligne de ce fichier : ils viennent du serveur.
+   On les recopie dans la matrice locale pour que les écrans, qui interrogent
+   CAN(), continuent de fonctionner sans être réécrits — mais ils ne décident
+   plus rien : le serveur a déjà refusé ce qu'il fallait refuser. */
+function srvAppliquerDroits(d, moi){
+ if(!d || !moi) return;
+ role = moi.role;
+ if(!ROLES[role]) return;
+ const R = ROLES[role];
+ ['prix','med','compta','caCabinet','encaisse','volumes','suppTrace']
+   .forEach(k => { if(d[k] !== undefined) R[k] = !!d[k] });
+ R.u = moi.nom;
+ R.i = String(moi.nom||'').split(/\s+/).map(w=>w[0]).filter(Boolean).slice(-2).join('').toUpperCase();
+}
+
 (async()=>{
  cfgCharger();
  cfgActif=true;
+
+ /* 1 · Y a-t-il un serveur ? La question se pose avant tout le reste, parce
+        que la réponse décide d'où viennent les dossiers. */
+ const serveur = await srvChercher();
+
+ /* 2 · Un lien d'enrôlement l'emporte sur tout : quelqu'un vient poser son
+        mot de passe, il n'a pas encore de compte utilisable. */
+ if(serveur){
+   let jeton=null;
+   try{ jeton = new URLSearchParams(location.search).get('jeton') }catch(e){}
+   if(jeton && /enrolement/.test(location.search + location.hash)){
+     ENR.jeton = jeton;
+     const r = await srvAppel('GET','/api/enrolement?jeton='+encodeURIComponent(jeton));
+     if(r.code===200) ENR.qui = r.corps; else ENR.erreur = (r.corps&&r.corps.erreur)||'';
+     peindreEnrolement(); initVersion(); return;
+   }
+ }
+
+ /* 3 · Une session déjà ouverte ? Alors on charge l'espace et on entre. */
+ if(serveur && await srvMoi()){
+   clActif = false;              /* le classeur local se tait : le serveur fait foi */
+   paint();
+   initVersion();
+   return;
+ }
+
+ /* 4 · Un serveur, mais pas de session : on demande à s'identifier. */
+ if(serveur){ peindreConnexion(); initVersion(); return }
+
+ /* 5 · Aucun serveur : le mode autonome, inchangé depuis le premier jour. */
  if(await clOuvrir()){
    const o=await clLire();
    if(o&&clAppliquer(o)){
