@@ -1386,6 +1386,17 @@ body.en-connexion aside{display:none}
   background:var(--good-w);color:var(--tx);position:sticky;top:-18px;z-index:6}
 .bandeau b{font-weight:600}
 .bandeau>span{line-height:1.35;opacity:.75}
+.bandeau.force{background:var(--warn-w);border-bottom-color:rgba(250,178,25,.5)}
+.bandeau .btn.xs{vertical-align:middle}
+/* Les choix du banc d'essai tiennent sur deux lignes : .btn a une hauteur
+   fixe et ne renvoie pas à la ligne, ce qui coupait le sous-titre. */
+.mode-choix{height:auto!important;white-space:normal!important;flex:1;min-width:158px;
+  flex-direction:column;align-items:flex-start;gap:2px;padding:9px 11px;text-align:left}
+.mode-choix .t{font-weight:600;font-size:12.5px;line-height:1.25}
+.mode-choix .s{font-size:10.5px;font-weight:400;line-height:1.35;color:var(--mu)}
+.mode-choix.p .s{color:rgba(255,255,255,.82)}
+.mode-choix.on{cursor:default}
+.mode-choix.on:hover{transform:none;filter:none}
 .prc-h{display:flex;align-items:center;gap:9px;margin-bottom:9px}
 .prc-g{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
 .prc-g label{font-size:10.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em;font-weight:600;display:flex;flex-direction:column;gap:3px}
@@ -8345,6 +8356,7 @@ V.params=()=>{
         </div></div>`).join('')}
      </div></div>
    </div>
+   ${carteBanc()}
    ${carteClasseur()}
    ${carteSauvegarde()}`;
   },
@@ -11597,7 +11609,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DA';
+const BUILD='DB';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -13660,13 +13672,37 @@ function paint(){
    fictif, et de la croire enregistrée.
    -------------------------------------------------------------------------- */
 function bandeauHTML(){
- /* En mode autonome sur la démonstration publique, le bandeau serait un
-    bruit permanent : le fichier n'a jamais rien fait d'autre. On ne le montre
-    donc que lorsqu'il apprend quelque chose — un serveur, ou une lecture
-    seule qu'il faut savoir. */
+ /* Le cas qui doit crier : on a FORCÉ le mode autonome alors qu'un serveur
+    répondait. On travaille dans la démonstration en croyant peut-être être
+    sur les dossiers du cabinet. Rien n'est plus dangereux, et rien n'est plus
+    facile à oublier au bout d'une heure d'essais. */
+ if(!CONNECTE() && SRV.voulu==='autonome' && SRV.dispo)
+   return `<div class="bandeau force"><span>▲</span><div><b>Mode autonome forcé</b> — un serveur
+     répond pourtant à cette adresse. <b>Vous êtes dans la démonstration</b>, pas sur les dossiers
+     du cabinet : rien de ce que vous saisissez ici n’ira au serveur.
+     <button class="btn xs" style="margin-left:6px" onclick="reglerMode('auto')">Revenir en automatique</button></div></div>`;
+
+ /* Forcé aussi, mais sans serveur en face : c'est un essai délibéré, on le
+    rappelle sans dramatiser. */
+ if(!CONNECTE() && SRV.voulu==='autonome')
+   return `<div class="bandeau"><span>◌</span><div><b>Mode autonome forcé</b> — démonstration.
+     <button class="btn xs" style="margin-left:6px" onclick="reglerMode('auto')">Revenir en automatique</button></div></div>`;
+
+ /* On voulait le serveur, il n'a pas répondu. Le dire, sinon on croit à une
+    panne du logiciel alors que c'est une panne de liaison. */
+ if(!CONNECTE() && SRV.voulu==='connecte')
+   return `<div class="bandeau force"><span>▲</span><div><b>Serveur demandé, mais injoignable</b>
+     ${SRV.sonde==='trop-long'?'(il n’a pas répondu à temps)':''} — le logiciel a repris la
+     démonstration pour rester utilisable.
+     <button class="btn xs" style="margin-left:6px" onclick="reglerMode('auto')">Revenir en automatique</button></div></div>`;
+
+ /* En autonome normal, sur la démonstration publique, le bandeau serait un
+    bruit permanent : le fichier n'a jamais rien fait d'autre. */
  if(!CONNECTE()) return '';
+
  return `<div class="bandeau srv"><span>●</span><div><b>${esc(SRV.moi.nom)}</b> · ${esc(ROLES[role]?ROLES[role].l:role)}
    — dossiers du cabinet, sur le serveur.`
+   + (SRV.voulu==='connecte' ? ' <b>(mode forcé)</b>' : '')
    + (SRV.lecture ? ` <b>Lecture seule</b> : ce que vous modifiez ici n’est pas encore renvoyé
       au serveur. N’y saisissez pas de dossier réel tant que l’écriture n’est pas posée.` : '')
    + `</div></div>`;
@@ -14033,6 +14069,66 @@ function svAge(){
  if(!t) return null;
  return Math.floor((Date.now()-new Date(t).getTime())/86400000);
 }
+/* --------------------------------------------------------------------------
+   Le banc d'essai, dans les réglages
+   --------------------------------------------------------------------------
+   Il montre ce qui a été DÉTECTÉ et ce qui a été DEMANDÉ, séparément. Les
+   confondre est la façon la plus simple de se tromper : « pourquoi je ne vois
+   pas mes dossiers » a deux causes très différentes selon qu'aucun serveur ne
+   répond, ou qu'on a soi-même forcé l'autonome trois jours plus tôt.
+   -------------------------------------------------------------------------- */
+function carteBanc(){
+ const SONDE = {
+   trouve:      ['b-good', 'un serveur répond'],
+   rien:        ['b-neu',  'aucun serveur à cette adresse'],
+   injoignable: ['b-warn', 'adresse injoignable'],
+   'trop-long': ['b-warn', 'le serveur n’a pas répondu à temps'],
+ }[SRV.sonde] || ['b-neu', 'pas de serveur cherché'];
+ const adr = adresseReglee();
+ const choix = (v, titre, sous) => {
+   const actif = SRV.voulu === v;
+   return `<button class="btn mode-choix${actif?' p on':''}" onclick="reglerMode('${v}')">
+      <span class="t">${titre}</span><span class="s">${sous}</span></button>`;
+ };
+ return `<div class="card" style="margin-top:13px"><div class="h"><h2>Banc d’essai</h2>
+    <span class="s">mode appliqué : <b>${CONNECTE()?'connecté':'autonome'}</b></span></div>
+   <div class="b">
+    <div class="mu" style="font-size:11.5px;margin-bottom:11px">
+      Le mode se déduit tout seul : c’est ce qu’il faut en usage réel, pour qu’on ne puisse pas
+      saisir une vraie séance dans la démonstration en croyant l’inverse.
+      Pour <b>mettre au point</b>, on peut le forcer — le bandeau le rappellera en permanence,
+      et le forçage se garde d’un rechargement à l’autre.</div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px">
+      ${choix('auto','Automatique','on prend le serveur s’il répond')}
+      ${choix('autonome','Forcer autonome','démonstration, même si un serveur répond')}
+      ${choix('connecte','Forcer connecté','on exige le serveur ; sinon on le dit')}
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:11px">
+      <span class="bdg ${SONDE[0]}">Sonde · ${SONDE[1]}</span>
+      <span class="bdg b-neu">Demandé · ${SRV.voulu==='auto'?'automatique':'forcé '+SRV.voulu}</span>
+      ${CONNECTE()?`<span class="bdg b-good">Connecté · ${esc(SRV.moi.nom)}</span>`:''}
+    </div>
+
+    <label style="display:block;font-size:11.5px;color:var(--mu)">Adresse du serveur
+      <input class="inp" id="banc-adr" style="width:100%;margin-top:4px" placeholder="${esc(location.protocol==='file:'?'http://127.0.0.1:8787':location.origin)}"
+             value="${esc(adr||'')}"
+             onkeydown="if(event.key==='Enter')reglerMode(SRV.voulu==='autonome'?'auto':SRV.voulu, this.value.trim())"></label>
+    <div class="mu" style="font-size:11px;margin-top:6px">
+      Vide = la même origine que cette page. Renseignée, elle sert aussi en mode automatique.
+      <button class="btn xs" style="margin-left:6px"
+        onclick="reglerMode(SRV.voulu==='autonome'?'auto':SRV.voulu, document.getElementById('banc-adr').value.trim())">Appliquer</button>
+      ${adr?`<button class="btn xs" onclick="reglerMode(SRV.voulu,'')">Oublier l’adresse</button>`:''}
+    </div>
+
+    <div class="mu" style="font-size:11px;margin-top:10px;border-top:1px solid var(--bd);padding-top:9px">
+      Depuis un lien, sans rien régler : <span class="mono">?mode=autonome</span> ·
+      <span class="mono">?mode=connecte</span> ·
+      <span class="mono">?serveur=http://127.0.0.1:8787</span>. Un paramètre d’adresse l’emporte sur le réglage enregistré.</div>
+   </div></div>`;
+}
+
 function carteClasseur(){
  const D=Object.keys(CLA).map(k=>{ const v=CLA[k].lit();
    return {l:CLA[k].l, n:Array.isArray(v)?v.length:Object.keys(v||{}).length} }).filter(x=>x.n);
@@ -14103,7 +14199,10 @@ const SRV = {
   base: null,          /* l'adresse du serveur, quand il y en a un */
   moi: null,           /* qui je suis, selon le serveur */
   droits: null,        /* ce que j'ai le droit de faire, selon le serveur */
-  mode: 'autonome',    /* 'autonome' | 'connecte' */
+  mode: 'autonome',    /* 'autonome' | 'connecte' — ce qui s'applique */
+  voulu: 'auto',       /* 'auto' | 'autonome' | 'connecte' — ce qu'on a demandé */
+  dispo: false,        /* un serveur répondait-il, indépendamment du mode */
+  sonde: null,         /* 'trouve' | 'rien' | 'injoignable' | 'trop-long' */
   lecture: true,       /* le lot 04 lit ; l'écriture traversante vient ensuite */
 };
 const CONNECTE = () => SRV.mode === 'connecte';
@@ -14111,11 +14210,64 @@ const CONNECTE = () => SRV.mode === 'connecte';
 /* Où chercher le serveur. Sur un poste du cabinet, l'interface est servie par
    le serveur lui-même : la même origine suffit. On laisse la possibilité de
    pointer ailleurs pour les essais, jamais pour l'exploitation. */
-function adresseServeur(){
+/* --------------------------------------------------------------------------
+   Le banc d'essai : forcer le mode, pour éprouver
+   --------------------------------------------------------------------------
+   Le mode se déduit, et c'est bien : un praticien ne doit pas pouvoir se
+   tromper de mode et saisir une vraie séance dans la démonstration.
+
+   Mais celui qui MET AU POINT le logiciel a besoin de basculer à volonté :
+   comparer le rendu, éprouver le repli quand le serveur tombe, vérifier qu'un
+   écran tient dans les deux cas. Le forçage existe donc — sous trois
+   conditions qui le rendent sans danger :
+
+     · il est explicite (on le règle, il ne s'active jamais tout seul) ;
+     · il est bruyant (le bandeau le dit, en permanence, dans les deux sens) ;
+     · il s'annule d'un clic, et le mode automatique reprend la main.
+
+   Le cas dangereux — et c'est celui que le bandeau crie — est de forcer le
+   mode autonome ALORS QU'UN SERVEUR RÉPOND : on croirait travailler sur les
+   dossiers du cabinet, on serait dans la démonstration.
+   -------------------------------------------------------------------------- */
+const MODE_CLE = 'praxis.mode', SRVADR_CLE = 'praxis.serveur';
+/* 'auto' | 'autonome' | 'connecte' */
+function modeVoulu(){
+ try{
+   const p = new URLSearchParams(location.search).get('mode');
+   if(p==='auto'||p==='autonome'||p==='connecte') return p;
+ }catch(e){}
+ try{ const v = localStorage.getItem(MODE_CLE);
+      if(v==='autonome'||v==='connecte') return v }catch(e){}
+ return 'auto';
+}
+function reglerMode(m, adresse){
+ /* Rien à faire si rien ne change : recharger pour recharger ferait clignoter
+    l'écran sans raison, et perdrait l'endroit où l'on était. */
+ if(m === SRV.voulu && adresse === undefined) return;
+ try{
+   if(m==='auto') localStorage.removeItem(MODE_CLE); else localStorage.setItem(MODE_CLE, m);
+   if(adresse!==undefined){
+     if(adresse) localStorage.setItem(SRVADR_CLE, String(adresse).replace(/\/+$/,''));
+     else localStorage.removeItem(SRVADR_CLE);
+   }
+ }catch(e){}
+ /* Tout se décide au démarrage : d'où viennent les dossiers, qui on est, ce
+    qu'on a le droit de voir. Recharger est la seule façon honnête d'appliquer
+    un changement de mode — bricoler à chaud laisserait un écran mi-serveur,
+    mi-démonstration, et c'est exactement ce qu'on veut éviter. */
+ location.reload();
+}
+const adresseReglee = () => {
  try{
    const p = new URLSearchParams(location.search).get('serveur');
    if(p) return p.replace(/\/+$/,'');
- }catch(e){}
+   return localStorage.getItem(SRVADR_CLE) || null;
+ }catch(e){ return null }
+};
+
+function adresseServeur(){
+ const reglee = adresseReglee();
+ if(reglee) return reglee;
  /* Un fichier ouvert depuis le disque n'a pas d'origine utilisable. */
  if(location.protocol === 'file:') return null;
  /* GitHub Pages : c'est la démonstration, il n'y a pas de serveur derrière. */
@@ -14142,18 +14294,32 @@ async function srvAppel(methode, chemin, corps){
    on passe en autonome et on continue. Un cabinet dont le réseau hoquette doit
    pouvoir ouvrir ses écrans, pas regarder une roue tourner.
    -------------------------------------------------------------------------- */
-async function srvChercher(){
+/* Un serveur répond-il ? On garde toujours la réponse — même quand le mode
+   forcé nous fera l'ignorer. C'est ce qui permet au bandeau d'avertir qu'on
+   travaille en démonstration alors qu'un serveur était disponible. */
+async function srvSonder(){
  const base = adresseServeur();
- if(!base) return false;
+ if(!base) return null;
  try{
    const course = await Promise.race([
      fetch(base + '/api/etat', {credentials:'include'}).then(r => r.ok ? r.json() : null),
      new Promise(r => setTimeout(() => r('trop-long'), 2500)),
    ]);
-   if(course === 'trop-long' || !course || course.service !== 'praxis') return false;
-   SRV.base = base;
-   return true;
- }catch(e){ return false }
+   if(course === 'trop-long') { SRV.sonde = 'trop-long'; return null }
+   if(!course || course.service !== 'praxis') { SRV.sonde = 'rien'; return null }
+   SRV.sonde = 'trouve';
+   return base;
+ }catch(e){ SRV.sonde = 'injoignable'; return null }
+}
+
+async function srvChercher(){
+ SRV.voulu = modeVoulu();
+ const trouve = await srvSonder();
+ SRV.dispo = !!trouve;
+ if(SRV.voulu === 'autonome') return false;      /* on ignore le serveur, exprès */
+ if(!trouve) return false;
+ SRV.base = trouve;
+ return true;
 }
 
 /* Ai-je déjà une session ouverte ? */
