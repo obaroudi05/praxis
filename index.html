@@ -562,6 +562,9 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
 .dv-ti h1{font-size:17px;font-weight:720;letter-spacing:-.02em;line-height:1.15}
 .dv-ti .n{margin-left:auto;text-align:right;font-size:10.5px;color:#3f3f46;line-height:1.5}
 .dv-ti .n b{font-size:13px;color:#16161a;font-variant-numeric:tabular-nums}
+/* Un devis modifié après son établissement le dit, en plus discret : c'est
+   une précision, pas l'information principale. */
+.dv-ti .n .dv-maj{font-size:9.5px;color:#71717a;font-style:italic;white-space:nowrap}
 .dv-2{display:grid;grid-template-columns:1fr 1fr;gap:5mm;margin-bottom:3.2mm}
 .dv-bx{border:1px solid #d4d4d8;border-radius:2mm;padding:2.8mm 4mm}
 .dv-bx .lb{font-size:8.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#71717a;margin-bottom:1.6mm}
@@ -2526,26 +2529,26 @@ const zoneSummary=a=>{
 
 /* ---------- Devis / factures / stock / règles ---------- */
 const DEVIS=[
- {id:'D-2606-011',patient:1043,date:'2026-06-08',montant:1180,statut:'relance2',envoye:'2026-06-08',relances:2,derniere:'2026-07-13',lignes:[['AH','Acide hyaluronique',2,350],['LAS2','Photorajeunissement',1,280],['SKB','Skinbooster',1,200]],
+ {id:'D-2606-011',patient:1043,date:'2026-06-08',cree:'2026-06-08T09:12',montant:1180,statut:'relance2',envoye:'2026-06-08',relances:2,derniere:'2026-07-13',lignes:[['AH','Acide hyaluronique',2,350],['LAS2','Photorajeunissement',1,280],['SKB','Skinbooster',1,200]],
   zs:[{cerne_d:.5,cerne_g:.5,pomm_d:1,pomm_g:1},{pomm_d:null,pomm_g:null},{mand_d:null,mand_g:null}],
   cs:['Reprise du volume, résultat progressif en deux temps','Cure de 3 séances espacées de 4 semaines','']},
- {id:'D-2607-004',patient:1047,date:'2026-07-11',montant:700, statut:'relance1',envoye:'2026-07-11',relances:1,derniere:'2026-07-14',lignes:[['AH','Acide hyaluronique',2,350]],
+ {id:'D-2607-004',patient:1047,date:'2026-07-11',cree:'2026-07-11T11:47',montant:700, statut:'relance1',envoye:'2026-07-11',relances:1,derniere:'2026-07-14',lignes:[['AH','Acide hyaluronique',2,350]],
   zs:[{levres:1}]},
- {id:'D-2607-009',patient:1051,date:'2026-07-19',montant:1320,statut:'envoye',  envoye:'2026-07-19',relances:0,derniere:null,lignes:[['RF','Radiofréquence',3,220],['LAS2','Photorajeunissement',2,280],['SKB','Skinbooster',1,100]],
+ {id:'D-2607-009',patient:1051,date:'2026-07-19',cree:'2026-07-19T14:32',montant:1320,statut:'envoye',  envoye:'2026-07-19',relances:0,derniere:null,lignes:[['RF','Radiofréquence',3,220],['LAS2','Photorajeunissement',2,280],['SKB','Skinbooster',1,100]],
   zs:[{mand_d:null,mand_g:null,menton:null},{pomm_d:null,pomm_g:null},{cou:null}]},
- {id:'D-2607-012',patient:1046,date:'2026-07-24',montant:960, statut:'envoye',  envoye:'2026-07-24',relances:0,derniere:null,lignes:[['LAS1','Forfait épilation',8,120]],
+ {id:'D-2607-012',patient:1046,date:'2026-07-24',cree:'2026-07-24T16:05',montant:960, statut:'envoye',  envoye:'2026-07-24',relances:0,derniere:null,lignes:[['LAS1','Forfait épilation',8,120]],
   zs:[{aiss_d:null,aiss_g:null,maillot:null}], cs:['Forfait 8 séances, tarif dégressif déjà appliqué']},
- {id:'D-2607-015',patient:1054,date:'2026-07-28',montant:840, statut:'envoye',  envoye:'2026-07-28',relances:0,derniere:null,lignes:[['LAS2','Cure photorajeunissement',3,280]],
+ {id:'D-2607-015',patient:1054,date:'2026-07-28',cree:'2026-07-28T10:23',montant:840, statut:'envoye',  envoye:'2026-07-28',relances:0,derniere:null,lignes:[['LAS2','Cure photorajeunissement',3,280]],
   zs:[{decol:null}]},
- {id:'D-2605-006',patient:1052,date:'2026-05-14',montant:390, statut:'expire',  envoye:'2026-05-14',relances:3,derniere:'2026-06-25',lignes:[['BTX','Haut du visage',1,390]],
+ {id:'D-2605-006',patient:1052,date:'2026-05-14',cree:'2026-05-14T15:41',montant:390, statut:'expire',  envoye:'2026-05-14',relances:3,derniere:'2026-06-25',lignes:[['BTX','Haut du visage',1,390]],
   zs:[{front:12,glab:20,cou:16}], cs:['Retouche incluse à 15 jours si besoin']},
- {id:'D-2607-002',patient:1045,date:'2026-07-06',montant:970, statut:'accepte', envoye:'2026-07-06',relances:0,derniere:null,lignes:[['AH','Acide hyaluronique',2,325],['SKB','Skinbooster',1,320]],
+ {id:'D-2607-002',patient:1045,date:'2026-07-06',cree:'2026-07-06T08:58',montant:970, statut:'accepte', envoye:'2026-07-06',relances:0,derniere:null,lignes:[['AH','Acide hyaluronique',2,325],['SKB','Skinbooster',1,320]],
   zs:[{pomm_d:1,pomm_g:1,mand_d:.5,mand_g:.5},{cerne_d:null,cerne_g:null}]},
- {id:'D-2606-018',patient:1050,date:'2026-06-20',montant:970, statut:'accepte', envoye:'2026-06-20',relances:1,derniere:'2026-06-24',lignes:[['AH','Acide hyaluronique',2,325],['SKB','Skinbooster',1,320]],
+ {id:'D-2606-018',patient:1050,date:'2026-06-20',cree:'2026-06-20T17:19',montant:970, statut:'accepte', envoye:'2026-06-20',relances:1,derniere:'2026-06-24',lignes:[['AH','Acide hyaluronique',2,325],['SKB','Skinbooster',1,320]],
   zs:[{pomm_d:1,pomm_g:1},{cou:null}]},
- {id:'D-2607-021',patient:1042,date:'2026-07-30',montant:340, statut:'brouillon',envoye:null,relances:0,derniere:null,lignes:[['MESO','Mésothérapie',1,180],['PEEL','Peeling',1,160]],
+ {id:'D-2607-021',patient:1042,date:'2026-07-30',cree:'2026-07-30T13:06',montant:340, statut:'brouillon',envoye:null,relances:0,derniere:null,lignes:[['MESO','Mésothérapie',1,180],['PEEL','Peeling',1,160]],
   zs:[{cou:null},{front:null,pomm_d:null,pomm_g:null}]},
- {id:'D-2604-007',patient:1048,date:'2026-04-15',montant:390, statut:'refuse',  envoye:'2026-04-15',relances:2,derniere:'2026-05-06',lignes:[['BTX','Haut du visage',1,390]],
+ {id:'D-2604-007',patient:1048,date:'2026-04-15',cree:'2026-04-15T12:35',montant:390, statut:'refuse',  envoye:'2026-04-15',relances:2,derniere:'2026-05-06',lignes:[['BTX','Haut du visage',1,390]],
   zs:[{front:12,glab:20,cou:16}]},
 ];
 /* rattachement d'un devis à l'acte de la consultation où il a été établi
@@ -2806,12 +2809,18 @@ const nbRange=G=>G.reduce((n,f)=>n+f.sfams.reduce((m,g)=>m+g.items.length,0),0);
  TODAYS=jour;
  if(!dec) return;
  const ISO=/^\d{4}-\d{2}-\d{2}$/;
+ /* Un horodatage est une date : il doit glisser comme les autres, sinon le
+    devis afficherait « établi le 8 juin » à côté d'une date de dossier au
+    14 juillet — deux versions contradictoires du même fait. L'HEURE, elle,
+    ne bouge pas : c'est elle qui porte le sens. */
+ const ISOH=/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/;
  const gliss=d=>new Date(new Date(d).getTime()+dec*864e5).toISOString().slice(0,10);
  const vu=new Set();
  const parcours=o=>{
   if(!o||typeof o!=='object'||vu.has(o)) return; vu.add(o);
   for(const k of Object.keys(o)){ const v=o[k];
    if(typeof v==='string'&&ISO.test(v)){ if(k!=='ddn') o[k]=gliss(v) }   /* la naissance ne bouge pas */
+   else if(typeof v==='string'&&ISOH.test(v)){ const m=v.match(ISOH); o[k]=gliss(m[1])+'T'+m[2] }
    else if(v&&typeof v==='object') parcours(v) } };
  [PATIENTS,ACTES,DEVIS,FACTURES,STOCK].forEach(A=>A.forEach(parcours));
 })();
@@ -6139,7 +6148,8 @@ function pDetail(p){
      <tbody>${L.map(d=>`<tr>
        <td><span class="bdg b-neu">${KIND[d.k][1]} ${KIND[d.k][2]}</span></td>
        <td><b>${d.t}</b><div class="mu" style="font-size:11.5px">${esc(d.s)}</div></td>
-       <td class="mono" style="white-space:nowrap">${DF(d.date)}</td>
+       <td class="mono" style="white-space:nowrap" title="${(()=>{const e=devisEtabliTxt(d);
+         return esc('Devis établi le '+e.cree+(e.maj?' · modifié le '+e.maj:''))})()}">${DF(d.date)}</td>
        <td>${d.st}</td>
        <td class="num" style="white-space:nowrap">${d.a}</td></tr>${d.cf||''}`).join('')}
      </tbody></table>${L.length?'':'<div class="empty">Aucun document de ce type.</div>'}</div>
@@ -6185,7 +6195,8 @@ function pDetail(p){
      <button class="btn xs p" onclick="openDevis(${p.id},'esth')">+ Devis esthétique</button></div></div>
    <div class="tw"><table><thead><tr><th>N°</th><th>Date</th><th>Prestations</th><th class="num">Montant</th><th>Statut</th><th>Relances</th><th></th></tr></thead>
     <tbody>${D.map(d=>`<tr class="c" onclick="go('devis','${d.id}')">
-      <td class="mono">${d.id}</td><td class="mono">${DF(d.date)}</td>
+      <td class="mono">${d.id}</td><td class="mono" title="${(()=>{const e=devisEtabliTxt(d);
+        return esc('Devis établi le '+e.cree+(e.maj?' · modifié le '+e.maj:''))})()}">${DF(d.date)}</td>
       <td>${d.lignes.map(l=>esc(l[1])).join(' · ')}</td>
       <td class="num">${EUR(d.montant)}</td><td>${bdgDevis(d)}</td>
       <td class="mono mu">${d.relances||'—'}</td>
@@ -6327,7 +6338,8 @@ V.devis=()=>{
   if(d.statut==='refuse')h.push([d.derniere||d.date,'Devis refusé','✕']);
   if(d.statut==='expire')h.push([d.derniere||d.date,'Expiré (30 j sans réponse)','⏱']);
   const nx=RELS.find(r=>r.d.id===d.id);
-  return `<div class="head"><div><h1>${d.id}</h1><p>${esc(fn(p))} · ${DF(d.date)} · ${bdgDevis(d)}${
+  return `<div class="head"><div><h1>${d.id}</h1><p>${esc(fn(p))} · ${(()=>{const e=devisEtabliTxt(d);
+    return `établi le ${e.cree}`+(e.maj?` <span class="mu">· modifié le ${e.maj}</span>`:'')})()} · ${bdgDevis(d)}${
     d.realise?(()=>{const a2=ACTES.find(x=>x.id===d.realise);return a2?` · acte du ${DF(a2.date)}`:''})():''}</p></div>
    <div class="r"><button class="btn g" onclick="dSel=null;paint()">← Retour</button>
     <button class="btn" onclick="openPatient(${p.id})">Fiche patient</button>
@@ -6408,7 +6420,8 @@ V.devis=()=>{
         if(!T.length) return '<i>prestation libre</i>';
         const v=T.slice(0,3).map(t=>esc(acteDef(t).n)).join(' · ');
         return v+(T.length>3?` <span class="mu">+${T.length-3}</span>`:'')})()}</div></td>
-    <td class="mono">${DF(d.date)}</td>
+    <td class="mono" title="${(()=>{const e=devisEtabliTxt(d);
+      return esc('Devis établi le '+e.cree+(e.maj?' · modifié le '+e.maj:''))})()}">${DF(d.date)}</td>
     <td class="num">${EUR(d.montant)}</td><td>${bdgDevis(d)}</td>
     <td class="mono" style="white-space:nowrap${ag>21?';color:var(--crit);font-weight:620':''}" ${ag>21?'':'class="mono mu"'}>${ag!==null?ag+' j':'—'}</td>
     <td>${nx?(nx.du?bdg('b-crit','⚠ '+nx.r.c+' échu'):bdg('b-info',nx.r.c+' le '+DFS(nx.e))):'<span class="mu">—</span>'}</td>
@@ -10603,7 +10616,7 @@ function saveDevis(){
  const net=Math.max(0,brut-rem);
  const num='D-'+String(TODAYS.slice(2,4))+String(TODAYS.slice(5,7))+'-'+String(DEVIS.length+22).padStart(3,'0');
  const acteJour=ACTES.find(x=>x.patient===AS.pid&&x.date===TODAYS);
- DEVIS.unshift({id:num,patient:AS.pid,date:TODAYS,montant:net,statut:'brouillon',acte:acteJour?acteJour.id:null,
+ DEVIS.unshift({id:num,patient:AS.pid,date:TODAYS,cree:HORO(),montant:net,statut:'brouillon',acte:acteJour?acteJour.id:null,
    fam:(T.length?acteDef(T[0]).fam:'esth')||'esth',praticien:AS.prat,
    envoye:null,relances:0,derniere:null,lignes,prest,
    zones:{...AS.z},seances:seancesMax(),remise:rem,validite:AS.validite,
@@ -11927,7 +11940,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DE';
+const BUILD='DF';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -12007,6 +12020,40 @@ function totauxDoc(d){
 const hfDevis=(t,p,prn)=>{const pr=pratInfo(prn);
  return esc(fillTpl(t,tplCtx(p,{praticien:prn,rpps:pr.rpps,rcp:`${pr.rcpCie} n° ${pr.rcpPolice}`}))).replace(/\n/g,'<br>')};
 
+/* ==========================================================================
+   Quand ce devis a-t-il été établi ?
+   --------------------------------------------------------------------------
+   Un devis est une offre : sa date et son heure comptent, pour la durée de
+   validité comme en cas de contestation. Encore faut-il qu'elles PROUVENT
+   quelque chose.
+
+   L'horodatage est donc posé À LA CRÉATION et gardé tel quel. Le calculer à
+   l'impression n'attesterait rien : il indiquerait l'instant où l'on a rouvert
+   le document, et changerait à chaque réédition.
+
+   Deux dates, et la seconde n'est pas un détail : un devis modifié après coup
+   n'est plus le même document. On affiche l'établissement, et la modification
+   si elle a eu lieu — plutôt que de laisser croire que le contenu d'aujourd'hui
+   date d'il y a trois semaines.
+   ========================================================================== */
+const HORO=()=>{ const d=new Date();
+ const p=n=>String(n).padStart(2,'0');
+ return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}` };
+/* « le 12/07/2026 à 14 h 32 ». Sans heure connue — un devis d'avant cette
+   version — on n'en invente pas : on donne la date seule. */
+const horoTxt=t=>{
+ if(!t) return null;
+ const s=String(t);
+ const j=s.slice(0,10), h=s.slice(11,16);
+ return DF(j)+(h?` à ${h.replace(':','\u202fh\u202f')}`:'');
+};
+/* Ce qu'on imprime en tête du devis. */
+function devisEtabliTxt(d){
+ const cree=horoTxt(d.cree)||horoTxt(d.date);
+ const maj=(d.maj && String(d.maj).slice(0,16)!==String(d.cree||'').slice(0,16))?horoTxt(d.maj):null;
+ return {cree, maj};
+}
+
 function devisDoc(d){
  const p=pById(d.patient), prn=d.praticien||p.prat, pr=pratInfo(prn), T=trame(d.fam||'esth');
  const {L,brut,remL,sous,rem,net,tva,ht}=totauxDoc(d);
@@ -12026,7 +12073,8 @@ function devisDoc(d){
   <div class="gr">
   <div class="dv-ti">
    <h1>${esc(T.titre)}</h1>
-   <div class="n"><b>${esc(d.id||'projet')}</b><br>Établi le ${DF(d.date)}</div></div>
+   <div class="n"><b>${esc(d.id||'projet')}</b><br>${(()=>{const e=devisEtabliTxt(d);
+     return `Devis établi le ${e.cree}${e.maj?`<br><span class="dv-maj">Modifié le ${e.maj}</span>`:''}`})()}</div></div>
 
   ${(T.praticien||T.patient)?`<div class="dv-2">
    ${T.praticien?`<div class="dv-bx"><div class="lb">Praticien</div>
@@ -12897,7 +12945,9 @@ function dvEnregistrer(envoyer){
  if(DV.id){
   const d=DEVIS.find(x=>x.id===DV.id);
   if(d.statut==='accepte'){toast('Devis accepté par le patient — il n’est plus modifiable');return}
-  Object.assign(d,{montant:net,remise:rem,validite:DV.validite,note:DV.note,prest,lignes,fam:DV.fam});
+  /* maj, jamais cree : l'établissement est un fait, il ne se réécrit pas. */
+  Object.assign(d,{montant:net,remise:rem,validite:DV.validite,note:DV.note,prest,lignes,fam:DV.fam,
+    cree:d.cree||HORO(), maj:HORO()});
   logDoc(d.id,'Devis modifié');
   if(envoyer){ const renv=d.statut!=='brouillon';
    d.statut='envoye'; d.envoye=TODAYS; d.relances=0; d.derniere=null;
@@ -12907,7 +12957,7 @@ function dvEnregistrer(envoyer){
  }
  const num='D-'+TODAYS.slice(2,4)+TODAYS.slice(5,7)+'-'+String(DEVIS.length+22).padStart(3,'0');
  const p=pById(DV.pid), ca=canalPat(p);
- DEVIS.unshift({id:num,patient:DV.pid,date:DV.date,montant:net,fam:DV.fam,
+ DEVIS.unshift({id:num,patient:DV.pid,date:DV.date,cree:HORO(),montant:net,fam:DV.fam,
    statut:envoyer?'envoye':'brouillon',acte:null,praticien:DV.prat,
    envoye:envoyer?TODAYS:null,relances:0,derniere:null,lignes,prest,
    zones:{...prest[0].z},seances:prest[0].seances,remise:rem,validite:DV.validite,
