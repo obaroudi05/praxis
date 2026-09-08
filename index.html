@@ -1681,9 +1681,17 @@ body.en-connexion aside{display:none}
 .facewrap.cumul{grid-template-columns:minmax(0,1fr) minmax(0,420px);align-items:start}
 .facewrap.cumul>div:first-child{overflow:visible;display:block}
 .facewrap.cumul>div:first-child .facebox{max-height:none}
-.facewrap.cumul>div:first-child .face{height:auto;max-height:calc(100vh - 300px)}
+.facewrap.cumul>div:first-child .face{height:auto;max-height:calc(100vh - 300px);min-height:665px}
 .facewrap.cumul>div:first-child .barp{max-height:calc(100vh - 300px)}
 .facewrap.cumul>div:last-child{max-height:calc(100vh - 240px);overflow:auto}
+/* Sous 1260 px, la colonne de gauche n'a plus la largeur qu'il faut pour un
+   schéma lisible : plutôt que de le rapetisser, on empile. Le dessin reprend
+   toute la largeur du panneau, la liste passe dessous. */
+@media(max-width:1260px){
+  .facewrap.cumul{grid-template-columns:minmax(0,1fr)}
+  .facewrap.cumul>div:first-child .face{margin:0 auto}
+  .facewrap.cumul>div:last-child{max-height:none}
+}
 /* l'illustration porte déjà ses tracés : au repos la zone cliquable s'efface derrière eux */
 .zone{fill:var(--ink);fill-opacity:.012;stroke:var(--ink);stroke-opacity:0;stroke-width:1.6;stroke-linejoin:round;cursor:pointer;transition:fill-opacity .12s,stroke-opacity .12s}
 .zone:hover{fill-opacity:.15;stroke-opacity:.6}
@@ -1710,6 +1718,27 @@ body.en-connexion aside{display:none}
 .neck{fill:var(--ink);fill-opacity:.028;stroke:var(--ink);stroke-opacity:.20;stroke-width:1.6;pointer-events:none}
 .zlabel{font:700 11px var(--sans);fill:#fff;text-anchor:middle;pointer-events:none;paint-order:stroke;
   stroke:rgba(0,0,0,.28);stroke-width:2.4px}
+/* --- les étiquettes du schéma, posées sur une pastille pleine ---------------
+   Le contraste vient du fond, pas d'un liseré : sur une illustration claire,
+   du blanc cerné de noir à 28 % ne se lit qu'en zoomant. */
+/* La teinte qui remplit une zone du schéma est claire — elle doit laisser
+   deviner le dessin dessous. Sur une pastille, elle ne suffit pas : du blanc
+   sur l'orange de l'acide hyaluronique ne donne que 3,2 pour 1, sous le seuil
+   de lisibilité d'un texte de cette taille. On l'assombrit donc pour l'écrit,
+   sans toucher à la couleur des zones. Les tests mesurent le rapport obtenu
+   et refusent tout ce qui descend sous 4,5 pour 1, dans les deux thèmes. */
+.zpill{pointer-events:none}
+.zpill rect{fill:color-mix(in srgb,var(--zc) 72%,#08172b);stroke:rgba(255,255,255,.8);stroke-width:1}
+.zpill text{text-anchor:middle;dominant-baseline:middle}
+.zpill .zq{font:700 12px var(--sans);fill:#fff;letter-spacing:.01em}
+.zpill .zd2{font:600 9px var(--sans);fill:#fff;letter-spacing:.02em}
+/* traitée autrefois, rien aujourd'hui : pastille claire, texte assombri */
+.zpill.ant rect{fill:var(--panel);fill-opacity:.96;stroke:var(--zc);stroke-opacity:.8;stroke-width:1.2}
+.zpill.ant .zq,.zpill.ant .zd2{fill:color-mix(in srgb,var(--zc) 68%,#08172b);fill-opacity:1}
+:root[data-theme="dark"] .zpill rect{stroke:rgba(0,0,0,.55)}
+:root[data-theme="dark"] .zpill.ant rect{fill:var(--panel);fill-opacity:.97;stroke:var(--zc);stroke-opacity:.85}
+:root[data-theme="dark"] .zpill.ant .zq,:root[data-theme="dark"] .zpill.ant .zd2{
+  fill:color-mix(in srgb,var(--zc) 86%,#fff)}
 /* injections antérieures : contour discret + date en tout petit */
 .zone.ant{stroke-dasharray:none;stroke-width:1.2}
 .zone.ant-tox{fill:var(--toxine);fill-opacity:.09;stroke:var(--toxine);stroke-opacity:.42}
@@ -4275,13 +4304,37 @@ function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=n
   return z.pa?`<path class="${cls}"${st} d="${zPath(z.pa)}" ${ev}><title>${tt}</title></path>`
             :`<ellipse class="${cls}"${st} cx="${z.cx}" cy="${z.cy}" rx="${z.rx}" ry="${z.ry}" ${ev}><title>${tt}</title></ellipse>`;
  }).join('');
- /* étiquettes anti-chevauchement : quantité au centre, date en tout petit dessous */
+ /* ==========================================================================
+    Les étiquettes du schéma
+    --------------------------------------------------------------------------
+    Elles étaient écrites en blanc, avec un mince liseré noir à 28 % pour tout
+    contraste, par-dessus une illustration de visage claire. Résultat : il
+    fallait zoomer pour lire une dose. Un liseré ne fait pas un fond ; sur un
+    aplat clair, du blanc sur du blanc reste du blanc.
+
+    Chaque étiquette est donc posée sur une pastille pleine, de la couleur du
+    produit, texte blanc dessus : le contraste ne dépend plus de ce qu'il y a
+    derrière. La date, qui plafonnait à 8,8 px à l'écran — sous le seuil de
+    lecture confortable —, passe à 11. Et la couleur de la pastille dit le
+    produit sans qu'on ait à descendre lire la légende.
+
+    Une zone traitée autrefois mais pas aujourd'hui garde une pastille claire à
+    texte coloré : elle reste lisible, tout en se distinguant de ce qui est en
+    cours de saisie.
+    ========================================================================== */
  const pris=[];
  const place=(x,y,w,h)=>{
-  const heurte=yy=>pris.some(p=>Math.abs(p.x-x)<(p.w+w)/2+2 && Math.abs(p.y-yy)<(p.h+h)/2+1);
-  for(const d of [0,10,-10,20,-20,30,-30]){ if(!heurte(y+d)){ pris.push({x,y:y+d,w,h}); return y+d } }
+  const heurte=yy=>pris.some(p=>Math.abs(p.x-x)<(p.w+w)/2+2 && Math.abs(p.y-yy)<(p.h+h)/2+2);
+  for(const d of [0,12,-12,24,-24,36,-36,48,-48]){ if(!heurte(y+d)){ pris.push({x,y:y+d,w,h}); return y+d } }
   pris.push({x,y,w,h}); return y;
  };
+ /* largeur d'un texte, en unités du dessin : les chiffres et les lettres de
+    ces étiquettes tournent autour de 0,56 em, les séparateurs bien moins.
+    L'estimation est vérifiée par les tests, qui exigent que le texte rendu
+    tienne dans sa pastille. */
+ const largeurTxt=(txt,fs)=>[...txt].reduce((w,c)=>
+   w + fs*(/[ .,/:]/.test(c)?0.30 : /[×]/.test(c)?0.60 : /[a-z]/.test(c)?0.55 : 0.60), 0);
+ const FQ=12, FD=9;                       /* corps de la dose, corps de la date */
  const lbl=L.filter(z=>Object.prototype.hasOwnProperty.call(state,z.id)||H[z.id])
   .sort((a,b)=>a.cy-b.cy||a.cx-b.cx)
   .map(z=>{
@@ -4290,12 +4343,31 @@ function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=n
    /* une prestation libre n'a ni produit ni unité : on n'affiche que ce qui a un sens */
    const qt=q?(CT?(UT?fmtDose(q,t):''):(libre?(q!==1?nb(q):''):fmtQ(q,z.p))):'';
    const dt=ant?DFT(ant[0].d)+(ant.length>1?` ×${ant.length}`:''):'';
-   const w=Math.max(qt.length*6.2, dt.length*4.1), h=(qt?11:0)+(dt?8:0);
-   const y=place(z.cx, z.cy, w, h);
-   const fil=Math.abs(y-z.cy)>7?`<line class="zlead ${z.p==='tox'?'t':'a'}" x1="${z.cx}" y1="${z.cy}" x2="${z.cx}" y2="${y+(y>z.cy?-7:5)}"/>`:'';
+   if(!qt&&!dt) return '';
+   const plein=!!qt;
+   /* Une zone seulement traitée autrefois se colore selon SON produit, pas
+      selon l'acte en cours de saisie : une tempe comblée à l'acide ne devient
+      pas bleue parce qu'on injecte de la toxine ailleurs aujourd'hui. C'est
+      déjà la règle du contour de la zone ; la pastille la suit. */
+   const coul=(plein&&CT?colActe(t):null)||(z.p==='tox'?'var(--toxine)':'var(--ah)');
+   const w=Math.max(largeurTxt(qt,FQ), largeurTxt(dt,FD))+11;
+   const h=(qt?FQ+2:0)+(dt?FD+2:0)+6;
+   /* une étiquette ne sort pas du cadre : au bord, elle se recentre */
+   const [VX,VY,VW,VH]=S.vb.split(/\s+/).map(Number);
+   const cx=Math.min(VX+VW-w/2-3, Math.max(VX+w/2+3, z.cx));
+   const y=Math.min(VY+VH-h/2-3, Math.max(VY+h/2+3, place(cx, z.cy, w, h)));
+   const fil=(Math.abs(y-z.cy)>h/2+3||Math.abs(cx-z.cx)>2)
+     ?`<line class="zlead ${z.p==='tox'?'t':'a'}" x1="${z.cx}" y1="${z.cy}" x2="${cx}" y2="${(y+(y>z.cy?-h/2:h/2)).toFixed(1)}"/>`:'';
+   /* le texte est centré dans la pastille : une seule ligne au milieu, deux
+      lignes réparties de part et d'autre */
+   const yq = qt ? (dt ? y-2 : y) : 0;
+   const yd = dt ? (qt ? y+FD+1.5 : y) : 0;
    return fil
-        + (qt?`<text class="zlabel" x="${z.cx}" y="${y+(dt?0:4)}">${qt}</text>`:'')
-        + (dt?`<text class="zdate ${qt?'':'seul'} ${z.p==='tox'?'t':'a'}" x="${z.cx}" y="${y+(qt?11:4)}">${dt}</text>`:'');
+        + `<g class="zpill ${plein?'on':'ant'}" data-z="${z.id}" style="--zc:${coul}">
+             <rect x="${(cx-w/2).toFixed(1)}" y="${(y-h/2).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="${Math.min(6,h/2).toFixed(1)}"/>
+             ${qt?`<text class="zq" x="${cx.toFixed(1)}" y="${yq.toFixed(1)}">${qt}</text>`:''}
+             ${dt?`<text class="zd2" x="${cx.toFixed(1)}" y="${yd.toFixed(1)}">${dt}</text>`:''}
+           </g>`;
   }).join('');
  return `<svg class="face" viewBox="${S.vb}">${S.g}${tr}${zs}${lbl}</svg>`;
 }
@@ -12280,7 +12352,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DG';
+const BUILD='DH';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -14430,13 +14502,27 @@ function calerCumul(){
  if(col) col.style.maxHeight='';
  /* on retire à la plus haute des deux colonnes ce que la vue fait défiler en trop,
     jusqu'à ce que tout tienne — deux ou trois passes suffisent */
+ /* ---------------------------------------------------------------------
+    Le plancher du schéma
+    ---------------------------------------------------------------------
+    Il était à 200 px. Sur une fenêtre courte, le schéma descendait donc
+    jusqu'au tiers de sa taille, et les étiquettes avec lui : la date des
+    séances tombait à 5,6 px à l'écran. Autrement dit, pour éviter une barre
+    de défilement, on rendait le dessin illisible.
+
+    C'est le mauvais échange. Un schéma qu'on fait défiler se lit ; un schéma
+    qu'on doit agrandir à la loupe, non. Le plancher est donc calé sur la
+    taille au-dessous de laquelle la date passe sous 10 px — 665 px de haut,
+    soit 470 de large pour ce cadre de 400 × 568. En dessous, la page défile,
+    et c'est très bien ainsi. */
+ const PLANCHER=665;
  for(let i=0;i<4;i++){
   const trop=m.scrollHeight-m.clientHeight;
   if(trop<=0) break;
   const hc=col?col.getBoundingClientRect().height:0;
   const hf=f?f.getBoundingClientRect().height:0;
   if(col&&hc>=hf) col.style.maxHeight=Math.max(200,Math.round(hc-trop))+'px';
-  else if(f) f.style.maxHeight=Math.max(200,Math.round(hf-trop))+'px';
+  else if(f&&hf>PLANCHER) f.style.maxHeight=Math.max(PLANCHER,Math.round(hf-trop))+'px';
   else break;
  }
 }
