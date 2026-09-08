@@ -273,6 +273,33 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .drange.on{border-color:var(--accent);background:var(--accent-wash)}
 .drange span{color:var(--ink-3);font-size:12px}
 .drange .inp{height:30px;font-size:12.5px;padding:0 8px}
+/* la période en une seule liste, et le petit menu de création */
+/* Largeur fixe : sans elle, c'est l'option la plus longue — « Personnalisée… »
+   — qui dicte la taille de la liste, et la barre déborde pour un libellé qu'on
+   ne lit qu'une fois. */
+.persel{width:104px;flex:none;height:33px}
+/* La recherche ne sort que si on la demande : sur six documents elle ne sert
+   pas, et elle coûtait deux cents pixels dans une barre qui devait tenir sur
+   une ligne. Dès qu'une recherche est en cours, le champ reste ouvert. */
+.dochead .docq{width:180px;flex:0 1 180px;min-width:120px}
+.perso-r{margin:-4px 0 11px}
+.dochead{margin-bottom:11px}
+/* Le pictogramme de chaque catégorie se répète déjà dans la colonne Type de
+   la table, juste dessous : sur le filtre, il ne servait qu'à élargir. Le
+   compte, lui, reste — c'est ce qu'on vient y lire. */
+.dochead .seg button{white-space:nowrap;gap:4px;display:inline-flex;align-items:center}
+.dochead .seg button .n{font-variant-numeric:tabular-nums;font-weight:640;font-size:11px;
+  color:var(--ink-3);background:var(--panel-2);border-radius:5px;padding:1px 4px}
+.dochead .seg button.on .n{color:var(--accent);background:var(--accent-wash)}
+.ddw{position:relative;display:flex}
+.ddm{position:absolute;top:calc(100% + 5px);right:0;z-index:40;min-width:186px;
+  display:flex;flex-direction:column;padding:5px;gap:1px;
+  background:var(--panel);border:1px solid var(--line);border-radius:11px;
+  box-shadow:0 10px 28px rgba(15,23,42,.16)}
+.ddm button{all:unset;display:block;padding:7px 10px;border-radius:8px;cursor:pointer;
+  font-size:12.5px;font-weight:520;color:var(--ink);white-space:nowrap}
+.ddm button:hover{background:var(--panel-2)}
+.ddm button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 /* patients vus récemment, avec leurs actes */
 .hp{border:1px solid var(--line);border-radius:12px;background:var(--panel-2);overflow:hidden}
 .hp+.hp{margin-top:6px}
@@ -1019,6 +1046,44 @@ tr.neuf>td{background:color-mix(in srgb,var(--accent) 9%,transparent)}
   color:var(--ink-3);cursor:pointer;font-variant-numeric:tabular-nums;transition:.12s}
 .zc b{color:var(--ink-2);font-weight:650}
 .zc:hover{border-color:var(--accent);color:var(--accent-ink)}
+
+/* --- Cumul historique : une ligne par zone ---------------------------------
+   La version précédente prenait deux lignes et répétait le nom du produit sur
+   chaque carte, alors que la pastille de couleur le dit déjà. Tout tient
+   désormais sur une ligne ; le produit passe en infobulle, là où on le cherche
+   quand on en a besoin. Le compteur « ×3 » a disparu aussi : il y a trois
+   pastilles, le dire une seconde fois n'apprenait rien. */
+.cum-r{gap:7px;padding:5px 8px;flex-wrap:nowrap}
+.cum-z{font-size:12.5px;font-weight:560;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  min-width:44px;flex:8 1 auto}
+.cum-q{font-size:12.5px;white-space:nowrap;margin-left:auto;flex:none;font-variant-numeric:tabular-nums}
+/* Les pastilles ne passent JAMAIS à la ligne : c'est la promesse d'une ligne
+   par zone. Quand la place manque, c'est le nom de la zone qui s'abrège — il
+   se relit d'un survol. Et si un dossier très ancien alignait plus de
+   pastilles que la ligne n'en peut tenir, la bande défile : mieux vaut une
+   barre visible qu'une séance escamotée sans le dire. */
+.cum-c{display:flex;gap:4px;flex:0 1 auto;min-width:0;flex-wrap:nowrap;justify-content:flex-end;
+  overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
+.cum-c .zc{flex:none}
+.cum-c .zc{display:inline-flex;align-items:center;gap:4px;border-color:color-mix(in srgb,var(--sc) 42%,transparent);
+  background:color-mix(in srgb,var(--sc) 9%,var(--panel))}
+.cum-c .zc:hover{border-color:var(--sc)}
+.cum-c .zc i,.cum-s i{width:6px;height:6px;border-radius:2px;display:inline-block;flex:none}
+/* la légende des séances */
+.cum-lg{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:10.5px;
+  color:var(--ink-3);margin:2px 0 8px;line-height:1.5}
+.cum-s{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:7px;
+  border:1px solid var(--line);background:var(--panel);font-variant-numeric:tabular-nums}
+.cum-s b{font-weight:500;color:var(--ink-3)}
+.cum-s u{text-decoration:none;font-weight:640;color:var(--ink-2)}
+.cum-x{font-weight:500;color:var(--ink-3);font-size:10.5px;margin-left:5px}
+.cum-c .zc u{text-decoration:none;font-weight:640;font-variant-numeric:tabular-nums;
+  color:var(--sc);letter-spacing:.2px}
+/* un numéro de séance collé à une dose se lit comme un seul nombre : on les
+   sépare d'un filet, pas d'une espace qu'on ne verrait pas. */
+.cum-c .zc u+b{margin-left:5px;padding-left:5px;font-weight:560;
+  border-left:1px solid color-mix(in srgb,var(--sc) 34%,transparent)}
+.cum-lg .mu{font-size:10.5px}
 /* --- dossier d'un acte : onglets de section --- */
 .anav{display:flex;align-items:center;gap:5px;background:var(--panel-2);border:1px solid var(--line);
   border-radius:999px;padding:3px 7px 3px 3px}
@@ -2360,10 +2425,22 @@ function nouvelActe(cat){
  if(e){ e.focus(); e.select(); e.scrollIntoView({block:'center'}) }
  toast('Acte ajouté dans « '+cat+' » — nommez-le et réglez son tarif');
 }
-const nb=q=>String(+(+q).toFixed(2));      /* 16.00 → 16 · 1.20 → 1.2 */
+/* Une quantité, écrite comme on l'écrit en France : 16,00 → 16 · 1,20 → 1,2.
+   Le point décimal anglo-saxon n'a rien à faire sur une ordonnance française,
+   et « 0.5 ml » se lit mal à côté d'un « 0,5 » manuscrit. Cette fonction ne
+   sert qu'à l'affichage — aucune saisie n'en relit la sortie. */
+const nb=q=>String(+(+q).toFixed(2)).replace('.',',');
 const uniteZone=id=>{const z=zoneDef(id); return (z&&z.u)||null};
-/* l'unité d'une quantité de zone : celle réglée sur la zone, sinon aucune */
-const uniteDose=(t,id)=>uniteZone(id);
+/* L'unité d'une quantité de zone. Une zone peut imposer la sienne ; à défaut,
+   c'est celle de l'acte pratiqué — l'acide hyaluronique se compte en ml, la
+   toxine en unités, un peeling ne se compte pas.
+
+   Cette fonction ne lisait que la zone. Comme aucune zone ne porte d'unité,
+   elle rendait toujours « rien » : les doses s'affichaient nues, « 0,5 » là
+   où il fallait « 0,5 ml ». Sur un dossier d'injection, 0,5 ml d'acide et
+   0,5 unité de toxine ne sont pas la même chose, et l'ambiguïté n'a rien
+   d'esthétique. */
+const uniteDose=(t,id)=>uniteZone(id)||((t&&acteDef(t)||{}).unite)||null;
 const fmtDose=(q,t,id)=>{if(q==null||q==='') return '';
  const u=uniteDose(t,id); return u?`${nb(q)} ${u}`:`${nb(q)}`};
 /* montant proposé : le tarif de l'acte, multiplié par la quantité */
@@ -2421,6 +2498,11 @@ const fn=p=>`${p.nom} ${p.prenom}`;
 const age=p=>p&&p.ddn?Math.floor(days(p.ddn,TODAY)/365.25):null;
 const ageTxt=p=>age(p)!==null?age(p)+' ans':'âge n.c.';
 const ini=p=>p.prenom[0]+p.nom[0];
+/* la dose cumulée d'une zone, ou un tiret quand l'acte ne se dose pas */
+/* l'unité se lit sur la ZONE, pas sur l'acte : oublier ce troisième argument
+   fait imprimer « 0,5 » là où il fallait « 0,5 ml » — sur une dose injectée,
+   c'est une faute, pas une coquille. */
+const q_=(q,t,CZ,z)=>(q&&CZ&&CZ.unite)?fmtDose(q,t,z):'—';
 
 /* ---------- Actes (avec zones injectées) ---------- */
 let ACTES=[];
@@ -3327,6 +3409,41 @@ function moisConnus(){
  return [...S].sort().reverse();
 }
 const anneesConnues=()=>[...new Set(moisConnus().map(m=>m.slice(0,4)))].sort().reverse();
+/* ==========================================================================
+   La même période, en une seule commande
+   --------------------------------------------------------------------------
+   La barre complète — cinq raccourcis, deux listes, deux dates et un compteur
+   — occupe une ligne entière. C'est justifié sur un écran de pilotage où l'on
+   change de fenêtre sans arrêt. Sur l'onglet Documents d'un dossier, qui tient
+   en six lignes, elle coûtait plus de place que ce qu'elle filtrait.
+
+   Une seule liste dit donc la même chose : les raccourcis, puis les mois et
+   les années réellement présents dans les données, puis « Personnalisée… »
+   qui déplie les deux dates — et seulement alors.
+   ========================================================================== */
+function perSelect(per,setter){
+ const o=(v,l,on)=>`<option value="${v}" ${on?'selected':''}>${esc(l)}</option>`;
+ return `<select class="inp persel" title="Période affichée : ${esc(perLabel(per))}" onchange="${setter}(perSelVal(this.value))">
+   ${PRESETS_STD.map(k=>o(k,PRESET_L[k],per.k===k)).join('')}
+   <optgroup label="Un mois">${moisConnus().map(m=>o('m:'+m,ml(m),per.k==='moisSel'&&per.m===m)).join('')}</optgroup>
+   <optgroup label="Une année">${anneesConnues().map(y=>o('y:'+y,y,per.k==='anneeSel'&&per.y===y)).join('')}</optgroup>
+   ${o('perso','Personnalisée…',per.k==='perso')}
+ </select>`;
+}
+const perSelVal=v=>v.startsWith('m:')?{k:'moisSel',m:v.slice(2)}
+                 :v.startsWith('y:')?{k:'anneeSel',y:v.slice(2)}
+                 :v==='perso'?{k:'perso',from:DATE_MIN,to:TODAYS}:{k:v};
+function perDates(per,setter){
+ const [ra0,rb]=perRange(per); const ra=(ra0<DATE_MIN?DATE_MIN:ra0);
+ return `<div class="drange on">
+   <input class="inp" type="date" value="${ra}" max="${TODAYS}"
+     onchange="${setter}({k:'perso',from:this.value,to:document.querySelector('.drange input:last-of-type').value||'${TODAYS}'})">
+   <span>→</span>
+   <input class="inp" type="date" value="${rb}" max="${TODAYS}"
+     onchange="${setter}({k:'perso',from:document.querySelector('.drange input:first-of-type').value||'${DATE_MIN}',to:this.value})">
+ </div>`;
+}
+
 /* barre de filtre période réutilisable ; `mois` ajoute le choix d'un mois et
    d'une année précis, comme sur la page des statistiques d'Amesla */
 function periodBar(per,setter,info,presets,mois){
@@ -3783,7 +3900,7 @@ function aReactiver(p){
  if(REACT.exclureDevis && st.devisEnCours) return null;
  return st;
 }
-const reactList=()=>PATIENTS.map(p=>({p,st:aReactiver(p)})).filter(x=>x.st).sort((a,b)=>b.st.rec-a.st.rec);
+const reactList=()=>patientsActifs().map(p=>({p,st:aReactiver(p)})).filter(x=>x.st).sort((a,b)=>b.st.rec-a.st.rec);
 
 /* --- anniversaires --- */
 let ANNIV={actif:true, heure:'09:00', canal:'SMS', modele:'anniv-sms',
@@ -4294,7 +4411,7 @@ function heroRows(q){
  q=(q||'').trim();
  if(!q) return heroRecent();
  const ql=q.toLowerCase();
- const found=PATIENTS.filter(p=>[p.nom,p.prenom,p.tel,p.mail,String(p.id)].join(' ').toLowerCase().includes(ql)).slice(0,5);
+ const found=patientsActifs().filter(p=>[p.nom,p.prenom,p.tel,p.mail,String(p.id)].join(' ').toLowerCase().includes(ql)).slice(0,5);
  const parts=q.split(/\s+/), nom=(parts[0]||'').toUpperCase(), prenom=parts.slice(1).join(' ');
  const np={nom, prenom};
  const create=`<div class="hr new" onclick="heroNew('${esc(nom)}','${esc(prenom)}')">
@@ -4400,7 +4517,7 @@ function heroKey(e){
 function heroNew(nom,prenom){openActe(null,null,{nom,prenom})}
 
 /* ---------------- Patients (maître-détail) ---------------- */
-let pq='',pPrat='',pSel=null,pTab='resume',docF='tous',docQ='',docTri='recent';
+let pq='',pPrat='',pSel=null,pTab='resume',docF='tous',docQ='',docTri='recent',docMenu=false,docSrch=false;
 /* la liste des documents se filtre par période et se classe par date */
 let perD2={k:'tout',from:'',to:''};
 function setPerD2(x){ perD2={...perD2,...x}; paint() }
@@ -4409,7 +4526,7 @@ let actTri='desc', actCat='', actPrat='', actQ='';
 let schemaReg='visage';
 let pView='liste', fidF='tous', annivF='mois', perP={k:'mois',from:'',to:''}, photoQ='';
 function setPerP(x){perP=x;paint()}
-const PVIEWS=[['liste','Tous les patients'],['fideles','Fidèles'],['reactiver','À réactiver'],['anniv','Anniversaires'],['photos','Photothèque']];
+const PVIEWS=[['liste','Tous les patients'],['fideles','Fidèles'],['reactiver','À réactiver'],['anniv','Anniversaires'],['photos','Photothèque'],['archives','Archivés']];
 
 /* ==========================================================================
    Fiche patient — édition (phase 2)
@@ -4757,7 +4874,7 @@ function trouverDossier(x){
  if(x.tel){ const d=chiffres(x.tel); const m=PATIENTS.find(p=>chiffres(p.tel)&&chiffres(p.tel)===d); if(m) return m }
  /* sans date de naissance, le seul nom ne suffirait pas à conclure — mais s'il
     n'existe qu'un dossier à ce nom, c'est bien celui-là */
- const h=PATIENTS.filter(p=>sansAcc(p.nom)===sansAcc(x.nom)&&sansAcc(p.prenom)===sansAcc(x.prenom));
+ const h=patientsActifs().filter(p=>sansAcc(p.nom)===sansAcc(x.nom)&&sansAcc(p.prenom)===sansAcc(x.prenom));
  return h.length===1?h[0]:null;
 }
 const IMP_L={nom:'Nom',prenom:'Prénom',ddn:'Date de naissance',tel:'Téléphone',mail:'E-mail',adr:'Adresse'};
@@ -5298,14 +5415,93 @@ V.envois=()=>{
 };
 
 V.patients=()=>{
- const nFid=PATIENTS.filter(p=>fidLevel(p)).length;
- const nAnn=PATIENTS.filter(p=>annivDate(p,annivF)).length;
+ const nFid=patientsActifs().filter(p=>fidLevel(p)).length;
+ const nAnn=patientsActifs().filter(p=>annivDate(p,annivF)).length;
  const sub=`<div class="fbar" style="margin-bottom:14px"><div class="seg">${PVIEWS.map(([k,l])=>{
-   const n=k==='fideles'?nFid:k==='reactiver'?reactList().length:k==='anniv'?nAnn:k==='photos'?PHOTOS.length:PATIENTS.length;
+   const n=k==='fideles'?nFid:k==='reactiver'?reactList().length:k==='anniv'?nAnn:k==='photos'?PHOTOS.length
+     :k==='archives'?PATIENTS.filter(p=>p.archive).length:patientsActifs().length;
    return `<button class="${pView===k?'on':''}" onclick="pView='${k}';paint()">${l} · ${n}</button>`}).join('')}</div>
    <div style="margin-left:auto"><button class="btn s g" onclick="go('params')">⚙ Régler les critères et les modèles</button></div></div>`;
- return sub+({liste:pListe, fideles:pFideles, reactiver:pReactiver, anniv:pAnniv, photos:pPhotos}[pView]||pListe)();
+ return sub+({liste:pListe, fideles:pFideles, reactiver:pReactiver, anniv:pAnniv,
+              photos:pPhotos, archives:pArchives}[pView]||pListe)();
 };
+
+/* ==========================================================================
+   Retirer un dossier patient
+   --------------------------------------------------------------------------
+   C'est la suppression la plus délicate de l'application, et elle recouvre
+   deux situations qu'il ne faut surtout pas traiter pareil.
+
+   UNE FICHE CRÉÉE PAR ERREUR — un doublon, une faute de frappe, quelqu'un
+   qui a donné ses coordonnées et n'est jamais venu. Aucune séance, aucune
+   facture, aucune photo, aucun document. Rien de médical n'existe : la fiche
+   s'efface, et c'est même ce qu'exige le RGPD si la personne le demande.
+
+   UN DOSSIER QUI A SERVI — dès qu'il porte une séance, une facture ou une
+   photo, il ne s'efface pas. Deux raisons, et elles convergent :
+
+     · un dossier médical se conserve, longtemps, et sa destruction n'est pas
+       à la main du praticien tant que ce délai court ;
+     · une facture est une pièce comptable : l'effacer ferait un trou dans la
+       comptabilité et fausserait tous les totaux déjà déclarés.
+
+   Le dossier est donc ARCHIVÉ : il sort des listes de travail, il n'apparaît
+   plus dans les recherches ni les relances, mais ses actes, ses factures et
+   ses photos restent, et on peut le rouvrir.
+
+   Le droit à l'effacement du RGPD ne renverse pas cela : il cède devant une
+   obligation légale de conservation. Ce que le patient obtient, c'est que son
+   dossier cesse d'être exploité — pas qu'il disparaisse avant son terme.
+   ========================================================================== */
+function bilanPatient(id){
+ const A=(typeof ACTES!=='undefined'?ACTES:[]).filter(a=>a.patient===id).length;
+ const F=(typeof FACTURES!=='undefined'?FACTURES:[]).filter(f=>f.patient===id).length;
+ const D=(typeof DEVIS!=='undefined'?DEVIS:[]).filter(d=>d.patient===id).length;
+ const P=(typeof PHOTOS!=='undefined'?PHOTOS:[]).filter(x=>x.patient===id).length;
+ const O=(typeof AUTRES_DOCS!=='undefined'?AUTRES_DOCS:[]).filter(x=>x.patient===id).length;
+ const E=(typeof ENVOIS!=='undefined'?ENVOIS:[]).filter(x=>x.patient===id).length;
+ const C=(typeof CONSO!=='undefined'?CONSO:[]).filter(x=>x.patient===id).length;
+ /* Un reste dû interdit l'archivage sans qu'on le dise : on ne range pas un
+    dossier sur lequel de l'argent est encore attendu. */
+ const du=(typeof FACTURES!=='undefined'?FACTURES:[])
+   .filter(f=>f.patient===id).reduce((s,f)=>s+rdu(f),0);
+ return {actes:A, factures:F, devis:D, photos:P, docs:O, envois:E, conso:C, du,
+         medical: !!(A||P||O||C),
+         vierge: !A && !F && !D && !P && !O && !E && !C};
+}
+
+let patRetrait=null;     /* la fiche dont on confirme le retrait */
+
+/* La fiche n'a jamais rien porté : on l'efface pour de bon. */
+function effacerPatient(id){
+ const i=PATIENTS.findIndex(p=>p.id===id);
+ if(i<0) return;
+ if(!bilanPatient(id).vierge){ toast('Ce dossier porte des données : il s’archive, il ne s’efface pas'); return }
+ const nom=fn(PATIENTS[i]);
+ PATIENTS.splice(i,1);
+ if(pSel===id) pSel=null;
+ patRetrait=null; paint();
+ toast(`Fiche de ${nom} supprimée`);
+}
+
+/* Le dossier a servi : il est archivé, avec la date et par qui. */
+function archiverPatient(id, motif){
+ const p=pById(id); if(!p) return;
+ p.archive=TODAYS; p.archivePar=monPrat(); p.archiveMotif=motif||'';
+ if(pSel===id) pSel=null;
+ patRetrait=null; paint();
+ const B=bilanPatient(id);
+ toast(`Dossier de ${fn(p)} archivé · ${B.actes} séance${B.actes>1?'s':''} et ${B.factures} facture${B.factures>1?'s':''} conservées`);
+}
+function desarchiverPatient(id){
+ const p=pById(id); if(!p) return;
+ delete p.archive; delete p.archivePar; delete p.archiveMotif;
+ paint(); toast(`Dossier de ${fn(p)} rouvert`);
+}
+/* Les dossiers en activité. Tout ce qui travaille — listes, recherche,
+   relances, anniversaires, statistiques d'activité — passe par là ; l'archive
+   reste accessible en la demandant. */
+const patientsActifs=()=>PATIENTS.filter(p=>!p.archive);
 
 /* ---------- Tous les patients (maître-détail) ---------- */
 /* Chaque colonne a son sens naturel : les noms de A à Z, les compteurs et les
@@ -5327,7 +5523,7 @@ const thPat=(k,cls)=>`<th class="tri${cls?' '+cls:''}" onclick="trierPatients('$
   title="Classer par ${PCOL[k].l.toLowerCase()}">${PCOL[k].l}${flechePat(k)}</th>`;
 const triTxt=()=>`${PCOL[pTri].l.toLowerCase()} ${pSens>0?'croissant':'décroissant'}`;
 function patientsTries(){
- const L=PATIENTS.filter(p=>{const q=pq.toLowerCase();
+ const L=patientsActifs().filter(p=>{const q=pq.toLowerCase();
   return (!q||[p.nom,p.prenom,p.mail,p.tel,String(p.id)].join(' ').toLowerCase().includes(q))&&(!pPrat||p.prat===pPrat)});
  const c=PCOL[pTri]||PCOL.nom;
  const alpha=(a,b)=>(a.nom+' '+a.prenom).localeCompare(b.nom+' '+b.prenom,'fr',{sensitivity:'base'});
@@ -5356,13 +5552,64 @@ function pFiche(){
      <button class="btn s" onclick="toast('SMS ouvert')" title="Envoyer un SMS">💬</button>
      <button class="btn s" onclick="toast('E-mail ouvert')" title="Envoyer un e-mail">✉</button>
      <button class="btn" onclick="dvChoix(${p.id})">📄 Devis</button>
-     <button class="btn p" onclick="openActe(${p.id})">✚ Nouvel acte</button></div></div>
+     <button class="btn p" onclick="openActe(${p.id})">✚ Nouvel acte</button>
+     ${CAN('suppTrace')?(()=>{const B=bilanPatient(p.id);
+       return `<button class="btn s" title="${B.vierge?'Fiche vide : elle peut être supprimée'
+         :'Ce dossier a servi : il s’archive, il ne s’efface pas'}"
+         onclick="patRetrait=${p.id};paint()">${B.vierge?'🗑':'🗄'}</button>`})():''}</div></div>
+  ${patRetrait===p.id?blocRetraitPatient(p):''}
+  ${p.archive?`<div class="tip" style="margin-bottom:12px"><span class="e">🗄️</span><div>
+     <b>Dossier archivé le ${DF(p.archive)}</b>${p.archivePar?` par ${esc(p.archivePar)}`:''}${
+       p.archiveMotif?` — ${esc(p.archiveMotif)}`:''}. Il n’apparaît plus dans les listes de travail ;
+     ses séances et ses factures sont conservées.
+     <button class="btn xs" style="margin-left:6px" onclick="desarchiverPatient(${p.id})">Rouvrir le dossier</button></div></div>`:''}
   ${pDetail(p)}`;
+}
+
+/* --------------------------------------------------------------------------
+   La confirmation : on dit ce qu'on touche avant de le toucher
+   -------------------------------------------------------------------------- */
+function blocRetraitPatient(p){
+ const B=bilanPatient(p.id);
+ if(B.vierge) return `<div class="suppb" style="margin-bottom:12px"><span class="e">⚠</span>
+   <div style="flex:1;min-width:0"><b>Supprimer définitivement la fiche de ${esc(fn(p))} ?</b>
+     <div class="mu">Elle ne porte aucune séance, aucune facture, aucune photo ni document.
+       Rien de médical n’existe : rien ne sera perdu.</div></div>
+   <button class="btn xs g" onclick="patRetrait=null;paint()">Annuler</button>
+   <button class="btn xs crit" onclick="effacerPatient(${p.id})">Supprimer</button></div>`;
+
+ const bd=[];
+ if(B.actes)    bd.push(`<span class="bdg b-neu">${B.actes} séance${B.actes>1?'s':''}</span>`);
+ if(B.factures) bd.push(`<span class="bdg b-neu">${B.factures} facture${B.factures>1?'s':''}</span>`);
+ if(B.devis)    bd.push(`<span class="bdg b-neu">${B.devis} devis</span>`);
+ if(B.photos)   bd.push(`<span class="bdg b-neu">${B.photos} photo${B.photos>1?'s':''}</span>`);
+ if(B.docs)     bd.push(`<span class="bdg b-neu">${B.docs} document${B.docs>1?'s':''}</span>`);
+ if(B.conso)    bd.push(`<span class="bdg b-neu">${B.conso} consommation${B.conso>1?'s':''}</span>`);
+ if(B.du)       bd.push(`<span class="bdg b-crit">${EUR(B.du)} encore dus</span>`);
+
+ return `<div class="suppb" style="margin-bottom:12px;align-items:flex-start"><span class="e">⚠</span>
+   <div style="flex:1;min-width:0">
+     <b>Archiver le dossier de ${esc(fn(p))} ?</b>
+     <div class="mu" style="margin:3px 0 7px">Ce dossier <b>ne sera pas supprimé</b>${B.medical?" : un dossier médical se conserve, et sa destruction n’est pas à la main du praticien tant que ce délai court":''}${
+       B.factures?". Ses factures sont des pièces comptables : les effacer ferait un trou dans la comptabilité":''}.
+       Il sort des listes de travail, des recherches et des relances — et se rouvre à tout moment.</div>
+     <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">${bd.join('')}</div>
+     ${B.du?`<div class="mu" style="font-size:11.5px;margin-bottom:7px"><b>Attention :</b> ${EUR(B.du)} restent dus sur ce dossier.
+       L’archiver ne l’annule pas, mais il ne remontera plus dans les relances.</div>`:''}
+     <label style="font-size:11.5px;color:var(--mu);display:block">Motif <span class="mu">(facultatif, conservé avec le dossier)</span>
+       <input class="inp" id="pat-motif" style="width:100%;max-width:420px;margin-top:3px"
+         placeholder="Demande du patient, doublon, départ du cabinet…"></label>
+   </div>
+   <button class="btn xs g" onclick="patRetrait=null;paint()">Annuler</button>
+   <button class="btn xs crit" onclick="(function(){const m=document.getElementById('pat-motif');
+     archiverPatient(${p.id}, m?m.value.trim():'')})()">Archiver</button></div>`;
 }
 function pListe(){
  if(pSel) return pFiche();
  const L=patientsTries();
- return `<div class="head" style="margin-bottom:12px"><div><h1>Patients</h1><p>${L.length} sur ${PATIENTS.length} · classés par ${triTxt()} · un clic sur un nom ouvre le dossier</p></div>
+ const nArch=PATIENTS.filter(p=>p.archive).length;
+ return `<div class="head" style="margin-bottom:12px"><div><h1>Patients</h1><p>${L.length} sur ${patientsActifs().length} · classés par ${triTxt()} · un clic sur un nom ouvre le dossier${
+   nArch?` · <a onclick="pView='archives';paint()">${nArch} dossier${nArch>1?'s':''} archivé${nArch>1?'s':''}</a>`:''}</p></div>
   <div class="r">${peutImporter()?`<button class="btn" onclick="ouvrirImport()"
      title="Reprendre les identités depuis un export Doctolib">↧ Doctolib</button>`:''}
    <button class="btn" onclick="toast('Recherche de doublons : 0 doublon détecté')">Doublons</button>
@@ -5429,7 +5676,7 @@ function pReactiver(){
 }
 
 function pFideles(){
- const all=PATIENTS.map(p=>({p,f:fidLevel(p)})).filter(x=>x.f);
+ const all=patientsActifs().map(p=>({p,f:fidLevel(p)})).filter(x=>x.f);
  const L=all.filter(x=>fidF==='tous'||x.f.n===fidF).sort((a,b)=>b.f.idx-a.f.idx||b.f.ca-a.f.ca);
  const caFid=all.reduce((s,x)=>s+x.f.ca,0);
  const caTot=FACTURES.reduce((s,f)=>s+f.paye,0);
@@ -5475,11 +5722,39 @@ function pFideles(){
    </tbody></table></div></div>`:''}`;
 }
 
+/* ---------- Dossiers archivés ----------
+   Ils ne sont pas perdus : ils sont rangés. Un dossier archivé garde ses
+   séances, ses factures et ses photos — c'est la raison même de l'archivage
+   plutôt que de l'effacement. */
+function pArchives(){
+ const L=PATIENTS.filter(p=>p.archive)
+   .sort((a,b)=>String(b.archive).localeCompare(String(a.archive)));
+ if(!L.length) return `<div class="card"><div class="b"><div class="empty">
+   Aucun dossier archivé.<div class="mu" style="margin-top:6px;font-size:11.5px">Un dossier qui a servi ne s’efface pas :
+   il s’archive depuis sa fiche. Ses séances et ses factures restent.</div></div></div></div>`;
+ return `<div class="head" style="margin-bottom:12px"><div><h1>Dossiers archivés</h1>
+   <p>${L.length} dossier${L.length>1?'s':''} · retirés des listes de travail, conservés en entier</p></div></div>
+  <div class="tip"><span class="e">🗄️</span><div>Un dossier archivé n’apparaît plus dans les recherches, les relances ni les
+   anniversaires. Ses <b>séances, factures et photos sont intactes</b> : elles continuent de compter dans la comptabilité et
+   dans les statistiques d’activité. On peut le rouvrir à tout moment.</div></div>
+  <div class="card"><div class="tw"><table>
+   <thead><tr><th>Patient</th><th>Archivé le</th><th>Par</th><th>Motif</th>
+     <th class="num">Séances</th><th class="num">Factures</th><th></th></tr></thead>
+   <tbody>${L.map(p=>{const B=bilanPatient(p.id);
+     return `<tr><td><div class="rowline"><div class="pav" style="width:26px;height:26px;font-size:10px">${esc(ini(p))}</div>
+        <div><b>${esc(fn(p))}</b><div class="mu" style="font-size:11px">dossier ${p.id}</div></div></div></td>
+      <td class="mono">${DF(p.archive)}</td><td class="mu">${esc(p.archivePar||'—')}</td>
+      <td class="mu el" style="max-width:220px">${esc(p.archiveMotif||'—')}</td>
+      <td class="num">${B.actes}</td><td class="num">${B.factures}</td>
+      <td class="num"><button class="btn xs" onclick="desarchiverPatient(${p.id})">Rouvrir</button></td></tr>`}).join('')}
+   </tbody></table></div></div>`;
+}
+
 /* ---------- Anniversaires ---------- */
 function pAnniv(){
- const L=PATIENTS.map(p=>({p,d:annivDate(p,annivF)})).filter(x=>x.d).sort((a,b)=>a.d.localeCompare(b.d));
+ const L=patientsActifs().map(p=>({p,d:annivDate(p,annivF)})).filter(x=>x.d).sort((a,b)=>a.d.localeCompare(b.d));
  const m=modById(ANNIV.modele)||MODELES[0];
- const sansDate=PATIENTS.filter(p=>!p.ddn).length;
+ const sansDate=patientsActifs().filter(p=>!p.ddn).length;
  const ids=j=>JSON.stringify(j).replace(/"/g,'&quot;');
  return `<div class="head" style="margin-bottom:12px">
    <div><h1>Anniversaires</h1><p>${L.length} patient${L.length>1?'s':''} sur la période sélectionnée</p></div>
@@ -5768,7 +6043,12 @@ function pDetail(p){
    cumul[z]=(cumul[z]||0)+q; cumulT[z]=acteZone(a,z)}));
  const AD=AUTRES_DOCS.filter(x=>x.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
  const AG=DOCADD.filter(x=>x.patient===p.id).sort((a,b)=>b.ts.localeCompare(a.ts));   /* produits depuis un modèle */
- const nDoc=O.length+C.length+AD.length+D.length+AG.length;
+ /* Le badge annonçait dix documents pour une liste qui en tenait six : les
+    consentements reconduits — volontairement masqués comme doublons — étaient
+    comptés quand même, et les pièces établies hors séance ne l'étaient pas.
+    Un compteur qui promet des lignes absentes envoie chercher pour rien. */
+ const nDoc=O.length+D.length+AD.length+AG.length+libDe(p.id).length
+          +C.filter(a=>!CONS_SUPP.has(a.id)&&!consentPorteur(a)).length;
  const nFac=D.length+F.length+F.filter(f=>f.avoir>0).length;
  const TB=[['resume','Résumé'],['actes',`Actes · ${A.length}`],['schema','Schéma cumulé'],
            ['photos','Photos A/A']]
@@ -5974,20 +6254,64 @@ function pDetail(p){
     <div>${BAR?baremeListe(BAR,cur,{ro:true,hist:ZH,motTotal:'déjà traitée'+(Object.keys(cur).length>1?'s':'')})
      :`<div class="facebox">${schemaSVG(cur,{editable:false,hist:ZH,region:schemaReg,zt:cumulT})}</div>
      <div class="face-legend"><span><i style="background:var(--toxine)"></i>Toxine</span><span><i style="background:var(--ah)"></i>Acide hyaluronique</span>
-      <span class="mu">quantité cumulée · date de la dernière injection</span></div>`}</div>
+      <span class="mu">quantité cumulée · dernière séance et nombre de passages</span></div>`}</div>
     <div>
      <div class="tip" style="margin-bottom:10px"><span class="e">🗺️</span><div>${BAR
        ?`<b>Cure d'épilation.</b> Les zones déjà traitées de ce barème sont cochées ; à droite de chacune, la date de la dernière séance et le nombre de passages.`
-       :`<b>Cumul historique.</b> Toutes les injections de ce patient sur un seul schéma. Sous chaque quantité, la date de la dernière séance sur cette zone — et le nombre de fois qu'elle a été traitée.`}</div></div>
-     ${Object.keys(cur).length?Object.entries(cur).sort((a,b)=>b[1]-a[1]).map(([z,q])=>{const Z=zoneDef(z), L=ZH[z]||[];
-       const t=cumulT[z]||(Z.p==='tox'?'BTX':'AH'), CZ=acteDef(t);
-       return `<div class="zrow" style="display:block">
-        <div style="display:flex;align-items:center;gap:8px">
-         <span class="zd" style="background:${colActe(t)}"></span>
-         <div class="zn">${esc(zoneNom(z))}<small>${esc(CZ.n)} · traitée ${L.length} fois</small></div>
-         <b class="mono" style="font-size:12.5px">${q&&CZ.unite?fmtDose(q,t):'—'}</b></div>
-        ${L.length?`<div class="zchr">${L.map(x=>`<button class="zc" onclick="openActe(${p.id},${x.aid})" title="Ouvrir l’acte du ${DF(x.d)}">${DFT(x.d)}${x.q&&CZ.unite?' <b>'+fmtDose(x.q,t)+'</b>':''}</button>`).join('')}</div>`:''}
-       </div>`}).join(''):'<div class="empty">Aucune injection enregistrée.</div>'}
+       :`<b>Cumul historique.</b> Sur le schéma, la quantité cumulée de chaque zone et sa dernière séance. À droite, une ligne par zone, de la plus petite dose à la plus grande, suivie d’une pastille par séance avec la dose de ce jour-là. Deux pastilles de la même couleur, sur deux zones différentes : c’est la même séance.`}</div></div>
+     ${(()=>{
+       const zones=Object.keys(cur);
+       if(!zones.length) return '<div class="empty">Aucune injection enregistrée.</div>';
+       /* --------------------------------------------------------------------
+          Les séances, et pas seulement les zones
+          --------------------------------------------------------------------
+          Une même séance traite souvent plusieurs zones : front, glabelle et
+          pattes d'oie le même jour, c'est une injection, pas trois. En listant
+          zone par zone, on perdait cette information — chaque date semblait un
+          événement isolé.
+
+          On numérote donc les journées de soin, de la plus ancienne à la plus
+          récente, et chaque pastille de date porte la couleur de sa séance.
+          Deux pastilles de la même couleur, sur deux zones différentes : c'est
+          le même rendez-vous.
+
+          La couleur ne porte jamais seule : la pastille imprime le numéro de
+          la séance, et la légende donne la date en face de chaque numéro. Un
+          code qui ne tiendrait qu'à la teinte serait illisible pour un œil qui
+          distingue mal les couleurs, et disparaîtrait à l'impression. Quand il
+          n'y a qu'une séance, il n'y a rien à numéroter : la pastille porte
+          alors directement sa date, et la légende ne s'affiche pas.
+          -------------------------------------------------------------------- */
+       const jours=[...new Set(zones.flatMap(z=>(ZH[z]||[]).map(x=>x.d)))].sort();
+       const nSeance=Object.fromEntries(jours.map((d,i)=>[d,i+1]));
+       const SC=['#4b7bec','#e8833a','#2fa87c','#9b59c7','#d9534f','#0f9aa8','#c9992a','#6b7a8f'];
+       const coul=d=>SC[(nSeance[d]-1)%SC.length];
+       return `
+       ${jours.length>1?`<div class="cum-lg"><span class="mu">Séances</span>${jours.map(d=>`<span class="cum-s" title="Séance ${nSeance[d]} du ${DF(d)}">
+          <i style="background:${coul(d)}"></i><u>${nSeance[d]}</u><b>${DFT(d)}</b></span>`).join('')}
+         </div>`:''}
+       ${zones.sort((a,b)=>(cur[a]-cur[b])||zoneNom(a).localeCompare(zoneNom(b),'fr')).map(z=>{
+         const Z=zoneDef(z), L=(ZH[z]||[]).slice().sort((x,y)=>x.d.localeCompare(y.d));
+         const t=cumulT[z]||(Z.p==='tox'?'BTX':'AH'), CZ=acteDef(t);
+         /* Trois séances de 4 U écrivaient « 4 U » trois fois pour un total de
+            12 U déjà affiché à côté : c'est du bruit, et c'est ce bruit qui
+            poussait la ligne à se replier. Quand toutes les séances portent la
+            même dose, on la dit une fois — au total, sous la forme « 3 × 4 U »
+            — et les pastilles ne gardent que leur couleur et leur numéro.
+            Dès que les doses diffèrent, chacune revient sur sa pastille : là,
+            elle apprend quelque chose. */
+         const egales = L.length>1 && CZ.unite && L.every(x=>x.q===L[0].q);
+         const detail = !egales;
+         return `<div class="zrow cum-r" title="${esc(zoneNom(z))} — ${esc(CZ.n)} · ${L.length} séance${L.length>1?'s':''}">
+          <span class="zd" style="background:${colActe(t)}"></span>
+          <span class="cum-z">${esc(zoneNom(z))}</span>
+          <b class="mono cum-q">${q_(cur[z],t,CZ,z)}${egales?`<span class="cum-x">${L.length} × ${fmtDose(L[0].q,t,z)}</span>`:''}</b>
+          <span class="cum-c">${L.map(x=>`<button class="zc" style="--sc:${coul(x.d)}"
+            onclick="openActe(${p.id},${x.aid})"
+            title="Séance ${nSeance[x.d]} du ${DF(x.d)}${x.q&&CZ.unite?' — '+fmtDose(x.q,t,z):''} — ouvrir l’acte">
+            <i style="background:${coul(x.d)}"></i><u>${jours.length>1?nSeance[x.d]:DFT(x.d)}</u>${detail&&x.q&&CZ.unite?'<b>'+fmtDose(x.q,t,z)+'</b>':''}</button>`).join('')}</span>
+         </div>`}).join('')}`;
+     })()}
     </div></div>`},
 
   photos:()=>{
@@ -6109,35 +6433,51 @@ function pDetail(p){
                .filter(d=>inPer(d.date,perD2))
                .filter(d=>!dq||(d.t+' '+d.s+' '+d.id).toLowerCase().includes(dq))
                .sort((a,b)=>docTri==='vieux'?a.date.localeCompare(b.date):b.date.localeCompare(a.date));
-   return `<div class="fbar">
-     <span class="mu" style="font-size:11.5px;font-weight:600;align-self:center">Catégorie</span>
+   /* ---------------------------------------------------------------------
+      Quatre lignes de commandes pour six documents
+      ---------------------------------------------------------------------
+      L'en-tête tenait sur quatre lignes : les catégories, quatre boutons de
+      création, la barre de période avec son compteur, puis le tri. Trois de
+      ces lignes redisaient ce que la première montrait déjà — « 6 documents »
+      à côté d'un onglet « Documents · 6 » et d'un bouton « Toutes · 6 ».
+
+      Tout tient maintenant sur une ligne : les catégories comptent, la période
+      est une liste, le tri est une bascule, et les quatre créations passent
+      derrière un seul bouton — ce sont des actions, pas des filtres, et elles
+      n'avaient rien à faire au milieu d'une barre de tri.
+      --------------------------------------------------------------------- */
+   const filtre=(perD2.k!=='tout'||docF!=='tous'||docQ);
+   return `<div class="fbar dochead">
      <div class="seg">
-       <button class="${docF==='tous'?'on':''}" onclick="docF='tous';paint()">Toutes · ${DOCP().length}</button>
-       ${Object.keys(KIND).filter(k=>cnt(k)>0||docF===k).map(k=>`<button class="${docF===k?'on':''}" onclick="docF='${k}';paint()">${KIND[k][1]} ${KIND[k][0]} · ${cnt(k)}</button>`).join('')}
+       <button class="${docF==='tous'?'on':''}" onclick="docF='tous';paint()">Toutes<span class="n">${DOCP().length}</span></button>
+       ${Object.keys(KIND).filter(k=>cnt(k)>0||docF===k).map(k=>`<button class="${docF===k?'on':''}" onclick="docF='${k}';paint()" title="${esc(KIND[k][2])} — ${cnt(k)} pièce${cnt(k)>1?'s':''}">${KIND[k][0]}<span class="n">${cnt(k)}</span></button>`).join('')}
      </div>
-     <input class="inp" id="dqi" style="min-width:180px" placeholder="Rechercher…" value="${esc(docQ)}"
-       oninput="docQ=this.value;paint();const e=document.getElementById('dqi');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
-     <div style="margin-left:auto;display:flex;gap:6px">
-       <button class="btn s" onclick="dvChoix(${p.id})">◫ Devis</button>
-       ${CAN('med')?`<button class="btn s ${docLib&&docLib.k==='ordonnance'?'g':''}"
-         onclick="${docLib&&docLib.k==='ordonnance'?'fermerDocLib()':`ouvrirDocLib(${p.id},'ordonnance')`}"
-         title="Établir une ordonnance sans passer par une séance">℞ Ordonnance</button>`:''}
-       <button class="btn s ${docLib&&docLib.k==='consentement'?'g':''}"
-         onclick="${docLib&&docLib.k==='consentement'?'fermerDocLib()':`ouvrirDocLib(${p.id},'consentement')`}"
-         title="Faire signer un consentement avant la séance">✎ Consentement</button>
-       <button class="btn s" onclick="toast('Document téléversé')">↑ Téléverser</button>
+     ${(docSrch||docQ)?`<input class="inp docq" id="dqi" placeholder="Rechercher…" value="${esc(docQ)}"
+       oninput="docQ=this.value;paint();const e=document.getElementById('dqi');e.focus();e.setSelectionRange(e.value.length,e.value.length)">`
+      :`<button class="btn s" id="dqb" aria-label="Rechercher dans les documents" title="Rechercher dans les documents"
+       onclick="docSrch=true;paint();const e=document.getElementById('dqi');if(e)e.focus()"
+       ><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+         ><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg></button>`}
+     ${perSelect(perD2,'setPerD2')}
+     <button class="btn s" title="Inverser l’ordre d’affichage"
+       onclick="docTri=docTri==='recent'?'vieux':'recent';paint()">${docTri==='recent'?'↓ Récent':'↑ Ancien'}</button>
+     ${filtre?`<button class="chip" title="Retirer le filtre, la recherche et la période"
+        onclick="docF='tous';docQ='';docSrch=false;setPerD2({k:'tout'})">↺ Tout afficher</button>`:''}
+     <div class="ddw" style="margin-left:auto">
+       <button class="btn s p" onclick="event.stopPropagation();docMenu=!docMenu;paint()">＋ Document ▾</button>
+       ${docMenu?`<div class="ddm" onclick="event.stopPropagation()">
+         <button onclick="docMenu=false;dvChoix(${p.id})">◫ Devis</button>
+         ${CAN('med')?`<button onclick="docMenu=false;${docLib&&docLib.k==='ordonnance'?'fermerDocLib()':`ouvrirDocLib(${p.id},'ordonnance')`}"
+           title="Établir une ordonnance sans passer par une séance">℞ Ordonnance</button>`:''}
+         <button onclick="docMenu=false;${docLib&&docLib.k==='consentement'?'fermerDocLib()':`ouvrirDocLib(${p.id},'consentement')`}"
+           title="Faire signer un consentement avant la séance">✎ Consentement</button>
+         <button onclick="docMenu=false;paint();toast('Document téléversé')">↑ Téléverser</button>
+       </div>`:''}
      </div></div>
+    ${perD2.k==='perso'?`<div class="fbar perso-r">
+       <span class="mu" style="font-size:11.5px;font-weight:600;align-self:center">Du</span>
+       ${perDates(perD2,'setPerD2')}</div>`:''}
     ${(docLib&&docLib.pid===p.id)?formDocLib(p):''}
-    ${periodBar(perD2,'setPerD2',`${L.length} document${L.length>1?'s':''}`,PRESETS_STD,1)}
-    <div class="fbar" style="margin-top:-4px">
-      <span class="mu" style="font-size:11.5px;font-weight:600;align-self:center">Classer</span>
-      <div class="seg">
-        <button class="${docTri==='recent'?'on':''}" onclick="docTri='recent';paint()">Du plus récent</button>
-        <button class="${docTri==='vieux'?'on':''}" onclick="docTri='vieux';paint()">Du plus ancien</button>
-      </div>
-      ${(perD2.k!=='tout'||docF!=='tous'||docQ)?`<button class="chip" style="margin-left:auto"
-        onclick="docF='tous';docQ='';setPerD2({k:'tout'})">Tout afficher</button>`:''}
-    </div>
     ${(CORBEILLE.length&&['devis','consent'].includes(CORBEILLE[CORBEILLE.length-1].kind))?`<div class="undo"><span class="e">🗑</span>
       <div style="flex:1;min-width:0"><b>${esc(CORBEILLE[CORBEILLE.length-1].quoi)}</b> — supprimé
         <span class="mu">${DTS(CORBEILLE[CORBEILLE.length-1].ts)} par ${esc(CORBEILLE[CORBEILLE.length-1].par)}</span></div>
@@ -6266,7 +6606,7 @@ function pDetail(p){
  };
 
  return `<div class="card fiche">
-  <div class="b" style="padding-bottom:0"><div class="tabs">${TB.map(([k,l])=>`<button class="${pTab===k?'on':''}" onclick="pTab='${k}';paint()">${l}</button>`).join('')}</div></div>
+  <div class="b" style="padding-bottom:0"><div class="tabs">${TB.map(([k,l])=>`<button class="${pTab===k?'on':''}" onclick="pTab='${k}';docMenu=false;paint()">${l}</button>`).join('')}</div></div>
   <div class="b">${(body[pTab]||body.resume)()}</div></div>`;
 }
 
@@ -8899,7 +9239,7 @@ V.params=()=>{
          faudrait pour aller plus loin. Rien n'est simulé ni connecté. --- */
   doctolib:()=>{
    const J=IMP_JOURNAL.slice().reverse();
-   const inc=PATIENTS.filter(ficheIncomplete).length;
+   const inc=patientsActifs().filter(ficheIncomplete).length;
    const PRE=[
     ['Contrat de partenariat signé avec Doctolib','L’accès aux données d’un cabinet passe par leur programme partenaire : dossier, revue de sécurité, contrat. Il n’existe pas d’API publique en libre accès.'],
     ['Serveur intermédiaire agréé HDS','Les identifiants d’une liaison ne vivent jamais dans le navigateur. Il faut un service hébergé chez un hébergeur de données de santé, qui porte la clé et journalise les appels.'],
@@ -9010,7 +9350,7 @@ V.params=()=>{
    </div>`;
   },
   fidelite:()=>{
-   const all=PATIENTS.map(p=>({p,f:fidLevel(p)})).filter(x=>x.f);
+   const all=patientsActifs().map(p=>({p,f:fidLevel(p)})).filter(x=>x.f);
    return `<div class="tip"><span class="e">⭐</span><div>Ces critères pilotent la liste <b>Patients → Fidèles</b>. Chaque modification est répercutée immédiatement : le compteur ci-dessous se met à jour à chaque changement.</div></div>
    <div class="grid g2">
     <div class="card"><div class="h"><h2>Réglages généraux</h2></div><div class="b">
@@ -9025,7 +9365,7 @@ V.params=()=>{
         <div class="fld"><label>Résultat avec ces réglages</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             ${FID.niveaux.map(n=>`<span class="bdg ${n.c}" style="font-size:12.5px;padding:5px 10px">★ ${n.n} : ${all.filter(x=>x.f.n===n.n).length} patient(s)</span>`).join('')}
-            <span class="bdg b-neu" style="font-size:12.5px;padding:5px 10px">${PATIENTS.length-all.length} hors critères</span></div></div>
+            <span class="bdg b-neu" style="font-size:12.5px;padding:5px 10px">${patientsActifs().length-all.length} hors critères</span></div></div>
         <button class="btn s" onclick="go('patients');pView='fideles';paint()">Voir la liste →</button></div>
       <div style="margin-top:16px;padding-top:13px;border-top:1px solid var(--line)">
         <div class="subh" style="border-top:none;padding-top:0;margin-top:0"><h3>Patients à réactiver<span>${reactList().length}</span></h3></div>
@@ -10137,7 +10477,7 @@ function renderOver(){
         ${ORIGINES.map(o=>`<option ${AS.np.origine===o?'selected':''}>${esc(o)}</option>`).join('')}</select></div>
    </div>`}
   ${AS.ro?'':`<div class="fbar" style="margin-bottom:12px">
-    ${AS.np?'':`<select class="inp" onchange="AS.pid=+this.value;renderOver()">${PATIENTS.map(x=>`<option value="${x.id}" ${x.id===AS.pid?'selected':''}>${esc(fn(x))}</option>`).join('')}</select>
+    ${AS.np?'':`<select class="inp" onchange="AS.pid=+this.value;renderOver()">${patientsActifs().map(x=>`<option value="${x.id}" ${x.id===AS.pid?'selected':''}>${esc(fn(x))}</option>`).join('')}</select>
     <button class="btn s" onclick="AS.np={nom:'',prenom:'',ddn:'',tel:'',mail:'',adr:'',origine:''};AS.npKO=[];renderOver()">+ Nouveau patient</button>`}
     <input class="inp" type="date" value="${AS.date}" onchange="AS.date=this.value">
     <select class="inp" onchange="AS.prat=this.value">${PRATICIENS.map(x=>`<option ${AS.prat===x?'selected':''}>${x}</option>`).join('')}</select>
@@ -11940,7 +12280,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DF';
+const BUILD='DG';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -13150,7 +13490,7 @@ function renderDevis(){
 
  document.getElementById('overb').innerHTML=`
   <div class="fbar" style="margin-bottom:12px">
-   <select class="inp" onchange="DV.pid=+this.value;renderDevis()">${PATIENTS.map(x=>`<option value="${x.id}" ${x.id===DV.pid?'selected':''}>${esc(fn(x))}</option>`).join('')}</select>
+   <select class="inp" onchange="DV.pid=+this.value;renderDevis()">${patientsActifs().map(x=>`<option value="${x.id}" ${x.id===DV.pid?'selected':''}>${esc(fn(x))}</option>`).join('')}</select>
    <input class="inp" type="date" value="${DV.date}" onchange="DV.date=this.value">
    <select class="inp" onchange="DV.prat=this.value">${PRATICIENS.map(x=>`<option ${DV.prat===x?'selected':''}>${x}</option>`).join('')}</select>
    ${histoHtml(DV.pid, DV.lignes.map(l=>l.type))}
@@ -13317,7 +13657,7 @@ function buildPal(q){
  if(!q){ it.push(...ACT.slice(0,3)); it.push(...ACT.slice(3)); }
  else{
   ACT.filter(a=>a.t.toLowerCase().includes(q)).forEach(a=>it.push(a));
-  PATIENTS.filter(p=>[p.nom,p.prenom,p.mail,p.tel,String(p.id)].join(' ').toLowerCase().includes(q)).slice(0,6)
+  patientsActifs().filter(p=>[p.nom,p.prenom,p.mail,p.tel,String(p.id)].join(' ').toLowerCase().includes(q)).slice(0,6)
    .forEach(p=>it.push({t:fn(p),s:`${ageTxt(p)} · ${ACTES.filter(a=>a.patient===p.id).length} actes · dossier ${p.id}`,ic:ini(p),k:'Patient',go:()=>{closeAll();openPatient(p.id)}}));
   DEVIS.filter(d=>d.id.toLowerCase().includes(q)||fn(pById(d.patient)).toLowerCase().includes(q)).slice(0,4)
    .forEach(d=>it.push({t:d.id,s:`${fn(pById(d.patient))} · ${EUR(d.montant)} · ${SD[d.statut][0]}`,ic:'◫',k:'Devis',go:()=>{closeAll();go('devis',d.id)}}));
@@ -13335,6 +13675,11 @@ function buildPal(q){
    <div class="tag">${x.k}</div></div>`).join(''):'<div class="empty">Aucun résultat.</div>';
 }
 document.getElementById('palq').addEventListener('input',e=>buildPal(e.target.value));
+/* Un menu qui ne se referme qu'en rappuyant sur son bouton reste ouvert
+   derrière le dos de celui qui a cliqué ailleurs. Un clic dans le vide, ou la
+   touche Échap, le referme — et changer d'onglet aussi. */
+document.addEventListener('click',()=>{ if(docMenu){ docMenu=false; paint() } });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&docMenu){ docMenu=false; paint() } });
 document.addEventListener('keydown',e=>{
  const palOn=document.getElementById('pal').classList.contains('on');
  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();palOn?closeAll():openPal();return}
@@ -13593,7 +13938,7 @@ function vxPatient(mots){
      else if(nom.startsWith(w)||pre.startsWith(w)) n+=2;
      else if(nom.includes(w)||pre.includes(w)) n+=1 });
    return n };
- const L=PATIENTS.map(p=>({p,n:score(p)})).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
+ const L=patientsActifs().map(p=>({p,n:score(p)})).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
  if(!L.length) return null;
  if(L.length>1&&L[1].n===L[0].n) return {ambigu:L.filter(x=>x.n===L[0].n).slice(0,4).map(x=>x.p)};
  return {p:L[0].p};
