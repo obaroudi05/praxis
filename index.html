@@ -367,6 +367,13 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .dvp-tot .big{border-top:1px solid var(--line);margin-top:5px;padding-top:6px;font-size:14px}
 .dvp-tot .big b{font-size:18px;letter-spacing:-.03em}
 .dvp-inf{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding-right:3px}
+/* les consentements que le devis va préparer : annoncés avant, pas découverts après */
+.dvp-cons{background:var(--accent-wash);border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);
+  border-radius:10px;padding:8px 11px;margin-top:10px;display:flex;flex-direction:column;gap:5px}
+.dvp-cons .r{display:flex;align-items:center;gap:8px;font-size:12.5px}
+.dvp-cons .r b{font-weight:640}
+.dvp-cons .r .sw{margin-left:auto}
+.dvp-cons .mu{font-size:11.5px;line-height:1.45}
 .dvp,.cpane{overflow:hidden}
 .ctab,.crow{min-width:0;max-width:100%}
 .crow .cn{overflow:hidden}
@@ -496,6 +503,59 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
 .sig-h b{font-size:14.5px;font-weight:680;display:block;letter-spacing:-.01em}
 .sig-h small{display:block;font-size:11.5px;color:var(--ink-3);margin-top:2px}
 .sig-h .btn{margin-left:auto}
+/* ==========================================================================
+   Le parapheur — plusieurs pièces, une seule séance de signature
+   --------------------------------------------------------------------------
+   Faire signer un devis, puis rouvrir une fenêtre pour le consentement à
+   l'acide, puis une troisième pour celui au laser : trois fois le même geste,
+   et autant d'occasions d'en oublier un. Un parapheur, en cabinet comme
+   ailleurs, c'est une chemise : on lit les pièces l'une après l'autre, et on
+   signe une fois.
+
+   Ce qui est signé reste distinct : chaque pièce reçoit sa propre signature,
+   son propre horodatage, et un journal qui NOMME les autres pièces de la
+   séance. C'est ce qui permet, des mois plus tard, de savoir exactement ce
+   qui a été présenté ce jour-là.
+   ========================================================================== */
+#parv{position:fixed;inset:0;z-index:700;background:rgba(24,24,27,.66);backdrop-filter:blur(3px);
+  display:none;align-items:center;justify-content:center;padding:20px;opacity:0;transition:.18s}
+#parv.on{display:flex;opacity:1}
+.par-box{background:var(--panel);border-radius:18px;box-shadow:0 26px 70px rgba(0,0,0,.34);
+  width:min(1080px,100%);height:min(880px,92vh);padding:15px;display:flex;flex-direction:column;gap:11px}
+.par-h{display:flex;align-items:flex-start;gap:10px;flex:none}
+.par-h b{font-size:14.5px;font-weight:680;display:block;letter-spacing:-.01em}
+.par-h small{display:block;font-size:11.5px;color:var(--ink-3);margin-top:2px}
+.par-h .btn{margin-left:auto}
+.par-b{flex:1;min-height:0;display:grid;grid-template-columns:262px minmax(0,1fr);gap:12px}
+.par-nav{overflow:auto;display:flex;flex-direction:column;gap:5px;padding-right:2px}
+.par-i{display:flex;gap:8px;align-items:flex-start;text-align:left;padding:8px 9px;border-radius:11px;
+  border:1px solid var(--line);background:var(--panel-2);cursor:pointer;font-family:inherit;
+  font-size:12.5px;color:var(--ink);transition:.13s}
+.par-i:hover{border-color:var(--line-2)}
+.par-i.on{border-color:var(--accent);background:var(--accent-wash)}
+.par-i .n{flex:none;width:19px;height:19px;border-radius:6px;display:grid;place-items:center;
+  font-size:10.5px;font-weight:700;background:var(--panel);border:1px solid var(--line);
+  color:var(--ink-3);font-variant-numeric:tabular-nums}
+.par-i.lu .n{background:var(--good);border-color:var(--good);color:#fff}
+.par-i.fait .n{background:var(--ink-3);border-color:var(--ink-3);color:#fff}
+.par-i .t{flex:1;min-width:0;font-weight:580;line-height:1.3}
+.par-i .s{display:block;font-weight:450;font-size:10.5px;color:var(--ink-3);margin-top:2px}
+.par-doc{overflow:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel-2);padding:14px}
+/* la pièce se lit dans la fenêtre : elle prend la largeur qu'on lui donne,
+   sans l'ombre ni la hauteur imposée d'une feuille A4 à l'écran */
+.par-doc .a4{width:100%;min-height:0;box-shadow:none;padding:9mm 10mm;border-radius:8px}
+.par-f{flex:none;display:flex;gap:12px;align-items:stretch}
+.par-pad{width:270px;height:104px;flex:none}
+.par-a{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px;justify-content:center}
+.par-a .msg{font-size:12px;line-height:1.45;color:var(--ink-2)}
+.par-a .msg b{font-weight:640}
+.par-a .r{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.par-a .r .btn{flex:none}
+@media(max-width:900px){
+  .par-b{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+  .par-nav{flex-direction:row;overflow-x:auto;max-height:none}
+  .par-f{flex-direction:column}.par-pad{width:100%}
+}
 /* --- passerelle Doctolib : reprise d'un export --- */
 #impv,#envv{position:fixed;inset:0;z-index:700;background:rgba(24,24,27,.66);backdrop-filter:blur(3px);
   display:none;align-items:center;justify-content:center;padding:20px;opacity:0;transition:.18s}
@@ -2002,6 +2062,19 @@ body.en-connexion aside{display:none}
     <button class="btn s" onclick="effacerSign()">↺ Effacer</button>
     <button class="btn s" onclick="signPapier()" title="Le document a été imprimé et signé à la main">✎ Signé sur papier</button>
     <button class="btn p" id="sigOk" onclick="validerSign()" disabled>✓ Valider la signature</button></div>
+</div></div>
+<div id="parv"><div class="par-box">
+  <div class="par-h"><div><b id="parT">Signature</b><small id="parS"></small></div>
+    <button class="btn g s" onclick="fermerParapheur()">✕</button></div>
+  <div class="par-b">
+    <div class="par-nav" id="parNav"></div>
+    <div class="par-doc" id="parDoc" onscroll="parLu()"></div>
+  </div>
+  <div class="par-f">
+    <div class="par-pad sig-pad"><canvas id="parC"></canvas>
+      <span class="sig-ph">Le patient signe ici</span><span class="sig-line"></span></div>
+    <div class="par-a" id="parA"></div>
+  </div>
 </div></div>
 <div id="impv"><div class="imp-box">
   <div class="imp-h"><div><b id="impT">Passerelle Doctolib</b><small id="impS"></small></div>
@@ -6174,7 +6247,11 @@ function pDetail(p){
     a:`<button class="btn xs" onclick="event.stopPropagation();apercuDevis('${d.id}')">◫ PDF</button>
         ${d.realise?'':`<button class="btn xs p" title="Reprendre ces soins pour la consultation d’aujourd’hui"
           onclick="event.stopPropagation();realiserDevis('${d.id}')">✚ Réaliser</button>`}
-        ${d.statut==='accepte'?'':`<button class="btn xs" title="Le patient signe dans l’encadré"
+        ${d.statut==='accepte'?''
+          :consentsDeDevis(d.id).some(x=>!x.signe)
+           ?`<button class="btn xs" title="Lire le devis et ses consentements, puis signer en une fois"
+              onclick="event.stopPropagation();parapheurDevis('${d.id}')">✎ Lire et signer · ${1+consentsDeDevis(d.id).filter(x=>!x.signe).length}</button>`
+           :`<button class="btn xs" title="Le patient signe dans l’encadré"
           onclick="event.stopPropagation();signerDevis('${d.id}')">✎ Faire signer</button>`}
         <button class="btn xs" onclick="event.stopPropagation();go('devis','${d.id}')">Ouvrir</button>
         ${btnSuppDevis(d)}`,
@@ -6554,6 +6631,14 @@ function pDetail(p){
       <div style="flex:1;min-width:0"><b>${esc(CORBEILLE[CORBEILLE.length-1].quoi)}</b> — supprimé
         <span class="mu">${DTS(CORBEILLE[CORBEILLE.length-1].ts)} par ${esc(CORBEILLE[CORBEILLE.length-1].par)}</span></div>
       <button class="btn xs" onclick="retablirActe()">↺ Rétablir</button></div>`:''}
+    ${(()=>{ const R=refsASigner(p.id); if(!R.length) return '';
+       const P=R.map(parPiece).filter(Boolean);
+       const dev=P.filter(x=>x.k==='devis').length, cons=P.length-dev;
+       return `<div class="tip"><span class="e">✎</span>
+        <div style="flex:1;min-width:0"><b>${P.length} pièce${P.length>1?'s attendent':' attend'} une signature.</b>
+          ${dev?`${dev} devis`:''}${dev&&cons?' et ':''}${cons?`${cons} consentement${cons>1?'s':''}`:''}.
+          Le parapheur les présente l’une après l’autre au patient, puis recueille une seule signature.</div>
+        <button class="btn xs p" onclick="parapheurPatient(${p.id})">Ouvrir le parapheur</button></div>` })()}
     ${C.some(a=>!consentOK(a))?`<div class="tip" style="background:var(--crit-w);border-color:rgba(208,59,59,.25)"><span class="e">⚠</span><div><b>${C.filter(a=>!consentOK(a)).length} consentement${C.filter(a=>!consentOK(a)).length>1?'s non signés':' non signé'}.</b> Un acte injectable sans consentement signé n'est pas défendable en cas de litige — le lien de signature part par SMS en un clic.</div></div>`:''}
     <div class="tw"><table>
      <thead><tr><th style="width:130px">Type</th><th>Document</th><th style="width:96px">Date</th><th style="width:130px">Statut</th><th style="width:96px"></th></tr></thead>
@@ -6614,8 +6699,11 @@ function pDetail(p){
       <td class="mono mu">${d.relances||'—'}</td>
       <td class="num" style="white-space:nowrap">
         ${d.statut==='accepte'?(signOf(d.id)?`<span class="bdg b-good" title="${esc(signTxt(signOf(d.id)))}">✎ Signé</span>`:'')
-          :`${lienDe(d.id)?lienBadge(d.id):`<button class="btn xs" title="Le patient signe dans l’encadré, ici"
-             onclick="event.stopPropagation();signerDevis('${d.id}')">✎ Signer sur place</button>
+          :`${lienDe(d.id)?lienBadge(d.id):`${consentsDeDevis(d.id).some(x=>!x.signe)
+             ?`<button class="btn xs p" title="Lire le devis et ses consentements, puis signer en une fois"
+                onclick="event.stopPropagation();parapheurDevis('${d.id}')">✎ Lire et signer · ${1+consentsDeDevis(d.id).filter(x=>!x.signe).length}</button>`
+             :`<button class="btn xs" title="Le patient signe dans l’encadré, ici"
+             onclick="event.stopPropagation();signerDevis('${d.id}')">✎ Signer sur place</button>`}
             <button class="btn xs" title="Envoyer un lien de signature au patient"
              onclick="event.stopPropagation();composerEnvoi(null,null,'${d.id}')">✉ Signature à distance</button>`}`}
         ${lienDe(d.id)?`<button class="btn xs" onclick="event.stopPropagation();pageSignature('${lienDe(d.id).jeton}')">🔗 Page du patient</button>`:''}
@@ -11813,6 +11901,56 @@ function consentAcquis(pid,type){
    le fait signer */
 const consentEnCours=(pid,type)=>DOCLIB.find(x=>x.patient===pid&&x.k==='consentement'
   &&x.type===type&&!x.signe)||null;
+
+/* ==========================================================================
+   Les consentements d'un devis
+   --------------------------------------------------------------------------
+   Un devis dit ce qu'on va faire. Les soins qu'il contient appellent, pour
+   certains, un consentement éclairé — et ce consentement doit être lu et
+   signé AVANT le geste, pas rattrapé après. L'établir à la main, un par un,
+   au moment où le patient est déjà dans le fauteuil, c'est la meilleure façon
+   de l'oublier.
+
+   On les prépare donc au moment où le devis s'enregistre. Deux verrous, qui
+   sont ceux du logiciel depuis toujours et qu'il n'est pas question
+   d'assouplir ici :
+
+     · un soin déjà consenti ne redonne jamais lieu à un second document —
+       deux consentements pour le même soin, c'est deux pièces qui peuvent se
+       contredire au dossier ;
+     · un consentement déjà établi et en attente de signature ne se double
+       pas non plus : on le fait signer, on n'en refait pas un.
+
+   Préparer n'est pas signer. Ces pièces arrivent au dossier à l'état
+   « à faire signer » ; rien n'est réputé consenti tant que le patient n'a
+   pas lu et signé.
+   ========================================================================== */
+function consentsAPreparer(pid, prest){
+ const vus=new Set(), out=[];
+ (prest||[]).forEach(l=>{
+  const t=l&&l.type; if(!t||vus.has(t)) return; vus.add(t);
+  const C=acteDef(t); if(!C||!C.cons) return;
+  if(consentAcquis(pid,t)||consentEnCours(pid,t)) return;
+  out.push(t);
+ });
+ return out;
+}
+function preparerConsentements(d, prest){
+ const p=pById(d.patient); if(!p) return [];
+ const faits=[];
+ consentsAPreparer(d.patient, prest).forEach(t=>{
+  const id=numLib('consentement');
+  DOCLIB.push({id, k:'consentement', patient:p.id, date:d.date,
+    praticien:d.praticien||p.prat||PRATICIENS[0],
+    type:t, nom:`Consentement — ${acteDef(t).n}`, note:'', devis:d.id,
+    ts:nowStamp(), par:ROLES[role].u, envoye:null, signe:null});
+  logDoc(id, `Consentement préparé avec le devis ${d.id} — ${acteDef(t).n}`, ROLES[role].u);
+  faits.push(id);
+ });
+ return faits;
+}
+/* les consentements nés d'un devis donné, signés ou non */
+const consentsDeDevis=did=>DOCLIB.filter(x=>x.devis===did&&x.k==='consentement');
 function ouvrirDocLib(pid,k){
  /* un refus referme ce qui était ouvert : on ne laisse pas un formulaire
     orphelin derrière un message d'interdiction */
@@ -12352,7 +12490,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DH';
+const BUILD='DI';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -13004,11 +13142,16 @@ function ouvrirSign(id,titre,sous,par,apres){
  document.getElementById('sigv').classList.add('on');
  /* le rectangle est mesurable dès que la boîte est affichée : getBoundingClientRect
     force le calcul de mise en page, inutile d'attendre une frame */
- padInit();
+ padInit('sigC','sigOk',SIG);
 }
 function fermerSign(){ document.getElementById('sigv').classList.remove('on'); SIG=null }
-function padInit(){
- const c=document.getElementById('sigC'); if(!c) return;
+/* Le pavé de signature sert à deux fenêtres : celle d'une pièce isolée et le
+   parapheur. Il prend donc son canevas, son bouton et son état en paramètre
+   plutôt que de les supposer. */
+function padInit(cid,okId,etat){
+ const c=document.getElementById(cid||'sigC'); if(!c) return;
+ const OK=document.getElementById(okId||'sigOk');
+ const E=etat!==undefined?etat:SIG;
  const r=c.parentNode.getBoundingClientRect();
  const dpr=Math.min(3,window.devicePixelRatio||1);
  c.width=Math.max(1,Math.round(r.width*dpr));
@@ -13016,8 +13159,8 @@ function padInit(){
  const x=c.getContext('2d');
  x.scale(dpr,dpr); x.lineCap='round'; x.lineJoin='round'; x.strokeStyle='#18181b';
  c.parentNode.classList.remove('ecrit');
- document.getElementById('sigOk').disabled=true;
- if(SIG) SIG.trace=false;
+ if(OK) OK.disabled=true;
+ if(E) E.trace=false;
  let bas=false, px=0, py=0;
  const pos=e=>{const b=c.getBoundingClientRect(); return [e.clientX-b.left, e.clientY-b.top]};
  /* la largeur du trait suit la pression du stylet quand elle est transmise */
@@ -13027,14 +13170,15 @@ function padInit(){
    bas=true; [px,py]=pos(e);
    x.lineWidth=trait(e); x.beginPath(); x.moveTo(px,py); x.lineTo(px+.01,py); x.stroke();
    c.parentNode.classList.add('ecrit');
-   if(SIG) SIG.trace=true; document.getElementById('sigOk').disabled=false };
+   if(E) E.trace=true; if(OK&&(!E||!E.verrou||!E.verrou())) OK.disabled=false;
+   if(E&&E.majPied) E.majPied() };
  c.onpointermove=e=>{ if(!bas) return; e.preventDefault();
    const [nx,ny]=pos(e);
    x.lineWidth=trait(e); x.beginPath(); x.moveTo(px,py); x.lineTo(nx,ny); x.stroke();
    px=nx; py=ny };
  c.onpointerup=c.onpointercancel=c.onpointerleave=()=>{ bas=false };
 }
-function effacerSign(){ padInit() }
+function effacerSign(){ padInit('sigC','sigOk',SIG) }
 function validerSign(){
  if(!SIG) return;
  const c=document.getElementById('sigC');
@@ -13046,6 +13190,191 @@ function signPapier(){
  if(!SIG) return;
  SIGNS[SIG.id]={img:null, t:nowStamp(), par:SIG.par, mode:'papier'};
  const f=SIG.apres; fermerSign(); f&&f('papier');
+}
+
+/* ==========================================================================
+   Le parapheur
+   --------------------------------------------------------------------------
+   Une chemise de pièces, lues l'une après l'autre, signées en une fois.
+
+   Deux règles tiennent tout le reste :
+
+     1. On ne signe pas ce qu'on n'a pas lu. Chaque pièce doit avoir été
+        déroulée jusqu'à sa dernière ligne — mesuré sur le défilement réel —
+        avant que le bouton ne s'ouvre. Un consentement signé sans avoir été
+        lu ne vaut rien, et c'est précisément la pièce qu'on produit en cas
+        de litige.
+
+     2. Une signature, mais des pièces distinctes. Chacune reçoit son propre
+        enregistrement, son horodatage, et un journal qui nomme les autres
+        pièces présentées le même jour. On ne fabrique pas un document unique
+        « valant pour trois » : ce serait plus simple à coder et impossible à
+        défendre.
+   ========================================================================== */
+let PAR=null;
+/* une pièce, décrite à partir de sa référence : rien que des données, pour
+   que l'état du parapheur reste lisible et vérifiable */
+function parPiece(ref){
+ if(!ref) return null;
+ if(ref.t==='devis'){
+  const d=DEVIS.find(x=>x.id===ref.id); if(!d) return null;
+  return {ref, id:d.id, nom:nomDevis(d), k:'devis', pid:d.patient, ic:'◫',
+          sous:`${d.id} · ${DF(d.date)}`, deja:d.statut==='accepte'&&!!signOf(d.id)};
+ }
+ if(ref.t==='lib'){
+  const x=libById(ref.id); if(!x) return null;
+  return {ref, id:x.id, nom:x.nom, k:x.k, pid:x.patient, ic:x.k==='ordonnance'?'℞':'✎',
+          sous:`${x.id} · ${x.devis?'préparé avec le devis '+x.devis:'hors séance'}`, deja:!!x.signe};
+ }
+ if(ref.t==='acte'){
+  const a=ACTES.find(y=>y.id===ref.aid); if(!a) return null;
+  const d=docsActe(a).find(y=>y.id===ref.id); if(!d) return null;
+  return {ref, id:d.id, nom:d.nom, k:'consentement', pid:a.patient, ic:'✎',
+          sous:`séance du ${DF(a.date)}`, deja:!!a.consent||!!consentPorteur(a)};
+ }
+ return null;
+}
+function parCorps(pc){
+ if(pc.ref.t==='devis'){ const d=DEVIS.find(x=>x.id===pc.ref.id); return d?devisDoc(d):'' }
+ if(pc.ref.t==='lib'){ const x=libById(pc.ref.id); return x?docDoc(acteLib(x), ficheLib(x)):'' }
+ const a=ACTES.find(y=>y.id===pc.ref.aid); if(!a) return '';
+ const d=docsActe(a).find(y=>y.id===pc.ref.id);
+ return d?docDoc(a,d):'';
+}
+/* ce que la signature d'une pièce change dans le dossier */
+function parEffet(pc, mode, t){
+ if(pc.ref.t==='devis'){ const d=DEVIS.find(x=>x.id===pc.ref.id);
+   if(d){ d.statut='accepte'; d.derniere=TODAYS } return }
+ if(pc.ref.t==='lib'){ const x=libById(pc.ref.id); if(x) x.signe=t; return }
+ const a=ACTES.find(y=>y.id===pc.ref.aid); if(!a) return;
+ if(pc.id==='CONS-'+a.id){ a.consent=true; if(AS&&AS.aid===a.id) AS.consent=true }
+ const ad=DOCADD.find(x=>x.id===pc.id); if(ad) ad.signe=t;
+}
+const parASigner=()=>PAR?PAR.docs.filter(x=>!x.deja):[];
+const parReste=()=>parASigner().filter(x=>!x.lu);
+
+function ouvrirParapheur(refs,o){
+ const L=(refs||[]).map(parPiece).filter(Boolean);
+ if(!L.length){ toast('Aucune pièce à faire signer'); return }
+ const pid=(o&&o.pid)||L[0].pid, p=pById(pid);
+ L.forEach(x=>{ x.lu=false });
+ PAR={pid, par:(o&&o.par)||fn(p), docs:L, i:0, trace:false,
+      titre:(o&&o.titre)||`Lecture et signature — ${fn(p)}`,
+      sous:(o&&o.sous)||''};
+ /* le pavé n'ouvre son bouton que si toutes les pièces ont été lues */
+ PAR.verrou=()=>parReste().length>0;
+ PAR.majPied=()=>parPied();
+ document.getElementById('parv').classList.add('on');
+ parRender();
+ padInit('parC','parOk',PAR);
+}
+function fermerParapheur(){ document.getElementById('parv').classList.remove('on'); PAR=null }
+function parRender(){
+ if(!PAR) return;
+ const aS=parASigner();
+ document.getElementById('parT').textContent=PAR.titre;
+ document.getElementById('parS').textContent=PAR.sous
+   || `${PAR.docs.length} pièce${PAR.docs.length>1?'s':''}${aS.length<PAR.docs.length
+        ?` · ${PAR.docs.length-aS.length} déjà signée${PAR.docs.length-aS.length>1?'s':''}`:''}`;
+ parNav(); parDocPane(); parPied();
+}
+function parNav(){
+ const el=document.getElementById('parNav'); if(!el||!PAR) return;
+ el.innerHTML=PAR.docs.map((x,i)=>`<button class="par-i ${i===PAR.i?'on':''} ${x.deja?'fait':(x.lu?'lu':'')}"
+   onclick="parAller(${i})">
+   <span class="n">${x.deja?'✓':(x.lu?'✓':i+1)}</span>
+   <span class="t">${esc(x.nom)}<span class="s">${x.deja?'déjà signé — ne se signe pas deux fois'
+     :(x.lu?'lu':'à lire jusqu’au bout')} · ${esc(x.sous)}</span></span></button>`).join('');
+}
+function parDocPane(){
+ const el=document.getElementById('parDoc'); if(!el||!PAR) return;
+ el.innerHTML=parCorps(PAR.docs[PAR.i]);
+ el.scrollTop=0;
+ /* une pièce qui tient sans défilement est lue dès qu'elle est affichée */
+ parLu();
+}
+function parAller(i){ if(!PAR) return; PAR.i=Math.max(0,Math.min(PAR.docs.length-1,i));
+ parNav(); parDocPane(); parPied() }
+/* lue = déroulée jusqu'à la fin, ou tenant entièrement dans la fenêtre */
+function parLu(){
+ if(!PAR) return;
+ const el=document.getElementById('parDoc'); if(!el) return;
+ const pc=PAR.docs[PAR.i]; if(!pc||pc.lu) return;
+ const court=el.scrollHeight-el.clientHeight<=4;
+ const bas=el.scrollTop+el.clientHeight>=el.scrollHeight-26;
+ if(court||bas){ pc.lu=true; parNav(); parPied() }
+}
+function parPied(){
+ const el=document.getElementById('parA'); if(!el||!PAR) return;
+ const aS=parASigner(), reste=parReste();
+ const msg = reste.length
+   ? `<b>${reste.length} pièce${reste.length>1?'s restent':' reste'} à dérouler jusqu’au bout</b> avant de pouvoir signer :
+      ${reste.map(x=>esc(x.nom)).join(', ')}.`
+   : (!PAR.trace
+      ? `Les ${aS.length>1?aS.length+' pièces ont':'pièces ont'} été lues. Faites signer le patient dans l’encadré —
+         ou consignez une signature recueillie sur papier.`
+      : `Prêt. Une seule signature, apposée sur ${aS.length>1?`les ${aS.length} pièces`:'la pièce'},
+         chacune horodatée et journalisée séparément.`);
+ el.innerHTML=`<div class="msg">${msg}</div>
+  <div class="r">
+   <button class="btn s" onclick="padInit('parC','parOk',PAR);parPied()">↺ Effacer</button>
+   <button class="btn s" ${reste.length?'disabled':''} onclick="parApposer('papier')"
+     title="Les exemplaires ont été imprimés et signés à la main">✎ Signé sur papier</button>
+   <button class="btn p" id="parOk" ${(reste.length||!PAR.trace)?'disabled':''} onclick="parApposer('ecran')">
+     ✓ Signer ${aS.length>1?`les ${aS.length} documents`:'le document'}</button>
+  </div>`;
+}
+function parApposer(mode){
+ if(!PAR) return;
+ const L=parASigner();
+ if(!L.length){ toast('Toutes les pièces sont déjà signées'); return }
+ /* le verrou de lecture ne se contourne pas, pas même par le chemin papier */
+ if(parReste().length){ toast(`${parReste().length} pièce${parReste().length>1?'s n’ont':' n’a'} pas été lue${parReste().length>1?'s':''} jusqu’au bout`); return }
+ if(mode!=='papier'&&!PAR.trace){ toast('Faites signer le patient dans l’encadré'); return }
+ const img=mode==='papier'?null:document.getElementById('parC').toDataURL('image/png');
+ const t=nowStamp(), par=PAR.par;
+ const noms=L.map(x=>x.nom), ids=L.map(x=>x.id);
+ L.forEach(x=>{
+  SIGNS[x.id]={img, t, par, mode:mode==='papier'?'papier':'ecran',
+               seance:L.length>1?{n:L.length, pieces:ids}:null};
+  parEffet(x, mode, t);
+  logDoc(x.id, (mode==='papier'
+    ? 'Signé à la main sur un exemplaire papier, versé au dossier'
+    : 'Signé dans l’encadré — tracé manuscrit conservé')
+    + (L.length>1?` · séance de signature de ${L.length} pièces lues sur place : ${noms.join(', ')}`:''), par);
+ });
+ fermerParapheur();
+ paint&&paint(); if(AS) renderOver();
+ toast(L.length>1
+   ? `${L.length} documents signés et horodatés — ${DTS(t)}`
+   : `${noms[0]} — signé et horodaté`);
+}
+/* ---- les portes d'entrée ---- */
+/* un devis et les consentements qu'il a préparés */
+function parapheurDevis(did){
+ const d=DEVIS.find(x=>x.id===did); if(!d){ toast('Devis introuvable'); return }
+ const refs=[{t:'devis',id:d.id}, ...consentsDeDevis(d.id).map(x=>({t:'lib',id:x.id}))];
+ const L=refs.map(parPiece).filter(Boolean);
+ if(L.every(x=>x.deja)){ toast('Tout est déjà signé sur ce devis'); return }
+ ouvrirParapheur(refs, {pid:d.patient, titre:`Lecture et signature — ${fn(pById(d.patient))}`,
+   sous:`Devis ${d.id}${L.length>1?` et ${L.length-1} consentement${L.length>2?'s':''}`:''}`});
+}
+/* toutes les pièces d'un patient qui attendent une signature */
+function refsASigner(pid){
+ const out=[];
+ DEVIS.filter(d=>d.patient===pid&&d.statut!=='accepte'&&d.statut!=='brouillon')
+      .forEach(d=>out.push({t:'devis',id:d.id}));
+ DOCLIB.filter(x=>x.patient===pid&&x.k==='consentement'&&!x.signe)
+       .forEach(x=>out.push({t:'lib',id:x.id}));
+ ACTES.filter(a=>a.patient===pid&&(catById(a.type)||{}).cons&&!a.consent&&!consentPorteur(a)
+                 &&!CONS_SUPP.has(a.id))
+      .forEach(a=>out.push({t:'acte',aid:a.id,id:'CONS-'+a.id}));
+ return out;
+}
+function parapheurPatient(pid){
+ const refs=refsASigner(pid);
+ if(!refs.length){ toast('Aucune pièce n’attend de signature dans ce dossier'); return }
+ ouvrirParapheur(refs, {pid, sous:`${refs.length} pièce${refs.length>1?'s':''} en attente de signature`});
 }
 
 let PV=null;
@@ -13066,7 +13395,9 @@ function apercuDevis(id){
  pdfView(nomDevis(d), `${d.id||'projet non enregistré'} · ${fn(p)} · ${DF(d.date)}${CAN('prix')?' · '+E2(net):''}`,
    devisDoc(d),
    [d.id&&d.statut==='brouillon'?`<button class="pv-b" onclick="fermerPdf();sendRel('${d.id}')">✉ Envoyer au patient</button>`:'',
-    (d.id&&d.statut!=='accepte')?`<button class="pv-b" onclick="fermerPdf();signerDevis('${d.id}')">✎ Faire signer</button>`:''].join(''));
+    (d.id&&d.statut!=='accepte')?(consentsDeDevis(d.id).some(x=>!x.signe)
+      ?`<button class="pv-b" onclick="fermerPdf();parapheurDevis('${d.id}')">✎ Lire et signer · ${1+consentsDeDevis(d.id).filter(x=>!x.signe).length}</button>`
+      :`<button class="pv-b" onclick="fermerPdf();signerDevis('${d.id}')">✎ Faire signer</button>`):''].join(''));
 }
 function apercuAutre(id){
  const x=AUTRES_DOCS.find(y=>y.id===id); if(!x) return;
@@ -13115,7 +13446,7 @@ function openDevis(pid,fam,did){
       date:d?d.date:TODAYS, prat:d?(d.praticien||PRATICIENS[0]):PRATICIENS[0],
       remise:d?(d.remise||0):0, remiseType:d?'€':'%',   /* un devis enregistré stocke sa remise en euros */
       validite:d?(d.validite||trame(f).validiteJours):trame(f).validiteJours,
-      note:d?(d.note||''):'', infosOn:true,
+      note:d?(d.note||''):'', infosOn:true, consOn:true,
       lignes:(d&&d.prest&&d.prest.length)?d.prest.map(x=>({...x,z:{...x.z},com:x.com||'',
               prix:(x.brut!=null?x.brut:x.prix), remise:+x.remise||0, remiseType:x.remiseType||'%'}))
             :[{type:null, libre:null, reg:regionFam(f), z:{}, seances:1, prix:null, remise:0, remiseType:'%'}] };
@@ -13361,10 +13692,14 @@ function dvEnregistrer(envoyer){
   Object.assign(d,{montant:net,remise:rem,validite:DV.validite,note:DV.note,prest,lignes,fam:DV.fam,
     cree:d.cree||HORO(), maj:HORO()});
   logDoc(d.id,'Devis modifié');
+  /* un devis corrigé peut avoir gagné un soin : on complète, on ne double pas */
+  const nc=DV.consOn?preparerConsentements(d,prest):[];
   if(envoyer){ const renv=d.statut!=='brouillon';
    d.statut='envoye'; d.envoye=TODAYS; d.relances=0; d.derniere=null;
    logDoc(d.id,(renv?'Devis corrigé et renvoyé par ':'Devis envoyé par ')+canalPat(pById(d.patient))) }
-  closeAll(); go('devis',d.id); toast('Devis '+d.id+' mis à jour'+(envoyer?' et envoyé':''));
+  closeAll(); go('devis',d.id);
+  toast('Devis '+d.id+' mis à jour'+(envoyer?' et envoyé':'')
+    +(nc.length?` · ${nc.length} consentement${nc.length>1?'s préparés':' préparé'}`:''));
   return;
  }
  const num='D-'+TODAYS.slice(2,4)+TODAYS.slice(5,7)+'-'+String(DEVIS.length+22).padStart(3,'0');
@@ -13376,8 +13711,10 @@ function dvEnregistrer(envoyer){
    infos:DV.infosOn?infosPatient(prest[0].z):null,note:DV.note||''});
  logDoc(num,'Devis établi');
  if(envoyer) logDoc(num,'Devis envoyé par '+ca);
+ const nc=DV.consOn?preparerConsentements(DEVIS[0],prest):[];
  closeAll(); dF='tous'; dCat=''; dActe=''; go('devis',num);
- toast(envoyer?`Devis ${num} envoyé par ${ca} à ${fn(p)} · ${EUR(net)}`:`Devis ${num} enregistré en brouillon · ${EUR(net)}`);
+ toast((envoyer?`Devis ${num} envoyé par ${ca} à ${fn(p)} · ${EUR(net)}`:`Devis ${num} enregistré en brouillon · ${EUR(net)}`)
+   +(nc.length?` · ${nc.length} consentement${nc.length>1?'s préparés':' préparé'}`:''));
 }
 
 /* ==========================================================================
@@ -13686,6 +14023,23 @@ function renderDevis(){
        <div class="big"><span>Total TTC</span><b>${EUR(T.net)}</b></div>
        <div class="mu" style="font-size:11px">dont TVA ${EUR(T.net-Math.round(T.net/1.2))} · valable jusqu'au ${DF(addD(DV.date,DV.validite))}</div>
       </div>`:''}
+     ${(()=>{ const prest=DV.lignes.filter(l=>l.type);
+       const aPrep=consentsAPreparer(DV.pid, prest);
+       const dej=[...new Set(prest.map(l=>l.type))].filter(t=>acteDef(t)&&acteDef(t).cons&&consentAcquis(DV.pid,t));
+       const enc=[...new Set(prest.map(l=>l.type))].filter(t=>acteDef(t)&&acteDef(t).cons&&!consentAcquis(DV.pid,t)&&consentEnCours(DV.pid,t));
+       if(!aPrep.length&&!dej.length&&!enc.length) return '';
+       return `<div class="dvp-cons">
+        <div class="r"><b>Consentements</b>
+         ${aPrep.length?`<button class="sw ${DV.consOn?'on':''}" title="Préparer les consentements avec ce devis"
+           onclick="DV.consOn=!DV.consOn;renderDevis()"></button>`:''}</div>
+        ${aPrep.length?`<div class="mu">${DV.consOn
+          ? `${aPrep.length} consentement${aPrep.length>1?'s seront préparés':' sera préparé'} avec le devis, à faire lire et signer avant le geste :
+             <b>${aPrep.map(t=>esc(acteDef(t).n)).join(', ')}</b>.`
+          : `${aPrep.length} soin${aPrep.length>1?'s de ce devis exigent':' de ce devis exige'} un consentement qui n’existe pas encore :
+             <b>${aPrep.map(t=>esc(acteDef(t).n)).join(', ')}</b>. Il faudra l’établir à la main.`}</div>`:''}
+        ${dej.length?`<div class="mu">Déjà signé pour <b>${dej.map(t=>esc(acteDef(t).n)).join(', ')}</b> — un consentement ne s’établit pas deux fois.</div>`:''}
+        ${enc.length?`<div class="mu">Déjà en attente de signature pour <b>${enc.map(t=>esc(acteDef(t).n)).join(', ')}</b>.</div>`:''}
+       </div>` })()}
      <div class="fld" style="margin-top:10px"><label>Note pour le patient</label>
       <textarea class="note" style="min-height:70px" oninput="DV.note=this.value" placeholder="ex. tarif valable pour un règlement en 3 fois">${esc(DV.note||'')}</textarea></div>
     </div>
@@ -13757,6 +14111,7 @@ document.addEventListener('keydown',e=>{
  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();palOn?closeAll():openPal();return}
  if((e.metaKey||e.ctrlKey)&&e.shiftKey&&e.key.toLowerCase()==='v'){e.preventDefault();VX?voixFermer():voixOuvrir();return}
  if(e.key==='Escape'){ if(HFEN){histoFermerFen();return}
+   if(PAR){fermerParapheur();return}
    if(VX){voixFermer();return}
    if(GAL&&GAL.grand){GAL.grand=false;paint();return}
    if(PV){fermerPdf();return}
