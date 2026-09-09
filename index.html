@@ -645,6 +645,20 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
   display:flex;flex-direction:column;min-height:297mm}
 .a4 .gr{flex:1}
 .dv-hd{font-size:10.5px;line-height:1.45;color:#3f3f46;padding-bottom:3mm;border-bottom:1.5px solid #16161a;margin-bottom:4mm}
+.dv-hd.avec-logo{display:flex;align-items:flex-start;gap:5mm}
+.dv-hd .hdt{flex:1;min-width:0}
+.dv-logo{flex:none;max-width:54mm;object-fit:contain;display:block}
+/* le réglage du logo, dans les paramètres */
+.hf-logo{display:flex;gap:14px;align-items:stretch;margin-top:13px;padding-top:12px;
+  border-top:1px dashed var(--line)}
+.hf-logo .lg-v{width:190px;min-height:74px;flex:none;border:1px dashed var(--line);border-radius:11px;
+  background:var(--panel-2);display:grid;place-items:center;padding:9px;overflow:hidden}
+.hf-logo .lg-v img{max-width:100%;max-height:64px;object-fit:contain}
+.hf-logo .lg-v .mu{font-size:11.5px}
+.hf-logo .lg-a{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;justify-content:center}
+.hf-logo .lg-a .r{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:2px}
+.ds-h.avec-logo{display:flex;align-items:flex-start;gap:9px}
+.ds-h.avec-logo img{flex:none;max-width:96px;object-fit:contain}
 .dv-ti{display:flex;align-items:flex-end;gap:10px;margin-bottom:4mm}
 .dv-ti h1{font-size:17px;font-weight:720;letter-spacing:-.02em;line-height:1.15}
 .dv-ti .n{margin-left:auto;text-align:right;font-size:10.5px;color:#3f3f46;line-height:1.5}
@@ -1156,6 +1170,37 @@ tr.neuf>td{background:color-mix(in srgb,var(--accent) 9%,transparent)}
 table.chrono tr.yr td{background:var(--panel-3);font-weight:800;font-size:11px;letter-spacing:.08em;
   color:var(--ink-3);padding:4px 10px;border-top:1px solid var(--line)}
 table.chrono tr.c td{vertical-align:top}
+/* ==========================================================================
+   La chronologie, une séance par ligne
+   --------------------------------------------------------------------------
+   Chaque cellule tient sur une ligne et s'abrège plutôt que de s'empiler.
+   Ce qui est abrégé se relit d'un survol, et la ligne entière ouvre la
+   séance : rien n'est perdu, tout est visible ensemble.
+   ========================================================================== */
+table.chrono.compact{table-layout:fixed;width:100%}
+table.chrono.compact tr.c td{vertical-align:middle;padding:6px 8px;font-size:12px}
+table.chrono.compact thead th{padding:7px 8px;white-space:nowrap}
+.ct-a b{display:block;font-weight:650;font-size:12.5px;line-height:1.25;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ct-a .s,.ct-p .s{display:block;font-size:10.5px;color:var(--ink-3);font-weight:450;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3}
+.ct-p{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ct-z{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ct-z .bdg{margin-right:3px}
+.ct-1{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px}
+.ct-1 .mch{display:inline-flex;align-items:center;gap:4px;max-width:100%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.ct-1 .mono{font-size:11px}
+.pl{font-size:10px;font-weight:700;color:var(--ink-3);margin-left:2px}
+.ct-e{white-space:nowrap}
+.ct-c{text-align:center}
+.ct-c .com{cursor:help;font-size:12px;opacity:.75}
+/* les pièces d'une séance, en pastilles */
+.dmini{display:flex;gap:3px;flex-wrap:nowrap;overflow:hidden}
+.dmini .dm{width:23px;height:23px;flex:none;border-radius:7px;cursor:pointer;font-family:inherit;
+  font-size:11px;line-height:1;display:grid;place-items:center;border:1px solid transparent;
+  transition:.12s;padding:0}
+.dmini .dm:hover{transform:translateY(-1px);filter:brightness(.96)}
 .chips{display:flex;flex-wrap:wrap;gap:5px}
 .prow{display:flex;align-items:center;gap:6px;margin-bottom:5px}
 .prow .inp{height:30px}
@@ -1741,17 +1786,14 @@ body.en-connexion aside{display:none}
 .facewrap.cumul{grid-template-columns:minmax(0,1fr) minmax(0,420px);align-items:start}
 .facewrap.cumul>div:first-child{overflow:visible;display:block}
 .facewrap.cumul>div:first-child .facebox{max-height:none}
-.facewrap.cumul>div:first-child .face{height:auto;max-height:calc(100vh - 300px);min-height:665px}
+.facewrap.cumul>div:first-child .face{height:auto;max-height:calc(100vh - 300px)}
 .facewrap.cumul>div:first-child .barp{max-height:calc(100vh - 300px)}
 .facewrap.cumul>div:last-child{max-height:calc(100vh - 240px);overflow:auto}
-/* Sous 1260 px, la colonne de gauche n'a plus la largeur qu'il faut pour un
-   schéma lisible : plutôt que de le rapetisser, on empile. Le dessin reprend
-   toute la largeur du panneau, la liste passe dessous. */
-@media(max-width:1260px){
-  .facewrap.cumul{grid-template-columns:minmax(0,1fr)}
-  .facewrap.cumul>div:first-child .face{margin:0 auto}
-  .facewrap.cumul>div:last-child{max-height:none}
-}
+/* On a un temps empilé les deux colonnes sous 1260 px, pour donner au schéma
+   la largeur que sa lisibilité exigeait. Depuis que l'écriture ne dépend plus
+   de la taille du dessin, ce n'est plus nécessaire — et l'empilement, lui,
+   obligeait à dérouler. Les deux colonnes restent donc côte à côte. */
+.facewrap.cumul>div:first-child .face{margin:0 auto}
 /* l'illustration porte déjà ses tracés : au repos la zone cliquable s'efface derrière eux */
 .zone{fill:var(--ink);fill-opacity:.012;stroke:var(--ink);stroke-opacity:0;stroke-width:1.6;stroke-linejoin:round;cursor:pointer;transition:fill-opacity .12s,stroke-opacity .12s}
 .zone:hover{fill-opacity:.15;stroke-opacity:.6}
@@ -1790,8 +1832,8 @@ body.en-connexion aside{display:none}
 .zpill{pointer-events:none}
 .zpill rect{fill:color-mix(in srgb,var(--zc) 72%,#08172b);stroke:rgba(255,255,255,.8);stroke-width:1}
 .zpill text{text-anchor:middle;dominant-baseline:middle}
-.zpill .zq{font:700 12px var(--sans);fill:#fff;letter-spacing:.01em}
-.zpill .zd2{font:600 9px var(--sans);fill:#fff;letter-spacing:.02em}
+.zpill .zq{font:700 var(--fq,12px) var(--sans);fill:#fff;letter-spacing:.01em}
+.zpill .zd2{font:600 var(--fd,9px) var(--sans);fill:#fff;letter-spacing:.02em}
 /* traitée autrefois, rien aujourd'hui : pastille claire, texte assombri */
 .zpill.ant rect{fill:var(--panel);fill-opacity:.96;stroke:var(--zc);stroke-opacity:.8;stroke-width:1.2}
 .zpill.ant .zq,.zpill.ant .zd2{fill:color-mix(in srgb,var(--zc) 68%,#08172b);fill-opacity:1}
@@ -4032,6 +4074,9 @@ let CABINET={
  entete:'{{raison}} — {{cabinet}}\n{{adresse}}\nTél. {{tel}} · {{mail}}',
  pied:'{{raison}} · SIRET {{siret}} · TVA {{tva}} · APE {{ape}}\n{{praticien}} — RPPS {{rpps}} · Assurance RCP {{rcp}}\nActes de médecine esthétique non pris en charge par l’Assurance Maladie, soumis à TVA au taux de 20 %.',
  enteteOn:true, piedOn:true,
+ /* le logo de la structure : une image collée dans le fichier, pas un lien —
+    un document doit rester lisible quand il quitte le logiciel */
+ logo:null, logoOn:false, logoH:14,
  /* un consentement signé vaut pour les séances suivantes du même soin */
  consentReconduit:true
 };
@@ -4074,6 +4119,32 @@ let PRATS=[
   rcpCie:'AXA', rcpPolice:'RCP-2298104', rcpFin:'2026-10-31'},
 ];
 const pratInfo=n=>PRATS.find(x=>x.nom===n)||PRATS[0];
+
+/* ==========================================================================
+   L'en-tête, le pied de page et le logo d'une pièce
+   --------------------------------------------------------------------------
+   Ils étaient ceux de la structure, pour tout le monde. Dans une structure
+   qui héberge plusieurs praticiens, c'est faux : chacun exerce sous son
+   propre numéro, avec sa propre assurance, et souvent sous son propre nom
+   commercial. Un praticien peut donc désormais porter son en-tête, son pied
+   et son logo.
+
+   La règle de résolution est explicite, et volontairement conservatrice :
+   tant qu'un praticien n'a rien réglé, il imprime l'identité du cabinet.
+   On ne devine pas une identité professionnelle.
+   ========================================================================== */
+const hfPrat = prn => { const x=pratInfo(prn); return (x&&x.hf==='perso')?x:null };
+const enteteTxt = prn => { const x=hfPrat(prn);
+  return (x&&x.entete!=null&&String(x.entete).trim())?x.entete:CABINET.entete };
+const piedTxt = prn => { const x=hfPrat(prn);
+  return (x&&x.pied!=null&&String(x.pied).trim())?x.pied:CABINET.pied };
+const enteteVisible = prn => { const x=hfPrat(prn); return x?x.enteteOn!==false:!!CABINET.enteteOn };
+const piedVisible   = prn => { const x=hfPrat(prn); return x?x.piedOn!==false:!!CABINET.piedOn };
+const logoDoc = prn => { const x=hfPrat(prn);
+  if(x) return x.logoOn===false?null:(x.logo||(CABINET.logoOn?CABINET.logo:null));
+  return CABINET.logoOn?CABINET.logo:null };
+const logoHmm = prn => { const x=hfPrat(prn);
+  return (x&&x.logo&&+x.logoH)||+CABINET.logoH||14 };
 const rcpAlerte=x=>days(TODAYS,x.rcpFin)<90;
 
 /* --------------------------------------------------------------------------
@@ -4357,7 +4428,7 @@ const baremePane=zAll=>baremeListe(baremeById(AS.reg), zAll||AS.z, {
  prix:CAN('prix')&&!AS.ro&&AS.but==='devis',
  clic:'zClick', groupe:'baremeGroupe'});
 
-function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=null,clic='zClick',libre=false}={}){
+function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=null,clic='zClick',libre=false,ech=1}={}){
  const R=SILH[region]?region:'visage', S=SILH[R];
  const az=z=>(zt&&zt[z])||type;                       /* l'acte de cette zone */
  const H=hist||{};
@@ -4396,9 +4467,11 @@ function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=n
     cours de saisie.
     ========================================================================== */
  const pris=[];
- const place=(x,y,w,h)=>{
+ const place=(x,y,w,h,pas)=>{
   const heurte=yy=>pris.some(p=>Math.abs(p.x-x)<(p.w+w)/2+2 && Math.abs(p.y-yy)<(p.h+h)/2+2);
-  for(const d of [0,12,-12,24,-24,36,-36,48,-48]){ if(!heurte(y+d)){ pris.push({x,y:y+d,w,h}); return y+d } }
+  const P=pas||12;
+  for(const d of [0,P,-P,2*P,-2*P,3*P,-3*P,4*P,-4*P,5*P,-5*P]){
+    if(!heurte(y+d)){ pris.push({x,y:y+d,w,h}); return y+d } }
   pris.push({x,y,w,h}); return y;
  };
  /* largeur d'un texte, en unités du dessin : les chiffres et les lettres de
@@ -4406,8 +4479,22 @@ function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=n
     L'estimation est vérifiée par les tests, qui exigent que le texte rendu
     tienne dans sa pastille. */
  const largeurTxt=(txt,fs)=>[...txt].reduce((w,c)=>
-   w + fs*(/[ .,/:]/.test(c)?0.30 : /[×]/.test(c)?0.60 : /[a-z]/.test(c)?0.55 : 0.60), 0);
- const FQ=12, FD=9;                       /* corps de la dose, corps de la date */
+   w + fs*(/[ .,]/.test(c)?0.30 : /[/:]/.test(c)?0.35 : /[×]/.test(c)?0.66 : /[a-z]/.test(c)?0.55 : 0.60), 0);
+ /* ------------------------------------------------------------------------
+    Le corps des étiquettes ne suit pas celui du dessin
+    ------------------------------------------------------------------------
+    Un texte SVG est écrit en unités du cadre : quand le schéma rétrécit pour
+    tenir dans la fenêtre, l'écriture rétrécit avec lui. C'est ce qui rendait
+    les doses illisibles sur une fenêtre courte, et ce qui a fait poser une
+    taille plancher au schéma — au prix d'une barre de défilement.
+
+    On prend le problème par l'autre bout : `ech` vaut l'inverse de la
+    réduction subie par le dessin, si bien que la dose garde à l'écran la
+    même taille en pixels quelle que soit celle du visage. Le schéma peut
+    alors rapetisser autant qu'il faut pour tenir d'un seul tenant.
+    ------------------------------------------------------------------------ */
+ const K=Math.max(1, Math.min(2.2, +ech||1));
+ const FQ=12*K, FD=9*K;                   /* corps de la dose, corps de la date */
  const lbl=L.filter(z=>Object.prototype.hasOwnProperty.call(state,z.id)||H[z.id])
   .sort((a,b)=>a.cy-b.cy||a.cx-b.cx)
   .map(z=>{
@@ -4423,21 +4510,21 @@ function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=n
       pas bleue parce qu'on injecte de la toxine ailleurs aujourd'hui. C'est
       déjà la règle du contour de la zone ; la pastille la suit. */
    const coul=(plein&&CT?colActe(t):null)||(z.p==='tox'?'var(--toxine)':'var(--ah)');
-   const w=Math.max(largeurTxt(qt,FQ), largeurTxt(dt,FD))+11;
-   const h=(qt?FQ+2:0)+(dt?FD+2:0)+6;
+   const w=Math.max(largeurTxt(qt,FQ), largeurTxt(dt,FD))+13*K;
+   const h=(qt?FQ+2*K:0)+(dt?FD+2*K:0)+6*K;
    /* une étiquette ne sort pas du cadre : au bord, elle se recentre */
    const [VX,VY,VW,VH]=S.vb.split(/\s+/).map(Number);
    const cx=Math.min(VX+VW-w/2-3, Math.max(VX+w/2+3, z.cx));
-   const y=Math.min(VY+VH-h/2-3, Math.max(VY+h/2+3, place(cx, z.cy, w, h)));
+   const y=Math.min(VY+VH-h/2-3, Math.max(VY+h/2+3, place(cx, z.cy, w, h, 12*K)));
    const fil=(Math.abs(y-z.cy)>h/2+3||Math.abs(cx-z.cx)>2)
      ?`<line class="zlead ${z.p==='tox'?'t':'a'}" x1="${z.cx}" y1="${z.cy}" x2="${cx}" y2="${(y+(y>z.cy?-h/2:h/2)).toFixed(1)}"/>`:'';
    /* le texte est centré dans la pastille : une seule ligne au milieu, deux
       lignes réparties de part et d'autre */
-   const yq = qt ? (dt ? y-2 : y) : 0;
-   const yd = dt ? (qt ? y+FD+1.5 : y) : 0;
+   const yq = qt ? (dt ? y-2*K : y) : 0;
+   const yd = dt ? (qt ? y+FD+1.5*K : y) : 0;
    return fil
-        + `<g class="zpill ${plein?'on':'ant'}" data-z="${z.id}" style="--zc:${coul}">
-             <rect x="${(cx-w/2).toFixed(1)}" y="${(y-h/2).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="${Math.min(6,h/2).toFixed(1)}"/>
+        + `<g class="zpill ${plein?'on':'ant'}" data-z="${z.id}" style="--zc:${coul};--fq:${FQ.toFixed(2)}px;--fd:${FD.toFixed(2)}px">
+             <rect x="${(cx-w/2).toFixed(1)}" y="${(y-h/2).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="${Math.min(6*K,h/2).toFixed(1)}"/>
              ${qt?`<text class="zq" x="${cx.toFixed(1)}" y="${yq.toFixed(1)}">${qt}</text>`:''}
              ${dt?`<text class="zd2" x="${cx.toFixed(1)}" y="${yd.toFixed(1)}">${dt}</text>`:''}
            </g>`;
@@ -6146,7 +6233,7 @@ function docAvoir(av){
  const t=f?tauxTVA(f.type):FACTU.tvaDefaut;
  const ht=Math.round(av.montant/(1+t/100)*100)/100;
  return `<div class="a4">
-  ${CABINET.enteteOn?`<div class="dv-hd">${hfDevis(CABINET.entete,p,prn)}</div>`:''}
+  ${docEntete(p,prn)}
   <div class="gr">
    <div class="dv-ti"><h1>Avoir</h1>
     <div class="n"><b>${esc(av.id)}</b><br>Établi le ${DF(av.date)}</div></div>
@@ -6168,7 +6255,7 @@ function docAvoir(av){
     Il vient en déduction des sommes dues ; s’il excède le solde restant, la différence est remboursée au patient.</div>
    <div class="dv-hist"><span>${DTS(av.ts||av.date+'T11:00')} — Avoir établi <i>(${esc(av.par||prn)})</i></span></div>
   </div>
-  ${CABINET.piedOn?`<div class="dv-ft">${hfDevis(CABINET.pied,p,prn)}</div>`:''}
+  ${docPied(p,prn)}
  </div>`;
 }
 function apercuAvoir(id){
@@ -6213,6 +6300,17 @@ function pDetail(p){
        <span class="dl">${esc(LBLDOC[d.k]||d.k)}</span>
        <span class="bdg ${st[1]}">${st[0]}</span>
        <span class="dt">${DTS(last?last.t:d.ts)}</span></div>`}).join('')}</div>`};
+
+ /* La même information que colDocs, en pastilles : sur la chronologie, ce
+    qu'on cherche c'est « y a-t-il un consentement, est-il signé », pas le
+    libellé complet de chaque pièce. Le détail reste au survol, et la pièce
+    s'ouvre au clic comme avant. */
+ const colDocsMini = a => {const L=docsActe(a);
+   if(!L.length) return '<span class="mu">—</span>';
+   return `<div class="dmini">${L.map(d=>{const H=histo(d.id,d.seed||[]), last=H[H.length-1];
+     const st=DST[d.st]||[d.st,'b-neu'];
+     return `<button class="dm ${st[1]}" title="${esc(d.nom)} — ${esc(st[0])}${last?' · '+esc(last.ev)+' le '+DTS(last.t):''}"
+        onclick="event.stopPropagation();apercuDoc(${a.id},'${d.id}')">${d.ic}</button>`}).join('')}</div>`};
 
  const tableActes = () => `<div class="tw"><table>
    <thead><tr><th>Schéma</th><th>Date</th><th>Acte</th><th>Zones injectées</th><th style="min-width:250px">Documents</th><th>Praticien</th><th>Lot</th>${ROLES[role].prix?'<th class="num">Montant</th>':''}<th style="width:74px"></th></tr></thead>
@@ -6325,6 +6423,22 @@ function pDetail(p){
    const nC=L.reduce((s2,a)=>s2+consoActe(a).length,0);
    const nE=L.reduce((s2,a)=>s2+effetsActe(a).length,0);
    let an=null;
+   /* ---------------------------------------------------------------------
+      Toute l'histoire du patient d'un seul coup d'œil
+      ---------------------------------------------------------------------
+      Cette table faisait 1716 px de large dans un panneau de 1244 : la
+      colonne Documents en prenait 316 à elle seule, et les lignes montaient
+      à 123 px parce que chaque réglage, chaque lot et chaque document
+      s'empilaient verticalement. Il fallait donc défiler dans les deux sens
+      pour lire sept séances — c'est-à-dire ne jamais les voir ensemble.
+
+      Une séance tient maintenant sur une ligne. Ce qui ne tient pas sur la
+      ligne n'est pas perdu : il passe en infobulle, et la ligne entière
+      ouvre le dossier de la séance, où tout est déplié. La catégorie rejoint
+      le nom de l'acte, dont elle n'est qu'une précision ; le commentaire
+      devient une pastille qu'on survole.
+      --------------------------------------------------------------------- */
+   const nCols=ROLES[role].prix?10:9;
    return `<div class="fbar">
      <span class="mu" style="font-size:11.5px;font-weight:600;align-self:center">Chronologie</span>
      <button class="btn s" onclick="actTri=actTri==='desc'?'asc':'desc';paint()"
@@ -6349,42 +6463,47 @@ function pDetail(p){
      ${L.length} acte${L.length>1?'s':''}${L.length!==A.length?` sur ${A.length}`:''}
      · ${nC} consommable${nC>1?'s':''} tracé${nC>1?'s':''}
      · ${nE} effet${nE>1?'s':''} secondaire${nE>1?'s':''} signalé${nE>1?'s':''}</div>
-   <div class="tw"><table class="chrono">
-    <thead><tr><th style="width:96px">Date</th><th>Acte</th><th>Catégorie</th><th>Praticien</th>
-      <th>Zones</th><th style="min-width:150px">Matériel &amp; réglages</th>
-      <th>Consommables</th><th>Effets</th><th style="min-width:210px">Documents</th>
-      ${ROLES[role].prix?'<th class="num">Facturé</th>':''}<th style="min-width:150px">Commentaire</th>
-      <th style="width:74px"></th></tr></thead>
+   <div class="tw"><table class="chrono compact">
+    <thead><tr><th style="width:86px">Date</th><th style="width:186px">Acte</th>
+      <th style="width:104px">Praticien</th><th>Zones</th>
+      <th style="width:132px">Matériel</th><th style="width:142px">Consommables</th>
+      <th style="width:70px">Effets</th><th style="width:104px">Documents</th>
+      ${ROLES[role].prix?'<th class="num" style="width:82px">Facturé</th>':''}
+      <th style="width:34px"></th><th style="width:72px"></th></tr></thead>
     <tbody>${L.map(a=>{
       const y=a.date.slice(0,4), sep=(y!==an); an=y;
       const CS=consoActe(a), ES=effetsActe(a), com=(a.zonesNote||a.note||'').trim();
-      return `${sep?`<tr class="yr"><td colspan="${ROLES[role].prix?11:10}">${y}</td></tr>`:''}
+      const M=matsActe(a);
+      return `${sep?`<tr class="yr"><td colspan="${nCols+1}">${y}</td></tr>`:''}
       <tr class="c" onclick="openActe(${a.patient},${a.id})">
         <td class="mono">${DF(a.date)}</td>
-        <td><b>${esc(a.nom)}</b></td>
-        <td class="mu">${esc(a.cat||'—')}</td>
-        <td class="mu" style="white-space:nowrap">${esc(a.praticien)}${a.operateur?`<div style="font-size:11px">op. ${esc(a.operateur)}</div>`:''}</td>
-        <td style="max-width:190px">${a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneDef(z); if(!Z) return '';
+        <td class="ct-a"><b title="${esc(a.nom)}${a.cat?' · '+esc(a.cat):''}">${esc(a.nom)}</b>
+          <span class="s">${esc(a.cat||'—')}</span></td>
+        <td class="mu ct-p" title="${esc(a.praticien)}${a.operateur?' · opérateur '+esc(a.operateur):''}">${esc(a.praticien)}${
+          a.operateur?`<span class="s">op. ${esc(a.operateur)}</span>`:''}</td>
+        <td class="ct-z" title="${a.zones?esc(zonesOf(a).map(([z,q])=>{const t=acteZone(a,z);
+             return zoneNom(z)+(q&&uniteDose(t,z)?' '+fmtDose(q,t,z):'')}).join(' · ')):''}">${
+           a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneDef(z); if(!Z) return '';
            const t=acteZone(a,z), C=acteDef(t);
-           return `<span class="bdg ${C.col==='toxine'?'b-info':'b-warn'}" style="margin:0 3px 3px 0">${esc(zoneNom(z))}${q&&uniteDose(t,z)?' '+fmtDose(q,t,z):''}</span>`}).join(''):`<span class="mu">${noZoneTxt(a)}</span>`}</td>
-        <td style="font-size:11.5px">${(()=>{const M=matsActe(a);
-           if(!M.length) return '<span class="mu">—</span>';
-           return M.map(x=>{const mm=matById(x.mat); if(!mm) return '';
-             const zs=x.parZ?Object.keys(x.parZ):[];
-             return `<div style="margin-bottom:3px"><b style="font-weight:620">
-               <span class="mdot" style="background:${mm.col};display:inline-block;margin-right:4px"></span>${esc(mm.n)}</b>
-               ${paramsTexte(x)?`<div class="mu">${esc(paramsTexte(x))}</div>`:''}
-               ${majActeHist(a.id).some(h=>/Réglages/.test(h.ev))?`<div class="mu" style="font-size:10.5px"
-                 title="${esc(majActeHist(a.id).filter(h=>/Réglages/.test(h.ev)).map(h=>DTS(h.t)+' — '+h.ev).join('\n'))}">✎ corrigé</div>`:''}
-               ${zs.length?`<div class="mu">${zs.length} zone${zs.length>1?'s':''} détaillée${zs.length>1?'s':''}</div>`:''}</div>`}).join('')})()}</td>
-        <td class="mu" style="font-size:11.5px">${CS.length?CS.map(c=>`<div>${esc(c.nom.split(' —')[0])} <span class="mono">${esc(c.lot)}</span></div>`).join(''):'—'}</td>
-        <td>${ES.length?ES.map(e=>`<div style="margin-bottom:2px">${gradeBdg(e.grade)} <span class="mu" style="font-size:11px">${esc(e.quoi)}</span></div>`).join(''):'<span class="mu">—</span>'}</td>
-        <td>${colDocs(a)}</td>
+           return `<span class="bdg ${C.col==='toxine'?'b-info':'b-warn'}" title="${esc(zoneTitre(z)||C.n)}">${esc(zoneNom(z))}${q&&uniteDose(t,z)?' '+fmtDose(q,t,z):''}</span>`}).join(''):`<span class="mu">${esc(noZoneTxt(a))}</span>`}</td>
+        <td class="ct-1">${M.length?M.map(x=>{const mm=matById(x.mat); if(!mm) return '';
+             const det=[paramsTexte(x), x.parZ&&Object.keys(x.parZ).length?`${Object.keys(x.parZ).length} zone(s) détaillée(s)`:'']
+               .filter(Boolean).join(' · ');
+             return `<span class="mch" title="${esc(mm.n+(det?' — '+det:''))}"><span class="mdot" style="background:${mm.col}"></span>${esc(mm.n)}</span>`
+           }).join(''):'<span class="mu">—</span>'}</td>
+        <td class="ct-1 mu">${CS.length
+           ? `<span title="${esc(CS.map(c=>c.nom.split(' —')[0]+' · lot '+c.lot).join('\n'))}">${esc(CS[0].nom.split(' —')[0])}
+              <span class="mono">${esc(CS[0].lot)}</span>${CS.length>1?` <b class="pl">+${CS.length-1}</b>`:''}</span>`
+           : '—'}</td>
+        <td class="ct-e">${ES.length
+           ? `<span title="${esc(ES.map(e=>e.quoi).join('\n'))}">${gradeBdg(ES[0].grade)}${ES.length>1?`<b class="pl">+${ES.length-1}</b>`:''}</span>`
+           : '<span class="mu">—</span>'}</td>
+        <td class="ct-d">${colDocsMini(a)}</td>
         ${ROLES[role].prix?`<td class="num">${montantTxt(a)}</td>`:''}
-        <td class="mu" style="font-size:11.5px;max-width:220px">${com?esc(com.length>90?com.slice(0,90)+'…':com):'—'}</td>
+        <td class="ct-c">${com?`<span class="com" title="${esc(com)}">💬</span>`:''}</td>
         ${tdActions(a)}
       </tr>
-      ${trConfirm(a,ROLES[role].prix?12:11)}`}).join('')}
+      ${trConfirm(a,nCols+1)}`}).join('')}
     </tbody></table>${L.length?'':'<div class="empty">Aucun acte ne correspond à ces filtres.</div>'}</div>`;
   },
 
@@ -6401,7 +6520,7 @@ function pDetail(p){
       return `<button class="${schemaReg===r.id?'on':''}" onclick="schemaReg='${r.id}';paint()">${r.i} ${esc(r.n)} · ${n}</button>`}).join('')}</div></div>
    <div class="facewrap cumul">
     <div>${BAR?baremeListe(BAR,cur,{ro:true,hist:ZH,motTotal:'déjà traitée'+(Object.keys(cur).length>1?'s':'')})
-     :`<div class="facebox">${schemaSVG(cur,{editable:false,hist:ZH,region:schemaReg,zt:cumulT})}</div>
+     :`<div class="facebox">${schemaSVG(cur,{editable:false,hist:ZH,region:schemaReg,zt:cumulT,ech:CUM_ECH})}</div>
      <div class="face-legend"><span><i style="background:var(--toxine)"></i>Toxine</span><span><i style="background:var(--ah)"></i>Acide hyaluronique</span>
       <span class="mu">quantité cumulée · dernière séance et nombre de passages</span></div>`}</div>
     <div>
@@ -9775,16 +9894,69 @@ V.params=()=>{
   documents:()=>{
    const d=DOCMOD.find(x=>x.id===docSel)||DOCMOD[0];
    const cats=[...new Set(DOCMOD.map(x=>x.cat))];
-   return `<div class="grid g2" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
-    <div class="card"><div class="h"><h2>En-tête automatique</h2>
-      <div class="r"><button class="sw ${CABINET.enteteOn?'on':''}" onclick="CABINET.enteteOn=!CABINET.enteteOn;paint()"></button></div></div>
-     <div class="b"><div class="vars">${VARS.slice(2,14).map(v=>`<button class="varchip" onclick="insHF('hdr','${v}')">{{${v}}}</button>`).join('')}</div>
-      <textarea class="note" id="hdr" style="min-height:74px" oninput="CABINET.entete=this.value;document.getElementById('docprev').innerHTML=docPrev()">${esc(CABINET.entete)}</textarea></div></div>
-    <div class="card"><div class="h"><h2>Pied de page automatique</h2>
-      <div class="r"><button class="sw ${CABINET.piedOn?'on':''}" onclick="CABINET.piedOn=!CABINET.piedOn;paint()"></button></div></div>
-     <div class="b"><div class="vars">${VARS.slice(2,14).map(v=>`<button class="varchip" onclick="insHF('ftr','${v}')">{{${v}}}</button>`).join('')}</div>
-      <textarea class="note" id="ftr" style="min-height:74px" oninput="CABINET.pied=this.value;document.getElementById('docprev').innerHTML=docPrev()">${esc(CABINET.pied)}</textarea></div></div>
-   </div>
+   const O=hfObj(), perso=(hfCible!=='cabinet');
+   const propre=perso&&O.hf==='perso';
+   const ro=perso&&!propre;                       /* il suit l'identité du cabinet */
+   return `<div class="card" style="margin-bottom:14px"><div class="h">
+     <h2>En-tête, pied de page et logo</h2>
+     <span class="s">ce qui s’imprime en haut et en bas de chaque pièce</span>
+     <div class="r"><button class="btn xs" onclick="apercuGlobal()">◫ Aperçu global (PDF)</button></div></div>
+    <div class="b">
+     <div class="fbar" style="margin-bottom:11px">
+      <span class="mu" style="font-size:11.5px;font-weight:600;align-self:center">Identité de</span>
+      <div class="seg">
+        <button class="${hfCible==='cabinet'?'on':''}" onclick="hfCible='cabinet';paint()">La structure</button>
+        ${pratsFiltre().map(n=>`<button class="${hfCible===n?'on':''}" onclick="hfCible='${esc(n)}';paint()">${esc(n)}</button>`).join('')}
+      </div>
+      ${perso?`<div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+        <span class="mu" style="font-size:11.5px">${propre?'identité propre':'identité de la structure'}</span>
+        <button class="sw ${propre?'on':''}" title="Donner à ce praticien son propre en-tête"
+          onclick="hfBascule()"></button></div>`:''}
+     </div>
+     ${ro?`<div class="tip"><span class="e">🏛</span><div><b>${esc(hfCible)} imprime l’identité de la structure.</b>
+        Ses pièces portent l’en-tête, le pied et le logo réglés ci-dessus pour la structure.
+        Activez l’interrupteur pour lui en donner de propres — utile lorsqu’il exerce sous son
+        propre numéro et sa propre assurance.</div></div>`:''}
+     <div class="grid g2" style="grid-template-columns:1fr 1fr">
+      <div>
+       <div class="prow"><b style="font-size:12.5px">En-tête</b>
+         <button class="sw ${(ro?CABINET.enteteOn:O.enteteOn!==false)?'on':''}" style="margin-left:auto"
+           ${ro?'disabled':''} onclick="hfObj().enteteOn=!(hfObj().enteteOn!==false);paint()"></button></div>
+       <div class="vars">${VARS.slice(2,14).map(v=>`<button class="varchip" ${ro?'disabled':''} onclick="insHF('hdr','${v}')">{{${v}}}</button>`).join('')}</div>
+       <textarea class="note" id="hdr" style="min-height:74px" ${ro?'disabled':''}
+         oninput="hfSaisie('entete',this.value)">${esc(ro?CABINET.entete:(O.entete!=null?O.entete:CABINET.entete))}</textarea>
+      </div>
+      <div>
+       <div class="prow"><b style="font-size:12.5px">Pied de page</b>
+         <button class="sw ${(ro?CABINET.piedOn:O.piedOn!==false)?'on':''}" style="margin-left:auto"
+           ${ro?'disabled':''} onclick="hfObj().piedOn=!(hfObj().piedOn!==false);paint()"></button></div>
+       <div class="vars">${VARS.slice(2,14).map(v=>`<button class="varchip" ${ro?'disabled':''} onclick="insHF('ftr','${v}')">{{${v}}}</button>`).join('')}</div>
+       <textarea class="note" id="ftr" style="min-height:74px" ${ro?'disabled':''}
+         oninput="hfSaisie('pied',this.value)">${esc(ro?CABINET.pied:(O.pied!=null?O.pied:CABINET.pied))}</textarea>
+      </div>
+     </div>
+     <div class="hf-logo">
+      <div class="lg-v">${(()=>{const L=ro?(CABINET.logoOn?CABINET.logo:null):(O.logo||(perso&&O.logoOn!==false&&CABINET.logoOn?CABINET.logo:null));
+        return L?`<img src="${L}" alt="">`:'<span class="mu">aucun logo</span>'})()}</div>
+      <div class="lg-a">
+       <b style="font-size:12.5px">Logo</b>
+       <div class="mu" style="font-size:11.5px">Il s’imprime à gauche de l’en-tête. PNG, JPEG ou SVG, 400 Ko au maximum —
+         l’image est enregistrée dans le dossier, pas liée à un fichier extérieur.</div>
+       <div class="r">
+        <label class="btn xs ${ro?'':'p'}" style="${ro?'opacity:.5;pointer-events:none':''}">Choisir une image
+          <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" style="display:none" onchange="hfLogo(this)"></label>
+        ${(!ro&&O.logo)?`<button class="btn xs g" onclick="hfLogoRetirer()">Retirer</button>`:''}
+        ${(!ro&&(O.logo||(!perso&&CABINET.logo)))?`<label class="prow" style="margin:0;gap:5px">
+          <span class="mu" style="font-size:11.5px">Hauteur</span>
+          <input class="inp" type="number" min="6" max="30" style="width:62px;text-align:right"
+            value="${+O.logoH||14}" onchange="hfObj().logoH=Math.max(6,Math.min(30,+this.value||14));paint()">
+          <span class="mu" style="font-size:11.5px">mm</span></label>`:''}
+        ${(!ro&&!perso)?`<button class="sw ${CABINET.logoOn?'on':''}" title="Imprimer le logo"
+           onclick="CABINET.logoOn=!CABINET.logoOn;paint()"></button>`:''}
+       </div>
+      </div>
+     </div>
+    </div></div>
    <div class="grid g2" style="grid-template-columns:280px 1fr">
     <div class="card"><div class="h"><h2>Modèles</h2><div class="r"><button class="btn xs p" onclick="newDoc()">+</button></div></div>
      <div class="b" style="padding:8px">
@@ -9882,20 +10054,78 @@ function trameEditeur(){
     </div>
    </div></div></div>`;
 }
+/* ==========================================================================
+   Le réglage de l'identité : structure ou praticien
+   ========================================================================== */
+let hfCible='cabinet';
+const hfObj=()=>hfCible==='cabinet'?CABINET:(PRATS.find(x=>x.nom===hfCible)||CABINET);
+/* Donner à un praticien son identité propre, c'est partir de celle de la
+   structure : on ne le laisse pas devant deux champs vides. */
+function hfBascule(){
+ const o=hfObj(); if(o===CABINET) return;
+ if(o.hf==='perso'){ o.hf='cabinet' }
+ else { o.hf='perso';
+   if(o.entete==null) o.entete=CABINET.entete;
+   if(o.pied==null) o.pied=CABINET.pied;
+   if(o.logoH==null) o.logoH=CABINET.logoH||14; }
+ paint();
+}
+function hfSaisie(champ,v){ hfObj()[champ]=v;
+ const e=document.getElementById('docprev'); if(e) e.innerHTML=docPrev() }
+function hfLogo(input){
+ const f=input.files&&input.files[0]; if(!f) return;
+ if(!/^image\//.test(f.type)){ toast('Choisissez une image'); input.value=''; return }
+ if(f.size>400*1024){ toast(`Image trop lourde — ${Math.round(f.size/1024)} Ko pour 400 Ko autorisés`); input.value=''; return }
+ const r=new FileReader();
+ r.onerror=()=>toast('Cette image n’a pas pu être lue');
+ r.onload=()=>{ const o=hfObj();
+   o.logo=r.result; o.logoOn=true; if(!o.logoH) o.logoH=14;
+   input.value=''; paint(); toast('Logo enregistré dans le dossier') };
+ r.readAsDataURL(f);
+}
+function hfLogoRetirer(){ const o=hfObj(); o.logo=null; if(o===CABINET) o.logoOn=false; paint(); toast('Logo retiré') }
+
+/* ==========================================================================
+   L'aperçu global
+   --------------------------------------------------------------------------
+   Régler un en-tête sans voir ce qu'il donne sur une facture, une ordonnance
+   et un consentement, c'est régler à l'aveugle : chaque pièce a sa mise en
+   page, et un logo qui va bien sur un devis peut écraser le titre d'une
+   ordonnance. On les montre donc toutes, d'un coup, avec l'identité choisie.
+   ========================================================================== */
+function apercuGlobal(){
+ const P = hfCible==='cabinet' ? (PRATICIENS[0]||'Praticien') : hfCible;
+ const pages=[], vus=new Set();
+ const d=DEVIS[0]; if(d){ pages.push(devisDoc({...d, praticien:P})); vus.add('devis') }
+ ACTES.forEach(a=>{ if(pages.length>=6) return;
+  docsActe(a).forEach(x=>{ if(vus.has(x.k)||pages.length>=6) return;
+   vus.add(x.k); pages.push(docDoc({...a, praticien:P}, x)) }) });
+ if(AVOIRS[0]&&pages.length<6) pages.push(docAvoir({...AVOIRS[0], praticien:P}));
+ if(!pages.length){ toast('Aucune pièce à montrer'); return }
+ pdfView(`Aperçu global — ${P}`,
+   `${pages.length} pièce${pages.length>1?'s':''} · en-tête ${enteteVisible(P)?'affiché':'masqué'}`
+   + ` · pied ${piedVisible(P)?'affiché':'masqué'}` + (logoDoc(P)?' · logo présent':' · sans logo'),
+   pages.join(''), '');
+}
+
 const prevHTML=t=>esc(fillTpl(t,tplCtx(PATIENTS[0]))).replace(/\n/g,'<br>');
 function docPrev(){
  const d=DOCMOD.find(x=>x.id===docSel)||DOCMOD[0];
+ const P=hfCible==='cabinet'?(PRATICIENS[0]||'Praticien'):hfCible;
+ const L=logoDoc(P);
  return `<div class="docsheet">
-  ${CABINET.enteteOn?`<div class="ds-h">${prevHTML(CABINET.entete)}</div>`:''}
+  ${enteteVisible(P)?`<div class="ds-h${L?' avec-logo':''}">${L?`<img src="${L}" alt="" style="height:${logoHmm(P)*2.2}px">`:''}
+    <span>${prevHTML(enteteTxt(P))}</span></div>`:''}
   <div class="ds-t">${esc(d.nom)}</div>
   <div class="ds-b">${prevHTML(d.corps)||'<span class="mu">corps du document vide</span>'}</div>
-  ${CABINET.piedOn?`<div class="ds-f">${prevHTML(CABINET.pied)}</div>`:''}
+  ${piedVisible(P)?`<div class="ds-f">${prevHTML(piedTxt(P))}</div>`:''}
  </div>`;
 }
 function insHF(id,v){
- const e=document.getElementById(id), a=(e.selectionStart==null?e.value.length:e.selectionStart);
+ const e=document.getElementById(id); if(!e||e.disabled) return;
+ const a=(e.selectionStart==null?e.value.length:e.selectionStart);
  e.value=e.value.slice(0,a)+'{{'+v+'}}'+e.value.slice(e.selectionEnd==null?a:e.selectionEnd);
- if(id==='hdr') CABINET.entete=e.value; else CABINET.pied=e.value;
+ hfObj()[id==='hdr'?'entete':'pied']=e.value;
  e.focus(); e.selectionStart=e.selectionEnd=a+v.length+4;
  document.getElementById('docprev').innerHTML=docPrev();
 }
@@ -12490,7 +12720,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DJ';
+const BUILD='DK';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -12569,6 +12799,15 @@ function totauxDoc(d){
 }
 const hfDevis=(t,p,prn)=>{const pr=pratInfo(prn);
  return esc(fillTpl(t,tplCtx(p,{praticien:prn,rpps:pr.rpps,rcp:`${pr.rcpCie} n° ${pr.rcpPolice}`}))).replace(/\n/g,'<br>')};
+/* l'en-tête et le pied tels qu'ils s'impriment, logo compris */
+function docEntete(p,prn){
+ if(!enteteVisible(prn)) return '';
+ const L=logoDoc(prn);
+ return `<div class="dv-hd${L?' avec-logo':''}">${L
+   ?`<img class="dv-logo" src="${L}" alt="" style="height:${logoHmm(prn)}mm">`:''}
+   <div class="hdt">${hfDevis(enteteTxt(prn),p,prn)}</div></div>`;
+}
+const docPied=(p,prn)=>piedVisible(prn)?`<div class="dv-ft">${hfDevis(piedTxt(prn),p,prn)}</div>`:'';
 
 /* ==========================================================================
    Quand ce devis a-t-il été établi ?
@@ -12619,7 +12858,7 @@ function devisDoc(d){
    return n===1?[rest,0,0] : n===2?[Math.round(rest*.45),Math.round(rest*.55),0]
      : [Math.round(rest*.34),Math.round(rest*.36),Math.round(rest*.30)] })();
  return `<div class="a4">
-  ${CABINET.enteteOn?`<div class="dv-hd">${hfDevis(CABINET.entete,p,prn)}</div>`:''}
+  ${docEntete(p,prn)}
   <div class="gr">
   <div class="dv-ti">
    <h1>${esc(T.titre)}</h1>
@@ -12688,7 +12927,7 @@ function devisDoc(d){
    <div class="c"><div class="lb">${esc(T.sigPat||'Le patient')}</div>
     ${signBox(d.id,`Date${T.manuscrite?', mention manuscrite ci-dessus':''}, puis signature`)}</div></div>`:''}
   </div>
-  ${CABINET.piedOn?`<div class="dv-ft">${hfDevis(CABINET.pied,p,prn)}</div>`:''}
+  ${docPied(p,prn)}
  </div>`;
 }
 
@@ -12851,14 +13090,14 @@ function docDoc(a,d){
  const p=pById(a.patient), prn=a.praticien;
  const H=histo(d.id,d.seed||[]);
  return `<div class="a4">
-  ${CABINET.enteteOn?`<div class="dv-hd">${hfDevis(CABINET.entete,p,prn)}</div>`:''}
+  ${docEntete(p,prn)}
   <div class="gr">
    <div class="dv-ti"><h1>${esc(d.nom)}</h1>
     <div class="n"><b>${esc(d.id)}</b><br>Établi le ${DF((H[0]?.t||d.ts).slice(0,10))}</div></div>
    ${corpsDoc(a,d)}
    <div class="dv-hist">${H.map(h=>`<span>${DTS(h.t)} — ${esc(h.ev)} <i>(${esc(h.par)})</i></span>`).join('')}</div>
   </div>
-  ${CABINET.piedOn?`<div class="dv-ft">${hfDevis(CABINET.pied,p,prn)}</div>`:''}
+  ${docPied(p,prn)}
  </div>`;
 }
 
@@ -12866,7 +13105,7 @@ function docDoc(a,d){
 function docAutre(x){
  const p=pById(x.patient), prn=p.prat;
  return `<div class="a4">
-  ${CABINET.enteteOn?`<div class="dv-hd">${hfDevis(CABINET.entete,p,prn)}</div>`:''}
+  ${docEntete(p,prn)}
   <div class="gr">
    <div class="dv-ti"><h1>${esc(x.nom)}</h1>
     <div class="n"><b>${esc(x.id)}</b><br>Établi le ${DF(x.date)}</div></div>
@@ -12879,7 +13118,7 @@ function docAutre(x){
     <div class="c"><div class="lb">${x.cat==='Information'?'Le patient':'Destinataire'}</div>
      <div class="hint">${x.cat==='Information'?'Reçu le, puis signature':'Médecin traitant'}</div></div></div>
   </div>
-  ${CABINET.piedOn?`<div class="dv-ft">${hfDevis(CABINET.pied,p,prn)}</div>`:''}
+  ${docPied(p,prn)}
  </div>`;
 }
 
@@ -14873,28 +15112,62 @@ function calerCumul(){
  /* on retire à la plus haute des deux colonnes ce que la vue fait défiler en trop,
     jusqu'à ce que tout tienne — deux ou trois passes suffisent */
  /* ---------------------------------------------------------------------
-    Le plancher du schéma
+    Faire tenir le schéma, sans le rendre illisible
     ---------------------------------------------------------------------
-    Il était à 200 px. Sur une fenêtre courte, le schéma descendait donc
-    jusqu'au tiers de sa taille, et les étiquettes avec lui : la date des
-    séances tombait à 5,6 px à l'écran. Autrement dit, pour éviter une barre
-    de défilement, on rendait le dessin illisible.
+    Deux exigences qui se contredisaient : que tout tienne dans la fenêtre
+    sans avoir à dérouler, et que les doses se lisent sans zoomer. Tant que
+    l'écriture rétrécissait avec le dessin, on ne pouvait satisfaire que
+    l'une des deux — d'abord un plancher de 200 px qui donnait des dates de
+    5,6 px, puis un plancher de 665 px qui obligeait à dérouler.
 
-    C'est le mauvais échange. Un schéma qu'on fait défiler se lit ; un schéma
-    qu'on doit agrandir à la loupe, non. Le plancher est donc calé sur la
-    taille au-dessous de laquelle la date passe sous 10 px — 665 px de haut,
-    soit 470 de large pour ce cadre de 400 × 568. En dessous, la page défile,
-    et c'est très bien ainsi. */
- const PLANCHER=665;
- for(let i=0;i<4;i++){
+    Depuis que le corps des étiquettes se règle indépendamment (voir `ech`
+    dans schemaSVG), la contradiction tombe : le visage rapetisse autant
+    qu'il faut, et les étiquettes gardent leur taille à l'écran. Le plancher
+    n'a plus lieu d'être ; il reste une limite basse de sécurité, très
+    au-dessous de tout usage réel.
+    --------------------------------------------------------------------- */
+ const PLANCHER=300;
+ for(let i=0;i<5;i++){
   const trop=m.scrollHeight-m.clientHeight;
   if(trop<=0) break;
   const hc=col?col.getBoundingClientRect().height:0;
   const hf=f?f.getBoundingClientRect().height:0;
-  if(col&&hc>=hf) col.style.maxHeight=Math.max(200,Math.round(hc-trop))+'px';
+  if(col&&hc>hf) col.style.maxHeight=Math.max(200,Math.round(hc-trop))+'px';
   else if(f&&hf>PLANCHER) f.style.maxHeight=Math.max(PLANCHER,Math.round(hf-trop))+'px';
   else break;
  }
+ calerEtiquettes();
+}
+/* ==========================================================================
+   Le corps des étiquettes, réglé sur la taille finale du dessin
+   --------------------------------------------------------------------------
+   La taille du visage ne se connaît qu'après la mise en page. On la mesure
+   donc ici, on en déduit de combien il faut grossir l'écriture pour qu'elle
+   garde son corps à l'écran, et on redessine — une seule fois : le facteur
+   ne change pas la taille du visage, la boucle converge au premier tour.
+
+   La compensation est bornée, et plus étroitement lorsqu'il y a beaucoup de
+   zones : sur un visage réduit, onze étiquettes à taille pleine finiraient
+   par se recouvrir, et un chiffre lisible posé sur un autre chiffre lisible
+   ne se lit pas davantage.
+   ========================================================================== */
+let CUM_ECH=1, CUM_PASSE=false;
+function calerEtiquettes(){
+ const svg=document.querySelector('#main .facewrap.cumul svg.face'); if(!svg) return;
+ const l=svg.getBoundingClientRect().width; if(!l) return;
+ const k=l/(svg.viewBox.baseVal.width||400);
+ const n=svg.querySelectorAll('.zpill').length;
+ /* La cible n'est pas « garder les unités du cadre » mais « garder la taille
+    à l'écran » : 14 px pour la dose, 10,5 pour la date — les valeurs sous
+    lesquelles il fallait zoomer. À corps de base 12, le facteur vaut donc
+    14/(12·k), soit 1,167/k. */
+ const CIBLE=1.167;
+ const max=n<=6?2.4:n<=10?1.8:1.45;
+ const veut=Math.max(1, Math.min(max, +(CIBLE/k).toFixed(2)));
+ if(Math.abs(veut-CUM_ECH)<0.04 || CUM_PASSE){ CUM_PASSE=false; return }
+ CUM_ECH=veut; CUM_PASSE=true;      /* une seule reprise, jamais deux */
+ paint();
+ CUM_PASSE=false;
 }
 addEventListener('resize',()=>{ if(document.querySelector('#main .facewrap.cumul')) calerCumul() });
 /* Un clic sur une entrée du menu ramène toujours à la vue d'ensemble :
