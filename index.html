@@ -12490,7 +12490,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DI';
+const BUILD='DJ';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -13199,11 +13199,17 @@ function signPapier(){
 
    Deux règles tiennent tout le reste :
 
-     1. On ne signe pas ce qu'on n'a pas lu. Chaque pièce doit avoir été
-        déroulée jusqu'à sa dernière ligne — mesuré sur le défilement réel —
-        avant que le bouton ne s'ouvre. Un consentement signé sans avoir été
-        lu ne vaut rien, et c'est précisément la pièce qu'on produit en cas
-        de litige.
+     1. Le logiciel n'empêche pas de signer, il enregistre ce qui s'est passé.
+        Il a d'abord exigé que chaque pièce soit déroulée jusqu'au bout avant
+        d'ouvrir le bouton ; c'était présumer que le praticien n'a pas déjà
+        expliqué son geste de vive voix, ce qui est la façon normale de
+        recueillir un consentement. Le blocage est levé.
+
+        Ce qui reste, et qui compte davantage : chaque pièce garde la trace de
+        ce qu'elle a réellement été pendant la séance — déroulée en entier,
+        affichée sans l'être, ou pas ouverte du tout. Le journal l'écrit. Un
+        dossier qui affirmerait « lu et signé » d'une pièce que personne n'a
+        ouverte serait plus dangereux qu'un dossier qui dit la vérité.
 
      2. Une signature, mais des pièces distinctes. Chacune reçoit son propre
         enregistrement, son horodatage, et un journal qui nomme les autres
@@ -13257,12 +13263,13 @@ function ouvrirParapheur(refs,o){
  const L=(refs||[]).map(parPiece).filter(Boolean);
  if(!L.length){ toast('Aucune pièce à faire signer'); return }
  const pid=(o&&o.pid)||L[0].pid, p=pById(pid);
- L.forEach(x=>{ x.lu=false });
+ L.forEach(x=>{ x.lu=false; x.vue=false });
  PAR={pid, par:(o&&o.par)||fn(p), docs:L, i:0, trace:false,
       titre:(o&&o.titre)||`Lecture et signature — ${fn(p)}`,
       sous:(o&&o.sous)||''};
- /* le pavé n'ouvre son bouton que si toutes les pièces ont été lues */
- PAR.verrou=()=>parReste().length>0;
+ /* rien ne verrouille la signature : c'est au praticien de juger quand le
+    patient a compris ce qu'il signe. Le logiciel note, il n'arbitre pas. */
+ PAR.verrou=()=>false;
  PAR.majPied=()=>parPied();
  document.getElementById('parv').classList.add('on');
  parRender();
@@ -13284,12 +13291,14 @@ function parNav(){
    onclick="parAller(${i})">
    <span class="n">${x.deja?'✓':(x.lu?'✓':i+1)}</span>
    <span class="t">${esc(x.nom)}<span class="s">${x.deja?'déjà signé — ne se signe pas deux fois'
-     :(x.lu?'lu':'à lire jusqu’au bout')} · ${esc(x.sous)}</span></span></button>`).join('');
+     :x.lu?'déroulée en entier':x.vue?'affichée, non déroulée':'pas encore ouverte'} · ${esc(x.sous)}</span></span></button>`).join('');
 }
 function parDocPane(){
  const el=document.getElementById('parDoc'); if(!el||!PAR) return;
- el.innerHTML=parCorps(PAR.docs[PAR.i]);
+ const pc=PAR.docs[PAR.i];
+ el.innerHTML=parCorps(pc);
  el.scrollTop=0;
+ if(pc) pc.vue=true;                 /* affichée au moins une fois */
  /* une pièce qui tient sans défilement est lue dès qu'elle est affichée */
  parLu();
 }
@@ -13307,20 +13316,22 @@ function parLu(){
 function parPied(){
  const el=document.getElementById('parA'); if(!el||!PAR) return;
  const aS=parASigner(), reste=parReste();
- const msg = reste.length
-   ? `<b>${reste.length} pièce${reste.length>1?'s restent':' reste'} à dérouler jusqu’au bout</b> avant de pouvoir signer :
-      ${reste.map(x=>esc(x.nom)).join(', ')}.`
-   : (!PAR.trace
-      ? `Les ${aS.length>1?aS.length+' pièces ont':'pièces ont'} été lues. Faites signer le patient dans l’encadré —
-         ou consignez une signature recueillie sur papier.`
-      : `Prêt. Une seule signature, apposée sur ${aS.length>1?`les ${aS.length} pièces`:'la pièce'},
-         chacune horodatée et journalisée séparément.`);
- el.innerHTML=`<div class="msg">${msg}</div>
+ const msg = !PAR.trace
+   ? `Faites signer le patient dans l’encadré — ou consignez une signature recueillie sur papier.`
+   : `Une seule signature, apposée sur ${aS.length>1?`les ${aS.length} pièces`:'la pièce'},
+      chacune horodatée et journalisée séparément.`;
+ /* Ce n'est pas un obstacle : c'est ce que le dossier écrira. Le praticien
+    voit avant de signer ce que le journal dira de chaque pièce. */
+ const note = reste.length
+   ? `<div class="msg mu">Le dossier notera ${reste.length>1?`que ${reste.length} pièces n’ont`:'qu’une pièce n’a'} pas été
+      déroulée${reste.length>1?'s':''} en entier à l’écran : ${reste.map(x=>esc(x.nom)).join(', ')}.</div>`
+   : '';
+ el.innerHTML=`<div class="msg">${msg}</div>${note}
   <div class="r">
    <button class="btn s" onclick="padInit('parC','parOk',PAR);parPied()">↺ Effacer</button>
-   <button class="btn s" ${reste.length?'disabled':''} onclick="parApposer('papier')"
+   <button class="btn s" onclick="parApposer('papier')"
      title="Les exemplaires ont été imprimés et signés à la main">✎ Signé sur papier</button>
-   <button class="btn p" id="parOk" ${(reste.length||!PAR.trace)?'disabled':''} onclick="parApposer('ecran')">
+   <button class="btn p" id="parOk" ${PAR.trace?'':'disabled'} onclick="parApposer('ecran')">
      ✓ Signer ${aS.length>1?`les ${aS.length} documents`:'le document'}</button>
   </div>`;
 }
@@ -13328,20 +13339,24 @@ function parApposer(mode){
  if(!PAR) return;
  const L=parASigner();
  if(!L.length){ toast('Toutes les pièces sont déjà signées'); return }
- /* le verrou de lecture ne se contourne pas, pas même par le chemin papier */
- if(parReste().length){ toast(`${parReste().length} pièce${parReste().length>1?'s n’ont':' n’a'} pas été lue${parReste().length>1?'s':''} jusqu’au bout`); return }
  if(mode!=='papier'&&!PAR.trace){ toast('Faites signer le patient dans l’encadré'); return }
  const img=mode==='papier'?null:document.getElementById('parC').toDataURL('image/png');
  const t=nowStamp(), par=PAR.par;
  const noms=L.map(x=>x.nom), ids=L.map(x=>x.id);
+ /* ce que chaque pièce a réellement été pendant la séance — écrit tel quel */
+ const etat=x=>x.lu?'déroulée en entier à l’écran'
+              :x.vue?'affichée à l’écran sans être déroulée en entier'
+              :'non affichée pendant la séance de signature';
  L.forEach(x=>{
   SIGNS[x.id]={img, t, par, mode:mode==='papier'?'papier':'ecran',
-               seance:L.length>1?{n:L.length, pieces:ids}:null};
+               lecture:{lu:!!x.lu, vue:!!x.vue},
+               seance:L.length>1?{n:L.length, pieces:ids, lues:L.filter(y=>y.lu).map(y=>y.id)}:null};
   parEffet(x, mode, t);
   logDoc(x.id, (mode==='papier'
     ? 'Signé à la main sur un exemplaire papier, versé au dossier'
     : 'Signé dans l’encadré — tracé manuscrit conservé')
-    + (L.length>1?` · séance de signature de ${L.length} pièces lues sur place : ${noms.join(', ')}`:''), par);
+    + (L.length>1?` · séance de signature de ${L.length} pièces : ${noms.join(', ')}`:'')
+    + ` · pièce ${etat(x)}`, par);
  });
  fermerParapheur();
  paint&&paint(); if(AS) renderOver();
