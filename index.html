@@ -649,6 +649,27 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
 .dv-hd .hdt{flex:1;min-width:0}
 .dv-logo{flex:none;max-width:54mm;object-fit:contain;display:block}
 /* le réglage du logo, dans les paramètres */
+/* l'éditeur d'en-tête : une barre d'outils courte et un champ qui ressemble
+   à ce qui s'imprimera */
+.hf-tb{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:6px 0 5px}
+.hf-tb .tb{min-width:27px;height:27px;padding:0 7px;border-radius:8px;border:1px solid var(--line);
+  background:var(--panel);color:var(--ink-2);font-size:12px;line-height:1;cursor:pointer;
+  font-family:inherit;transition:.12s}
+.hf-tb .tb:hover{border-color:var(--accent);color:var(--accent)}
+.hf-tb .tbs{height:27px;width:auto;min-width:78px;font-size:11.5px;padding:0 6px}
+.hf-tb .tbc{width:30px;height:27px;padding:1px;border:1px solid var(--line);border-radius:8px;
+  background:var(--panel);cursor:pointer}
+.hf-tb .sep{width:1px;height:17px;background:var(--line);margin:0 2px}
+.hf-ed{min-height:84px;border:1px solid var(--line);border-radius:11px;background:var(--panel);
+  padding:9px 11px;font-size:12.5px;line-height:1.5;color:var(--ink);overflow:auto;max-height:190px}
+.hf-ed:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-wash)}
+.hf-ed.ro{background:var(--panel-2);color:var(--ink-3)}
+.vx-aide{margin-top:9px;padding:7px 10px;border-radius:10px;background:var(--panel-2);
+  border:1px solid var(--line);font-size:11.5px;line-height:1.5;color:var(--ink-3)}
+.vx-aide b{color:var(--ink-2);font-weight:640}
+.vtag{display:inline-block;padding:0 6px;border-radius:6px;font-size:11.5px;font-weight:620;
+  background:var(--accent-wash);color:var(--accent);
+  border:1px solid color-mix(in srgb,var(--accent) 28%,transparent);white-space:nowrap}
 .hf-logo{display:flex;gap:14px;align-items:stretch;margin-top:13px;padding-top:12px;
   border-top:1px dashed var(--line)}
 .hf-logo .lg-v{width:190px;min-height:74px;flex:none;border:1px dashed var(--line);border-radius:11px;
@@ -1369,7 +1390,10 @@ th.tri.on.desc::after{content:'▼'}
 .vx-seg .seg button{flex:1;text-align:center}
 /* la dictée telle qu'elle a été entendue : la pièce à conviction */
 .vx-d{font-size:12.5px;line-height:1.55;background:var(--panel-2);border:1px solid var(--line);
- border-radius:10px;padding:9px 11px;max-height:150px;overflow:auto;margin-bottom:11px}
+ border-radius:10px;padding:9px 11px;max-height:150px;overflow:auto;margin-bottom:11px;
+ /* « à la ligne » doit se voir dans le panneau, pas seulement dans le texte
+    qu'on emportera : sans ceci le retour dicté disparaît à l'affichage */
+ white-space:pre-wrap}
 .vx-rl{display:flex;flex-direction:column;gap:5px}
 .vx-r{display:flex;align-items:center;gap:9px;padding:7px 9px;border:1px solid var(--line);
  border-radius:9px;background:var(--panel);font-size:12.5px}
@@ -4133,11 +4157,116 @@ const pratInfo=n=>PRATS.find(x=>x.nom===n)||PRATS[0];
    tant qu'un praticien n'a rien réglé, il imprime l'identité du cabinet.
    On ne devine pas une identité professionnelle.
    ========================================================================== */
+/* ==========================================================================
+   L'en-tête se saisit comme on l'écrit
+   --------------------------------------------------------------------------
+   Il se réglait en tapant « {{raison}} — {{cabinet}} ». C'est une syntaxe de
+   gabarit : elle demande de savoir ce qu'est une variable, d'en connaître la
+   liste, et de lire un texte qui ne ressemble pas à ce qui s'imprimera.
+
+   On écrit maintenant directement, en clair, avec le gras, l'italique, la
+   taille, la couleur et l'alignement. Les quelques données qui doivent
+   VRAIMENT changer d'une pièce à l'autre — le praticien, son RPPS, son
+   assurance — restent disponibles, mais sous forme d'étiquettes qu'on insère
+   d'un clic et qu'on lit en français. Aucune accolade nulle part.
+
+   Pourquoi les garder : un pied de page commun à la structure qui
+   imprimerait en dur « RPPS 10101234567 » donnerait le numéro du docteur
+   Baroudi sur les ordonnances du docteur Merlin. Ce n'est pas une commodité
+   d'affichage, c'est une mention légale qui doit suivre le signataire.
+   ========================================================================== */
+const HF_CHAMPS=[
+ ['praticien','Praticien'],['rpps','RPPS'],['rcp','Assurance RCP'],
+ ['cabinet','Nom du cabinet'],['raison','Raison sociale'],['adresse','Adresse'],
+ ['tel','Téléphone'],['mail','E-mail'],['site','Site'],
+ ['siret','SIRET'],['tva','N° TVA'],['ape','Code APE']
+];
+const HF_LIB=Object.fromEntries(HF_CHAMPS);
+const hfTag=k=>`<span class="vtag" data-v="${k}" contenteditable="false">${esc(HF_LIB[k]||k)}</span>`;
+/* un ancien gabarit « {{x}} » devient du texte mis en forme, une fois pour toutes */
+function hfDepuisModele(t){
+ return String(t||'').split('\n').map(l=>
+   esc(l).replace(/\{\{(\w+)\}\}/g,(m,k)=>HF_LIB[k]?hfTag(k):m)
+ ).join('<br>');
+}
+/* ------------------------------------------------------------------------
+   Le ménage : on ne laisse pas entrer n'importe quel HTML dans une pièce
+   ------------------------------------------------------------------------
+   Le champ est modifiable en place, et un collage depuis un traitement de
+   texte apporte tout un fatras de balises. On reconstruit donc l'arbre à
+   partir d'une liste blanche : quelques balises de mise en forme, et
+   quelques propriétés de style. Rien d'exécutable, aucun lien, aucune image.
+   ------------------------------------------------------------------------ */
+const HF_BAL=new Set(['B','STRONG','I','EM','U','BR','DIV','SPAN','P','FONT']);
+/* Ces balises-là ne laissent RIEN derrière elles, pas même leur texte : le
+   contenu d'un <script> collé n'est pas exécutable une fois désarmé, mais il
+   n'a rien à faire en clair au milieu d'un en-tête. */
+const HF_JETER=new Set(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','LINK','META',
+  'NOSCRIPT','TEMPLATE','SVG','CANVAS','VIDEO','AUDIO','IMG','INPUT','BUTTON','FORM','TITLE']);
+const HF_STYLE=['text-align','font-size','font-weight','font-style','text-decoration','color'];
+function hfNettoyer(html){
+ /* On analyse dans un <template> : son contenu est INERTE. Un simple <div>,
+    même détaché du document, fait bel et bien charger les images collées —
+    et une image qui échoue déclenche son onerror. Le seul endroit où ce HTML
+    étranger prend forme ne doit rien pouvoir exécuter ni appeler. */
+ const tpl=document.createElement('template'); tpl.innerHTML=String(html||'');
+ const bac=tpl.content;
+ const sortie=document.createElement('div');
+ const okCouleur=v=>/^(#[0-9a-f]{3,8}|rgba?\([\d.,\s%]+\))$/i.test(String(v).trim());
+ const okTaille=v=>/^(\d{1,2}(\.\d)?px|\d{1,3}%|small|medium|large|x-large|smaller|larger)$/i.test(String(v).trim());
+ const copie=(src,dst)=>{
+  src.childNodes.forEach(n=>{
+   if(n.nodeType===3){ dst.appendChild(document.createTextNode(n.nodeValue)); return }
+   if(n.nodeType!==1) return;
+   if(HF_JETER.has(n.tagName)) return;                     /* elle et tout son contenu */
+   if(!HF_BAL.has(n.tagName)){ copie(n,dst); return }      /* balise inconnue : on garde le texte */
+   /* l'étiquette d'un champ dynamique se recopie telle quelle */
+   if(n.tagName==='SPAN'&&n.classList.contains('vtag')&&HF_LIB[n.dataset.v]){
+     const t=document.createElement('span');
+     t.className='vtag'; t.dataset.v=n.dataset.v; t.setAttribute('contenteditable','false');
+     t.textContent=HF_LIB[n.dataset.v]; dst.appendChild(t); return }
+   const bal=n.tagName==='FONT'?'span':n.tagName.toLowerCase();
+   const e=document.createElement(bal);
+   HF_STYLE.forEach(p=>{ const v=n.style&&n.style.getPropertyValue(p); if(!v) return;
+     if(p==='color'&&!okCouleur(v)) return;
+     if(p==='font-size'&&!okTaille(v)) return;
+     e.style.setProperty(p,v) });
+   if(n.tagName==='FONT'){ if(n.color&&okCouleur(n.color)) e.style.color=n.color }
+   copie(n,e); dst.appendChild(e);
+  });
+ };
+ copie(bac,sortie);
+ return sortie.innerHTML;
+}
+/* le rendu final : les étiquettes prennent leur valeur, le reste est déjà propre */
+function hfRendu(html,p,prn){
+ const pr=pratInfo(prn);
+ const ctx=tplCtx(p,{praticien:prn,rpps:pr.rpps,rcp:`${pr.rcpCie} n° ${pr.rcpPolice}`});
+ const tpl=document.createElement('template'); tpl.innerHTML=hfNettoyer(html);
+ const bac=tpl.content;
+ bac.querySelectorAll('span.vtag').forEach(t=>{
+   const v=ctx[t.dataset.v];
+   t.replaceWith(document.createTextNode(v!=null?String(v):''));
+ });
+ const d=document.createElement('div'); d.appendChild(bac.cloneNode(true));
+ return d.innerHTML;
+}
+
 const hfPrat = prn => { const x=pratInfo(prn); return (x&&x.hf==='perso')?x:null };
+/* Le réglage est désormais du HTML mis en forme. Les dossiers réglés avant
+   portent encore un gabarit à accolades : on le convertit à la volée, sans
+   rien perdre — la conversion est écrite une fois, à la première lecture. */
+const hfH=(o,champ)=>{
+ const cle=champ+'H';
+ if(o[cle]==null) o[cle]=hfDepuisModele(o[champ]);
+ return o[cle];
+};
 const enteteTxt = prn => { const x=hfPrat(prn);
-  return (x&&x.entete!=null&&String(x.entete).trim())?x.entete:CABINET.entete };
+  const h=x?hfH(x,'entete'):null;
+  return (h&&h.replace(/<[^>]*>/g,'').trim())?h:hfH(CABINET,'entete') };
 const piedTxt = prn => { const x=hfPrat(prn);
-  return (x&&x.pied!=null&&String(x.pied).trim())?x.pied:CABINET.pied };
+  const h=x?hfH(x,'pied'):null;
+  return (h&&h.replace(/<[^>]*>/g,'').trim())?h:hfH(CABINET,'pied') };
 const enteteVisible = prn => { const x=hfPrat(prn); return x?x.enteteOn!==false:!!CABINET.enteteOn };
 const piedVisible   = prn => { const x=hfPrat(prn); return x?x.piedOn!==false:!!CABINET.piedOn };
 const logoDoc = prn => { const x=hfPrat(prn);
@@ -9918,22 +10047,8 @@ V.params=()=>{
         Activez l’interrupteur pour lui en donner de propres — utile lorsqu’il exerce sous son
         propre numéro et sa propre assurance.</div></div>`:''}
      <div class="grid g2" style="grid-template-columns:1fr 1fr">
-      <div>
-       <div class="prow"><b style="font-size:12.5px">En-tête</b>
-         <button class="sw ${(ro?CABINET.enteteOn:O.enteteOn!==false)?'on':''}" style="margin-left:auto"
-           ${ro?'disabled':''} onclick="hfObj().enteteOn=!(hfObj().enteteOn!==false);paint()"></button></div>
-       <div class="vars">${VARS.slice(2,14).map(v=>`<button class="varchip" ${ro?'disabled':''} onclick="insHF('hdr','${v}')">{{${v}}}</button>`).join('')}</div>
-       <textarea class="note" id="hdr" style="min-height:74px" ${ro?'disabled':''}
-         oninput="hfSaisie('entete',this.value)">${esc(ro?CABINET.entete:(O.entete!=null?O.entete:CABINET.entete))}</textarea>
-      </div>
-      <div>
-       <div class="prow"><b style="font-size:12.5px">Pied de page</b>
-         <button class="sw ${(ro?CABINET.piedOn:O.piedOn!==false)?'on':''}" style="margin-left:auto"
-           ${ro?'disabled':''} onclick="hfObj().piedOn=!(hfObj().piedOn!==false);paint()"></button></div>
-       <div class="vars">${VARS.slice(2,14).map(v=>`<button class="varchip" ${ro?'disabled':''} onclick="insHF('ftr','${v}')">{{${v}}}</button>`).join('')}</div>
-       <textarea class="note" id="ftr" style="min-height:74px" ${ro?'disabled':''}
-         oninput="hfSaisie('pied',this.value)">${esc(ro?CABINET.pied:(O.pied!=null?O.pied:CABINET.pied))}</textarea>
-      </div>
+      ${hfEditeur('entete','En-tête','hdr',ro,O)}
+      ${hfEditeur('pied','Pied de page','ftr',ro,O)}
      </div>
      <div class="hf-logo">
       <div class="lg-v">${(()=>{const L=ro?(CABINET.logoOn?CABINET.logo:null):(O.logo||(perso&&O.logoOn!==false&&CABINET.logoOn?CABINET.logo:null));
@@ -10065,13 +10180,129 @@ function hfBascule(){
  const o=hfObj(); if(o===CABINET) return;
  if(o.hf==='perso'){ o.hf='cabinet' }
  else { o.hf='perso';
-   if(o.entete==null) o.entete=CABINET.entete;
-   if(o.pied==null) o.pied=CABINET.pied;
+   if(o.enteteH==null) o.enteteH=hfH(CABINET,'entete');
+   if(o.piedH==null)   o.piedH=hfH(CABINET,'pied');
    if(o.logoH==null) o.logoH=CABINET.logoH||14; }
  paint();
 }
-function hfSaisie(champ,v){ hfObj()[champ]=v;
- const e=document.getElementById('docprev'); if(e) e.innerHTML=docPrev() }
+/* ------------------------------------------------------------------------
+   Le champ d'édition : ce qu'on tape est ce qui s'imprime
+   ------------------------------------------------------------------------ */
+const HF_TAILLES=[['11px','Petit'],['13px','Normal'],['16px','Grand'],['20px','Très grand']];
+function hfEditeur(champ,titre,id,ro,O){
+ const html=ro?hfH(CABINET,champ):hfH(O,champ);
+ const actif=ro?(champ==='entete'?CABINET.enteteOn:CABINET.piedOn)
+               :(O[champ+'On']!==false);
+ return `<div>
+  <div class="prow"><b style="font-size:12.5px">${esc(titre)}</b>
+    <button class="sw ${actif?'on':''}" style="margin-left:auto" ${ro?'disabled':''}
+      onclick="hfObj().${champ}On=!(hfObj().${champ}On!==false);paint()"></button></div>
+  ${ro?'':`<div class="hf-tb">
+   <button class="tb" title="Gras" onmousedown="event.preventDefault()" onclick="hfCmd('${id}','bold')"><b>B</b></button>
+   <button class="tb" title="Italique" onmousedown="event.preventDefault()" onclick="hfCmd('${id}','italic')"><i>I</i></button>
+   <button class="tb" title="Souligné" onmousedown="event.preventDefault()" onclick="hfCmd('${id}','underline')"><u>U</u></button>
+   <span class="sep"></span>
+   <select class="inp tbs" title="Taille du texte" onmousedown="hfGarde('${id}')"
+     onchange="hfTaille('${id}',this.value);this.selectedIndex=0">
+     <option value="">Taille</option>
+     ${HF_TAILLES.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select>
+   <input class="tbc" type="color" title="Couleur du texte" value="#3f3f46"
+     onmousedown="hfGarde('${id}')" oninput="hfCouleur('${id}',this.value)">
+   <span class="sep"></span>
+   <button class="tb" title="Aligner à gauche" onmousedown="event.preventDefault()" onclick="hfCmd('${id}','justifyLeft')">⯇</button>
+   <button class="tb" title="Centrer" onmousedown="event.preventDefault()" onclick="hfCmd('${id}','justifyCenter')">≡</button>
+   <button class="tb" title="Aligner à droite" onmousedown="event.preventDefault()" onclick="hfCmd('${id}','justifyRight')">⯈</button>
+   <span class="sep"></span>
+   <select class="inp tbs" title="Insérer une donnée qui change d’une pièce à l’autre"
+     onmousedown="hfGarde('${id}')" onchange="hfInserer('${id}',this.value);this.selectedIndex=0">
+     <option value="">Insérer…</option>
+     ${HF_CHAMPS.map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join('')}</select>
+   <button class="tb" title="Repartir de la mise en forme d’origine"
+     onmousedown="event.preventDefault()" onclick="hfEffacerMef('${id}','${champ}')">⌫ Mise en forme</button>
+  </div>`}
+  <div class="hf-ed${ro?' ro':''}" id="${id}" ${ro?'':'contenteditable="true"'}
+    spellcheck="true" data-champ="${champ}"
+    oninput="hfSaisie('${champ}',this)" onblur="hfSaisie('${champ}',this)"
+    onpaste="hfColler(event,'${id}','${champ}')">${html}</div>
+  ${ro?'':`<div class="mu" style="font-size:11px;margin-top:4px">Les étiquettes bleues prennent leur valeur
+    à l’impression — la mention du praticien suit celui qui signe.</div>`}
+ </div>`;
+}
+function hfSaisie(champ,el){
+ const o=hfObj();
+ o[champ+'H']=hfNettoyer(typeof el==='string'?el:el.innerHTML);
+ const e=document.getElementById('docprev'); if(e) e.innerHTML=docPrev();
+}
+/* la sélection se perd dès qu'on clique ailleurs : on la met de côté */
+let HF_SEL=null;
+function hfGarde(id){ const s2=window.getSelection();
+ const e=document.getElementById(id);
+ if(s2&&s2.rangeCount&&e&&e.contains(s2.anchorNode)) HF_SEL=s2.getRangeAt(0).cloneRange();
+}
+function hfFocus(id){
+ const e=document.getElementById(id); if(!e) return null;
+ e.focus();
+ if(HF_SEL&&e.contains(HF_SEL.commonAncestorContainer)){
+   const s2=window.getSelection(); s2.removeAllRanges(); s2.addRange(HF_SEL) }
+ return e;
+}
+function hfCmd(id,cmd){
+ const e=hfFocus(id); if(!e) return;
+ try{ document.execCommand(cmd,false,null) }catch(err){}
+ hfSaisie(e.dataset.champ,e);
+}
+function hfTaille(id,v){
+ if(!v) return; const e=hfFocus(id); if(!e) return;
+ const s2=window.getSelection();
+ if(!s2||s2.isCollapsed||!s2.rangeCount){ toast('Sélectionnez d’abord le texte à agrandir'); return }
+ const r=s2.getRangeAt(0), sp=document.createElement('span');
+ sp.style.fontSize=v;
+ try{ sp.appendChild(r.extractContents()); r.insertNode(sp) }catch(err){}
+ hfSaisie(e.dataset.champ,e);
+}
+function hfCouleur(id,v){
+ const e=hfFocus(id); if(!e) return;
+ try{ document.execCommand('foreColor',false,v) }catch(err){}
+ hfSaisie(e.dataset.champ,e);
+}
+function hfInserer(id,k){
+ if(!k) return; const e=hfFocus(id); if(!e) return;
+ const s2=window.getSelection();
+ const tag=document.createElement('span');
+ tag.className='vtag'; tag.dataset.v=k; tag.setAttribute('contenteditable','false');
+ tag.textContent=HF_LIB[k]||k;
+ if(s2&&s2.rangeCount&&e.contains(s2.anchorNode)){
+   const r=s2.getRangeAt(0); r.deleteContents(); r.insertNode(tag);
+   r.setStartAfter(tag); r.collapse(true); s2.removeAllRanges(); s2.addRange(r);
+ } else e.appendChild(tag);
+ hfSaisie(e.dataset.champ,e);
+}
+/* un collage arrive avec la mise en forme de son logiciel d'origine : on ne
+   prend que le texte, et on laisse le praticien remettre en forme ici */
+function hfColler(ev,id,champ){
+ ev.preventDefault();
+ const t=(ev.clipboardData||window.clipboardData).getData('text/plain')||'';
+ const e=document.getElementById(id); if(!e) return;
+ document.execCommand('insertText',false,t);
+ hfSaisie(champ,e);
+}
+function hfEffacerMef(id,champ){
+ const e=document.getElementById(id); if(!e) return;
+ const tpl=document.createElement('template'); tpl.innerHTML=e.innerHTML;
+ const bac=tpl.content;
+ const sortie=document.createElement('div');
+ const marche=n=>{ n.childNodes.forEach(x=>{
+   if(x.nodeType===3){ sortie.appendChild(document.createTextNode(x.nodeValue)); return }
+   if(x.nodeType!==1) return;
+   if(x.tagName==='BR'){ sortie.appendChild(document.createElement('br')); return }
+   if(x.classList&&x.classList.contains('vtag')){ sortie.appendChild(x.cloneNode(true)); return }
+   if(x.tagName==='DIV'&&sortie.childNodes.length) sortie.appendChild(document.createElement('br'));
+   marche(x) }) };
+ marche(bac);
+ e.innerHTML=sortie.innerHTML;
+ hfSaisie(champ,e);
+ toast('Mise en forme retirée — le texte est conservé');
+}
 function hfLogo(input){
  const f=input.files&&input.files[0]; if(!f) return;
  if(!/^image\//.test(f.type)){ toast('Choisissez une image'); input.value=''; return }
@@ -10115,20 +10346,13 @@ function docPrev(){
  const L=logoDoc(P);
  return `<div class="docsheet">
   ${enteteVisible(P)?`<div class="ds-h${L?' avec-logo':''}">${L?`<img src="${L}" alt="" style="height:${logoHmm(P)*2.2}px">`:''}
-    <span>${prevHTML(enteteTxt(P))}</span></div>`:''}
+    <span>${hfRendu(enteteTxt(P),PATIENTS[0],P)}</span></div>`:''}
   <div class="ds-t">${esc(d.nom)}</div>
   <div class="ds-b">${prevHTML(d.corps)||'<span class="mu">corps du document vide</span>'}</div>
-  ${piedVisible(P)?`<div class="ds-f">${prevHTML(piedTxt(P))}</div>`:''}
+  ${piedVisible(P)?`<div class="ds-f">${hfRendu(piedTxt(P),PATIENTS[0],P)}</div>`:''}
  </div>`;
 }
-function insHF(id,v){
- const e=document.getElementById(id); if(!e||e.disabled) return;
- const a=(e.selectionStart==null?e.value.length:e.selectionStart);
- e.value=e.value.slice(0,a)+'{{'+v+'}}'+e.value.slice(e.selectionEnd==null?a:e.selectionEnd);
- hfObj()[id==='hdr'?'entete':'pied']=e.value;
- e.focus(); e.selectionStart=e.selectionEnd=a+v.length+4;
- document.getElementById('docprev').innerHTML=docPrev();
-}
+
 function insVar(id,v,mid,did){
  const e=document.getElementById(id); if(!e) return;
  const a=(e.selectionStart==null?e.value.length:e.selectionStart);
@@ -12720,7 +12944,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DK';
+const BUILD='DL';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -12805,9 +13029,9 @@ function docEntete(p,prn){
  const L=logoDoc(prn);
  return `<div class="dv-hd${L?' avec-logo':''}">${L
    ?`<img class="dv-logo" src="${L}" alt="" style="height:${logoHmm(prn)}mm">`:''}
-   <div class="hdt">${hfDevis(enteteTxt(prn),p,prn)}</div></div>`;
+   <div class="hdt">${hfRendu(enteteTxt(prn),p,prn)}</div></div>`;
 }
-const docPied=(p,prn)=>piedVisible(prn)?`<div class="dv-ft">${hfDevis(piedTxt(prn),p,prn)}</div>`:'';
+const docPied=(p,prn)=>piedVisible(prn)?`<div class="dv-ft">${hfRendu(piedTxt(prn),p,prn)}</div>`:'';
 
 /* ==========================================================================
    Quand ce devis a-t-il été établi ?
@@ -14584,6 +14808,142 @@ function voixVersActe(){
  toast(n?`Consultation ouverte · ${n} prestation${n>1?'s':''} dictée${n>1?'s':''} en note`
         :'Consultation ouverte · dictée reportée en note');
 }
+/* ==========================================================================
+   Ce que le moteur rend, et ce qu'on en fait
+   --------------------------------------------------------------------------
+   Chrome rend une suite de mots, sans ponctuation, sans majuscule, et avec
+   les nombres en toutes lettres. Dicter une consultation dans ces conditions
+   donne un pavé illisible qu'il faut reprendre à la main — autant taper.
+
+   Quatre passes, dans cet ordre :
+
+     1. la ponctuation dite à voix haute devient de la ponctuation ;
+     2. le vocabulaire du métier est rétabli — « gla belle » n'est pas un
+        compliment, c'est la glabelle, et une erreur de zone sur un compte
+        rendu d'injection n'est pas une coquille ;
+     3. les doses passent en chiffres avec leur unité : « douze unités »
+        s'écrit « 12 U », parce que c'est ainsi qu'on relit une ordonnance ;
+     4. la typographie française : majuscule après un point, espace fine
+        devant les deux-points et les points-virgules.
+
+   Tout est fait sur du texte, sans micro : la fonction est pure, et les
+   tests la couvrent phrase par phrase.
+   ========================================================================== */
+/* Attention à `\b` : en JavaScript il ne connaît que l'alphabet ASCII, si
+   bien que « \bà » ne s'accroche jamais après une espace. Les motifs qui
+   commencent par une lettre accentuée bornent donc à la main. */
+const D0='(?:d\\s*[\u2019\']?\\s*)';        /* « d'», « d’», « d » : le moteur perd l'apostrophe */
+const VX_PONCT=[
+ [new RegExp('point\\s+'+D0+'interrogation','gi'),'?'],
+ [new RegExp('point\\s+'+D0+'exclamation','gi'),'!'],
+ [/(^|[\s,;:.])(?:nouveau paragraphe|nouvelle ligne|à la ligne|a la ligne|retour à la ligne)(?=$|[\s,;:.])/gi,'$1\n'],
+ [/\b(?:point[- ]virgule)\b/gi,';'],
+ [/\b(?:deux[- ]points)\b/gi,':'],
+ [/\b(?:ouvre[zr]? la parenthèse|ouvrir la parenthèse|entre parenthèses)\b/gi,'('],
+ [/\b(?:ferme[zr]? la parenthèse|fermer la parenthèse|fin de parenthèse)\b/gi,')'],
+ [new RegExp('trait\\s+'+D0+'union','gi'),'-'],
+ [/\btiret\b/gi,'-'],
+ [/\b(?:points de suspension)\b/gi,'…'],
+ [/\bvirgule\b/gi,','],
+ [/\bpoint\b/gi,'.'],
+];
+/* Le moteur rend « d acide », « patte d oie », « c est » : l'apostrophe
+   d'élision saute systématiquement. On la remet avant tout le reste, sinon
+   le vocabulaire du métier ne se reconnaît pas lui-même. */
+const vxElision=t=>t
+ .replace(/\b([cdjlmnstCDJLMNST])\s+(?=[aeiouyàâäéèêëîïôöùûüh])/g,'$1\u2019')
+ .replace(/\b(qu|Qu|QU)\s+(?=[aeiouyàâäéèêëîïôöùûüh])/g,'$1\u2019');
+/* Ce que le moteur entend de travers, et qui compte. La liste est courte
+   exprès : chaque entrée est une confusion constatée, pas une supposition. */
+const VX_MOTS=[
+ [/\bgla ?belle?\b/gi,'glabelle'],[/\bgla bel\b/gi,'glabelle'],
+ [/\bpatte[s]?\s*d\s*[\u2019']?\s*oie\b/gi,'pattes d’oie'],
+ [/\bsillon[s]? naso ?génien[s]?\b/gi,'sillons nasogéniens'],
+ [/\bvallée[s]? de[s]? larme[s]?\b/gi,'vallée des larmes'],
+ [/\bacide hyaluronic\b/gi,'acide hyaluronique'],
+ [/\bhyaluronic\b/gi,'hyaluronique'],
+ [/\bbott?ulique\b/gi,'botulique'],[/\bbotu?lynique\b/gi,'botulique'],
+ [/\bbotox\b/gi,'toxine botulique'],
+ [/\bskin ?booster\b/gi,'skinbooster'],
+ [/\bmézo ?thérapie\b/gi,'mésothérapie'],
+ [/\bpeeling?\b/gi,'peeling'],
+ [/\bradio ?fréquence\b/gi,'radiofréquence'],
+ [/\bphoto ?rajeunissement\b/gi,'photorajeunissement'],
+ [/\bpéri ?orbitaire[s]?\b/gi,'péri-orbitaire'],
+ [/\bnaso ?labial\b/gi,'nasolabial'],
+ [/\bcerne[s]?\b/gi,'cernes'],
+];
+const VX_CHIFFRES={zéro:0,zero:0,un:1,une:1,deux:2,trois:3,quatre:4,cinq:5,six:6,sept:7,huit:8,
+ neuf:9,dix:10,onze:11,douze:12,treize:13,quatorze:14,quinze:15,seize:16,vingt:20,trente:30,
+ quarante:40,cinquante:50,soixante:60};
+/* « unités » et « millilitres » s'écrivent U et ml : c'est la forme d'une
+   ordonnance, et c'est celle que le reste du logiciel affiche. */
+const VX_UNITES=[
+ [/\b(?:unités?|u\.?i\.?)\b/gi,'U'],
+ [/\b(?:millilitres?|milli litres?)\b/gi,'ml'],
+ [/\b(?:centimètres? cubes?)\b/gi,'ml'],
+];
+function vxNombres(t){
+ /* « zéro virgule cinq » → 0,5   ·   « douze » devant une unité → 12 */
+ const mot='(?:'+Object.keys(VX_CHIFFRES).join('|')+')';
+ /* « vingt cinq unités » → 25 U — AVANT la règle simple, sinon « cinq »
+    devient 5 tout seul et laisse « vingt » en toutes lettres */
+ t=t.replace(/\b(vingt|trente|quarante|cinquante|soixante)[ -](?:et[ -])?(un|une|deux|trois|quatre|cinq|six|sept|huit|neuf)\b(?=\s*(?:U|ml)\b)/gi,
+   (m,a,b)=>String((VX_CHIFFRES[a.toLowerCase()]||0)+(VX_CHIFFRES[b.toLowerCase()]||0)));
+ t=t.replace(new RegExp('\\b('+mot+') ?, ?('+mot+')\\b','gi'),(m,a,b)=>{
+   const x=VX_CHIFFRES[a.toLowerCase()], y=VX_CHIFFRES[b.toLowerCase()];
+   return (x==null||y==null)?m:`${x},${y}` });
+ t=t.replace(new RegExp('\\b('+mot+')\\b(?=\\s*(?:U|ml)\\b)','gi'),(m,a)=>{
+   const x=VX_CHIFFRES[a.toLowerCase()]; return x==null?m:String(x) });
+ return t;
+}
+function vxTypo(t){
+ t=t.replace(/\s+([,.;:!?…])/g,'$1')            /* pas d'espace avant */
+    /* une virgule ou un point ENTRE deux chiffres est un séparateur décimal :
+       « 0,5 » ne se coupe pas en « 0, 5 » */
+    .replace(/([,.;:!?…])(?=[^\s.,;:!?…)\n])/g,(m,c,i,str)=>
+       (/[.,]/.test(c)&&/\d/.test(str[i-1]||'')&&/\d/.test(str[i+1]||''))?c:c+' ')
+    .replace(/\(\s+/g,'(').replace(/\s+\)/g,')')
+    .replace(/[ \t]{2,}/g,' ')
+    .replace(/ *\n */g,'\n');
+ /* la ponctuation double se compose avec une espace fine en français */
+ t=t.replace(/([^\s\u202f])([;:!?])/g,'$1\u202f$2');
+ /* majuscule en tête, et après un point */
+ t=t.replace(/(^|[.!?…]\s+|\n)([a-zà-ÿ])/g,(m,a,b)=>a+b.toUpperCase());
+ return t.replace(/[ \u202f]+$/,'');
+}
+function vxTexte(brut){
+ let t=' '+String(brut||'')+' ';
+ t=vxElision(t);
+ VX_PONCT.forEach(([r,v])=>{ t=t.replace(r,v) });
+ VX_MOTS.forEach(([r,v])=>{ t=t.replace(r,v) });
+ VX_UNITES.forEach(([r,v])=>{ t=t.replace(r,v) });
+ t=vxNombres(t);
+ return vxTypo(t.trim());
+}
+/* Le fichier ouvert depuis le disque n'a pas d'origine stable : le navigateur
+   ne peut RIEN y retenir, autorisation du micro comprise. Ce n'est pas un
+   réglage du logiciel, c'est une règle du navigateur — autant le dire. */
+const VX_LOCAL=(typeof location!=='undefined'&&location.protocol==='file:');
+/* Un seul flux micro pour toute la séance : sans lui, chaque relance de
+   l'écoute redemandait l'autorisation. */
+let VX_FLUX=null;
+async function vxMicro(){
+ if(VX_FLUX&&VX_FLUX.active) return VX_FLUX;
+ if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) return null;
+ try{ VX_FLUX=await navigator.mediaDevices.getUserMedia({audio:true}); return VX_FLUX }
+ catch(e){ VX_FLUX=null; return null }
+}
+function vxRelacher(){ if(!VX_FLUX) return;
+ try{ VX_FLUX.getTracks().forEach(t=>t.stop()) }catch(e){}
+ VX_FLUX=null }
+async function vxEtatMicro(){
+ try{ if(navigator.permissions&&navigator.permissions.query){
+   const s=await navigator.permissions.query({name:'microphone'});
+   return s.state } }catch(e){}
+ return null;
+}
+
 const VOIX_MSG={
  absent:{t:'Ce navigateur ne sait pas écouter',
    d:'La reconnaissance vocale demande Chrome, Edge ou Safari. Les commandes restent accessibles au clavier et à la souris.'},
@@ -14829,8 +15189,12 @@ function vxRelever(texte){
 function voixOuvrir(){
  if(!VOIX_OK){ VX={on:false, erreur:'absent'}; renderVoix(); return }
  VX={on:false, mode:'commande', texte:'', partiel:'', intention:null, erreur:null,
-     dictee:'', lignes:[]};
- renderVoix(); voixEcouter();
+     dictee:'', brut:'', lignes:[], perm:null};
+ renderVoix();
+ /* on tient le micro pendant toute la séance : sinon chaque relance de
+    l'écoute rouvre la demande d'autorisation */
+ vxMicro().then(()=>vxEtatMicro()).then(e=>{ if(VX){ VX.perm=e; renderVoix() } });
+ voixEcouter();
 }
 /* Passer de la commande à la dictée : deux façons d'écouter très différentes.
    Une commande se dit en trois mots et déclenche ; une consultation se parle
@@ -14896,6 +15260,9 @@ function renderVoix(){
    ${dic?(()=>{const L=VX.lignes||[], G=vxGardees();
      return `${VX.dictee?`<div class="vx-d">${esc(VX.dictee)}${VX.partiel?` <span class="mu">${esc(VX.partiel)}</span>`:''}</div>`
        :`<div class="mu" style="font-size:12px">Parlez normalement pendant la consultation. Ce qui ressemble à une prestation est relevé au fil de l’eau ; rien n’est enregistré tant que vous ne l’avez pas demandé.</div>`}
+      <div class="vx-aide"><b>Dites la ponctuation</b> — « point », « virgule », « à la ligne », « deux points »,
+        « ouvrez la parenthèse ». Les doses se mettent en chiffres toutes seules : dire « douze unités » écrit
+        <span class="mono">12 U</span>.</div>
       ${L.length?`<div class="vx-rl"><span class="vx-gl">Relevé — ${G.length} prestation${G.length>1?'s':''} retenue${G.length>1?'s':''}</span>
         ${L.map((l,i)=>`<div class="vx-r ${l.retiree?'off':''}">
           <div style="min-width:0"><b>${esc(l.nom)}</b>${l.dose!=null?` <span class="mu">${l.dose} ${esc(l.unite||'')}</span>`:''}
@@ -14906,7 +15273,7 @@ function renderVoix(){
       ${G.length?`<div style="display:flex;gap:8px;margin-top:11px;flex-wrap:wrap">
         <button class="btn p" onclick="voixVersDevis()" ${p?'':'disabled'}>Créer le devis</button>
         <button class="btn" onclick="voixVersActe()" ${p?'':'disabled'}>Saisir la consultation</button>
-        ${VX.dictee?`<button class="btn g" onclick="VX.dictee='';VX.lignes=[];renderVoix()">Effacer</button>`:''}
+        ${VX.dictee?`<button class="btn g" onclick="VX.dictee='';VX.brut='';VX.lignes=[];renderVoix()">Effacer</button>`:''}
       </div>${p?'':'<div class="mu" style="font-size:11px;margin-top:6px">Ouvrez un dossier patient pour reprendre le relevé.</div>'}`:''}`})()
     :`<div class="vx-ex">
     ${VOIX_EX.map(([g,L])=>`<div class="vx-g"><span class="vx-gl">${esc(g)}</span>
@@ -14915,6 +15282,14 @@ function renderVoix(){
    ${VOIX_HIST.length?`<div class="vx-hist"><span class="mu">Dernières commandes</span>
      ${VOIX_HIST.slice(0,4).map(h=>`<div><b>${esc(h.quoi)}</b> <span class="mu">« ${esc(h.texte)} » · ${esc(String(h.ts).slice(11,16))}</span></div>`).join('')}</div>`:''}
   </div>
+  ${(VOIX_OK&&VX_LOCAL)?`<div class="tip wa" style="margin:0 14px 10px"><span class="e">🎙</span>
+    <div><b>Le micro sera redemandé à chaque ouverture.</b>
+      Ce fichier est ouvert depuis votre disque, et le navigateur ne retient aucune autorisation pour un
+      fichier local — ce n’est pas un réglage du logiciel, c’est une règle de Chrome.
+      Ouvrez plutôt <span class="mono">obaroudi05.github.io/praxis</span> : l’autorisation ne s’y donne qu’une fois,
+      et elle tient.</div></div>`
+   :(VOIX_OK&&VX&&VX.perm==='granted')?`<div class="mu" style="margin:0 14px 8px;font-size:11px">
+      ✓ Micro autorisé pour ce site — l’autorisation est retenue, elle ne sera plus redemandée.</div>`:''}
   <div class="vx-f">
    <span class="mu" style="font-size:11px">${VOIX_OK
      ? 'Chrome fait transcrire la parole par un service en ligne — ne dictez pas d’informations que vous ne confieriez pas à un tiers.'
@@ -14933,7 +15308,7 @@ function voixEssayer(t){
  VX.intention=voixIntention(t);
  if(VX.intention.ok&&!VX.intention.sur) voixExecuter(); else renderVoix();
 }
-function voixFermer(){ voixArreter(); VX=null; vxBouton();
+function voixFermer(){ voixArreter(); vxRelacher(); VX=null; vxBouton();
  const n=document.getElementById('voix'); if(n) n.classList.remove('on');
  document.getElementById('scrim').classList.remove('on') }
 function voixArreter(){ if(vxMoteur){
@@ -14958,7 +15333,10 @@ function voixEcouter(){
      if(r.isFinal) fini+=r[0].transcript; else partiel+=r[0].transcript }
    if(partiel){ VX.partiel=partiel; renderVoix() }
    if(fini&&VX.mode==='consultation'){
-     VX.dictee=(VX.dictee?VX.dictee+' ':'')+fini.trim();
+     /* la ponctuation dite, le vocabulaire du métier et les doses sont
+        rétablis avant d'être versés au compte rendu */
+     VX.brut=(VX.brut?VX.brut+' ':'')+fini.trim();
+     VX.dictee=vxTexte(VX.brut);
      VX.partiel=''; vxMajReleve(); renderVoix(); return }
    if(fini){ VX.texte=fini.trim(); VX.partiel='';
      /* on essaie les autres transcriptions si la première ne veut rien dire */
@@ -14971,14 +15349,21 @@ function voixEcouter(){
      /* naviguer est sans conséquence : on y va. Écrire attend un accord. */
      if(it.ok&&!it.sur){ voixExecuter() } else renderVoix() }
  };
- m.onerror=e=>{ if(!VX) return; VX.on=false;
+ m.onerror=e=>{ if(!VX) return;
+   /* Un silence pendant une consultation n'est pas une panne : le praticien
+      examine, palpe, réfléchit. On ne coupe pas la dictée pour ça. */
+   if(e.error==='no-speech'&&VX.mode==='consultation'){ return }
+   VX.on=false;
    VX.erreur=({'not-allowed':'refus','service-not-allowed':'refus','no-speech':'silence',
      'audio-capture':'micro','network':'reseau'})[e.error]||'erreur';
    renderVoix() };
  m.onend=()=>{ if(!VX) return;
-   /* en consultation, le moteur se coupe tout seul après un silence : on le
-      relance tant que le praticien n'a pas dit d'arrêter */
-   if(VX.on&&VX.mode==='consultation'&&!VX.erreur){ try{ m.start(); return }catch(e){} }
+   /* En consultation, le moteur se coupe tout seul après un silence. Relancer
+      le MÊME objet échoue une fois sur deux dans Chrome : on en refabrique un,
+      après un souffle, tant que le praticien n'a pas dit d'arrêter. */
+   if(VX.on&&VX.mode==='consultation'&&!VX.erreur){
+     setTimeout(()=>{ if(VX&&VX.on&&VX.mode==='consultation'&&!VX.erreur) voixEcouter() },160);
+     return }
    if(VX.on){ VX.on=false; renderVoix() } };
  vxMoteur=m;
  try{ m.start() }catch(e){ VX.erreur='erreur'; renderVoix() }
