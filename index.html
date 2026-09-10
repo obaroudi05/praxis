@@ -1854,15 +1854,25 @@ body.en-connexion aside{display:none}
    sans toucher à la couleur des zones. Les tests mesurent le rapport obtenu
    et refusent tout ce qui descend sous 4,5 pour 1, dans les deux thèmes. */
 .zpill{pointer-events:none}
-.zpill rect{fill:color-mix(in srgb,var(--zc) 72%,#08172b);stroke:rgba(255,255,255,.8);stroke-width:1}
+/* Attention à la portée : « .zpill rect » attrapait aussi le carré de séance
+   et le repeignait à la couleur du produit — la séance 3 s'affichait en bleu.
+   Seul le FOND porte la teinte du produit. */
+.zpill rect.zbg{fill:color-mix(in srgb,var(--zc) 72%,#08172b);stroke:rgba(255,255,255,.8);stroke-width:1}
 .zpill text{text-anchor:middle;dominant-baseline:middle}
 .zpill .zq{font:700 var(--fq,12px) var(--sans);fill:#fff;letter-spacing:.01em}
 .zpill .zd2{font:600 var(--fd,9px) var(--sans);fill:#fff;letter-spacing:.02em}
+.zpill .zd2.gauche{text-anchor:start}
+/* le carré de séance, posé sur la pastille : même couleur, même numéro que la
+   légende et que la liste de droite */
+.zpill .zsb{stroke:rgba(255,255,255,.9);stroke-width:.8}
+.zpill .zsn{font:700 calc(var(--fd,9px) * .86) var(--sans);fill:#fff;
+  text-anchor:middle;dominant-baseline:middle}
+.zpill.ant .zsb{stroke:var(--panel);stroke-width:.8}
 /* traitée autrefois, rien aujourd'hui : pastille claire, texte assombri */
-.zpill.ant rect{fill:var(--panel);fill-opacity:.96;stroke:var(--zc);stroke-opacity:.8;stroke-width:1.2}
+.zpill.ant rect.zbg{fill:var(--panel);fill-opacity:.96;stroke:var(--zc);stroke-opacity:.8;stroke-width:1.2}
 .zpill.ant .zq,.zpill.ant .zd2{fill:color-mix(in srgb,var(--zc) 68%,#08172b);fill-opacity:1}
-:root[data-theme="dark"] .zpill rect{stroke:rgba(0,0,0,.55)}
-:root[data-theme="dark"] .zpill.ant rect{fill:var(--panel);fill-opacity:.97;stroke:var(--zc);stroke-opacity:.85}
+:root[data-theme="dark"] .zpill rect.zbg{stroke:rgba(0,0,0,.55)}
+:root[data-theme="dark"] .zpill.ant rect.zbg{fill:var(--panel);fill-opacity:.97;stroke:var(--zc);stroke-opacity:.85}
 :root[data-theme="dark"] .zpill.ant .zq,:root[data-theme="dark"] .zpill.ant .zd2{
   fill:color-mix(in srgb,var(--zc) 86%,#fff)}
 /* injections antérieures : contour discret + date en tout petit */
@@ -4619,7 +4629,7 @@ const baremePane=zAll=>baremeListe(baremeById(AS.reg), zAll||AS.z, {
  prix:CAN('prix')&&!AS.ro&&AS.but==='devis',
  clic:'zClick', groupe:'baremeGroupe'});
 
-function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=null,clic='zClick',libre=false,ech=1}={}){
+function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=null,clic='zClick',libre=false,ech=1,seances=null}={}){
  const R=SILH[region]?region:'visage', S=SILH[R];
  const az=z=>(zt&&zt[z])||type;                       /* l'acte de cette zone */
  const H=hist||{};
@@ -4658,12 +4668,32 @@ function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=n
     cours de saisie.
     ========================================================================== */
  const pris=[];
- const place=(x,y,w,h,pas)=>{
-  const heurte=yy=>pris.some(p=>Math.abs(p.x-x)<(p.w+w)/2+2 && Math.abs(p.y-yy)<(p.h+h)/2+2);
+ /* Le recadrage se fait DANS la recherche, pas après : sinon la position
+   retenue n'est pas celle qui sera dessinée, la carte des places occupées
+   ment, et deux etiquettes finissent l'une sur l'autre en croyant s'eviter. */
+const place=(x,y,w,h,pas,cadre)=>{
+  const heurte=(xx,yy)=>pris.some(p=>Math.abs(p.x-xx)<(p.w+w)/2+2 && Math.abs(p.y-yy)<(p.h+h)/2+2);
+  const C=cadre||[0,0,1e4,1e4];
+  const serre=(xx,yy)=>[Math.min(C[0]+C[2]-w/2-3, Math.max(C[0]+w/2+3, xx)),
+                        Math.min(C[1]+C[3]-h/2-3, Math.max(C[1]+h/2+3, yy))];
   const P=pas||12;
-  for(const d of [0,P,-P,2*P,-2*P,3*P,-3*P,4*P,-4*P,5*P,-5*P]){
-    if(!heurte(y+d)){ pris.push({x,y:y+d,w,h}); return y+d } }
-  pris.push({x,y,w,h}); return y;
+  /* Les pastilles se sont elargies quand le carre de seance s'y est ajoute :
+     la recherche verticale seule butait, et seize d'entre elles se
+     recouvraient sur une fenetre etroite. On cherche donc plus loin ET de
+     cote — un decalage horizontal reste lisible, le filet de rappel montre de
+     quelle zone l'etiquette parle. Les essais sont tries du plus proche au
+     plus lointain : on ne s'eloigne qu'en dernier recours. */
+  const essais=[[0,0]];
+  for(let k=1;k<=10;k++){
+    essais.push([0,k*P],[0,-k*P]);
+    if(k<=4){ const dx=w*0.28*k;
+      essais.push([dx,k*P],[-dx,k*P],[dx,-k*P],[-dx,-k*P],[dx,0],[-dx,0]) }
+  }
+  essais.sort((a,b)=>(Math.abs(a[0])+Math.abs(a[1]))-(Math.abs(b[0])+Math.abs(b[1])));
+  for(const [dx,dy] of essais){
+    const [sx,sy]=serre(x+dx,y+dy);
+    if(!heurte(sx,sy)){ pris.push({x:sx,y:sy,w,h}); return [sx,sy] } }
+  const [fx,fy]=serre(x,y); pris.push({x:fx,y:fy,w,h}); return [fx,fy];
  };
  /* largeur d'un texte, en unités du dessin : les chiffres et les lettres de
     ces étiquettes tournent autour de 0,56 em, les séparateurs bien moins.
@@ -4701,12 +4731,32 @@ function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=n
       pas bleue parce qu'on injecte de la toxine ailleurs aujourd'hui. C'est
       déjà la règle du contour de la zone ; la pastille la suit. */
    const coul=(plein&&CT?colActe(t):null)||(z.p==='tox'?'var(--toxine)':'var(--ah)');
-   const w=Math.max(largeurTxt(qt,FQ), largeurTxt(dt,FD))+13*K;
+   /* ------------------------------------------------------------------------
+      Le code couleur des séances, sur le visage aussi
+      ------------------------------------------------------------------------
+      La pastille dit le PRODUIT — bleu pour la toxine, orange pour l'acide —
+      et c'est ce que la légende du schéma annonce. Elle ne disait rien de la
+      SÉANCE, alors que c'est justement la question qu'on se pose devant un
+      visage : qu'est-ce qui a été fait le même jour ?
+
+      Ce code-là existait déjà, mais seulement dans la liste de droite. On le
+      pose donc aussi ici, sous la forme d'un carré numéroté devant la date —
+      exactement les mêmes couleurs et les mêmes numéros que la légende.
+      Le fond garde le produit, le carré donne la séance : les deux
+      informations tiennent sans se marcher dessus.
+      ------------------------------------------------------------------------ */
+   const SC=(seances&&ant&&seances[ant[0].d])||null;
+   const wb=SC?FD*1.5:0;                       /* le carré de séance */
+   /* La date est ancrée à gauche : toute sous-estimation de sa largeur la fait
+      dépasser du fond, alors qu'un texte centré ne débordait que de moitié.
+      On prend donc 8 % de marge sur l'estimation — mesuré, pas supposé : les
+      tests refusent le moindre pixel de texte hors pastille. */
+   const wd=largeurTxt(dt,FD)*(SC?1.08:1)+(SC?wb+FD*0.34:0);
+   const w=Math.max(largeurTxt(qt,FQ), wd)+13*K;
    const h=(qt?FQ+2*K:0)+(dt?FD+2*K:0)+6*K;
    /* une étiquette ne sort pas du cadre : au bord, elle se recentre */
    const [VX,VY,VW,VH]=S.vb.split(/\s+/).map(Number);
-   const cx=Math.min(VX+VW-w/2-3, Math.max(VX+w/2+3, z.cx));
-   const y=Math.min(VY+VH-h/2-3, Math.max(VY+h/2+3, place(cx, z.cy, w, h, 12*K)));
+   const [cx,y]=place(z.cx, z.cy, w, h, 12*K, [VX,VY,VW,VH]);
    const fil=(Math.abs(y-z.cy)>h/2+3||Math.abs(cx-z.cx)>2)
      ?`<line class="zlead ${z.p==='tox'?'t':'a'}" x1="${z.cx}" y1="${z.cy}" x2="${cx}" y2="${(y+(y>z.cy?-h/2:h/2)).toFixed(1)}"/>`:'';
    /* le texte est centré dans la pastille : une seule ligne au milieu, deux
@@ -4715,9 +4765,20 @@ function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=n
    const yd = dt ? (qt ? y+FD+1.5*K : y) : 0;
    return fil
         + `<g class="zpill ${plein?'on':'ant'}" data-z="${z.id}" style="--zc:${coul};--fq:${FQ.toFixed(2)}px;--fd:${FD.toFixed(2)}px">
-             <rect x="${(cx-w/2).toFixed(1)}" y="${(y-h/2).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="${Math.min(6*K,h/2).toFixed(1)}"/>
+             <rect class="zbg" x="${(cx-w/2).toFixed(1)}" y="${(y-h/2).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="${Math.min(6*K,h/2).toFixed(1)}"/>
              ${qt?`<text class="zq" x="${cx.toFixed(1)}" y="${yq.toFixed(1)}">${qt}</text>`:''}
-             ${dt?`<text class="zd2" x="${cx.toFixed(1)}" y="${yd.toFixed(1)}">${dt}</text>`:''}
+             ${dt?(SC
+               /* La date s'ancre à GAUCHE, juste après le carré. La centrer
+                  dans l'espace restant supposait connaître sa largeur exacte ;
+                  l'estimation étant approchée, elle mordait sur le carré une
+                  fois sur trois. Ancrée, elle ne peut plus le recouvrir. */
+               ? (()=>{ const x0=cx-wd/2, xd=x0+wb+FD*0.34;
+                   return `<rect class="zsb" x="${x0.toFixed(1)}" y="${(yd-FD*0.62).toFixed(1)}"
+                       width="${wb.toFixed(1)}" height="${(FD*1.24).toFixed(1)}" rx="${(FD*0.34).toFixed(1)}"
+                       fill="${SC.c}"/>
+                     <text class="zsn" x="${(x0+wb/2).toFixed(1)}" y="${yd.toFixed(1)}">${SC.n}</text>
+                     <text class="zd2 gauche" x="${xd.toFixed(1)}" y="${yd.toFixed(1)}">${dt}</text>` })()
+               : `<text class="zd2" x="${cx.toFixed(1)}" y="${yd.toFixed(1)}">${dt}</text>`):''}
            </g>`;
   }).join('');
  return `<svg class="face" viewBox="${S.vb}">${S.g}${tr}${zs}${lbl}</svg>`;
@@ -6708,14 +6769,28 @@ function pDetail(p){
    if(!ONGLETS.some(r=>r.id===schemaReg)||!Object.keys(parReg(schemaReg)).length&&schemaReg!=='visage') schemaReg='visage';
    const cur=parReg(schemaReg);
    const BAR=baremeById(schemaReg);
+   /* ---------------------------------------------------------------------
+      Un seul code couleur pour tout l'écran
+      ---------------------------------------------------------------------
+      Les journées de soin se numérotent et se colorent ICI, avant que quoi
+      que ce soit ne se dessine : le schéma et la liste lisent la même table.
+      Calculée plus bas, au fil de la liste, elle arrivait vide au schéma —
+      qui se dessine en premier.
+      --------------------------------------------------------------------- */
+   const SEANCES=(()=>{
+     const zs=Object.keys(cur);
+     const jours=[...new Set(zs.flatMap(z=>(ZH[z]||[]).map(x=>x.d)))].sort();
+     const PAL=['#4b7bec','#e8833a','#2fa87c','#9b59c7','#d9534f','#0f9aa8','#c9992a','#6b7a8f'];
+     return Object.fromEntries(jours.map((d,i)=>[d,{n:i+1, c:PAL[i%PAL.length]}]));
+   })();
    return `<div class="fbar" style="margin-bottom:12px"><div class="seg">${ONGLETS.map(r=>{
       const n=Object.keys(parReg(r.id)).length;
       return `<button class="${schemaReg===r.id?'on':''}" onclick="schemaReg='${r.id}';paint()">${r.i} ${esc(r.n)} · ${n}</button>`}).join('')}</div></div>
    <div class="facewrap cumul">
     <div>${BAR?baremeListe(BAR,cur,{ro:true,hist:ZH,motTotal:'déjà traitée'+(Object.keys(cur).length>1?'s':'')})
-     :`<div class="facebox">${schemaSVG(cur,{editable:false,hist:ZH,region:schemaReg,zt:cumulT,ech:CUM_ECH})}</div>
+     :`<div class="facebox">${schemaSVG(cur,{editable:false,hist:ZH,region:schemaReg,zt:cumulT,ech:CUM_ECH,seances:SEANCES})}</div>
      <div class="face-legend"><span><i style="background:var(--toxine)"></i>Toxine</span><span><i style="background:var(--ah)"></i>Acide hyaluronique</span>
-      <span class="mu">quantité cumulée · dernière séance et nombre de passages</span></div>`}</div>
+      <span class="mu">le carré numéroté donne la séance — même code qu’à droite</span></div>`}</div>
     <div>
      <div class="tip" style="margin-bottom:10px"><span class="e">🗺️</span><div>${BAR
        ?`<b>Cure d'épilation.</b> Les zones déjà traitées de ce barème sont cochées ; à droite de chacune, la date de la dernière séance et le nombre de passages.`
@@ -6743,10 +6818,9 @@ function pDetail(p){
           n'y a qu'une séance, il n'y a rien à numéroter : la pastille porte
           alors directement sa date, et la légende ne s'affiche pas.
           -------------------------------------------------------------------- */
-       const jours=[...new Set(zones.flatMap(z=>(ZH[z]||[]).map(x=>x.d)))].sort();
-       const nSeance=Object.fromEntries(jours.map((d,i)=>[d,i+1]));
-       const SC=['#4b7bec','#e8833a','#2fa87c','#9b59c7','#d9534f','#0f9aa8','#c9992a','#6b7a8f'];
-       const coul=d=>SC[(nSeance[d]-1)%SC.length];
+       const jours=Object.keys(SEANCES).sort();
+       const nSeance=Object.fromEntries(jours.map(d=>[d,SEANCES[d].n]));
+       const coul=d=>SEANCES[d].c;
        return `
        ${jours.length>1?`<div class="cum-lg"><span class="mu">Séances</span>${jours.map(d=>`<span class="cum-s" title="Séance ${nSeance[d]} du ${DF(d)}">
           <i style="background:${coul(d)}"></i><u>${nSeance[d]}</u><b>${DFT(d)}</b></span>`).join('')}
@@ -11384,6 +11458,9 @@ function renderOver(){
           deux éditeurs de même taille l'un sous l'autre. Tant qu'un brouillon
           est en cours, les soins déjà confirmés se replient : c'est le
           brouillon qu'on est en train de remplir. */
+       /* AS.openSoin vaut un index, ou TOUS_PLIES quand rien ne doit être
+          déplié : aucun index ne peut valoir -1, la comparaison échoue donc
+          pour toutes les cartes. */
        const ouvert=!draftActif()&&(AS.openSoin==null?i===0:AS.openSoin===i);
        const nz=x.t?Z.length:0, rr=remUnSoin(x);
        return `<div class="soinc ${encours?'cur':''} ${x.t?'':'libre'} ${ouvert?'':'plie'}" data-i="${i}"
@@ -12256,6 +12333,8 @@ function majActe(){
 }
 function setZ(id,v){ AS.z[id]=(v===''||+v<=0)?null:Math.round(+v*100)/100; AS.prix=null; renderOver() }
 
+/* aucun soin déplié : un index qui n'existe pas */
+const TOUS_PLIES=-1;
 function applyProto(i){
  const P=PROTOS[i];
  if(AS.reg!=='visage'){toast('Les protocoles sont définis sur le visage');return}
@@ -12276,6 +12355,22 @@ function applyProto(i){
  });
  /* un protocole au forfait impose son montant ; sinon la séance additionne ses actes */
  AS.prix=protoForfait(P)?protoPrix(P):null;
+ /* ------------------------------------------------------------------------
+    Un protocole appliqué n'a plus rien à saisir
+    ------------------------------------------------------------------------
+    Un protocole pose d'un coup ses actes, ses zones et ses doses. Laisser le
+    dernier grand ouvert occupait la moitié de l'écran pour un formulaire déjà
+    rempli — et masquait justement ce qu'on voulait vérifier : la liste des
+    soins et leur total.
+
+    On replie donc tout. Un clic rouvre la carte qu'on veut ajuster, et le
+    schéma reste à portée pour cliquer une zone de plus.
+
+    Vaut pour un devis comme pour une consultation : dans les deux cas le
+    protocole vient de tout remplir, et la question du moment est « est-ce
+    bien la liste que je voulais ? », pas « quelle dose sur le front ? ».
+    ------------------------------------------------------------------------ */
+ AS.openSoin=TOUS_PLIES;
  renderOver();
  toast(`Protocole « ${P.n} » appliqué · ${protoActes(P).map(t=>acteDef(t).n).join(' + ')}`
    +(sup.length?` · ${sup.length} acte${sup.length>1?'s':''} associé${sup.length>1?'s':''} à la séance`:'')
@@ -13126,7 +13221,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DP';
+const BUILD='DQ';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
