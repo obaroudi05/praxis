@@ -1189,6 +1189,49 @@ tr.neuf>td{background:color-mix(in srgb,var(--accent) 9%,transparent)}
 .cum-c .zc:hover u{background:var(--accent)}
 
 .cum-c .zc u+b{font-weight:600}
+/* ==========================================================================
+   Désigner une zone
+   --------------------------------------------------------------------------
+   La ligne désignée s'allume ; les autres s'estompent sans disparaître —
+   on doit pouvoir continuer à les lire, et surtout continuer à COMPARER,
+   sans quoi désigner reviendrait à filtrer. L'estompe reste donc légère
+   (0,45), au-dessus du seuil où un texte cesse d'être lisible.
+   ========================================================================== */
+/* Le liseré est un box-shadow, pas une bordure. Mesuré : une bordure d'un
+   pixel élargit chaque ligne de deux, la colonne de droite réclame plus de
+   place, le visage rétrécit d'autant — et la dose tombait de 10,3 à 9,7 px à
+   1280. Un effet de style ne doit rien peser sur la mise en page. */
+.cum-sel{display:flex;align-items:center;gap:7px;margin:0 0 8px;padding:6px 9px;
+  border:1px solid var(--accent);border-radius:10px;background:var(--accent-wash);font-size:12.5px}
+.cum-sel b{color:var(--accent-ink)}
+.cum-sel .mu{font-size:11.5px}
+.cum-sel .chip{margin-left:auto}
+.cum-r{cursor:pointer;transition:opacity .13s,box-shadow .13s}
+.cum-r:hover{box-shadow:0 0 0 1px var(--line) inset}
+/* Mesuré, pas choisi à l'œil : à 0,45 le nom d'une zone estompée tombait à
+   3,12 pour 1 sur fond clair — sous le seuil de lecture confortable. On
+   estompe donc juste assez pour que le regard se porte ailleurs, pas au point
+   de rendre illisible ce qu'on veut justement pouvoir comparer. */
+.cum-r.pale{opacity:.62}
+.cum-r.sel{opacity:1;background:var(--accent-wash);box-shadow:0 0 0 1.6px var(--accent) inset}
+.cum-r.sel .cum-z{font-weight:700;color:var(--accent-ink)}
+/* le visage répond de la même façon : la zone désignée s'affirme, les autres
+   reculent — étiquette comprise, sans quoi le regard resterait accroché */
+svg.face.selq .zone.cli{cursor:pointer}
+svg.face.selq .zone.cli:hover{fill-opacity:.34;stroke-opacity:.85}
+/* Mesuré : mes deux premières règles ne peignaient rien du tout. Sur le cumul,
+   les zones sont volontairement effacées — « .zone.ro:not(.act-tox):not(.act-ah) »
+   met leur teinte à zéro, parce qu'un visage entièrement colorié ne se lit
+   plus et que ce sont les pastilles qui portent la couleur. Cette règle-là
+   pèse quatre classes ; les miennes en pesaient deux, et perdaient en silence.
+   La zone désignée s'affiche donc explicitement, et elle seule : une à la
+   fois, le visage reste propre. */
+svg.face.selq .zone.cli.sel{fill-opacity:.5;stroke-opacity:.95;stroke-width:2.6}
+svg.face.selq .zpill{pointer-events:auto;cursor:pointer}
+svg.face .zpill.pale{opacity:.42}
+svg.face .zpill.sel rect.zbg{stroke:var(--accent);stroke-width:2.2}
+svg.face .zlead{transition:opacity .13s}
+svg.face.selq .zpill:hover rect.zbg{stroke:var(--accent);stroke-width:2}
 .cum-lg .mu{font-size:10.5px}
 /* --- dossier d'un acte : onglets de section --- */
 .anav{display:flex;align-items:center;gap:5px;background:var(--panel-2);border:1px solid var(--line);
@@ -4650,7 +4693,7 @@ const baremePane=zAll=>baremeListe(baremeById(AS.reg), zAll||AS.z, {
  prix:CAN('prix')&&!AS.ro&&AS.but==='devis',
  clic:'zClick', groupe:'baremeGroupe'});
 
-function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=null,clic='zClick',libre=false,ech=1,seances=null}={}){
+function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=null,clic='zClick',libre=false,ech=1,seances=null,roClic=null,selZ=null}={}){
  const R=SILH[region]?region:'visage', S=SILH[R];
  const az=z=>(zt&&zt[z])||type;                       /* l'acte de cette zone */
  const H=hist||{};
@@ -4663,9 +4706,13 @@ function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=n
   const on=Object.prototype.hasOwnProperty.call(state,z.id), ant=H[z.id];
   const t=az(z.id), CT=t?acteDef(t):null;
   const cls=(on?(CT?'zone act-cur':(z.p==='tox'?'zone act-tox':'zone act-ah'))
-            :ant?(z.p==='tox'?'zone ant ant-tox':'zone ant ant-ah'):'zone')+(editable?'':' ro');
+            :ant?(z.p==='tox'?'zone ant ant-tox':'zone ant ant-ah'):'zone')+(editable?'':' ro')
+            +(roClic&&(on||ant)?' cli':'')+(selZ===z.id?' sel':'')+(selZ&&selZ!==z.id?' pale':'');
   const st=on&&CT?` style="fill:${colActe(t)};stroke:${colActe(t)}"`:'';
-  const ev=editable?`onclick="${clic}(event,'${z.id}')" oncontextmenu="${clic}(event,'${z.id}',-1);return false"`:'';
+  /* En saisie, la zone se coche. En lecture, elle peut tout de même répondre :
+     sur le cumul, cliquer une zone désigne sa ligne dans la liste de droite. */
+  const ev=editable?`onclick="${clic}(event,'${z.id}')" oncontextmenu="${clic}(event,'${z.id}',-1);return false"`
+          :(roClic&&(on||ant)?`onclick="${roClic}(event,'${z.id}')"`:'');
   const tt=esc(z.n)+(ant?'\n'+ant.map(x=>`${DFT(x.d)}${x.q?' · '+x.q:''}`).join('\n'):'');
   return z.pa?`<path class="${cls}"${st} d="${zPath(z.pa)}" ${ev}><title>${tt}</title></path>`
             :`<ellipse class="${cls}"${st} cx="${z.cx}" cy="${z.cy}" rx="${z.rx}" ry="${z.ry}" ${ev}><title>${tt}</title></ellipse>`;
@@ -4786,7 +4833,9 @@ const place=(x,y,w,h,pas,cadre)=>{
    const yq = qt ? (dt ? y-2*K : y) : 0;
    const yd = dt ? (qt ? y+FD+1.5*K : y) : 0;
    return fil
-        + `<g class="zpill ${plein?'on':'ant'}" data-z="${z.id}" style="--zc:${coul};--fq:${FQ.toFixed(2)}px;--fd:${FD.toFixed(2)}px">
+        + `<g class="zpill ${plein?'on':'ant'}${selZ===z.id?' sel':''}${selZ&&selZ!==z.id?' pale':''}"
+             data-z="${z.id}" style="--zc:${coul};--fq:${FQ.toFixed(2)}px;--fd:${FD.toFixed(2)}px"
+             ${roClic?`onclick="${roClic}(event,'${z.id}')"`:''}>
              <rect class="zbg" x="${(cx-w/2).toFixed(1)}" y="${(y-h/2).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="${Math.min(6*K,h/2).toFixed(1)}"/>
              ${qt?`<text class="zq" x="${cx.toFixed(1)}" y="${yq.toFixed(1)}">${qt}</text>`:''}
              ${dt?(SC
@@ -4802,7 +4851,13 @@ const place=(x,y,w,h,pas,cadre)=>{
                : `<text class="zd2" x="${cx.toFixed(1)}" y="${yd.toFixed(1)}">${dt}</text>`):''}
            </g>`;
   }).join('');
- return `<svg class="face" viewBox="${S.vb}">${S.g}${tr}${zs}${lbl}</svg>`;
+ /* Une pastille flotte souvent loin de sa zone, reliée par un trait. Tant
+    qu'elle ne servait qu'à lire, elle laissait passer le clic pour ne pas
+    gêner la saisie de la zone qu'elle recouvre. Maintenant qu'un clic
+    DÉSIGNE quelque chose, la laisser transparente ferait désigner la zone
+    du dessous — c'est-à-dire la mauvaise. Elle capte donc le clic, et
+    répond pour la sienne : sur le schéma en lecture seule uniquement. */
+ return `<svg class="face${roClic?' selq':''}" viewBox="${S.vb}">${S.g}${tr}${zs}${lbl}</svg>`;
 }
 const faceSVG=(state,o={})=>schemaSVG(state,{...o,region:o.region||'visage'});
 
@@ -6898,12 +6953,15 @@ function pDetail(p){
      return Object.fromEntries(jours.map((d,i)=>[d,{n:i+1}]));
    })();
    const NSEANCES=Object.keys(SEANCES).length;
+   /* Changer de région ou de patient périme la sélection sans qu'on ait à y
+      penser : une zone qui n'est pas à l'écran ne désigne plus rien. */
+   const SEL=(CUM_SEL&&CUM_SELP===p.id&&Object.prototype.hasOwnProperty.call(cur,CUM_SEL))?CUM_SEL:null;
    return `<div class="fbar" style="margin-bottom:12px"><div class="seg">${ONGLETS.map(r=>{
       const n=Object.keys(parReg(r.id)).length;
       return `<button class="${schemaReg===r.id?'on':''}" onclick="schemaReg='${r.id}';paint()">${r.i} ${esc(r.n)} · ${n}</button>`}).join('')}</div></div>
    <div class="facewrap cumul">
     <div>${BAR?baremeListe(BAR,cur,{ro:true,hist:ZH,motTotal:'déjà traitée'+(Object.keys(cur).length>1?'s':'')})
-     :`<div class="facebox">${schemaSVG(cur,{editable:false,hist:ZH,region:schemaReg,zt:cumulT,ech:CUM_ECH,seances:SEANCES})}</div>
+     :`<div class="facebox" onclick="cumVide(event)">${schemaSVG(cur,{editable:false,hist:ZH,region:schemaReg,zt:cumulT,ech:CUM_ECH,seances:SEANCES,roClic:'cumClic',selZ:SEL})}</div>
      <div class="face-legend"><span><i style="background:var(--toxine)"></i>Toxine</span><span><i style="background:var(--ah)"></i>Acide hyaluronique</span>
       <span class="mu">${NSEANCES>1?'la couleur dit le produit · le numéro dit la séance':'quantité cumulée et date de la dernière séance'}</span></div>`}</div>
     <div>
@@ -6913,9 +6971,11 @@ function pDetail(p){
          ?`<b>Cumul historique.</b> La <b>couleur</b> dit le produit — bleu pour la toxine, orange pour l’acide hyaluronique.
            Le <b>numéro</b> dit la séance : <span class="vnum">1</span> la plus ancienne, puis dans l’ordre.
            Deux zones qui portent le même numéro ont été faites le même jour.
-           À droite, une ligne par zone, de la plus petite dose à la plus grande.`
+           À droite, une ligne par zone, de la plus petite dose à la plus grande —
+           <b>cliquez une zone</b> du schéma pour retrouver sa ligne, et l’inverse.`
          :`<b>Cumul historique.</b> La couleur dit le produit — bleu pour la toxine, orange pour l’acide hyaluronique.
-           À droite, une ligne par zone, de la plus petite dose à la plus grande.`}</div></div>
+           À droite, une ligne par zone, de la plus petite dose à la plus grande —
+           <b>cliquez une zone</b> du schéma pour retrouver sa ligne, et l’inverse.`}</div></div>
      ${(()=>{
        const zones=Object.keys(cur);
        if(!zones.length) return '<div class="empty">Aucune injection enregistrée.</div>';
@@ -6943,6 +7003,9 @@ function pDetail(p){
        const nSeance=Object.fromEntries(jours.map(d=>[d,SEANCES[d].n]));
        const plusieurs=jours.length>1;
        return `
+       ${SEL?`<div class="cum-sel"><span class="zd" style="background:${colActe(cumulT[SEL]||(zoneDef(SEL).p==='tox'?'BTX':'AH'))}"></span>
+         <b>${esc(zoneNom(SEL))}</b><span class="mu">désignée sur le schéma</span>
+         <button class="chip" onclick="cumSel(null,1)">✕ tout réafficher</button></div>`:''}
        ${plusieurs?`<div class="cum-lg"><span class="mu">Séances</span>${jours.map(d=>`<span class="cum-s" title="Séance ${nSeance[d]} du ${DF(d)}">
           <u>${nSeance[d]}</u><b>${DFT(d)}</b></span>`).join('')}
          <span class="mu">— le numéro se retrouve sur le schéma</span></div>`:''}
@@ -6954,12 +7017,14 @@ function pDetail(p){
             « 3 × 4 U » d'un côté, des pastilles nues de l'autre. Deux règles
             à retenir pour un gain de place que le jeton neutre, plus étroit
             qu'une pastille colorée, rend inutile. Une seule écriture. */
-         return `<div class="zrow cum-r" title="${esc(zoneNom(z))} — ${esc(CZ.n)} · ${L.length} séance${L.length>1?'s':''}">
+         return `<div class="zrow cum-r${SEL===z?' sel':''}${SEL&&SEL!==z?' pale':''}"
+           onclick="cumSel('${z}',1)"
+           title="${esc(zoneNom(z))} — ${esc(CZ.n)} · ${L.length} séance${L.length>1?'s':''} — cliquer pour la situer sur le schéma">
           <span class="zd" style="background:${colActe(t)}"></span>
           <span class="cum-z">${esc(zoneNom(z))}</span>
           <b class="mono cum-q">${q_(cur[z],t,CZ,z)}</b>
           <span class="cum-c">${L.map(x=>`<button class="zc"
-            onclick="openActe(${p.id},${x.aid})"
+            onclick="event.stopPropagation();openActe(${p.id},${x.aid})"
             title="Séance ${nSeance[x.d]} du ${DF(x.d)}${x.q&&CZ.unite?' — '+fmtDose(x.q,t,z):''} — ouvrir l’acte">
             <u>${plusieurs?nSeance[x.d]:DFT(x.d)}</u>${x.q&&CZ.unite?'<b>'+fmtDose(x.q,t,z)+'</b>':''}</button>`).join('')}</span>
          </div>`}).join('')}`;
@@ -13413,7 +13478,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DS';
+const BUILD='DT';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -16020,6 +16085,36 @@ function calerCumul(){
    ne se lit pas davantage.
    ========================================================================== */
 let CUM_ECH=1, CUM_PASSE=false;
+/* ==========================================================================
+   Le schéma et la liste se répondent
+   --------------------------------------------------------------------------
+   Le visage et la liste de droite disent la même chose de deux façons. Devant
+   quatre zones, on relie encore de tête ; devant douze, on cherche « laquelle
+   de ces lignes est la bosse que je regarde ». Un clic sur la zone — ou sur
+   son étiquette — allume sa ligne, et éteint les autres. Un second clic, ou
+   un clic à côté, rend tout le monde à sa place.
+
+   Le lien joue dans les deux sens : la ligne se clique aussi, et c'est alors
+   la zone qui s'allume sur le visage. Rien ne se filtre, rien ne disparaît :
+   on désigne, on ne masque pas.
+   ========================================================================== */
+let CUM_SEL=null, CUM_SELP=null;
+function cumSel(z, doux){
+ CUM_SEL=(CUM_SEL===z)?null:z;
+ /* la désignation appartient au dossier où elle a été faite : « front » existe
+    chez tout le monde, et une ligne allumée en ouvrant un autre patient serait
+    un reste, pas une réponse */
+ CUM_SELP=CUM_SEL?pSel:null;
+ paint();
+ /* la ligne désignée depuis le visage peut être hors de vue */
+ if(CUM_SEL&&!doux) setTimeout(()=>{
+   const l=document.querySelector('.cum-r.sel');
+   if(l&&l.scrollIntoView) l.scrollIntoView({block:'nearest'});
+ },0);
+}
+function cumClic(e,z){ if(e){e.stopPropagation()} cumSel(z) }
+/* cliquer le cadre, à côté de toute zone, relâche la sélection */
+function cumVide(e){ if(CUM_SEL&&e&&e.target&&!e.target.closest('.zone,.zpill')) cumSel(null,true) }
 function calerEtiquettes(){
  const svg=document.querySelector('#main .facewrap.cumul svg.face'); if(!svg) return;
  const l=svg.getBoundingClientRect().width; if(!l) return;
