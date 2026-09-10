@@ -4175,13 +4175,20 @@ const pratInfo=n=>PRATS.find(x=>x.nom===n)||PRATS[0];
    Baroudi sur les ordonnances du docteur Merlin. Ce n'est pas une commodité
    d'affichage, c'est une mention légale qui doit suivre le signataire.
    ========================================================================== */
-const HF_CHAMPS=[
- ['praticien','Praticien'],['rpps','RPPS'],['rcp','Assurance RCP'],
- ['cabinet','Nom du cabinet'],['raison','Raison sociale'],['adresse','Adresse'],
- ['tel','Téléphone'],['mail','E-mail'],['site','Site'],
- ['siret','SIRET'],['tva','N° TVA'],['ape','Code APE']
+/* Toutes les données insérables, groupées comme on les cherche. Les libellés
+   sont ceux qu'on dirait à voix haute — pas des noms de variables. */
+const VAR_GROUPES=[
+ ['Le patient', [['prenom','Prénom'],['nom','Nom de famille']]],
+ ['Qui signe',  [['praticien','Praticien'],['rpps','RPPS'],['rcp','Assurance RCP']]],
+ ['La structure',[['cabinet','Nom du cabinet'],['raison','Raison sociale'],['adresse','Adresse'],
+                  ['tel','Téléphone'],['mail','E-mail'],['site','Site'],
+                  ['siret','SIRET'],['tva','N° TVA'],['ape','Code APE']]],
+ ['La pièce',   [['acte','Acte'],['date','Date'],['montant','Montant'],
+                 ['validite','Valable jusqu’au'],['remise','Remise'],['code','Code']]],
 ];
-const HF_LIB=Object.fromEntries(HF_CHAMPS);
+const HF_CHAMPS=VAR_GROUPES[1][1].concat(VAR_GROUPES[2][1]);
+const VAR_LIB=Object.fromEntries(VAR_GROUPES.flatMap(g=>g[1]));
+const HF_LIB=VAR_LIB;
 const hfTag=k=>`<span class="vtag" data-v="${k}" contenteditable="false">${esc(HF_LIB[k]||k)}</span>`;
 /* un ancien gabarit « {{x}} » devient du texte mis en forme, une fois pour toutes */
 function hfDepuisModele(t){
@@ -4251,6 +4258,25 @@ function hfRendu(html,p,prn){
  const d=document.createElement('div'); d.appendChild(bac.cloneNode(true));
  return d.innerHTML;
 }
+
+/* Le même contenu, rendu en TEXTE : un SMS n'a pas de mise en forme, et une
+   ordonnance se découpe en lignes. On ne peut pas leur servir du HTML. */
+function hfTexte(html,ctx){
+ const tpl=document.createElement('template');
+ tpl.innerHTML=hfNettoyer(html)
+   .replace(/<br\s*\/?>/gi,'\n')
+   .replace(/<\/(div|p)>/gi,'\n')
+   .replace(/<(div|p)[^>]*>/gi,'');
+ tpl.content.querySelectorAll('span.vtag').forEach(t=>{
+   const v=ctx?ctx[t.dataset.v]:undefined;
+   t.replaceWith(document.createTextNode(v!=null?String(v):''));
+ });
+ const d=document.createElement('div'); d.appendChild(tpl.content.cloneNode(true));
+ return (d.textContent||'').replace(/\n{3,}/g,'\n\n').replace(/[ \t]+\n/g,'\n').trim();
+}
+/* et sa longueur réelle : un compteur de SMS qui mesurerait « Prénom » au
+   lieu de « Yasmine » mentirait sur le nombre de messages facturés */
+const hfLongueur=(html,ctx)=>hfTexte(html,ctx).length;
 
 const hfPrat = prn => { const x=pratInfo(prn); return (x&&x.hf==='perso')?x:null };
 /* Le réglage est désormais du HTML mis en forme. Les dossiers réglés avant
@@ -6137,7 +6163,7 @@ function pAnniv(){
       <select class="inp" style="width:100%" onchange="ANNIV.modele=this.value;paint()">
         ${MODELES.filter(x=>x.cat==='Anniversaire').map(x=>`<option value="${x.id}" ${ANNIV.modele===x.id?'selected':''}>${esc(x.nom)}</option>`).join('')}</select></div>
     <div class="fld"><label>Aperçu réel</label>
-      <div class="msgprev">${esc(fillTpl(m.texte,tplCtx(L[0]?L[0].p:PATIENTS[0]))).replace(/\n/g,'<br>')}</div></div>
+      <div class="msgprev">${esc(hfTexte(hfH(m,'texte'),tplCtx(L[0]?L[0].p:PATIENTS[0]))).replace(/\n/g,'<br>')}</div></div>
     <button class="btn s" onclick="go('params')">⚙ Modifier ce modèle</button>
    </div></div>
   <div class="card"><div class="h"><h2>Qui fête son anniversaire</h2>
@@ -10011,11 +10037,12 @@ V.params=()=>{
        <div class="fld"><label>Canal</label><select class="inp" style="width:100%" onchange="modById('${m.id}').canal=this.value;paint()">
          ${['SMS','E-mail'].map(c=>`<option ${m.canal===c?'selected':''}>${c}</option>`).join('')}</select></div>
       </div>
-      <div class="fld"><label>Contenu — cliquez une variable pour l'insérer</label>
-       <div class="vars">${VARS.map(v=>`<button class="varchip" onclick="insVar('mtxt','${v}','${m.id}')">{{${v}}}</button>`).join('')}</div>
-       <textarea class="note" id="mtxt" style="min-height:150px" oninput="modById('${m.id}').texte=this.value;document.getElementById('mprev').innerHTML=prevHTML(this.value)">${esc(m.texte)}</textarea>
-       ${m.canal==='SMS'?`<div class="mu" style="font-size:11.5px;margin-top:4px">${m.texte.length} caractères — ${Math.ceil(m.texte.length/160)} SMS par destinataire</div>`:''}</div>
-      <div class="fld"><label>Aperçu avec un patient réel</label><div class="msgprev" id="mprev">${prevHTML(m.texte)}</div></div>
+      <div class="fld"><label>Contenu${m.canal==='SMS'?" — un SMS ne porte pas de mise en forme":""}</label>
+       ${edRiche({id:'mtxt', html:hfH(m,'texte'), mef:m.canal!=='SMS', min:150, max:280,
+         majFn:`modById('${m.id}').texteH=html; msgApercu('${m.id}');`})}
+       <div id="mlen" class="mu" style="font-size:11.5px;margin-top:4px">${msgLongueur(m)}</div></div>
+      <div class="fld"><label>Aperçu avec un patient réel</label>
+        <div class="msgprev" id="mprev">${msgPrev(m)}</div></div>
       <div style="display:flex;gap:8px"><button class="btn s" onclick="toast('Modèle enregistré')">Enregistrer</button>
        <button class="btn s" onclick="openMsg('${m.id}',${PATIENTS[0].id})">Tester l'envoi</button></div>
      </div></div></div>`;
@@ -10094,9 +10121,9 @@ V.params=()=>{
        <div class="fld"><label>Nom</label><input class="inp" style="width:100%" value="${esc(d.nom)}" onchange="DOCMOD.find(x=>x.id==='${d.id}').nom=this.value;paint()"></div>
        <div class="fld"><label>Type</label><select class="inp" style="width:100%" onchange="DOCMOD.find(x=>x.id==='${d.id}').cat=this.value;paint()">
          ${['Ordonnance','Consentement','Devis','Information'].map(c=>`<option ${d.cat===c?'selected':''}>${c}</option>`).join('')}</select></div></div>
-      <div class="fld"><label>Corps du document — mêmes variables que les messages</label>
-       <div class="vars">${VARS.map(v=>`<button class="varchip" onclick="insVar('dtxt','${v}',null,'${d.id}')">{{${v}}}</button>`).join('')}</div>
-       <textarea class="note" id="dtxt" style="min-height:200px" oninput="DOCMOD.find(x=>x.id==='${d.id}').corps=this.value;document.getElementById('docprev').innerHTML=docPrev()">${esc(d.corps)}</textarea></div>
+      <div class="fld"><label>Corps du document</label>
+       ${edRiche({id:'dtxt', html:hfH(d,'corps'), min:200, max:320,
+         majFn:`DOCMOD.find(x=>x.id==='${d.id}').corpsH=html; const e=document.getElementById('docprev'); if(e) e.innerHTML=docPrev();`})}</div>
       <div class="fld"><label>Aperçu du document généré — en-tête, corps, pied de page</label>
         <div id="docprev">${docPrev()}</div></div>
       <button class="btn s" onclick="toast('Modèle enregistré')">Enregistrer</button>
@@ -10189,107 +10216,100 @@ function hfBascule(){
    Le champ d'édition : ce qu'on tape est ce qui s'imprime
    ------------------------------------------------------------------------ */
 const HF_TAILLES=[['11px','Petit'],['13px','Normal'],['16px','Grand'],['20px','Très grand']];
-function hfEditeur(champ,titre,id,ro,O){
- const html=ro?hfH(CABINET,champ):hfH(O,champ);
- const actif=ro?(champ==='entete'?CABINET.enteteOn:CABINET.piedOn)
-               :(O[champ+'On']!==false);
- return `<div>
-  <div class="prow"><b style="font-size:12.5px">${esc(titre)}</b>
-    <button class="sw ${actif?'on':''}" style="margin-left:auto" ${ro?'disabled':''}
-      onclick="hfObj().${champ}On=!(hfObj().${champ}On!==false);paint()"></button></div>
-  ${ro?'':`<div class="hf-tb">
-   <button class="tb" title="Gras" onmousedown="event.preventDefault()" onclick="hfCmd('${id}','bold')"><b>B</b></button>
-   <button class="tb" title="Italique" onmousedown="event.preventDefault()" onclick="hfCmd('${id}','italic')"><i>I</i></button>
-   <button class="tb" title="Souligné" onmousedown="event.preventDefault()" onclick="hfCmd('${id}','underline')"><u>U</u></button>
+
+/* ==========================================================================
+   Un champ de saisie en clair, réutilisable
+   --------------------------------------------------------------------------
+   Trois endroits réglaient du texte avec des accolades : l'en-tête, les
+   modèles de message et le corps des modèles de document. Le même champ leur
+   sert désormais à tous — avec deux réglages, parce que les trois n'ont pas
+   les mêmes contraintes :
+
+     · `mef` : un SMS n'a pas de gras. Lui proposer une barre de mise en
+       forme serait promettre ce que le canal ne sait pas rendre.
+     · `champs` : les données insérables ne sont pas les mêmes partout — le
+       prénom du patient n'a rien à faire dans un en-tête de cabinet.
+   ========================================================================== */
+function edRiche(o){
+ const {id, html, majFn, mef=true, groupes=VAR_GROUPES, ro=false, min=84, max=190}=o;
+ return `${ro?'':`<div class="hf-tb">
+  ${mef?`<button class="tb" title="Gras" onmousedown="event.preventDefault()" onclick="edCmd('${id}','bold')"><b>B</b></button>
+   <button class="tb" title="Italique" onmousedown="event.preventDefault()" onclick="edCmd('${id}','italic')"><i>I</i></button>
+   <button class="tb" title="Souligné" onmousedown="event.preventDefault()" onclick="edCmd('${id}','underline')"><u>U</u></button>
    <span class="sep"></span>
    <select class="inp tbs" title="Taille du texte" onmousedown="hfGarde('${id}')"
-     onchange="hfTaille('${id}',this.value);this.selectedIndex=0">
+     onchange="edTaille('${id}',this.value);this.selectedIndex=0">
      <option value="">Taille</option>
      ${HF_TAILLES.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select>
    <input class="tbc" type="color" title="Couleur du texte" value="#3f3f46"
-     onmousedown="hfGarde('${id}')" oninput="hfCouleur('${id}',this.value)">
+     onmousedown="hfGarde('${id}')" oninput="edCouleur('${id}',this.value)">
    <span class="sep"></span>
-   <button class="tb" title="Aligner à gauche" onmousedown="event.preventDefault()" onclick="hfCmd('${id}','justifyLeft')">⯇</button>
-   <button class="tb" title="Centrer" onmousedown="event.preventDefault()" onclick="hfCmd('${id}','justifyCenter')">≡</button>
-   <button class="tb" title="Aligner à droite" onmousedown="event.preventDefault()" onclick="hfCmd('${id}','justifyRight')">⯈</button>
-   <span class="sep"></span>
-   <select class="inp tbs" title="Insérer une donnée qui change d’une pièce à l’autre"
-     onmousedown="hfGarde('${id}')" onchange="hfInserer('${id}',this.value);this.selectedIndex=0">
-     <option value="">Insérer…</option>
-     ${HF_CHAMPS.map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join('')}</select>
-   <button class="tb" title="Repartir de la mise en forme d’origine"
-     onmousedown="event.preventDefault()" onclick="hfEffacerMef('${id}','${champ}')">⌫ Mise en forme</button>
-  </div>`}
-  <div class="hf-ed${ro?' ro':''}" id="${id}" ${ro?'':'contenteditable="true"'}
-    spellcheck="true" data-champ="${champ}"
-    oninput="hfSaisie('${champ}',this)" onblur="hfSaisie('${champ}',this)"
-    onpaste="hfColler(event,'${id}','${champ}')">${html}</div>
-  ${ro?'':`<div class="mu" style="font-size:11px;margin-top:4px">Les étiquettes bleues prennent leur valeur
-    à l’impression — la mention du praticien suit celui qui signe.</div>`}
- </div>`;
+   <button class="tb" title="Aligner à gauche" onmousedown="event.preventDefault()" onclick="edCmd('${id}','justifyLeft')">⯇</button>
+   <button class="tb" title="Centrer" onmousedown="event.preventDefault()" onclick="edCmd('${id}','justifyCenter')">≡</button>
+   <button class="tb" title="Aligner à droite" onmousedown="event.preventDefault()" onclick="edCmd('${id}','justifyRight')">⯈</button>
+   <span class="sep"></span>`:''}
+  <select class="inp tbs" title="Insérer une donnée qui change d’une pièce à l’autre"
+    onmousedown="hfGarde('${id}')" onchange="edInserer('${id}',this.value);this.selectedIndex=0">
+    <option value="">Insérer…</option>
+    ${groupes.map(([g,L])=>`<optgroup label="${esc(g)}">${L.map(([k,l])=>
+      `<option value="${k}">${esc(l)}</option>`).join('')}</optgroup>`).join('')}</select>
+  ${mef?`<button class="tb" title="Repartir d’un texte sans mise en forme"
+    onmousedown="event.preventDefault()" onclick="edEffacerMef('${id}')">⌫ Mise en forme</button>`:''}
+ </div>`}
+ <div class="hf-ed${ro?' ro':''}" id="${id}" ${ro?'':'contenteditable="true"'}
+   spellcheck="true" data-maj="${esc(majFn||'')}"
+   style="min-height:${min}px;max-height:${max}px"
+   oninput="edMaj('${id}')" onblur="edMaj('${id}')"
+   onpaste="edColler(event,'${id}')">${html||''}</div>`;
 }
-function hfSaisie(champ,el){
- const o=hfObj();
- o[champ+'H']=hfNettoyer(typeof el==='string'?el:el.innerHTML);
- const e=document.getElementById('docprev'); if(e) e.innerHTML=docPrev();
+function edEl(id){ return document.getElementById(id) }
+function edMaj(id){
+ const e=edEl(id); if(!e) return;
+ const f=e.dataset.maj; if(!f) return;
+ /* la fonction de rangement est nommée dans l'attribut : le champ ne sait pas
+    où va son contenu, et n'a pas à le savoir */
+ try{ (new Function('html','id',f))(hfNettoyer(e.innerHTML), id) }catch(err){}
 }
-/* la sélection se perd dès qu'on clique ailleurs : on la met de côté */
-let HF_SEL=null;
-function hfGarde(id){ const s2=window.getSelection();
- const e=document.getElementById(id);
- if(s2&&s2.rangeCount&&e&&e.contains(s2.anchorNode)) HF_SEL=s2.getRangeAt(0).cloneRange();
-}
-function hfFocus(id){
- const e=document.getElementById(id); if(!e) return null;
+function edFocus(id){
+ const e=edEl(id); if(!e) return null;
  e.focus();
  if(HF_SEL&&e.contains(HF_SEL.commonAncestorContainer)){
    const s2=window.getSelection(); s2.removeAllRanges(); s2.addRange(HF_SEL) }
  return e;
 }
-function hfCmd(id,cmd){
- const e=hfFocus(id); if(!e) return;
- try{ document.execCommand(cmd,false,null) }catch(err){}
- hfSaisie(e.dataset.champ,e);
-}
-function hfTaille(id,v){
- if(!v) return; const e=hfFocus(id); if(!e) return;
+function edCmd(id,cmd){ const e=edFocus(id); if(!e) return;
+ try{ document.execCommand(cmd,false,null) }catch(err){} edMaj(id) }
+function edCouleur(id,v){ const e=edFocus(id); if(!e) return;
+ try{ document.execCommand('foreColor',false,v) }catch(err){} edMaj(id) }
+function edTaille(id,v){
+ if(!v) return; const e=edFocus(id); if(!e) return;
  const s2=window.getSelection();
  if(!s2||s2.isCollapsed||!s2.rangeCount){ toast('Sélectionnez d’abord le texte à agrandir'); return }
- const r=s2.getRangeAt(0), sp=document.createElement('span');
- sp.style.fontSize=v;
+ const r=s2.getRangeAt(0), sp=document.createElement('span'); sp.style.fontSize=v;
  try{ sp.appendChild(r.extractContents()); r.insertNode(sp) }catch(err){}
- hfSaisie(e.dataset.champ,e);
+ edMaj(id);
 }
-function hfCouleur(id,v){
- const e=hfFocus(id); if(!e) return;
- try{ document.execCommand('foreColor',false,v) }catch(err){}
- hfSaisie(e.dataset.champ,e);
-}
-function hfInserer(id,k){
- if(!k) return; const e=hfFocus(id); if(!e) return;
+function edInserer(id,k){
+ if(!k) return; const e=edFocus(id); if(!e) return;
  const s2=window.getSelection();
  const tag=document.createElement('span');
  tag.className='vtag'; tag.dataset.v=k; tag.setAttribute('contenteditable','false');
- tag.textContent=HF_LIB[k]||k;
+ tag.textContent=VAR_LIB[k]||k;
  if(s2&&s2.rangeCount&&e.contains(s2.anchorNode)){
    const r=s2.getRangeAt(0); r.deleteContents(); r.insertNode(tag);
    r.setStartAfter(tag); r.collapse(true); s2.removeAllRanges(); s2.addRange(r);
  } else e.appendChild(tag);
- hfSaisie(e.dataset.champ,e);
+ edMaj(id);
 }
-/* un collage arrive avec la mise en forme de son logiciel d'origine : on ne
-   prend que le texte, et on laisse le praticien remettre en forme ici */
-function hfColler(ev,id,champ){
+function edColler(ev,id){
  ev.preventDefault();
  const t=(ev.clipboardData||window.clipboardData).getData('text/plain')||'';
- const e=document.getElementById(id); if(!e) return;
- document.execCommand('insertText',false,t);
- hfSaisie(champ,e);
+ try{ document.execCommand('insertText',false,t) }catch(err){}
+ edMaj(id);
 }
-function hfEffacerMef(id,champ){
- const e=document.getElementById(id); if(!e) return;
+function edEffacerMef(id){
+ const e=edEl(id); if(!e) return;
  const tpl=document.createElement('template'); tpl.innerHTML=e.innerHTML;
- const bac=tpl.content;
  const sortie=document.createElement('div');
  const marche=n=>{ n.childNodes.forEach(x=>{
    if(x.nodeType===3){ sortie.appendChild(document.createTextNode(x.nodeValue)); return }
@@ -10298,11 +10318,32 @@ function hfEffacerMef(id,champ){
    if(x.classList&&x.classList.contains('vtag')){ sortie.appendChild(x.cloneNode(true)); return }
    if(x.tagName==='DIV'&&sortie.childNodes.length) sortie.appendChild(document.createElement('br'));
    marche(x) }) };
- marche(bac);
- e.innerHTML=sortie.innerHTML;
- hfSaisie(champ,e);
+ marche(tpl.content);
+ e.innerHTML=sortie.innerHTML; edMaj(id);
  toast('Mise en forme retirée — le texte est conservé');
 }
+function hfEditeur(champ,titre,id,ro,O){
+ const html=ro?hfH(CABINET,champ):hfH(O,champ);
+ const actif=ro?(champ==='entete'?CABINET.enteteOn:CABINET.piedOn)
+               :(O[champ+'On']!==false);
+ return `<div>
+  <div class="prow"><b style="font-size:12.5px">${esc(titre)}</b>
+    <button class="sw ${actif?'on':''}" style="margin-left:auto" ${ro?'disabled':''}
+      onclick="hfObj().${champ}On=!(hfObj().${champ}On!==false);paint()"></button></div>
+  ${edRiche({id, html, ro, majFn:`hfObj().${champ}H=html; const e=document.getElementById('docprev'); if(e) e.innerHTML=docPrev();`,
+    groupes:VAR_GROUPES.slice(1)})}
+  ${ro?'':`<div class="mu" style="font-size:11px;margin-top:4px">Les étiquettes bleues prennent leur valeur
+    à l’impression — la mention du praticien suit celui qui signe.</div>`}
+ </div>`;
+}
+/* la sélection se perd dès qu'on clique ailleurs : on la met de côté */
+let HF_SEL=null;
+function hfGarde(id){ const s2=window.getSelection();
+ const e=document.getElementById(id);
+ if(s2&&s2.rangeCount&&e&&e.contains(s2.anchorNode)) HF_SEL=s2.getRangeAt(0).cloneRange();
+}
+/* un collage arrive avec la mise en forme de son logiciel d'origine : on ne
+   prend que le texte, et on laisse le praticien remettre en forme ici */
 function hfLogo(input){
  const f=input.files&&input.files[0]; if(!f) return;
  if(!/^image\//.test(f.type)){ toast('Choisissez une image'); input.value=''; return }
@@ -10340,6 +10381,37 @@ function apercuGlobal(){
 }
 
 const prevHTML=t=>esc(fillTpl(t,tplCtx(PATIENTS[0]))).replace(/\n/g,'<br>');
+/* ------------------------------------------------------------------------
+   L'aperçu d'un modèle de message, et son vrai coût
+   ------------------------------------------------------------------------
+   Le compteur mesurait la longueur du GABARIT : « Bonjour {{prenom}} » comptait
+   dix-huit caractères là où le message parti en compte quinze ou vingt selon
+   le prénom. Sur un envoi facturé au SMS, c'est une erreur de facture.
+   On mesure donc le message rendu, sur un patient réel.
+   ------------------------------------------------------------------------ */
+const msgPatient=()=>PATIENTS[0];
+function msApercu(){
+ if(!MS) return;
+ const e=document.getElementById('msprev'); if(!e) return;
+ const p0=pById(MS.ids[0])||PATIENTS[0];
+ e.innerHTML=esc(hfTexte(MS.texteH!=null?MS.texteH:hfDepuisModele(MS.texte),tplCtx(p0))).replace(/\n/g,'<br>');
+}
+function msgPrev(m){
+ const ctx=tplCtx(msgPatient());
+ return m.canal==='SMS'
+   ? esc(hfTexte(hfH(m,'texte'),ctx)).replace(/\n/g,'<br>')
+   : hfRendu(hfH(m,'texte'), msgPatient(), (msgPatient().prat||PRATICIENS[0]));
+}
+function msgLongueur(m){
+ if(m.canal!=='SMS') return 'Aperçu calculé sur un dossier réel — les étiquettes prennent leur valeur.';
+ const n=hfLongueur(hfH(m,'texte'), tplCtx(msgPatient()));
+ return `${n} caractères une fois les étiquettes remplacées — ${Math.ceil(n/160)||1} SMS par destinataire.`;
+}
+function msgApercu(id){
+ const m=modById(id); if(!m) return;
+ const p=document.getElementById('mprev'); if(p) p.innerHTML=msgPrev(m);
+ const l=document.getElementById('mlen'); if(l) l.textContent=msgLongueur(m);
+}
 function docPrev(){
  const d=DOCMOD.find(x=>x.id===docSel)||DOCMOD[0];
  const P=hfCible==='cabinet'?(PRATICIENS[0]||'Praticien'):hfCible;
@@ -10348,20 +10420,11 @@ function docPrev(){
   ${enteteVisible(P)?`<div class="ds-h${L?' avec-logo':''}">${L?`<img src="${L}" alt="" style="height:${logoHmm(P)*2.2}px">`:''}
     <span>${hfRendu(enteteTxt(P),PATIENTS[0],P)}</span></div>`:''}
   <div class="ds-t">${esc(d.nom)}</div>
-  <div class="ds-b">${prevHTML(d.corps)||'<span class="mu">corps du document vide</span>'}</div>
+  <div class="ds-b">${hfRendu(hfH(d,'corps'),PATIENTS[0],P)||'<span class="mu">corps du document vide</span>'}</div>
   ${piedVisible(P)?`<div class="ds-f">${hfRendu(piedTxt(P),PATIENTS[0],P)}</div>`:''}
  </div>`;
 }
 
-function insVar(id,v,mid,did){
- const e=document.getElementById(id); if(!e) return;
- const a=(e.selectionStart==null?e.value.length:e.selectionStart);
- e.value=e.value.slice(0,a)+'{{'+v+'}}'+e.value.slice(e.selectionEnd==null?a:e.selectionEnd);
- if(mid) modById(mid).texte=e.value; if(did) DOCMOD.find(x=>x.id===did).corps=e.value;
- e.focus(); e.selectionStart=e.selectionEnd=a+v.length+4;
- if(id==='dtxt'){const pv=document.getElementById('docprev'); if(pv) pv.innerHTML=docPrev();}
- else {const pv=document.getElementById('mprev'); if(pv) pv.innerHTML=prevHTML(e.value);}
-}
 function newModele(){const id='m'+Date.now();MODELES.push({id,cat:'Fidélité',canal:'SMS',nom:'Nouveau modèle',actif:false,texte:'Bonjour {{prenom}}, '});modSel=id;paint()}
 function newDoc(){const id='x'+Date.now();DOCMOD.push({id,cat:'Ordonnance',nom:'Nouveau modèle',corps:''});docSel=id;docMode='modele';paint()}
 /* Un modèle qui ne sert plus se supprime — les pièces déjà générées, elles,
@@ -10422,15 +10485,16 @@ function renderMsg(){
   <div class="grid g2" style="grid-template-columns:1fr 320px;gap:14px">
    <div>
     <div class="fbar">
-     <select class="inp" onchange="MS.mod=this.value;MS.texte=modById(this.value).texte;MS.canal=modById(this.value).canal;renderMsg()">
+     <select class="inp" onchange="MS.mod=this.value;MS.texteH=hfH(modById(this.value),'texte');MS.texte=hfTexte(MS.texteH,null);MS.canal=modById(this.value).canal;renderMsg()">
        ${MODELES.map(x=>`<option value="${x.id}" ${MS.mod===x.id?'selected':''}>${esc(x.cat)} — ${esc(x.nom)}</option>`).join('')}</select>
      <select class="inp" onchange="MS.canal=this.value;renderMsg()">${['SMS','E-mail'].map(c=>`<option ${MS.canal===c?'selected':''}>${c}</option>`).join('')}</select>
     </div>
-    <div class="fld"><label>Message — les variables sont remplacées pour chaque destinataire</label>
-     <div class="vars">${VARS.map(v=>`<button class="varchip" onclick="insMsVar('${v}')">{{${v}}}</button>`).join('')}</div>
-     <textarea class="note" id="mstxt" style="min-height:170px" oninput="MS.texte=this.value;document.getElementById('msprev').innerHTML=esc(fillTpl(this.value,tplCtx(pById(MS.ids[0])))).replace(/\\n/g,'<br>')">${esc(MS.texte)}</textarea></div>
+    <div class="fld"><label>Message — les étiquettes prennent la valeur de chaque destinataire</label>
+     ${edRiche({id:'mstxt', html:MS.texteH!=null?MS.texteH:hfDepuisModele(MS.texte),
+       mef:MS.canal!=='SMS', min:170, max:300,
+       majFn:`MS.texteH=html; MS.texte=hfTexte(html,null); msApercu();`})}</div>
     <div class="fld"><label>Aperçu pour ${esc(fn(p0))}</label>
-     <div class="msgprev" id="msprev">${esc(fillTpl(MS.texte,tplCtx(p0))).replace(/\n/g,'<br>')}</div></div>
+     <div class="msgprev" id="msprev">${esc(hfTexte(MS.texteH!=null?MS.texteH:hfDepuisModele(MS.texte),tplCtx(p0))).replace(/\n/g,'<br>')}</div></div>
    </div>
    <div><div class="fld"><label>Destinataires (${n})</label>
      <div style="max-height:380px;overflow:auto">
@@ -10445,12 +10509,6 @@ function renderMsg(){
   <div style="margin-left:auto;display:flex;gap:8px">
    <button class="btn" onclick="closeAll()">Annuler</button>
    <button class="btn p" onclick="sendMsg()">Envoyer à ${n} destinataire${n>1?'s':''}</button></div>`;
-}
-function insMsVar(v){
- const e=document.getElementById('mstxt'), a=(e.selectionStart==null?e.value.length:e.selectionStart);
- e.value=e.value.slice(0,a)+'{{'+v+'}}'+e.value.slice(e.selectionEnd==null?a:e.selectionEnd);
- MS.texte=e.value; e.focus(); e.selectionStart=e.selectionEnd=a+v.length+4;
- document.getElementById('msprev').innerHTML=esc(fillTpl(e.value,tplCtx(pById(MS.ids[0])))).replace(/\n/g,'<br>');
 }
 function sendMsg(){const n=MS.ids.length;closeAll();toast(n+' message'+(n>1?'s envoyés':' envoyé')+' · '+MS.canal)}
 
@@ -12314,7 +12372,11 @@ function sendAllDocs(aid){
 function addDocActe(aid,mid,silent){
  const a=ACTES.find(x=>x.id===aid), m=DOCMOD.find(x=>x.id===mid); if(!m||!a) return;
  const id=m.cat.slice(0,3).toUpperCase()+'-'+(9000+DOCADD.length+1);
- DOCADD.push({id, acte:aid, patient:a.patient, cat:m.cat, nom:m.nom, corps:fillTpl(m.corps,tplCtx(pById(a.patient))),
+ const ctxA=tplCtx(pById(a.patient));
+ /* deux formes du même corps : le texte, parce qu'une ordonnance se découpe
+    en lignes ; le HTML, parce qu'une pièce imprimée garde sa mise en forme */
+ DOCADD.push({id, acte:aid, patient:a.patient, cat:m.cat, nom:m.nom,
+   corps:hfTexte(hfH(m,'corps'),ctxA), corpsH:hfRendu(hfH(m,'corps'),pById(a.patient),a.praticien),
    ts:nowStamp(), par:ROLES[role].u, envoye:null, signe:null});
  logDoc(id,'Généré depuis le modèle « '+m.nom+' »');
  if(silent) return id;
@@ -12421,7 +12483,7 @@ function dlMaj(champ,v){ if(!docLib) return;
  docLib[champ]=v;
  if(champ==='modele'&&v){
    const m=DOCMOD.find(x=>x.id===v);
-   if(m) docLib.lignes=fillTpl(m.corps, tplCtx(pById(docLib.pid)));
+   if(m) docLib.lignes=hfTexte(hfH(m,'corps'), tplCtx(pById(docLib.pid)));
    else docLib.lignes=(ORDO_TPL[v]||[]).join('\n');
  }
  paint();
@@ -12944,7 +13006,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DL';
+const BUILD='DM';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -13336,7 +13398,7 @@ function docAutre(x){
    <div class="dv-s">Patient</div>
    <div class="dv-p"><b>${esc(fn(p))}</b> — né(e) le ${DF(p.ddn)} · dossier n° ${p.id}<br>${esc(p.adr||'')}</div>
    <div class="dv-s">${esc(x.cat)}</div>
-   <div class="dv-p" style="white-space:pre-wrap">${esc(x.corps||x.sous||'')}</div>
+   <div class="dv-p" style="white-space:pre-wrap">${x.corpsH||esc(x.corps||x.sous||'')}</div>
    <div class="dv-sg"><div class="c"><div class="lb">Le praticien</div>
      <div class="hint">${esc(prn)} — signature</div></div>
     <div class="c"><div class="lb">${x.cat==='Information'?'Le patient':'Destinataire'}</div>
