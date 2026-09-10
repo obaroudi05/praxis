@@ -6526,10 +6526,10 @@ function pDetail(p){
  const horoBdg=(id,jour,off)=>{const t=signeLe(id, jour?hStamp(jour,id,off==null?1:off):null);
    return t?`<div class="horo" title="Horodatage de la signature">🕘 ${DTS(t)}</div>`:''};
  const DOCS=[
-  ...O.map(o=>({k:'ordonnance',id:o.id,date:o.date,
+  ...O.map(o=>({k:'ordonnance',id:o.id,date:o.date, cf:confirmSuppOrd(o.id,5),
     t:`Ordonnance — ${o.lignes.length} ligne${o.lignes.length>1?'s':''}`,
     s:o.lignes[0].split(' —')[0]+(o.lignes.length>1?` + ${o.lignes.length-1} autre${o.lignes.length>2?'s':''}`:''),
-    st:bdg('b-neu','Éditée'), a:pdfBtn(o.acte,o.id)})),
+    st:bdg('b-neu','Éditée'), a:pdfBtn(o.acte,o.id)+btnSuppOrd(o.id)})),
   ...D.map(d=>({k:'devis',id:d.id,date:d.date,t:nomDevis(d),
     s:`${d.id} · ${d.lignes.length} prestation${d.lignes.length>1?'s':''}${CAN('prix')?' · '+EUR(d.montant):''}${d.infos?' · fiche d’information jointe':''}`,
     st:bdgDevis(d)+(d.statut==='accepte'?horoBdg(d.id,d.derniere||d.date,2):''),
@@ -6574,7 +6574,9 @@ function pDetail(p){
        ${x.signe?'':`<button class="btn xs" title="Le patient signe dans l’encadré, ici"
          onclick="event.stopPropagation();signerLib('${x.id}')">✎ Signer sur place</button>`}
        <button class="btn xs p" onclick="event.stopPropagation();composerEnvoi(null,'${x.id}')">✉ Envoyer</button>
-       ${lienDe(x.id)?`<button class="btn xs" onclick="event.stopPropagation();pageSignature('${lienDe(x.id).jeton}')">🔗</button>`:''}`})),
+       ${lienDe(x.id)?`<button class="btn xs" onclick="event.stopPropagation();pageSignature('${lienDe(x.id).jeton}')">🔗</button>`:''}
+       ${x.k==='ordonnance'?btnSuppOrd(x.id):''}`,
+    cf:x.k==='ordonnance'?confirmSuppOrd(x.id,5):''})),
  ].sort((a,b)=>b.date.localeCompare(a.date));
  const KIND={devis:['Devis','◫','Devis'],ordonnance:['Ordonnances','℞','Ordonnance'],consentement:['Consentements','✎','Consentement'],
              information:['Informations','ⓘ','Information'],courrier:['Courriers','✉','Courrier']};
@@ -6937,7 +6939,7 @@ function pDetail(p){
        <span class="mu" style="font-size:11.5px;font-weight:600;align-self:center">Du</span>
        ${perDates(perD2,'setPerD2')}</div>`:''}
     ${(docLib&&docLib.pid===p.id)?formDocLib(p):''}
-    ${(CORBEILLE.length&&['devis','consent'].includes(CORBEILLE[CORBEILLE.length-1].kind))?`<div class="undo"><span class="e">🗑</span>
+    ${(CORBEILLE.length&&['devis','consent','ord','ordlib'].includes(CORBEILLE[CORBEILLE.length-1].kind))?`<div class="undo"><span class="e">🗑</span>
       <div style="flex:1;min-width:0"><b>${esc(CORBEILLE[CORBEILLE.length-1].quoi)}</b> — supprimé
         <span class="mu">${DTS(CORBEILLE[CORBEILLE.length-1].ts)} par ${esc(CORBEILLE[CORBEILLE.length-1].par)}</span></div>
       <button class="btn xs" onclick="retablirActe()">↺ Rétablir</button></div>`:''}
@@ -10958,6 +10960,78 @@ const confirmSuppDevis=(d,cols)=>suppDevis!==d.id?'':`<tr class="supp"><td colsp
     <button class="btn xs g" onclick="event.stopPropagation();suppDevis=null;paint()">Annuler</button>
     <button class="btn xs crit" onclick="event.stopPropagation();supprimerDevis('${d.id}')">Supprimer</button>
   </div></td></tr>`;
+/* --------------------------------------------------------------------------
+   Ordonnance : une prescription se retire, mais pas de la même main
+   --------------------------------------------------------------------------
+   Une ordonnance établie par erreur — mauvais patient, mauvaise date, ligne
+   fautive — doit pouvoir sortir du dossier, comme un devis ou un consentement
+   non signé. Elle n'est pourtant pas tout à fait de la même nature : une
+   ordonnance remise au patient a pu être présentée en pharmacie, et le
+   dossier doit garder trace de ce qui a été prescrit.
+
+   D'où la même gradation que pour le consentement : tant que la pièce n'a
+   pas quitté le cabinet, elle s'efface librement ; dès qu'elle a été envoyée
+   ou signée, seul l'administrateur peut le faire, et le geste est journalisé.
+   Dans les deux cas, la suppression reste rattrapable.
+   -------------------------------------------------------------------------- */
+let suppOrd=null;
+/* l'ordonnance, quelle que soit sa provenance : rattachée à une séance
+   (ORDONNANCES) ou établie hors séance (DOCLIB) */
+function ordById(id){
+ const o=ORDONNANCES.find(x=>x.id===id);
+ if(o) return {kind:'acte', o, date:o.date, patient:o.patient,
+   nom:`Ordonnance — ${o.lignes.length} ligne${o.lignes.length>1?'s':''}`};
+ const l=libById(id);
+ if(l&&l.k==='ordonnance') return {kind:'lib', o:l, date:l.date, patient:l.patient, nom:l.nom};
+ return null;
+}
+const ordPartie=id=>{
+ const x=ordById(id); if(!x) return null;
+ if(x.kind==='lib'&&x.o.signe) return 'signée';
+ return envDoc(id).length?'remise au patient':null;
+};
+const ordBloquante=id=>{ const p=ordPartie(id); return (p&&!EST_ADMIN())?p:null };
+function supprimerOrdonnance(id){
+ const x=ordById(id); if(!x){ suppOrd=null; return }
+ const b=ordBloquante(id);
+ if(b){ suppOrd=null; toast(`Ordonnance ${b} — sa suppression est réservée à l’administrateur`); paint&&paint(); return }
+ if(x.kind==='acte'){
+   const i=ORDONNANCES.indexOf(x.o);
+   CORBEILLE.push({kind:'ord', ord:x.o, i, hist:(DOCH[id]||[]).slice(),
+     ts:nowStamp(), par:ROLES[role].u,
+     quoi:`${x.nom} du ${DF(x.date)} — ${fn(pById(x.patient))}`});
+   ORDONNANCES.splice(i,1);
+ } else {
+   const i=DOCLIB.indexOf(x.o);
+   CORBEILLE.push({kind:'ordlib', ord:x.o, i, hist:(DOCH[id]||[]).slice(),
+     sign:SIGNS[id]||null, ts:nowStamp(), par:ROLES[role].u,
+     quoi:`${x.nom} du ${DF(x.date)} — ${fn(pById(x.patient))}`});
+   DOCLIB.splice(i,1); delete SIGNS[id];
+ }
+ delete DOCH[id];
+ suppOrd=null;
+ toast('Ordonnance supprimée · rattrapable'); paint&&paint(); if(AS) renderOver();
+}
+const btnSuppOrd=id=>{
+ const b=ordBloquante(id);
+ return b?`<button class="ib d" disabled title="Ordonnance ${b} — seul l’administrateur peut l’effacer">✕</button>`
+   :`<button class="ib d" title="Supprimer cette ordonnance"
+      onclick="event.stopPropagation();suppOrd='${id}';paint()">✕</button>` };
+const confirmSuppOrd=(id,cols)=>{
+ if(suppOrd!==id) return '';
+ const x=ordById(id); if(!x) return '';
+ const p=ordPartie(id);
+ return `<tr class="supp"><td colspan="${cols}">
+  <div class="suppb"><span class="e">⚠</span>
+    <div style="flex:1;min-width:0"><b>Supprimer l’${esc(x.nom.toLowerCase())} du ${DF(x.date)} ?</b>
+      <div class="mu">${p
+        ? `Elle a été ${esc(p)} : le patient en a une copie, et elle a pu être présentée en pharmacie. L’effacer retire du dossier la trace de ce qui a été prescrit.`
+        : 'Elle n’a pas quitté le cabinet — rien n’a été remis au patient.'}
+        Son historique part avec elle ; la suppression reste rattrapable.</div></div>
+    <button class="btn xs g" onclick="event.stopPropagation();suppOrd=null;paint()">Annuler</button>
+    <button class="btn xs crit" onclick="event.stopPropagation();supprimerOrdonnance('${id}')">Supprimer</button>
+  </div></td></tr>`;
+};
 function retablirActe(){
  const sac=CORBEILLE[CORBEILLE.length-1]; if(!sac) return;
  CORBEILLE.pop();
@@ -10965,6 +11039,15 @@ function retablirActe(){
    DEVIS.splice(Math.min(sac.i,DEVIS.length),0,sac.devis);
    if(sac.hist&&sac.hist.length) DOCH[sac.devis.id]=sac.hist;
    toast(`Devis ${sac.devis.id} rétabli`); paint&&paint(); return }
+ if(sac.kind==='ord'){
+   ORDONNANCES.splice(Math.min(sac.i,ORDONNANCES.length),0,sac.ord);
+   if(sac.hist&&sac.hist.length) DOCH[sac.ord.id]=sac.hist;
+   toast('Ordonnance rétablie'); paint&&paint(); return }
+ if(sac.kind==='ordlib'){
+   DOCLIB.splice(Math.min(sac.i,DOCLIB.length),0,sac.ord);
+   if(sac.hist&&sac.hist.length) DOCH[sac.ord.id]=sac.hist;
+   if(sac.sign) SIGNS[sac.ord.id]=sac.sign;
+   toast('Ordonnance rétablie'); paint&&paint(); return }
  if(sac.kind==='consent'){
    const a=ACTES.find(x=>x.id===sac.aid);
    CONS_SUPP.delete(sac.aid);
@@ -13043,7 +13126,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DO';
+const BUILD='DP';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
