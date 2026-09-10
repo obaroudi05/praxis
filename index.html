@@ -868,6 +868,12 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
   color:var(--accent-ink);background:var(--accent-wash);border-radius:5px;padding:2px 5px}
 .soinc-h .sc-tot{margin-left:auto;font-size:13px;font-weight:680;font-variant-numeric:tabular-nums;flex:none}
 .soinc-h .rm{flex:none}
+/* la flèche de repli : le pendant du clic qui déplie */
+.soinc-h .sc-ch{flex:none;width:22px;height:22px;border-radius:7px;border:1px solid transparent;
+  background:transparent;color:var(--ink-3);font-size:12px;line-height:1;cursor:pointer;
+  font-family:inherit;transition:.12s;display:grid;place-items:center;padding:0}
+.soinc-h .sc-ch:hover{border-color:var(--line-2);color:var(--ink);background:var(--panel)}
+.soinc.plie .soinc-h .sc-ch{color:var(--ink-3)}
 .sc-lib{flex:1;min-width:0;padding:4px 8px;font-size:12px}
 .sc-px{width:64px;text-align:right;padding:4px 7px;font-size:12px;flex:none}
 .soinc-b{padding:7px 10px}
@@ -1160,24 +1166,29 @@ tr.neuf>td{background:color-mix(in srgb,var(--accent) 9%,transparent)}
 .cum-c{display:flex;gap:4px;flex:0 1 auto;min-width:0;flex-wrap:nowrap;justify-content:flex-end;
   overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
 .cum-c .zc{flex:none}
-.cum-c .zc{display:inline-flex;align-items:center;gap:4px;border-color:color-mix(in srgb,var(--sc) 42%,transparent);
-  background:color-mix(in srgb,var(--sc) 9%,var(--panel))}
-.cum-c .zc:hover{border-color:var(--sc)}
-.cum-c .zc i,.cum-s i{width:6px;height:6px;border-radius:2px;display:inline-block;flex:none}
+/* Les pastilles ne portent plus de couleur : elle disait la séance, alors que
+   la même teinte disait déjà le produit ailleurs sur l'écran. Le numéro s'en
+   charge — un jeton sombre, lisible partout, y compris imprimé en noir. */
+.cum-c .zc{display:inline-flex;align-items:center;gap:0;padding:2px 7px 2px 3px;
+  border-color:var(--line);background:var(--panel)}
+.cum-c .zc:hover{border-color:var(--accent)}
 /* la légende des séances */
 .cum-lg{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:10.5px;
   color:var(--ink-3);margin:2px 0 8px;line-height:1.5}
 .cum-s{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:7px;
   border:1px solid var(--line);background:var(--panel);font-variant-numeric:tabular-nums}
 .cum-s b{font-weight:500;color:var(--ink-3)}
-.cum-s u{text-decoration:none;font-weight:640;color:var(--ink-2)}
-.cum-x{font-weight:500;color:var(--ink-3);font-size:10.5px;margin-left:5px}
-.cum-c .zc u{text-decoration:none;font-weight:640;font-variant-numeric:tabular-nums;
-  color:var(--sc);letter-spacing:.2px}
-/* un numéro de séance collé à une dose se lit comme un seul nombre : on les
-   sépare d'un filet, pas d'une espace qu'on ne verrait pas. */
-.cum-c .zc u+b{margin-left:5px;padding-left:5px;font-weight:560;
-  border-left:1px solid color-mix(in srgb,var(--sc) 34%,transparent)}
+.cum-s{padding:2px 8px 2px 3px}
+.vnum{display:inline-grid;place-items:center;min-width:16px;height:16px;padding:0 3px;
+  border-radius:5px;background:var(--ink-2);color:var(--panel);font-weight:800;font-size:10.5px;
+  vertical-align:1px}
+.cum-s u,.cum-c .zc u{text-decoration:none;font-weight:800;font-size:10.5px;
+  min-width:16px;height:16px;border-radius:5px;display:inline-grid;place-items:center;
+  background:var(--ink-2);color:var(--panel);margin-right:5px;
+  font-variant-numeric:tabular-nums;padding:0 3px}
+.cum-c .zc:hover u{background:var(--accent)}
+
+.cum-c .zc u+b{font-weight:600}
 .cum-lg .mu{font-size:10.5px}
 /* --- dossier d'un acte : onglets de section --- */
 .anav{display:flex;align-items:center;gap:5px;background:var(--panel-2);border:1px solid var(--line);
@@ -1862,12 +1873,19 @@ body.en-connexion aside{display:none}
 .zpill .zq{font:700 var(--fq,12px) var(--sans);fill:#fff;letter-spacing:.01em}
 .zpill .zd2{font:600 var(--fd,9px) var(--sans);fill:#fff;letter-spacing:.02em}
 .zpill .zd2.gauche{text-anchor:start}
-/* le carré de séance, posé sur la pastille : même couleur, même numéro que la
-   légende et que la liste de droite */
-.zpill .zsb{stroke:rgba(255,255,255,.9);stroke-width:.8}
-.zpill .zsn{font:700 calc(var(--fd,9px) * .86) var(--sans);fill:#fff;
+/* Le jeton de séance : un numéro, pas une couleur. La teinte est déjà prise
+   par le produit ; lui en donner une seconde, c'était faire dire deux choses
+   au même bleu. Le jeton se lit en creux sur la pastille — blanc sur plein,
+   sombre sur clair — et reste lisible à l'impression en noir et blanc. */
+/* mesuré : à 72 % de teinte le chiffre tombait à 4,45 pour 1 sur fond sombre.
+   Le jeton s'opacifie et le chiffre s'assombrit — la teinte reste lisible,
+   le contraste repasse le seuil. */
+.zpill .zsb{fill:rgba(255,255,255,.96);stroke:none}
+.zpill .zsn{font:800 calc(var(--fd,9px) * .92) var(--sans);
+  fill:color-mix(in srgb,var(--zc) 60%,#08172b);
   text-anchor:middle;dominant-baseline:middle}
-.zpill.ant .zsb{stroke:var(--panel);stroke-width:.8}
+.zpill.ant .zsb{fill:color-mix(in srgb,var(--zc) 68%,#08172b)}
+.zpill.ant .zsn{fill:var(--panel)}
 /* traitée autrefois, rien aujourd'hui : pastille claire, texte assombri */
 .zpill.ant rect.zbg{fill:var(--panel);fill-opacity:.96;stroke:var(--zc);stroke-opacity:.8;stroke-width:1.2}
 .zpill.ant .zq,.zpill.ant .zd2{fill:color-mix(in srgb,var(--zc) 68%,#08172b);fill-opacity:1}
@@ -4745,8 +4763,9 @@ const place=(x,y,w,h,pas,cadre)=>{
       Le fond garde le produit, le carré donne la séance : les deux
       informations tiennent sans se marcher dessus.
       ------------------------------------------------------------------------ */
-   const SC=(seances&&ant&&seances[ant[0].d])||null;
-   const wb=SC?FD*1.5:0;                       /* le carré de séance */
+   /* le numéro de séance n'a de sens que s'il y en a plusieurs à distinguer */
+   const SC=(seances&&ant&&Object.keys(seances).length>1&&seances[ant[0].d])||null;
+   const wb=SC?FD*1.5:0;                       /* le jeton de séance */
    /* La date est ancrée à gauche : toute sous-estimation de sa largeur la fait
       dépasser du fond, alors qu'un texte centré ne débordait que de moitié.
       On prend donc 8 % de marge sur l'estimation — mesuré, pas supposé : les
@@ -4774,8 +4793,7 @@ const place=(x,y,w,h,pas,cadre)=>{
                   fois sur trois. Ancrée, elle ne peut plus le recouvrir. */
                ? (()=>{ const x0=cx-wd/2, xd=x0+wb+FD*0.34;
                    return `<rect class="zsb" x="${x0.toFixed(1)}" y="${(yd-FD*0.62).toFixed(1)}"
-                       width="${wb.toFixed(1)}" height="${(FD*1.24).toFixed(1)}" rx="${(FD*0.34).toFixed(1)}"
-                       fill="${SC.c}"/>
+                       width="${wb.toFixed(1)}" height="${(FD*1.24).toFixed(1)}" rx="${(FD*0.62).toFixed(1)}"/>
                      <text class="zsn" x="${(x0+wb/2).toFixed(1)}" y="${yd.toFixed(1)}">${SC.n}</text>
                      <text class="zd2 gauche" x="${xd.toFixed(1)}" y="${yd.toFixed(1)}">${dt}</text>` })()
                : `<text class="zd2" x="${cx.toFixed(1)}" y="${yd.toFixed(1)}">${dt}</text>`):''}
@@ -6770,19 +6788,28 @@ function pDetail(p){
    const cur=parReg(schemaReg);
    const BAR=baremeById(schemaReg);
    /* ---------------------------------------------------------------------
-      Un seul code couleur pour tout l'écran
+      Une seule langue de couleur
       ---------------------------------------------------------------------
-      Les journées de soin se numérotent et se colorent ICI, avant que quoi
-      que ce soit ne se dessine : le schéma et la liste lisent la même table.
-      Calculée plus bas, au fil de la liste, elle arrivait vide au schéma —
-      qui se dessine en premier.
+      Cet écran en parlait deux à la fois, et elles se contredisaient : le
+      bleu voulait dire « toxine » sur une pastille et « séance 1 » sur un
+      carré ; l'orange voulait dire « acide hyaluronique » et « séance 2 ».
+      Les mêmes teintes, deux sens, au même endroit — illisible.
+
+      La couleur ne dit plus qu'une chose : LE PRODUIT. C'est la langue de
+      tout le logiciel, elle ne change pas ici. La séance, elle, se dit par
+      un NUMÉRO — neutre, sans teinte, le même sur le visage, dans la liste
+      et dans la légende. Deux zones qui portent ② ont été faites le même
+      jour, et rien ne vient brouiller la lecture.
+
+      Numérotées ici, avant que quoi que ce soit ne se dessine : le schéma
+      et la liste lisent la même table.
       --------------------------------------------------------------------- */
    const SEANCES=(()=>{
      const zs=Object.keys(cur);
      const jours=[...new Set(zs.flatMap(z=>(ZH[z]||[]).map(x=>x.d)))].sort();
-     const PAL=['#4b7bec','#e8833a','#2fa87c','#9b59c7','#d9534f','#0f9aa8','#c9992a','#6b7a8f'];
-     return Object.fromEntries(jours.map((d,i)=>[d,{n:i+1, c:PAL[i%PAL.length]}]));
+     return Object.fromEntries(jours.map((d,i)=>[d,{n:i+1}]));
    })();
+   const NSEANCES=Object.keys(SEANCES).length;
    return `<div class="fbar" style="margin-bottom:12px"><div class="seg">${ONGLETS.map(r=>{
       const n=Object.keys(parReg(r.id)).length;
       return `<button class="${schemaReg===r.id?'on':''}" onclick="schemaReg='${r.id}';paint()">${r.i} ${esc(r.n)} · ${n}</button>`}).join('')}</div></div>
@@ -6790,11 +6817,17 @@ function pDetail(p){
     <div>${BAR?baremeListe(BAR,cur,{ro:true,hist:ZH,motTotal:'déjà traitée'+(Object.keys(cur).length>1?'s':'')})
      :`<div class="facebox">${schemaSVG(cur,{editable:false,hist:ZH,region:schemaReg,zt:cumulT,ech:CUM_ECH,seances:SEANCES})}</div>
      <div class="face-legend"><span><i style="background:var(--toxine)"></i>Toxine</span><span><i style="background:var(--ah)"></i>Acide hyaluronique</span>
-      <span class="mu">le carré numéroté donne la séance — même code qu’à droite</span></div>`}</div>
+      <span class="mu">${NSEANCES>1?'la couleur dit le produit · le numéro dit la séance':'quantité cumulée et date de la dernière séance'}</span></div>`}</div>
     <div>
      <div class="tip" style="margin-bottom:10px"><span class="e">🗺️</span><div>${BAR
        ?`<b>Cure d'épilation.</b> Les zones déjà traitées de ce barème sont cochées ; à droite de chacune, la date de la dernière séance et le nombre de passages.`
-       :`<b>Cumul historique.</b> Sur le schéma, la quantité cumulée de chaque zone et sa dernière séance. À droite, une ligne par zone, de la plus petite dose à la plus grande, suivie d’une pastille par séance avec la dose de ce jour-là. Deux pastilles de la même couleur, sur deux zones différentes : c’est la même séance.`}</div></div>
+       :NSEANCES>1
+         ?`<b>Cumul historique.</b> La <b>couleur</b> dit le produit — bleu pour la toxine, orange pour l’acide hyaluronique.
+           Le <b>numéro</b> dit la séance : <span class="vnum">1</span> la plus ancienne, puis dans l’ordre.
+           Deux zones qui portent le même numéro ont été faites le même jour.
+           À droite, une ligne par zone, de la plus petite dose à la plus grande.`
+         :`<b>Cumul historique.</b> La couleur dit le produit — bleu pour la toxine, orange pour l’acide hyaluronique.
+           À droite, une ligne par zone, de la plus petite dose à la plus grande.`}</div></div>
      ${(()=>{
        const zones=Object.keys(cur);
        if(!zones.length) return '<div class="empty">Aucune injection enregistrée.</div>';
@@ -6820,31 +6853,27 @@ function pDetail(p){
           -------------------------------------------------------------------- */
        const jours=Object.keys(SEANCES).sort();
        const nSeance=Object.fromEntries(jours.map(d=>[d,SEANCES[d].n]));
-       const coul=d=>SEANCES[d].c;
+       const plusieurs=jours.length>1;
        return `
-       ${jours.length>1?`<div class="cum-lg"><span class="mu">Séances</span>${jours.map(d=>`<span class="cum-s" title="Séance ${nSeance[d]} du ${DF(d)}">
-          <i style="background:${coul(d)}"></i><u>${nSeance[d]}</u><b>${DFT(d)}</b></span>`).join('')}
-         </div>`:''}
+       ${plusieurs?`<div class="cum-lg"><span class="mu">Séances</span>${jours.map(d=>`<span class="cum-s" title="Séance ${nSeance[d]} du ${DF(d)}">
+          <u>${nSeance[d]}</u><b>${DFT(d)}</b></span>`).join('')}
+         <span class="mu">— le numéro se retrouve sur le schéma</span></div>`:''}
        ${zones.sort((a,b)=>(cur[a]-cur[b])||zoneNom(a).localeCompare(zoneNom(b),'fr')).map(z=>{
          const Z=zoneDef(z), L=(ZH[z]||[]).slice().sort((x,y)=>x.d.localeCompare(y.d));
          const t=cumulT[z]||(Z.p==='tox'?'BTX':'AH'), CZ=acteDef(t);
-         /* Trois séances de 4 U écrivaient « 4 U » trois fois pour un total de
-            12 U déjà affiché à côté : c'est du bruit, et c'est ce bruit qui
-            poussait la ligne à se replier. Quand toutes les séances portent la
-            même dose, on la dit une fois — au total, sous la forme « 3 × 4 U »
-            — et les pastilles ne gardent que leur couleur et leur numéro.
-            Dès que les doses diffèrent, chacune revient sur sa pastille : là,
-            elle apprend quelque chose. */
-         const egales = L.length>1 && CZ.unite && L.every(x=>x.q===L[0].q);
-         const detail = !egales;
+         /* Une pastille par séance : son numéro, sa dose. Il y avait ici deux
+            écritures selon que les doses étaient égales ou non — un total
+            « 3 × 4 U » d'un côté, des pastilles nues de l'autre. Deux règles
+            à retenir pour un gain de place que le jeton neutre, plus étroit
+            qu'une pastille colorée, rend inutile. Une seule écriture. */
          return `<div class="zrow cum-r" title="${esc(zoneNom(z))} — ${esc(CZ.n)} · ${L.length} séance${L.length>1?'s':''}">
           <span class="zd" style="background:${colActe(t)}"></span>
           <span class="cum-z">${esc(zoneNom(z))}</span>
-          <b class="mono cum-q">${q_(cur[z],t,CZ,z)}${egales?`<span class="cum-x">${L.length} × ${fmtDose(L[0].q,t,z)}</span>`:''}</b>
-          <span class="cum-c">${L.map(x=>`<button class="zc" style="--sc:${coul(x.d)}"
+          <b class="mono cum-q">${q_(cur[z],t,CZ,z)}</b>
+          <span class="cum-c">${L.map(x=>`<button class="zc"
             onclick="openActe(${p.id},${x.aid})"
             title="Séance ${nSeance[x.d]} du ${DF(x.d)}${x.q&&CZ.unite?' — '+fmtDose(x.q,t,z):''} — ouvrir l’acte">
-            <i style="background:${coul(x.d)}"></i><u>${jours.length>1?nSeance[x.d]:DFT(x.d)}</u>${detail&&x.q&&CZ.unite?'<b>'+fmtDose(x.q,t,z)+'</b>':''}</button>`).join('')}</span>
+            <u>${plusieurs?nSeance[x.d]:DFT(x.d)}</u>${x.q&&CZ.unite?'<b>'+fmtDose(x.q,t,z)+'</b>':''}</button>`).join('')}</span>
          </div>`}).join('')}`;
      })()}
     </div></div>`},
@@ -7328,19 +7357,23 @@ V.devis=()=>{
 
 /* ---------------- Encaissements ---------------- */
 let encView='detail', fMoyen='tous', fStatut='tous', fPrat='', fCat='', fq='';
-/* le relevé se transmet à un praticien : on choisit lequel, et c'est le sien
-   seul qui part — « tous » reste possible pour l'usage comptable interne */
-let retroPrat=null;
-const retroQui=()=>{ if(retroPrat!==null) return retroPrat;
- return PRATICIENS.includes(fPrat)?fPrat:(PRATICIENS[0]||'') };
-function setRetroPrat(v){ retroPrat=v; paint() }
+/* Un seul praticien par écran. Ce sélecteur ne désignait que le destinataire
+   du relevé exporté : on changeait de praticien, la liste et les totaux ne
+   bougeaient pas, et la barre de filtres en proposait un second qui, lui,
+   filtrait. Deux commandes pour une même idée, dont une sans effet visible.
+   Il n'en reste qu'une : elle filtre la liste, les totaux et le relevé. */
+const retroQui=()=>PRATICIENS.includes(fPrat)?fPrat:'';
+/* Un seul et même sélecteur, partout où un écran en montre un : mêmes options,
+   même ordre, même variable. « Tous » n'apparaît que si le droit existe. */
+const optionsPrat=()=>pratsArgent().map(x=>`<option value="${esc(x)}" ${fPrat===x?'selected':''}>${esc(x)}</option>`).join('')
+  +(caGlobal()?`<option value="" ${fPrat===''?'selected':''}>Tous les praticiens</option>`:'');
+const selPrat=(t='Praticien')=>`<span class="relx"><span class="mu">${t}</span>
+   <select class="inp" onchange="setRetroPrat(this.value)">${optionsPrat()}</select></span>`;
+function setRetroPrat(v){ fPrat=v; paint() }
 function choixRetro(){
- const q=retroQui();
- return `<span class="relx"><span class="mu">Relevé de</span>
-   <select class="inp" title="Le praticien à qui le relevé sera transmis"
-     onchange="setRetroPrat(this.value)">
-     ${pratsArgent().map(x=>`<option value="${esc(x)}" ${q===x?'selected':''}>${esc(x)}</option>`).join('')}
-     ${caGlobal()?`<option value="" ${q===''?'selected':''}>Tous les praticiens</option>`:''}</select>
+ return `<span class="relx"><span class="mu">Praticien</span>
+   <select class="inp" title="Filtre la liste et les totaux, et désigne le praticien du relevé"
+     onchange="setRetroPrat(this.value)">${optionsPrat()}</select>
    <button class="btn" onclick="releveRetro(retroQui())">⭳ Exporter le relevé</button></span>`;
 }
 const ENCV=[['detail','Facturations détaillées'],['jours','Totaux journaliers'],
@@ -7460,7 +7493,9 @@ function factFiltrees(){
   .filter(f=>{const p=pById(f.patient);return !q||[f.id,fn(p),String(f.patient),(ACTES.find(a=>a.id===f.acte)||{}).nom||''].join(' ').toLowerCase().includes(q)})
   .sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
 }
-function barreFiltres(){
+function barreFiltres(o){
+ /* le praticien peut déjà être commandé par l'en-tête : pas deux fois */
+ const cp=!o||o.prat!==false;
  return `<div class="fbar">
   <input class="inp" id="fqi" style="min-width:240px" placeholder="N°, patient, acte…" value="${esc(fq)}"
     oninput="fq=this.value;paint();const e=document.getElementById('fqi');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
@@ -7470,11 +7505,11 @@ function barreFiltres(){
   <select class="inp" onchange="fStatut=this.value;paint()">
    ${[['tous','Tous statuts'],['solde','Soldées'],['reste','Avec reste dû'],['avoir','Avec avoir'],['annulee','Annulées']]
      .map(([k,l])=>`<option value="${k}" ${fStatut===k?'selected':''}>${l}</option>`).join('')}</select>
-  <select class="inp" onchange="fPrat=this.value;paint()"><option value="">Tous praticiens</option>
-   ${pratsArgent().map(x=>`<option ${fPrat===x?'selected':''}>${x}</option>`).join('')}</select>
+  ${cp?`<select class="inp" onchange="fPrat=this.value;paint()"><option value="">Tous praticiens</option>
+   ${pratsArgent().map(x=>`<option ${fPrat===x?'selected':''}>${x}</option>`).join('')}</select>`:''}
   <select class="inp" onchange="fCat=this.value;paint()"><option value="">Toutes catégories</option>
    ${CATS.map(x=>`<option ${fCat===x?'selected':''}>${x}</option>`).join('')}</select>
-  ${(fq||fMoyen!=='tous'||fStatut!=='tous'||fPrat||fCat)?`<button class="chip" onclick="fq='';fMoyen='tous';fStatut='tous';fPrat='';fCat='';paint()">✕ Effacer</button>`:''}
+  ${(fq||fMoyen!=='tous'||fStatut!=='tous'||(cp&&fPrat)||fCat)?`<button class="chip" onclick="fq='';fMoyen='tous';fStatut='tous';${cp?"fPrat='';":''}fCat='';paint()">✕ Effacer</button>`:''}
  </div>`;
 }
 
@@ -7495,11 +7530,11 @@ function eDetail(){
  const cpt=CAN('compta'), dbl=FACTU.double&&cpt;
  return `<div class="head" style="margin-bottom:12px">
    <div><h1>Facturations détaillées</h1><p>${L.length} facturation${L.length>1?'s':''} sur la période${L.length!==ok.length?` · ${L.length-ok.length} annulée(s) exclue(s) des totaux`:''}</p></div>
-   <div class="r">${(FACTU.double&&CAN('compta'))?choixRetro():''}
+   <div class="r">${dbl?choixRetro():''}
     <button class="btn" onclick="exportFactures()">⭳ Exporter la liste</button>
     <button class="btn p" onclick="toast('Facturation créée')">+ Facturation</button></div></div>
  ${periodBar(perE,'setPerE',`${L.length} ligne${L.length>1?'s':''}`,presetsFactu(),1)}
- ${barreFiltres()}
+ ${barreFiltres(dbl?{prat:false}:null)}
  <div class="grid ${dbl?'g5':cpt?'g4':'g3'}" style="margin-bottom:13px">
   ${kpi('Facturation TTC',EUR(ttc),`${ok.length} facture(s) · moyenne ${EUR(ok.length?ttc/ok.length:0)}`)}
   ${cpt?kpi('Dont HT',EUR(ht),`TVA ${EUR(tva)}`):''}
@@ -7800,20 +7835,27 @@ function eJours(){
 
 /* ---------- Encaissement & caisse ---------- */
 function eCaisse(){
- const FP=FACTURES.filter(f=>inPer(f.date,perE)&&f.statut==='ok');
+ /* La caisse aussi appartient à quelqu'un. Cet écran lisait FACTURES en
+    entier : un médecin sans droit « CA du cabinet » y voyait l'encaissé, les
+    impayés, les chèques et les espèces de toute la structure — exactement ce
+    que les autres écrans lui refusent. Il passe par le même tamis, et le
+    praticien affiché se choisit ici comme ailleurs. */
+ const TOUT=mesFact(FACTURES).filter(f=>!fPrat||f.praticien===fPrat);
+ const FP=TOUT.filter(f=>inPer(f.date,perE)&&f.statut==='ok');
  const prev=perPrev(perE);
  const enc=FP.reduce((s,f)=>s+f.paye,0);
- const encPrev=FACTURES.filter(f=>inPer(f.date,prev)&&f.statut==='ok').reduce((s,f)=>s+f.paye,0);
+ const encPrev=TOUT.filter(f=>inPer(f.date,prev)&&f.statut==='ok').reduce((s,f)=>s+f.paye,0);
  const ev=encPrev?Math.round((enc-encPrev)/encPrev*100):0;
  const im=FP.filter(f=>rdu(f)>0).sort((a,b)=>a.date.localeCompare(b.date));
  const reste=im.reduce((s,f)=>s+rdu(f),0);
  const pm=MOYENS.map(m=>({label:m,v:FP.filter(f=>f.moyen===m).reduce((s,f)=>s+f.paye,0)})).filter(x=>x.v);
- const serie=perBuckets(perE).map(b=>({label:b.label,v:FACTURES.filter(f=>f.statut==='ok'&&f.date>=b.from&&f.date<=b.to).reduce((s,f)=>s+f.paye,0)}));
+ const serie=perBuckets(perE).map(b=>({label:b.label,v:TOUT.filter(f=>f.statut==='ok'&&f.date>=b.from&&f.date<=b.to).reduce((s,f)=>s+f.paye,0)}));
  const spanE=days(...perRange(perE))+1;
  const gran=spanE<=14?'par jour':spanE<=95?'par semaine':'par mois';
  return `<div class="head" style="margin-bottom:12px">
-  <div><h1>Encaissement &amp; caisse</h1><p>${FP.length} facture${FP.length>1?'s':''} · ${EUR(enc)} encaissés</p></div>
-  <div class="r"><button class="btn" onclick="toast('Clôture de caisse enregistrée')">Clôture du jour</button>
+  <div><h1>Encaissement &amp; caisse</h1><p>${FP.length} facture${FP.length>1?'s':''} · ${EUR(enc)} encaissés${fPrat?' · '+esc(fPrat):''}</p></div>
+  <div class="r">${pratsArgent().length>1?selPrat():''}
+   <button class="btn" onclick="toast('Clôture de caisse enregistrée')">Clôture du jour</button>
    <button class="btn p" onclick="toast('Encaissement saisi')">+ Encaissement</button></div></div>
  ${periodBar(perE,'setPerE',`${FP.length} facture${FP.length>1?'s':''}`,presetsFactu(),1)}
  <div class="grid g4" style="margin-bottom:14px">
@@ -11481,6 +11523,8 @@ function renderOver(){
             x.mat?esc(paramsTexte(x)||matById(x.mat).n):'', (x.com||'').trim()?esc(x.com.trim()):'']
             .filter(Boolean).join(' · ')||'à compléter'}</span>`})()}
           ${EUROS?`<b class="sc-tot">${EUR(tot)}</b>`:''}
+          ${AS.ro?'':`<button class="sc-ch" onclick="event.stopPropagation();replierSoin(${i})"
+             title="${ouvert?'Replier ce soin':'Déplier ce soin'}" aria-label="${ouvert?'Replier':'Déplier'}">${ouvert?'▾':'›'}</button>`}
           ${AS.ro?'':`<button class="rm" onclick="event.stopPropagation();rmSoin(${i})" title="Retirer ce soin de la séance">✕</button>`}
         </div>
         <div class="soinc-b">
@@ -12239,6 +12283,20 @@ function soinsLecture(){
 function ouvrirSoin(i){ AS.openSoin=i;
  const x=(AS.soins||[])[i]; if(x&&x.t) AS.type=x.t;
  renderOver() }
+/* ==========================================================================
+   Replier un soin
+   --------------------------------------------------------------------------
+   Une carte s'ouvrait d'un clic, mais rien ne la refermait : il fallait en
+   ouvrir une autre pour se débarrasser de celle-ci, et sur une séance à un
+   seul soin c'était impossible. La flèche fait les deux sens.
+   ========================================================================== */
+function replierSoin(i){
+ if(!AS) return;
+ const ouvert=!draftActif()&&(AS.openSoin==null?i===0:AS.openSoin===i);
+ if(ouvert){ AS.openSoin=TOUS_PLIES }
+ else { AS.openSoin=i; const x=(AS.soins||[])[i]; if(x&&x.t) AS.type=x.t }
+ renderOver();
+}
 /* Reprendre un devis pour le réaliser : mêmes soins, mêmes zones, mêmes montants,
    à la date du jour — il ne reste qu'à consigner ce qui s'est réellement passé. */
 function realiserDevis(id){
@@ -13221,7 +13279,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DQ';
+const BUILD='DR';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
