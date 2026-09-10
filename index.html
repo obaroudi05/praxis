@@ -2074,14 +2074,16 @@ body.en-connexion aside{display:none}
       </button>
     </div>
     <nav id="nav">
-      <div class="sgroup">Pilotage</div>
-      <a data-v="dash" class="on"><span class="i">◈</span>Tableau de bord</a>
-      <a data-v="stats"><span class="i">◔</span>Statistiques</a>
-      <a data-v="envois"><span class="i">✉</span>Envois &amp; remises<span class="n" id="n-env">0</span></a>
+      <!-- Les soins d'abord : c'est le métier. Le pilotage vient après, il
+           regarde ce que les soins ont produit. -->
       <div class="sgroup">Soins</div>
       <a data-v="patients"><span class="i">◍</span>Patients</a>
       <a data-v="actes"><span class="i">✚</span>Suivi des actes</a>
       <a class="soon"><span class="i">▤</span>Agenda<span class="n">Phase 2</span></a>
+      <div class="sgroup">Pilotage</div>
+      <a data-v="dash" class="on"><span class="i">◈</span>Tableau de bord</a>
+      <a data-v="stats"><span class="i">◔</span>Statistiques</a>
+      <a data-v="envois"><span class="i">✉</span>Envois &amp; remises<span class="n" id="n-env">0</span></a>
       <div class="sgroup">Facturation</div>
       <a data-v="devis"><span class="i">◫</span>Devis et conversions<span class="n" id="n-devis">0</span></a>
       <a data-v="encaiss"><span class="i">€</span>Facturation &amp; caisse</a>
@@ -13006,7 +13008,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DM';
+const BUILD='DN';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -15485,6 +15487,18 @@ function paint(){
  const al=ROLES[role].v; if(!al.includes(view))view='dash';
  document.querySelectorAll('#nav a[data-v]').forEach(a=>{a.classList.toggle('on',a.dataset.v===view);
   a.style.display=al.includes(a.dataset.v)?'':'none'});
+ /* Un titre de section sans rien dessous. Le secrétariat n'a accès à aucune
+    entrée d'administration : il voyait pourtant le mot « ADMIN » seul en bas
+    du menu, comme une porte fermée dont on lui montre la poignée. On masque
+    le titre quand tout ce qu'il annonce est masqué. */
+ let titre=null, garni=false;
+ [...document.querySelectorAll('#nav > *')].forEach(e=>{
+  if(e.classList.contains('sgroup')){
+    if(titre) titre.style.display=garni?'':'none';
+    titre=e; garni=false; return }
+  if(e.style.display!=='none') garni=true;
+ });
+ if(titre) titre.style.display=garni?'':'none';
  [['n-devis',ATT.length],['n-rel',RDUE.length],['n-stock',ALERTES.length],
   ['n-env',ENVOIS.filter(e=>e.statut==='echec').length]].forEach(([i,v])=>{
   const e=document.getElementById(i); e.textContent=v; e.style.display=v?'':'none'});
