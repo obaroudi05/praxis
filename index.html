@@ -4475,6 +4475,40 @@ let DOCMOD=[
 ];
 
 /* ==========================================================================
+   Les suites d'un soin deviennent des modèles du cabinet
+   --------------------------------------------------------------------------
+   Le choix d'un modèle d'ordonnance proposait deux listes : des « suites d'un
+   soin » figées dans le logiciel, et les modèles du cabinet. La première
+   n'était pas modifiable — un praticien qui ne prescrit pas d'arnica devait
+   corriger la même ligne à chaque ordonnance, sans jamais pouvoir la changer
+   une bonne fois.
+
+   Ces prescriptions ne sont pas jetées pour autant : elles rejoignent les
+   modèles du cabinet, où elles se modifient, se renomment et se suppriment
+   comme les autres. Il ne reste donc qu'une seule liste, et elle vous
+   appartient.
+   ========================================================================== */
+(function suitesEnModeles(){
+ const NOM={AH:'Suites d’acide hyaluronique', BTX:'Suites de toxine botulique',
+   SKB:'Suites de skinbooster', PEEL:'Suites de peeling',
+   MESO:'Suites de mésothérapie', LAS2:'Suites de laser'};
+ /* on ne recrée pas ce que le cabinet a déjà : la comparaison porte sur le
+    TEXTE, pas sur le nom — « Suites d'injection » et « Suites d'acide
+    hyaluronique » portent la même prescription */
+ const norme=t=>String(t||'').replace(/\s+/g,' ').trim().toLowerCase();
+ const deja=new Set(DOCMOD.filter(m=>m.cat==='Ordonnance').map(m=>norme(m.corps)));
+ Object.keys(ORDO_TPL).forEach(t=>{
+  if(!catById(t)) return;
+  const corps=ORDO_TPL[t].join('\n');
+  if(deja.has(norme(corps))) return;
+  deja.add(norme(corps));
+  DOCMOD.push({id:'ord-'+t.toLowerCase(), cat:'Ordonnance',
+    nom:NOM[t]||('Suites de '+acteDef(t).n.toLowerCase()), corps});
+ });
+})();
+
+
+/* ==========================================================================
    Composants
    ========================================================================== */
 const kpi=(k,v,d,c)=>`<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div>${d?`<div class="d ${c||''}">${d}</div>`:''}</div>`;
@@ -12483,10 +12517,11 @@ function ouvrirDocLib(pid,k){
 function fermerDocLib(){ docLib=null; paint() }
 function dlMaj(champ,v){ if(!docLib) return;
  docLib[champ]=v;
- if(champ==='modele'&&v){
-   const m=DOCMOD.find(x=>x.id===v);
-   if(m) docLib.lignes=hfTexte(hfH(m,'corps'), tplCtx(pById(docLib.pid)));
-   else docLib.lignes=(ORDO_TPL[v]||[]).join('\n');
+ if(champ==='modele'){
+   /* « — page blanche — » veut dire page blanche : laisser la prescription
+      précédente en place, c'était promettre le contraire de ce qui s'affiche. */
+   const m=v?DOCMOD.find(x=>x.id===v):null;
+   docLib.lignes=m?hfTexte(hfH(m,'corps'), tplCtx(pById(docLib.pid))):'';
  }
  paint();
 }
@@ -12539,11 +12574,11 @@ function formDocLib(p){
    ${ord?`<label>Partir d’un modèle
      <select class="inp" onchange="dlMaj('modele',this.value)">
        <option value="">— page blanche —</option>
-       <optgroup label="Suites d’un soin">${Object.keys(ORDO_TPL).filter(t=>catById(t)).map(t=>
-         `<option value="${t}" ${docLib.modele===t?'selected':''}>${esc(acteDef(t).n)}</option>`).join('')}</optgroup>
-       ${MODS.length?`<optgroup label="Modèles du cabinet">${MODS.map(m=>
-         `<option value="${m.id}" ${docLib.modele===m.id?'selected':''}>${esc(m.nom)}</option>`).join('')}</optgroup>`:''}
-     </select></label>`
+       ${MODS.map(m=>`<option value="${m.id}" ${docLib.modele===m.id?'selected':''}>${esc(m.nom)}</option>`).join('')}
+     </select>
+     <div class="mu" style="font-size:10.5px;margin-top:3px">${MODS.length
+       ? `<a onclick="fermerDocLib();closeAll();go('params');paramTab='documents';docMode='modele';paint()">Régler les modèles →</a>`
+       : `Aucun modèle d’ordonnance. <a onclick="fermerDocLib();closeAll();go('params');paramTab='documents';docMode='modele';paint()">En créer un →</a>`}</div></label>`
     :`<label>Soin concerné
       <select class="inp" onchange="dlMaj('type',this.value)">
         ${optionsActes(docLib.type)}
@@ -13008,7 +13043,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DN';
+const BUILD='DO';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
