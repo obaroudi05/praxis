@@ -3543,6 +3543,9 @@ const RESTE=FACTURES.reduce((s,f)=>s+rdu(f),0);
 const ATT=DEVIS.filter(d=>['envoye','relance1','relance2'].includes(d.statut));
 const MATT=ATT.reduce((s,d)=>s+d.montant,0);
 const ALERTES=STOCK.filter(s=>['bas','rupture','per'].includes(sst(s).k));
+/* « E-mail — Rappel doux », « SMS — Votre devis est toujours valable » : le
+   libellé de l'étape porte son canal. On le lit une fois, ici. */
+const canalRegle=r=>!r?null:/sms/i.test(r.c)?'SMS':/mail/i.test(r.c)?'e-mail':null;
 function fileRelances(){
  const o=[];
  ATT.forEach(d=>{const R=RULES.filter(x=>x.on), r=R[d.relances]; if(!r)return;
@@ -4821,7 +4824,7 @@ V.dash=()=>{
       l'ouvre, et le bouton le dit pour ceux qui ne devinent pas le clic */
    cl:'c', go:`apercuDevis('${r.d.id}')`, ti:'Voir le devis',
    a:`<button class="btn s" onclick="event.stopPropagation();apercuDevis('${r.d.id}')">◉ Aperçu</button>
-      <button class="btn s p" onclick="event.stopPropagation();sendRel('${r.d.id}')">Envoyer</button>`}));
+      <button class="btn s p" onclick="event.stopPropagation();composerRelance('${r.d.id}')">Relancer</button>`}));
  ALERTES.forEach(s=>todo.push({i:'▧',b:'var(--crit-w)',c:'#a52a2a',t:`${sst(s).l} — ${s.n}`,
    d:`${s.q} ${s.u} en stock · seuil ${s.s} · ${s.f}`,
    a:`<button class="btn s" onclick="toast('Bon de commande préparé pour ${esc(s.f)}')">Commander</button>`}));
@@ -5715,6 +5718,36 @@ function composerEnvoi(aid,id,dvId){
  document.getElementById('envv').classList.add('on');
  renderEnvoi();
 }
+/* ==========================================================================
+   Relancer, c'est envoyer — pas déclencher
+   --------------------------------------------------------------------------
+   La relance partait d'un seul clic : canal imposé (celui du patient), message
+   invisible, aucun retour en arrière possible. L'envoi initial, lui, ouvre une
+   fenêtre où l'on choisit e-mail ou SMS, où l'on relit le texte, et où l'on
+   peut annuler. Il n'y avait aucune raison qu'une relance mérite moins de
+   soin : c'est le même document, au même patient, et c'est la deuxième fois
+   qu'on le dérange.
+
+   La relance passe donc par la même fenêtre. Seul l'envoi groupé — « envoyer
+   les N relances échues » — reste d'un clic : on ne compose pas quinze
+   messages un par un, et c'est bien pour cela qu'on l'a groupé.
+   ========================================================================== */
+function composerRelance(id){
+ const dv=DEVIS.find(x=>x.id===id); if(!dv) return;
+ const p=pById(dv.patient); if(!p) return;
+ const n=(dv.relances||0)+1;
+ /* l'étape du scénario propose son canal ; on ouvre dessus, et on en change
+    d'un clic si le patient se joint mieux autrement */
+ const et=RELS.find(r=>r.d.id===id);
+ const sug=et&&canalRegle(et.r), joignable=sug&&destDe(p,sug);
+ const canal=(joignable&&joignable!=='—')?sug:canalDe(p), modeE=EXPEDITEUR.mode;
+ const sg=docSignable('devis')&&modeE==='lien'&&!signOf(dv.id);
+ ENV={aid:dv.acte||null, docId:dv.id, docNom:nomDevis(dv), docK:'devis', pid:p.id,
+   canal, mode:modeE, sign:sg, relance:n,
+   objet:objetPour(p,'devis',modeE==='lien',sg)};
+ document.getElementById('envv').classList.add('on');
+ renderEnvoi();
+}
 function fermerEnvoi(){ ENV=null; document.getElementById('envv').classList.remove('on') }
 /* Un objet neutre : ni le soin, ni le motif. Une adresse mal saisie ne doit rien
    révéler de médical. */
@@ -5728,7 +5761,7 @@ function corpsEnvoi(){
 function renderEnvoi(){
  if(!ENV) return;
  const p=pById(ENV.pid), B=document.getElementById('envB'), F=document.getElementById('envF');
- document.getElementById('envT').textContent='Envoyer — '+ENV.docNom;
+ document.getElementById('envT').textContent=(ENV.relance?`Relance ${ENV.relance} — `:'Envoyer — ')+ENV.docNom;
  document.getElementById('envS').textContent=`${fn(p)} · dossier ${p.id}`;
  const dest=destDe(p,ENV.canal), sms=ENV.canal==='SMS';
  const ok=dest&&dest!=='—';
@@ -5765,14 +5798,16 @@ function renderEnvoi(){
     ?'Relais d’envoi branché.'
     :'Relais d’envoi non branché — l’envoi sera journalisé, la remise reste à venir.'}</span>
    <div class="r"><button class="btn g" onclick="fermerEnvoi()">Annuler</button>
-   <button class="btn p" ${ok?'':'disabled'} onclick="envoyerDepuisComposeur()">✉ Envoyer</button></div>`;
+   <button class="btn p" ${ok?'':'disabled'} onclick="envoyerDepuisComposeur()">${
+     ENV.relance?'↻ Envoyer la relance':'✉ Envoyer'}</button></div>`;
 }
 function envoyerDepuisComposeur(){
  if(!ENV) return;
  const o={canal:ENV.canal, objet:ENV.objet, mode:ENV.mode, sign:!!ENV.sign};
- const aid=ENV.aid, id=ENV.docId, k=ENV.docK, pid=ENV.pid;
+ const aid=ENV.aid, id=ENV.docId, k=ENV.docK, pid=ENV.pid, rel=ENV.relance;
  fermerEnvoi();
- if(libById(id)) sendDocLib(id,o);
+ if(rel) sendRel(id,o);
+ else if(libById(id)) sendDocLib(id,o);
  else if(k==='devis'&&!ACTES.find(x=>x.id===aid)) envoyerDevis(id,o);
  else sendDoc(aid,id,o);
 }
@@ -5813,8 +5848,12 @@ function envoyerDevis(id,o){
  const plus=(t,min)=>{const [d,h]=t.split('T'); const D=new Date(`${d}T${h}:00`);
    D.setMinutes(D.getMinutes()+min);
    return `${D.toISOString().slice(0,10)}T${String(D.getHours()).padStart(2,'0')}:${String(D.getMinutes()).padStart(2,'0')}`};
- const pose=(p,jour,docId,docNom,docK,aid)=>{
-  const canal=canalDe(p), t=hh(jour, 9+Math.floor(rnd()*9), Math.floor(rnd()*60));
+ const pose=(p,jour,docId,docNom,docK,aid,voulu)=>{
+  /* le scénario annonce un canal par étape ; une relance qui part par un autre
+     fait mentir la file d'attente. On suit le scénario quand le patient a bien
+     ce qu'il faut pour le recevoir. */
+  const dv=voulu&&destDe(p,voulu);
+  const canal=(dv&&dv!=='—')?voulu:canalDe(p), t=hh(jour, 9+Math.floor(rnd()*9), Math.floor(rnd()*60));
   const e=creerEnvoi({pid:p.id, aid, docId, docNom, docK, canal, dest:destDe(p,canal),
     objet:objetNeutre(docK), mode:'lien', t, par:'Secrétariat'});
   const r=rnd();
@@ -5827,7 +5866,19 @@ function envoyerDevis(id,o){
  DEVIS.filter(d=>d.envoye).forEach(d=>{
   const p=pById(d.patient); if(!p) return;
   pose(p,d.envoye,d.id,nomDevis(d),'devis',d.acte||null);
-  if(d.derniere&&d.derniere!==d.envoye) pose(p,d.derniere,d.id,nomDevis(d)+' — relance','devis',d.acte||null);
+  /* Une relance comptée est une relance partie. Le jeu de démonstration n'en
+     journalisait qu'une, quel que soit le compteur du devis : l'historique
+     affichait une relance là où la fiche en annonçait deux. Un registre qui
+     ment par défaut est pire qu'un registre vide. */
+  const R=RULES.filter(x=>x.on), n=d.relances||0;
+  for(let i=0;i<n;i++){
+    const j=R[i]?R[i].j:(i+1)*7;
+    let t=new Date(new Date(d.envoye).getTime()+j*864e5).toISOString().slice(0,10);
+    if(i===n-1&&d.derniere&&d.derniere>d.envoye) t=d.derniere;
+    if(t>TODAYS) t=TODAYS;
+    if(t<d.envoye) t=d.envoye;
+    pose(p,t,d.id,nomDevis(d)+' — relance '+(i+1),'devis',d.acte||null,canalRegle(R[i]));
+  }
  });
  FACTURES.filter(f=>f.statut!=='annulee').slice(0,26).forEach(f=>{
   const p=pById(f.patient); if(!p) return;
@@ -5877,6 +5928,43 @@ function renvoyer(id){
  const n=poserEnvoi(p,e.docId,e.docNom,e.docK,e.aid,{canal:e.canal,objet:e.objet,mode:e.mode});
  envSel=n.id; paint(); toast(`Renvoyé à ${fn(p)} · ${n.ref}`);
 }
+/* ==========================================================================
+   L'historique des relances : ce qui est parti, pas ce qui était prévu
+   --------------------------------------------------------------------------
+   La fiche du devis reconstituait sa chronologie à partir du scénario : elle
+   affichait la date à laquelle la relance J+7 aurait dû partir, un « envoyé
+   par e-mail » écrit en dur, et rien de ce que le message était devenu. Si la
+   relance était partie par SMS, la fiche disait e-mail. Si elle avait échoué,
+   la fiche disait qu'elle était partie. Une chronologie qui décrit ce qui
+   était prévu au lieu de ce qui s'est passé ne sert à rien : on la consulte
+   justement quand le patient ne répond pas.
+
+   Le registre des envois sait tout cela — canal, destinataire, remise,
+   ouverture, échec et motif. On le lit.
+   ========================================================================== */
+const envoisDevis=id=>ENVOIS.filter(e=>e.docK==='devis'&&e.docId===id)
+  .sort((a,b)=>a.ts.localeCompare(b.ts));
+const estRelance=e=>/—\s*relance/i.test(e.docNom||'');
+const relancesDe=id=>envoisDevis(id).filter(estRelance);
+const noRelance=e=>{const m=(e.docNom||'').match(/relance\s*(\d+)/i); return m?+m[1]:null};
+/* la chronologie d'un devis, prête à afficher */
+function chronoDevis(d){
+ const H=envoisDevis(d.id).map(e=>{const n=noRelance(e);
+   return {t:e.ts, heure:true, ic:estRelance(e)?'↻':'✉',
+     lib:(estRelance(e)?`Relance${n?' '+n:''}`:'Devis envoyé')+' par '+e.canal, e}});
+ /* un devis marqué envoyé sans trace au registre garde tout de même sa date */
+ if(!H.length&&d.envoye) H.push({t:d.envoye, heure:false, ic:'✉', lib:'Devis envoyé'});
+ const fin=d.statut==='accepte'?['✓','Devis accepté']
+   :d.statut==='refuse'?['✕','Devis refusé']
+   :d.statut==='expire'?['⏱','Expiré (30 j sans réponse)']:null;
+ if(fin) H.push({t:d.derniere||d.date, heure:false, ic:fin[0], lib:fin[1]});
+ return H.sort((a,b)=>a.t.localeCompare(b.t));
+}
+const chronoLigne=x=>`<div class="tl">
+   <div class="ic" style="background:var(--accent-wash);color:var(--accent-ink)">${x.ic}</div>
+   <div><div class="t">${esc(x.lib)}${x.e?' '+bdg(ENV_ST[x.e.statut][0],ENV_ST[x.e.statut][1]):''}</div>
+    <div class="d">${x.heure?DTS(x.t):DF(x.t)}${x.e?' · '+esc(x.e.dest)+' · '+(x.e.mode==='lien'?'lien sécurisé':'pièce jointe'):''}${
+      x.e&&x.e.motif?' · '+esc(x.e.motif):''}</div></div></div>`;
 const envBandeau=()=>EXPEDITEUR.relais?'':`<div class="tip"><span class="e">✉</span><div>
   <b>Relais d’envoi non branché.</b> Les envois sont journalisés et horodatés ici comme ils le seront en
   production ; ${EXPEDITEUR.demo?'les états de remise sont simulés pour la démonstration':'ils restent en file tant que le relais n’est pas branché'}.
@@ -7246,12 +7334,7 @@ function setDActe(v){ dActe=v; if(v) dCat=acteDef(v).cat; paint() }
 const devSansFiltre=()=>!dCat&&!dActe;
 V.devis=()=>{
  if(dSel){const d=DEVIS.find(x=>x.id===dSel),p=pById(d.patient);
-  const h=[]; if(d.envoye)h.push([d.envoye,'Devis envoyé par e-mail','✉']);
-  for(let i=0;i<d.relances;i++){const r=RULES.filter(x=>x.on)[i];
-   h.push([new Date(new Date(d.envoye).getTime()+r.j*864e5).toISOString().slice(0,10),`Relance ${r.c} — ${r.l}`,'↻'])}
-  if(d.statut==='accepte')h.push([d.derniere||d.date,'Devis accepté','✓']);
-  if(d.statut==='refuse')h.push([d.derniere||d.date,'Devis refusé','✕']);
-  if(d.statut==='expire')h.push([d.derniere||d.date,'Expiré (30 j sans réponse)','⏱']);
+  const h=chronoDevis(d), nRel=relancesDe(d.id).length;
   const nx=RELS.find(r=>r.d.id===d.id);
   return `<div class="head"><div><h1>${d.id}</h1><p>${esc(fn(p))} · ${(()=>{const e=devisEtabliTxt(d);
     return `établi le ${e.cree}`+(e.maj?` <span class="mu">· modifié le ${e.maj}</span>`:'')})()} · ${bdgDevis(d)}${
@@ -7268,7 +7351,7 @@ V.devis=()=>{
       :`<button class="btn p" title="Ouvrir le message d’envoi — lien sécurisé et signature à distance"
         onclick="composerEnvoi(null,null,'${d.id}')">✉ Envoyer pour signature</button>`}
     ${lienDe(d.id)?`<button class="btn" onclick="pageSignature('${lienDe(d.id).jeton}')">🔗 Page du patient</button>`:''}
-    <button class="btn" onclick="sendRel('${d.id}')">↻ Relancer</button></div></div>
+    <button class="btn" onclick="composerRelance('${d.id}')">↻ Relancer</button></div></div>
   ${lienDe(d.id)?(()=>{const l=lienDe(d.id), e=lienEtat(l);
     return `<div class="tip"><span class="e">✎</span><div><b>Signature à distance — ${LIEN_ST[e][1].replace(/^[^ ]+ /,'')}</b> ·
       lien émis le ${DTS(l.cree)}${l.ouvert?`, ouvert le ${DTS(l.ouvert)}`:''}${l.signe?`, signé le ${DTS(l.signe)}`:''}
@@ -7280,10 +7363,10 @@ V.devis=()=>{
     ${d.lignes.map(l=>`<tr><td>${esc(l[1])}</td><td class="num">${l[2]}</td><td class="num">${EUR(l[3])}</td><td class="num">${EUR(l[2]*l[3])}</td></tr>`).join('')}
     <tr><td colspan="3" class="num"><b>Total TTC</b></td><td class="num"><b>${EUR(d.montant)}</b></td></tr></tbody></table></div>
     <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">Devis valable ${d.validite||30} jours. Devis détaillé obligatoire au-delà de ${SEUIL_DEVIS} € (arrêté du 17 octobre 1996) — ou à la demande du patient. Le délai de réflexion de 15 jours ne s'impose qu'en chirurgie esthétique.</div></div></div>
-   <div class="card"><div class="h"><h2>Historique &amp; relances</h2><div class="r">${nx?bdg('b-warn','Prochaine : '+DF(nx.e)):bdg('b-neu','Aucune')}</div></div>
-    <div class="b">${h.sort((a,b)=>a[0].localeCompare(b[0])).map(x=>`<div class="tl">
-     <div class="ic" style="background:var(--accent-wash);color:var(--accent-ink)">${x[2]}</div>
-     <div><div class="t">${esc(x[1])}</div><div class="d">${DF(x[0])}</div></div></div>`).join('')}
+   <div class="card"><div class="h"><h2>Historique &amp; relances</h2><div class="r">
+     ${bdg(nRel?'b-info':'b-neu', nRel?nRel+' relance'+(nRel>1?'s':'')+' envoyée'+(nRel>1?'s':''):'aucune relance')}
+     ${nx?bdg('b-warn','Prochaine : '+DF(nx.e)):''}</div></div>
+    <div class="b">${h.map(chronoLigne).join('')}
      ${nx?`<div class="tip" style="margin-top:12px"><span class="e">↻</span><div><b>${nx.r.c} programmé le ${DF(nx.e)}</b> — ${esc(nx.r.l)}${nx.du?' <b style="color:var(--crit)">· échu</b>':''}</div></div>`:''}</div></div>
   </div>`;}
 
@@ -7346,8 +7429,8 @@ V.devis=()=>{
             onclick="event.stopPropagation();pageSignature('${lienDe(d.id).jeton}')">🔗</button>`
         :`<button class="btn xs p" title="Ouvrir le message d’envoi — lien sécurisé et signature à distance"
             onclick="event.stopPropagation();composerEnvoi(null,null,'${d.id}')">✉ Envoyer</button>`}
-      ${nx&&nx.du?`<button class="btn xs" title="Envoyer une relance sans repasser par le message"
-          onclick="event.stopPropagation();sendRel('${d.id}')">↻ Relancer</button>`:''}
+      ${nx&&nx.du?`<button class="btn xs" title="Choisir le canal et relire le message avant d’envoyer"
+          onclick="event.stopPropagation();composerRelance('${d.id}')">↻ Relancer</button>`:''}
       ${(d.realise||['refuse','expire'].includes(d.statut))?'':`<button class="btn xs" title="Reprendre ces soins pour la consultation d’aujourd’hui"
         onclick="event.stopPropagation();realiserDevis('${d.id}')">✚ Réaliser</button>`}
       ${btnSuppDevis(d)}</td></tr>${confirmSuppDevis(d,8)}`}).join('')}
@@ -7900,10 +7983,61 @@ V.relances=()=>`<div class="head"><div><h1>Relances automatiques</h1><p>Le devis
     <td class="nm">${esc(fn(pById(r.d.patient)))}</td><td class="num">${EUR(r.d.montant)}</td><td>${r.r.c}</td>
     <td>${r.du?bdg('b-crit','⚠ Échue'):bdg('b-info','Programmée')}</td>
     <td class="num" style="white-space:nowrap"><button class="btn xs" onclick="event.stopPropagation();apercuDevis('${r.d.id}')">◉ Aperçu</button>
-     ${r.du?`<button class="btn xs p" onclick="event.stopPropagation();sendRel('${r.d.id}')">Envoyer</button>`:''}</td></tr>`).join('')}</tbody></table>
+     ${r.du?`<button class="btn xs p" onclick="event.stopPropagation();composerRelance('${r.d.id}')">Relancer</button>`:''}</td></tr>`).join('')}</tbody></table>
     ${RELS.length?'':'<div class="empty">Rien en attente.</div>'}</div>
    <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">Sur les ${ATT.length} devis en attente (${EUR(MATT)}), une relance structurée récupère typiquement 15 à 25 % de plus qu'une relance manuelle irrégulière — soit <b style="color:var(--ink)">${EUR(Math.round(MATT*.2))}</b> par cycle.</div></div></div>
- </div>`;
+ </div>
+ ${histoRelances()}`;
+
+/* ==========================================================================
+   Ce qui est déjà parti
+   --------------------------------------------------------------------------
+   L'écran ne montrait que l'avenir : le scénario et la file d'attente. Devant
+   un patient qui ne répond pas, la question n'est pourtant pas « quand vais-je
+   le relancer » mais « qu'est-ce qui lui a déjà été envoyé, par quel canal, et
+   l'a-t-il seulement reçu ». Un SMS non remis relancé trois fois par SMS,
+   c'est trois fois rien.
+   ========================================================================== */
+let relQ='', relCanal='', relStat='';
+function histoRelances(){
+ const q=relQ.trim().toLowerCase();
+ const L=ENVOIS.filter(e=>e.docK==='devis'&&estRelance(e))
+  .filter(e=>!relCanal||e.canal===relCanal)
+  .filter(e=>!relStat||e.statut===relStat)
+  .filter(e=>{const p=pById(e.pid);
+    return !q||[e.docId,e.dest,e.ref,p?fn(p):''].join(' ').toLowerCase().includes(q)})
+  .sort((a,b)=>b.ts.localeCompare(a.ts));
+ const n=k=>ENVOIS.filter(e=>e.docK==='devis'&&estRelance(e)&&(k==='tous'||e.statut===k)).length;
+ const ech=n('echec');
+ return `<div class="card" style="margin-top:13px"><div class="h"><h2>Relances envoyées</h2>
+   <div class="r"><span class="s">${L.length} sur ${n('tous')}</span>
+     ${ech?bdg('b-crit',ech+' échec'+(ech>1?'s':'')):''}</div></div>
+  <div class="fbar" style="padding:11px 13px 0">
+   <span class="mu" style="font-size:11.5px;font-weight:600;align-self:center">Canal</span>
+   <div class="seg">${[['','Tous'],['e-mail','E-mail'],['SMS','SMS']].map(([k,l])=>
+     `<button class="${relCanal===k?'on':''}" onclick="relCanal='${k}';paint()">${l}</button>`).join('')}</div>
+   <span class="mu" style="font-size:11.5px;font-weight:600;align-self:center">État</span>
+   <div class="seg">${[['','Tous'],['ouvert','Ouvertes'],['remis','Remises'],['echec','Échecs']].map(([k,l])=>
+     `<button class="${relStat===k?'on':''}" onclick="relStat='${k}';paint()">${l}</button>`).join('')}</div>
+   <input class="inp" id="rqi" style="min-width:180px" placeholder="Patient, devis, référence…"
+     value="${esc(relQ)}" oninput="relQ=this.value;paint();const e=document.getElementById('rqi');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
+   ${(relCanal||relStat||relQ)?`<button class="chip" style="margin-left:auto"
+     onclick="relCanal='';relStat='';relQ='';paint()">Tout afficher</button>`:''}</div>
+  <div class="tw"><table><thead><tr><th>Envoyée le</th><th>Patient</th><th>Devis</th>
+    <th class="num">Montant</th><th>N°</th><th>Canal</th><th>Destinataire</th><th>État</th><th class="mono">Référence</th></tr></thead>
+   <tbody>${L.map(e=>{const p=pById(e.pid), d=DEVIS.find(x=>x.id===e.docId), st=ENV_ST[e.statut];
+     return `<tr class="c" onclick="go('devis','${e.docId}')" title="Ouvrir le devis ${esc(e.docId)}">
+      <td class="mono nw">${DTS(e.ts)}</td>
+      <td class="nm">${esc(p?fn(p):'—')}</td>
+      <td class="mono">${esc(e.docId)}</td>
+      <td class="num">${d?EUR(d.montant):'—'}</td>
+      <td class="mono mu">${noRelance(e)||'—'}</td>
+      <td class="mu">${esc(e.canal)}</td>
+      <td class="mu el" style="max-width:190px" title="${esc(e.dest)}">${esc(e.dest)}</td>
+      <td>${bdg(st[0],st[1])}${e.motif?`<div class="mu" style="font-size:10.5px">${esc(e.motif)}</div>`:''}</td>
+      <td class="mono mu" style="font-size:11px">${esc(e.ref)}</td></tr>`}).join('')}</tbody></table>
+   ${L.length?'':`<div class="empty">${n('tous')?'Aucune relance ne correspond à ces filtres.':'Aucune relance envoyée pour l’instant.'}</div>`}</div></div>`;
+}
 
 /* ---------------- Stock ---------------- */
 let sF='tous',lotSel='';
@@ -13279,7 +13413,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DR';
+const BUILD='DS';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -14207,7 +14341,8 @@ function apercuDevis(id){
  const p=pById(d.patient), {net}=totauxDoc(d);
  pdfView(nomDevis(d), `${d.id||'projet non enregistré'} · ${fn(p)} · ${DF(d.date)}${CAN('prix')?' · '+E2(net):''}`,
    devisDoc(d),
-   [d.id&&d.statut==='brouillon'?`<button class="pv-b" onclick="fermerPdf();sendRel('${d.id}')">✉ Envoyer au patient</button>`:'',
+   /* un devis qui n'est jamais parti ne se « relance » pas : il s'envoie */
+   [d.id&&d.statut==='brouillon'?`<button class="pv-b" onclick="fermerPdf();composerEnvoi(null,null,'${d.id}')">✉ Envoyer au patient</button>`:'',
     (d.id&&d.statut!=='accepte')?(consentsDeDevis(d.id).some(x=>!x.signe)
       ?`<button class="pv-b" onclick="fermerPdf();parapheurDevis('${d.id}')">✎ Lire et signer · ${1+consentsDeDevis(d.id).filter(x=>!x.signe).length}</button>`
       :`<button class="pv-b" onclick="fermerPdf();signerDevis('${d.id}')">✎ Faire signer</button>`):''].join(''));
@@ -14957,12 +15092,13 @@ document.addEventListener('keydown',e=>{
 });
 
 /* ---------- actions ---------- */
-function sendRel(id){const d=DEVIS.find(x=>x.id===id); if(!d)return;
+function sendRel(id,o){const d=DEVIS.find(x=>x.id===id); if(!d)return;
+ const p=pById(d.patient);
  d.relances++; d.derniere=TODAYS; d.statut=d.relances>=2?'relance2':'relance1';
- poserEnvoi(pById(d.patient), d.id, nomDevis(d)+' — relance '+d.relances, 'devis', d.acte||null);
+ const e=poserEnvoi(p, d.id, nomDevis(d)+' — relance '+d.relances, 'devis', d.acte||null, o);
  RELS.length=0; fileRelances().forEach(r=>RELS.push(r));
  RDUE.length=0; RELS.filter(r=>r.du).forEach(r=>RDUE.push(r));
- paint(); toast('Relance envoyée à '+fn(pById(d.patient)));}
+ paint(); toast(`Relance ${d.relances} envoyée par ${e.canal} à ${fn(p)} · ${e.ref}`);}
 function allRel(){const n=RDUE.length; if(!n){toast('Aucune relance échue');return}
  [...RDUE].forEach(r=>{const d=r.d;d.relances++;d.derniere=TODAYS;d.statut=d.relances>=2?'relance2':'relance1';
    poserEnvoi(pById(d.patient), d.id, nomDevis(d)+' — relance '+d.relances, 'devis', d.acte||null)});
