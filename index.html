@@ -2161,16 +2161,35 @@ body.en-connexion aside{display:none}
 .ptpl-b button:disabled{opacity:.34;cursor:default}
 .ptpl-b button.on{border-color:var(--accent);background:var(--accent-wash)}
 .ptpl-b button.on svg{fill:var(--accent);stroke:var(--accent)}
-/* le montage */
-.gmont{display:grid;gap:11px}
-.gmont.m2{grid-template-columns:1fr 1fr}
-.gmont.m3{grid-template-columns:repeat(3,1fr)}
-.gmont.m4{grid-template-columns:repeat(4,1fr)}
-.gmont.mv2{grid-template-columns:1fr}
-.gmont.mg4{grid-template-columns:1fr 1fr}
-.gmontc .gz{max-height:none;aspect-ratio:3/4}
-.gmont.m2 .gz,.gmont.mv2 .gz{aspect-ratio:3/4;max-height:42vh}
-.gmont.m3 .gz,.gmont.m4 .gz,.gmont.mg4 .gz{aspect-ratio:3/4;max-height:34vh}
+/* ==========================================================================
+   Le montage se dimensionne par la HAUTEUR disponible
+   --------------------------------------------------------------------------
+   Il se dimensionnait par la largeur : chaque cadre prenait toute la carte,
+   et sa hauteur suivait le rapport de l'image. Mesuré : sur une fenêtre de
+   1050 px, le rideau sortait à 1728 px de haut — on en voyait un tiers, et
+   il fallait dérouler pour atteindre le bas d'une comparaison. Un montage
+   qu'on ne voit pas d'un coup ne compare rien.
+
+   C'est donc la hauteur qui commande, et la largeur qui suit le rapport de
+   l'image. Un cliché de visage est en portrait : deux cadres côte à côte
+   occupent alors moins que la carte, et se centrent — mieux vaut du blanc
+   sur les côtés qu'un visage rogné ou une comparaison hors écran.
+
+   Deux rangées prennent chacune la moitié du budget : quatre clichés tiennent
+   dans la même fenêtre que deux, plus petits. C'est le prix de les voir
+   ensemble, et il est assumé.
+   ========================================================================== */
+.gmont{display:flex;gap:11px;justify-content:center;align-items:flex-start;flex-wrap:nowrap}
+.gmont.m2,.gmont.m3,.gmont.m4{--mh:54vh}
+.gmont.mv2,.gmont.mg4{--mh:31vh;display:grid;justify-content:center;row-gap:9px}
+.gmont.mv2{grid-template-columns:auto}
+.gmont.mg4{grid-template-columns:auto auto}
+.gmont .gc{margin:0;min-width:0}
+.gmontc .gz{height:var(--mh,54vh);width:auto;aspect-ratio:3/4;max-height:none;max-width:100%}
+.gmontc .ba{height:54vh;width:auto;aspect-ratio:3/4;max-width:100%;margin:0 auto}
+/* le curseur du rideau fait la largeur de l'image, pas celle de la carte :
+   un rail deux fois plus large que ce qu'il commande se lit mal */
+.gmontc .gwipe{max-width:min(40.5vh,100%)}
 .plb{position:fixed;inset:0;z-index:120;background:rgba(8,12,20,.86);
   display:grid;place-items:center;padding:24px}
 .plb-b{position:relative;max-width:min(94vw,760px);max-height:92vh;display:flex;flex-direction:column;
@@ -4182,6 +4201,12 @@ function galOuvrirTpl(k){
  const t=GAL_TPL.find(x=>x.k===k); if(!t) return;
  if(GAL.sel.length!==t.n){ toast(`Cette présentation demande ${t.n} clichés`); return }
  GAL.tpl=k; GAL.z=1; GAL.px=0; GAL.py=0; paint();
+ /* Le montage tient dans la fenêtre, mais il s'ouvre sous la bande des
+    présentations, elle-même sous l'en-tête du dossier : sans cela on voyait
+    le haut d'une comparaison et il fallait dérouler pour le reste. On amène
+    donc le montage sous les yeux, puisque c'est lui qu'on vient de demander. */
+ setTimeout(()=>{ const c=document.querySelector('.gmontc');
+   if(c&&c.scrollIntoView) c.scrollIntoView({block:'start', behavior:'smooth'}) },30);
 }
 function galFermerTpl(){ GAL.tpl=null; paint() }
 /* ---- les groupes : une séance, une rangée ---- */
@@ -13823,7 +13848,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DX';
+const BUILD='DY';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
