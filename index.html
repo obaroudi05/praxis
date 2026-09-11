@@ -2094,6 +2094,89 @@ body.en-connexion aside{display:none}
  background:var(--panel-2);color:var(--ink-2);cursor:pointer;font-weight:560;transition:.12s}
 .gva button:hover{background:var(--panel-3);color:var(--ink)}
 .gva button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+/* ==========================================================================
+   La galerie du dossier
+   --------------------------------------------------------------------------
+   Une rangée par séance, comme les clichés ont été pris. La rangée défile
+   horizontalement si la séance est fournie : mieux vaut une bande qui glisse
+   qu'une grille qui repousse la séance suivante deux écrans plus bas.
+   ========================================================================== */
+.pgrp{margin-bottom:15px}
+.pgrp-h{display:flex;align-items:baseline;gap:9px;padding:0 2px 7px;
+  font-size:13px;font-weight:680;border-bottom:1px solid var(--line);margin-bottom:9px}
+.pgrp-h .mu{font-weight:500;font-size:12px}
+.pgrp-h .lnk{margin-left:auto;background:none;border:none;font-family:inherit;font-size:11.5px;
+  color:var(--accent);cursor:pointer;padding:0;font-weight:600}
+.pgrp-h .lnk:hover{text-decoration:underline}
+.pgrp-b{display:flex;gap:10px;overflow-x:auto;overflow-y:hidden;padding:2px 2px 8px;
+  scrollbar-width:thin;align-items:stretch}
+.pv{position:relative;flex:none;width:178px;margin:0;border:1px solid var(--line);
+  border-radius:10px;overflow:hidden;background:var(--panel-2);transition:.12s}
+.pv:hover{box-shadow:var(--sh-2)}
+.pv img{width:100%;aspect-ratio:3/4;object-fit:cover;display:block;cursor:zoom-in}
+.pv figcaption{position:absolute;left:0;right:0;bottom:0;padding:5px 8px;
+  background:linear-gradient(transparent,rgba(0,0,0,.72) 42%);
+  color:#fff;font-size:11.5px;font-weight:650;letter-spacing:.01em}
+/* la case à cocher : elle porte son rang, parce que l'ordre décide du montage */
+.pv-k{position:absolute;top:7px;left:7px;width:23px;height:23px;border-radius:50%;
+  border:1.6px solid rgba(255,255,255,.92);background:rgba(0,0,0,.28);
+  color:#fff;font:700 11.5px var(--sans);cursor:pointer;display:grid;place-items:center;
+  backdrop-filter:blur(2px);transition:.12s;padding:0}
+.pv-k:hover{background:rgba(0,0,0,.5)}
+.pv-k.on{background:var(--accent);border-color:#fff}
+.pv-m{position:absolute;top:7px;right:7px;width:23px;height:23px;border-radius:50%;
+  border:none;background:rgba(0,0,0,.34);color:#fff;font-size:14px;line-height:1;
+  cursor:pointer;display:grid;place-items:center;backdrop-filter:blur(2px);padding:0}
+.pv-m:hover{background:rgba(0,0,0,.6)}
+.pv-r{position:absolute;top:36px;right:9px;font-size:13px;color:#ffd24a;
+  text-shadow:0 1px 3px rgba(0,0,0,.6);pointer-events:none}
+.pv.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-wash)}
+.pv-mn{position:absolute;top:34px;right:7px;z-index:6;min-width:196px;
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  box-shadow:var(--sh-3);overflow:hidden;padding:3px}
+.pv-mn button{display:block;width:100%;text-align:left;padding:7px 10px;border:none;
+  background:none;font:inherit;font-size:12.5px;cursor:pointer;border-radius:7px;color:var(--ink)}
+.pv-mn button:hover:not(:disabled){background:var(--panel-2)}
+.pv-mn button:disabled{opacity:.4;cursor:default}
+.pv-mn button.d{color:var(--crit)}
+/* le ⊕ de fin de rangée : importer directement dans cette séance */
+.pv-add{flex:none;width:64px;align-self:stretch;min-height:180px;border-radius:10px;
+  border:1.6px dashed var(--line);background:none;color:var(--ink-3);font-size:24px;
+  cursor:pointer;transition:.12s}
+.pv-add:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-wash)}
+/* la bande des présentations */
+.ptpl{border:1px solid var(--line);border-radius:var(--r-m);background:var(--panel-2);
+  padding:10px 12px;margin-bottom:13px}
+.ptpl.actif{border-color:var(--accent);background:var(--accent-wash)}
+.ptpl-t{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12.5px;margin-bottom:9px}
+.ptpl-t .mu{font-size:11.5px}
+.ptpl-b{display:flex;gap:8px;flex-wrap:wrap}
+.ptpl-b button{position:relative;width:56px;height:44px;border-radius:9px;
+  border:1px solid var(--line);background:var(--panel);cursor:pointer;
+  display:grid;place-items:center;transition:.12s;padding:0}
+.ptpl-b button svg{width:26px;height:26px;fill:var(--ink-2);stroke:var(--ink-2)}
+.ptpl-b button span{position:absolute;bottom:2px;right:5px;font:700 9.5px var(--sans);color:var(--ink-3)}
+.ptpl-b button:hover:not(:disabled){border-color:var(--accent)}
+.ptpl-b button:hover:not(:disabled) svg{fill:var(--accent);stroke:var(--accent)}
+.ptpl-b button:disabled{opacity:.34;cursor:default}
+.ptpl-b button.on{border-color:var(--accent);background:var(--accent-wash)}
+.ptpl-b button.on svg{fill:var(--accent);stroke:var(--accent)}
+/* le montage */
+.gmont{display:grid;gap:11px}
+.gmont.m2{grid-template-columns:1fr 1fr}
+.gmont.m3{grid-template-columns:repeat(3,1fr)}
+.gmont.m4{grid-template-columns:repeat(4,1fr)}
+.gmont.mv2{grid-template-columns:1fr}
+.gmont.mg4{grid-template-columns:1fr 1fr}
+.gmontc .gz{max-height:none;aspect-ratio:3/4}
+.gmont.m2 .gz,.gmont.mv2 .gz{aspect-ratio:3/4;max-height:42vh}
+.gmont.m3 .gz,.gmont.m4 .gz,.gmont.mg4 .gz{aspect-ratio:3/4;max-height:34vh}
+.plb{position:fixed;inset:0;z-index:120;background:rgba(8,12,20,.86);
+  display:grid;place-items:center;padding:24px}
+.plb-b{position:relative;max-width:min(94vw,760px);max-height:92vh;display:flex;flex-direction:column;
+  background:var(--panel);border-radius:var(--r-l);overflow:hidden;box-shadow:var(--sh-3)}
+.plb-b img{max-height:78vh;width:auto;object-fit:contain;background:#000;display:block}
+.plb-h{display:flex;align-items:center;gap:9px;padding:9px 12px;font-size:12.5px;flex-wrap:wrap}
 .ba{position:relative;width:100%;aspect-ratio:4/3;border-radius:var(--r-m);overflow:hidden;user-select:none;background:#000}
 .ba img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .ba .af{clip-path:inset(0 0 0 50%)}
@@ -4025,42 +4108,154 @@ const photoActe=x=>x?ACTES.find(a=>a.id===x.acte):null;
 const photoTitre=x=>x?DF(x.date):'';
 const photoOmbre=x=>x?(x.s!==undefined?x.s:(x.kind==='apres'?8:0)):0;
 /* l'image simulée d'un cliché — le prototype ne porte aucune photo réelle */
-const photoSrc=x=>x?ph(DFS(x.date), x.h, photoOmbre(x)):'';
-let GAL={pid:null, a:null, b:null, mode:'cote', zone:'', v:50,
+/* un cliché importé porte son image ; les autres restent des illustrations
+   simulées — le prototype ne contient aucune photo réelle */
+const photoSrc=x=>!x?'':(x.src||ph(DFS(x.date), x.h, photoOmbre(x)));
+/* ==========================================================================
+   La galerie : les clichés d'abord, la comparaison ensuite
+   --------------------------------------------------------------------------
+   L'écran s'ouvrait sur un comparateur géant occupant les deux tiers de la
+   hauteur, et reléguait les clichés eux-mêmes à une rangée écrasée en bas.
+   Or on vient ici d'abord pour REGARDER les photos d'un dossier ; comparer
+   vient après, et seulement quand on a choisi quoi comparer.
+
+   L'ordre s'inverse donc. Les clichés occupent l'écran, groupés par séance
+   comme ils ont été pris. On en coche deux à quatre, on choisit une
+   présentation, et le montage s'ouvre par-dessus. Rien n'est perdu du
+   comparateur — le zoom solidaire, le rideau, le côte à côte sont tous là,
+   mais ils ne prennent la place que lorsqu'on les demande.
+   ========================================================================== */
+let GAL={pid:null, sel:[],   /* jusqu'à quatre clichés, dans l'ordre choisi */
+         tpl:null,           /* la présentation ouverte, ou aucune */
+         mode:'cote', acte:'', ref:false, v:50,
          tri:-1,      /* -1 : du plus récent ; +1 : du plus ancien */
-         grand:false, /* le comparateur prend toute la place qu'on lui donne */
-         z:1, px:0, py:0};  /* zoom et cadrage, communs aux deux clichés */
+         lb:null,     /* le cliché agrandi, en diaporama */
+         z:1, px:0, py:0};  /* zoom et cadrage, communs à tous les clichés */
+/* Les présentations, et le nombre de clichés que chacune demande. Un modèle
+   qui n'a pas son compte reste éteint : mieux vaut un bouton visiblement
+   inerte qu'un montage qui invente une case vide. */
+const GAL_TPL=[
+ {k:'rideau', n:2, l:'Avant / après, au rideau'},
+ {k:'h2',     n:2, l:'Deux côte à côte'},
+ {k:'h3',     n:3, l:'Trois côte à côte'},
+ {k:'h4',     n:4, l:'Quatre côte à côte'},
+ {k:'v2',     n:2, l:'Deux, l’une au-dessus de l’autre'},
+ {k:'g4',     n:4, l:'Quatre en grille'},
+];
+const tplIcone=k=>{
+ const r=(x,y,w,h)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1.5"/>`;
+ const g={rideau:`${r(2,4,20,16)}<path d="M12 4v16" stroke-width="1.6"/><path d="M7.5 12h9M9 9.6 6.4 12 9 14.4M15 9.6 17.6 12 15 14.4" fill="none" stroke-width="1.5"/>`,
+   h2:`${r(2,5,9.4,14)}${r(12.6,5,9.4,14)}`,
+   h3:`${r(1.5,6,6.6,12)}${r(8.7,6,6.6,12)}${r(15.9,6,6.6,12)}`,
+   h4:`${r(1.2,7,4.9,10)}${r(6.7,7,4.9,10)}${r(12.2,7,4.9,10)}${r(17.7,7,4.9,10)}`,
+   v2:`${r(4,3,16,8.2)}${r(4,12.8,16,8.2)}`,
+   g4:`${r(3,4,8.4,7.4)}${r(12.6,4,8.4,7.4)}${r(3,12.6,8.4,7.4)}${r(12.6,12.6,8.4,7.4)}`}[k]||'';
+ return `<svg viewBox="0 0 24 24" aria-hidden="true">${g}</svg>`;
+};
 /* la sélection appartient au patient qu'on regarde : changer de dossier la remet à zéro */
 function galPour(pid){
  const L=photosPatient(pid);
- /* changer de dossier remet la comparaison à zéro, mais garde la façon de
-    travailler : le mode, le sens de lecture, la taille du comparateur. Le
-    zoom, lui, appartient aux clichés qu'on regardait : il repart à 1. */
- if(GAL.pid!==pid) GAL={pid, a:null, b:null, zone:'', v:50,
-   mode:GAL.mode, tri:GAL.tri, grand:GAL.grand, z:1, px:0, py:0};
+ /* changer de dossier remet la sélection à zéro, mais garde la façon de
+    travailler : le sens de lecture, le mode de rideau. Le zoom, lui,
+    appartient aux clichés qu'on regardait : il repart à 1. */
+ if(GAL.pid!==pid) GAL={pid, sel:[], tpl:null, mode:GAL.mode, acte:'', ref:false,
+   v:50, tri:GAL.tri, lb:null, z:1, px:0, py:0};
  const vus=new Set(L.map(x=>x.id));
- if(GAL.a&&!vus.has(GAL.a)) GAL.a=null;
- if(GAL.b&&!vus.has(GAL.b)) GAL.b=null;
- /* d'emblée utile : le premier avant, et le dernier après */
- /* d'emblée ce qu'on veut voir : le plus ancien cliché face au plus récent */
- if(!GAL.a) GAL.a=(L[0]||{}).id||null;
- if(!GAL.b){ const c=L[L.length-1]||null;
-   GAL.b=(c&&c.id!==GAL.a)?c.id:null;
-   /* on ne remet d'aplomb que ce qu'on vient de choisir soi-même : un ordre
-      voulu par le praticien — comparer un après à un plus ancien — lui
-      appartient, et Intervertir doit tenir. */
-   const A=photoById(GAL.a), B=photoById(GAL.b);
-   if(A&&B&&A.date>B.date){ const t=GAL.a; GAL.a=GAL.b; GAL.b=t } }
+ GAL.sel=GAL.sel.filter(id=>vus.has(id));
+ if(GAL.lb&&!vus.has(GAL.lb)) GAL.lb=null;
+ if(GAL.tpl&&GAL.sel.length!==(GAL_TPL.find(t=>t.k===GAL.tpl)||{}).n) GAL.tpl=null;
  return L;
 }
-const galZones=pid=>[...new Set(photosPatient(pid).map(x=>x.zone).filter(Boolean))];
-/* L'ordre d'affichage : chronologique, dans le sens qu'on a choisi. Les
-   valeurs par défaut, elles, se calculent toujours sur l'ordre naturel —
-   sinon retourner la liste changerait la paire proposée. */
-function galFiltre(pid){
- const L=photosPatient(pid).filter(x=>!GAL.zone||x.zone===GAL.zone);
- return GAL.tri<0?L.slice().reverse():L;
+/* ---- la sélection : jusqu'à quatre, dans l'ordre où on les a cochés ---- */
+const GAL_MAX=4;
+const galChoisi=id=>GAL.sel.indexOf(id);
+function galCocher(id){
+ const i=GAL.sel.indexOf(id);
+ if(i>=0) GAL.sel.splice(i,1);
+ else if(GAL.sel.length>=GAL_MAX){ toast('Quatre clichés au maximum — décochez-en un'); return }
+ else GAL.sel.push(id);
+ if(GAL.tpl&&GAL.sel.length!==(GAL_TPL.find(t=>t.k===GAL.tpl)||{}).n) GAL.tpl=null;
+ paint();
 }
+function galVider(){ GAL.sel=[]; GAL.tpl=null; paint() }
+function galOuvrirTpl(k){
+ const t=GAL_TPL.find(x=>x.k===k); if(!t) return;
+ if(GAL.sel.length!==t.n){ toast(`Cette présentation demande ${t.n} clichés`); return }
+ GAL.tpl=k; GAL.z=1; GAL.px=0; GAL.py=0; paint();
+}
+function galFermerTpl(){ GAL.tpl=null; paint() }
+/* ---- les groupes : une séance, une rangée ---- */
+function galGroupes(pid){
+ const L=photosPatient(pid)
+   .filter(x=>!GAL.ref||x.ref)
+   .filter(x=>!GAL.acte||String(x.acte)===String(GAL.acte));
+ const sans=L.filter(x=>!x.acte);
+ const par={};
+ L.filter(x=>x.acte).forEach(x=>{(par[x.acte]=par[x.acte]||[]).push(x)});
+ const G=Object.keys(par).map(aid=>{
+   const a=ACTES.find(y=>String(y.id)===String(aid));
+   const P=par[aid].slice().sort((x,y)=>x.date.localeCompare(y.date));
+   return {aid, acte:a, date:(a?a.date:P[0].date), nom:a?a.nom:'Séance', photos:P}});
+ G.sort((x,y)=>GAL.tri<0?y.date.localeCompare(x.date):x.date.localeCompare(y.date));
+ return {sans:sans.slice().sort((x,y)=>x.date.localeCompare(y.date)), groupes:G, n:L.length};
+}
+/* ---- importer des clichés depuis l'ordinateur ---- */
+let galCible=null;   /* l'acte auquel rattacher ce qu'on importe, ou null */
+function galImporter(aid){
+ galCible=aid||null;
+ const i=document.getElementById('galfile');
+ if(i){ i.value=''; i.click() }
+}
+function galFichiers(input){
+ const F=[...(input.files||[])].filter(f=>/^image\//.test(f.type));
+ if(!F.length){ toast('Aucune image reconnue'); input.value=''; return }
+ const a=galCible?ACTES.find(x=>String(x.id)===String(galCible)):null;
+ let reste=F.length, ajoutes=0;
+ F.forEach(f=>{
+  const r=new FileReader();
+  r.onload=()=>{
+    PHOTOS.push({id:'PH-I'+Date.now()+'-'+(ajoutes++),
+      patient:GAL.pid, acte:a?a.id:null,
+      date:a?a.date:TODAYS, h:0, s:0,
+      zone:a&&a.zones?Object.keys(a.zones)[0]:null,
+      src:r.result, importe:true, nom:f.name});
+    if(--reste===0){ input.value=''; galCible=null; paint();
+      toast(`${F.length} cliché${F.length>1?'s importés':' importé'}${a?' — séance du '+DF(a.date):''}`) }
+  };
+  r.onerror=()=>{ if(--reste===0){ input.value=''; galCible=null; paint() } };
+  r.readAsDataURL(f);
+ });
+}
+/* ---- le menu d'un cliché ---- */
+let galMenuId=null;
+function galMenu(id,e){ if(e) e.stopPropagation();
+ galMenuId=galMenuId===id?null:id; paint() }
+function galRef(id){ const x=photoById(id); if(!x) return;
+ x.ref=!x.ref; galMenuId=null; paint();
+ toast(x.ref?'Marqué comme photo de référence':'N’est plus une photo de référence') }
+function galSupprimer(id){ const i=PHOTOS.findIndex(x=>x.id===id); if(i<0) return;
+ const x=PHOTOS[i];
+ if(!x.importe){ toast('Les clichés de démonstration ne s’effacent pas'); galMenuId=null; paint(); return }
+ PHOTOS.splice(i,1); GAL.sel=GAL.sel.filter(y=>y!==id);
+ if(GAL.lb===id) GAL.lb=null;
+ galMenuId=null; paint(); toast('Cliché retiré du dossier') }
+/* ---- le diaporama : un clic agrandit, les flèches font défiler ---- */
+function galAgrandir(id){ GAL.lb=id; galMenuId=null; paint() }
+function galFermerLb(){ GAL.lb=null; paint() }
+function galLbVoisin(d){
+ const L=galOrdre(); const i=L.findIndex(x=>x.id===GAL.lb);
+ if(i<0||!L.length) return;
+ GAL.lb=L[Math.max(0,Math.min(L.length-1,i+d))].id; paint();
+}
+/* l'ordre du diaporama est celui de la page : ce qu'on voit défiler est ce
+   qu'on vient de parcourir des yeux */
+function galOrdre(){
+ const G=galGroupes(GAL.pid);
+ return [...G.sans, ...G.groupes.flatMap(g=>g.photos)];
+}
+/* les zones restent une clé de lecture, mais le filtre principal est l'acte :
+   c'est la séance qu'on cherche, pas la zone */
+const galZones=pid=>[...new Set(photosPatient(pid).map(x=>x.zone).filter(Boolean))];
 function galTri(){ GAL.tri=-GAL.tri; paint() }
 /* ==========================================================================
    Zoom et cadrage
@@ -4117,19 +4312,18 @@ function bindGZ(){
   window.addEventListener('mouseup',fin); window.addEventListener('touchend',fin);
  });
 }
-function galSet(slot,id){
- if(slot==='a'&&GAL.b===id) GAL.b=GAL.a;
- if(slot==='b'&&GAL.a===id) GAL.a=GAL.b;
- GAL[slot]=id; paint();
-}
-function galEchange(){ const t=GAL.a; GAL.a=GAL.b; GAL.b=t; paint() }
-/* faire défiler la comparaison sans quitter la référence */
+/* faire défiler la comparaison sans quitter la première : le voisin remplace
+   le DERNIER cliché coché, celui qu'on est en train de promener */
 function galVoisin(d){
- const L=galFiltre(GAL.pid).filter(x=>x.id!==GAL.a);
- if(!L.length) return;
- const i=L.findIndex(x=>x.id===GAL.b);
- GAL.b=L[Math.max(0,Math.min(L.length-1,(i<0?0:i)+d))].id; paint();
+ const L=galOrdre(); if(L.length<2||!GAL.sel.length) return;
+ const der=GAL.sel[GAL.sel.length-1];
+ const i=L.findIndex(x=>x.id===der); if(i<0) return;
+ let j=i+d;
+ while(j>=0&&j<L.length&&GAL.sel.indexOf(L[j].id)>=0&&L[j].id!==der) j+=d;
+ if(j<0||j>=L.length) return;
+ GAL.sel[GAL.sel.length-1]=L[j].id; paint();
 }
+function galEchange(){ GAL.sel.reverse(); paint() }
 /* le temps écoulé entre deux clichés, dit comme on le dit à voix haute */
 function galEcart(x,y){
  if(!x||!y) return '';
@@ -6776,7 +6970,9 @@ function pDetail(p){
           +C.filter(a=>!CONS_SUPP.has(a.id)&&!consentPorteur(a)).length;
  const nFac=D.length+F.length+F.filter(f=>f.avoir>0).length;
  const TB=[['resume','Résumé'],['actes',`Actes · ${A.length}`],['schema','Schéma cumulé'],
-           ['photos','Photos A/A']]
+           /* l'onglet ne s'appelle plus « A/A » : on n'y compare plus seulement
+              un avant à un après, mais jusqu'à quatre clichés à la fois */
+           ['photos',`Photos · ${photosPatient(p.id).length}`]]
    .concat(ROLES[role].prix?[['factu',`Facturation · ${nFac}`]]:[])
    .concat([['docs',`Documents · ${nDoc}`],['envois',`Envois · ${envDe(p.id).length}`]]);
  if(!TB.some(t=>t[0]===pTab)) pTab='resume';
@@ -7134,115 +7330,134 @@ function pDetail(p){
 
   photos:()=>{
    const TOUT=galPour(p.id);
-   if(!TOUT.length) return `<div class="empty" style="padding:40px">Aucune photo dans ce dossier.<br>
-     <span class="mu" style="font-size:11.5px">Les clichés se prennent depuis la séance : ils s’y datent et s’y rattachent tout seuls.</span></div>`;
-   const L=galFiltre(p.id);
-   const A=photoById(GAL.a), B=photoById(GAL.b);
-   const aA=photoActe(A), aB=photoActe(B);
-   const zones=galZones(p.id);
-   const iB=L.filter(x=>x.id!==GAL.a).findIndex(x=>x.id===GAL.b);
-   const nB=L.filter(x=>x.id!==GAL.a).length;
-   const vign=(x)=>{const est=GAL.a===x.id?'a':GAL.b===x.id?'b':'';
-     const ac=photoActe(x);
-     return `<div class="gv ${est?'sel '+est:''}">
-      <img src="${photoSrc(x)}" alt="Cliché du ${DF(x.date)} — illustration simulée"
-        onclick="galSet('b','${x.id}')" title="Comparer ce cliché">
-      ${est?`<span class="gt">${est.toUpperCase()}</span>`:''}
-      <div class="gvl"><b>${DF(x.date)}</b></div>
-      <div class="gvs">${esc((ac||{}).nom||'séance')}${x.zone?' · '+esc(zoneNom(x.zone)):''}</div>
-      <div class="gva">
-        <button class="${GAL.a===x.id?'on':''}" onclick="galSet('a','${x.id}')"
-          title="Prendre ce cliché comme référence">Référence</button>
-        <button class="${GAL.b===x.id?'on':''}" onclick="galSet('b','${x.id}')"
-          title="Comparer à la référence">Comparer</button></div>
-     </div>`};
-   const cadre=(x,r)=>`<figure class="gc">
-      ${x?`<div class="gz"><img src="${photoSrc(x)}" style="${galTransform()}"
-            alt="Cliché du ${DF(x.date)} — illustration simulée"></div>`
-        :`<div class="gvide">Choisissez un cliché ci-dessous</div>`}
-      <figcaption><span class="gr">${r}</span>
-        ${x?`<b>${DF(x.date)}</b>
-          <small>${esc((photoActe(x)||{}).nom||'séance')}${x.zone?' · '+esc(zoneNom(x.zone)):''}</small>`
-          :'<span class="mu">aucun cliché</span>'}</figcaption></figure>`;
+   const G=galGroupes(p.id);
+   const actes=[...new Set(photosPatient(p.id).map(x=>x.acte).filter(Boolean))]
+     .map(aid=>ACTES.find(a=>String(a.id)===String(aid))).filter(Boolean)
+     .sort((a,b)=>b.date.localeCompare(a.date));
+   const nRef=photosPatient(p.id).filter(x=>x.ref).length;
+   const SEL=GAL.sel.map(photoById).filter(Boolean);
+
+   /* ---- une vignette : sa case à cocher, son menu, sa date ---- */
+   const vign=x=>{const r=galChoisi(x.id);
+    return `<figure class="pv${r>=0?' sel':''}${x.ref?' ref':''}" data-id="${x.id}">
+      <img src="${photoSrc(x)}" alt="Cliché du ${DF(x.date)}${x.importe?'':' — illustration simulée'}"
+        onclick="galAgrandir('${x.id}')" title="Agrandir — le diaporama part d’ici">
+      <button class="pv-k${r>=0?' on':''}" title="${r>=0?'Retirer de la sélection':'Choisir pour une présentation'}"
+        onclick="event.stopPropagation();galCocher('${x.id}')">${r>=0?r+1:''}</button>
+      <button class="pv-m" title="Actions sur ce cliché"
+        onclick="galMenu('${x.id}',event)">⋮</button>
+      ${x.ref?'<span class="pv-r" title="Photo de référence">★</span>':''}
+      <figcaption>${DF(x.date)}</figcaption>
+      ${galMenuId===x.id?`<div class="pv-mn" onclick="event.stopPropagation()">
+        <button onclick="galRef('${x.id}')">${x.ref?'☆ Retirer des références':'★ Photo de référence'}</button>
+        <button onclick="galCocher('${x.id}');galMenuId=null;paint()">${r>=0?'✕ Retirer de la sélection':'＋ Ajouter à la sélection'}</button>
+        <button onclick="galAgrandir('${x.id}')">⤢ Agrandir</button>
+        ${x.importe?`<button class="d" onclick="galSupprimer('${x.id}')">🗑 Supprimer</button>`
+          :'<button disabled title="Cliché de démonstration">🗑 Supprimer</button>'}
+      </div>`:''}
+     </figure>`};
+
+   const rangee=(titre,sous,photos,aid)=>`<div class="pgrp">
+     <div class="pgrp-h">${titre}${sous?`<span class="mu">${sous}</span>`:''}
+       ${aid?`<button class="lnk" onclick="GAL.acte=${GAL.acte===String(aid)?"''":`'${aid}'`};paint()">${
+         GAL.acte===String(aid)?'↩ Retirer le filtre':'Filtrer sur cet acte'}</button>`:''}</div>
+     <div class="pgrp-b">
+       ${photos.map(vign).join('')}
+       <button class="pv-add" title="Importer des clichés dans cette séance"
+         onclick="galImporter(${aid?`'${aid}'`:'null'})">＋</button>
+     </div></div>`;
+
+   /* ---- le montage : ce que la présentation choisie met à l'écran ---- */
+   const cadre=(x,i2)=>`<figure class="gc"><div class="gz"><img src="${photoSrc(x)}"
+       style="${galTransform()}" alt="Cliché du ${DF(x.date)}"></div>
+     <figcaption><span class="gr">${i2+1}</span><b>${DF(x.date)}</b>
+       <small>${esc((photoActe(x)||{}).nom||'sans acte')}${x.zone?' · '+esc(zoneNom(x.zone)):''}</small></figcaption></figure>`;
+   const montage=()=>{
+     const t=GAL_TPL.find(x=>x.k===GAL.tpl); if(!t||SEL.length!==t.n) return '';
+     if(GAL.tpl==='rideau'){ const [A,B]=SEL;
+       return `<div class="ba gz" id="ba" style="margin:0 auto">
+          <img src="${photoSrc(A)}" style="${galTransform()}" alt="Cliché du ${DF(A.date)}">
+          <img class="af" id="baA" src="${photoSrc(B)}" style="${galTransform()}" alt="Cliché du ${DF(B.date)}">
+          <div class="hd" id="baH" style="left:${GAL.v}%"></div>
+          <div class="tg l">${DF(A.date)}</div><div class="tg r">${DF(B.date)}</div></div>
+         <input type="range" min="0" max="100" value="${GAL.v}" class="gwipe"
+           oninput="GAL.v=+this.value;setBA(this.value)">` }
+     const cls={h2:'m2',h3:'m3',h4:'m4',v2:'mv2',g4:'mg4'}[GAL.tpl];
+     return `<div class="gmont ${cls}">${SEL.map(cadre).join('')}</div>`;
+   };
+
    return `
-   <div class="fbar">
-     <span class="mu" style="font-size:11.5px;font-weight:600;align-self:center">Comparer</span>
-     <div class="seg">
-       <button class="${GAL.mode==='cote'?'on':''}" onclick="GAL.mode='cote';paint()">Côte à côte</button>
-       <button class="${GAL.mode==='fondu'?'on':''}" onclick="GAL.mode='fondu';paint()">Superposé</button>
-     </div>
-     <button class="btn s" onclick="galEchange()" title="Intervertir la référence et la comparaison" ${(A&&B)?'':'disabled'}>⇄ Intervertir</button>
-     <button class="btn s ${GAL.grand?'g':''}" onclick="GAL.grand=!GAL.grand;paint()"
-       title="${GAL.grand?'Rendre la galerie visible sous le comparateur':'Donner tout l’écran aux deux clichés'}">${GAL.grand?'⤡ Réduire':'⤢ Agrandir'}</button>
-     <div class="zbar" title="Le zoom et le cadrage portent sur les deux clichés à la fois">
-       <button onclick="galZoom(1/1.4,true)" ${GAL.z>1?'':'disabled'} title="Dézoomer">−</button>
-       <span id="galz">${GAL.z.toFixed(1).replace('.0','')}×</span>
-       <button onclick="galZoom(1.4,true)" ${GAL.z<4?'':'disabled'} title="Zoomer">+</button>
-       <button id="galr" onclick="galReset()" ${GAL.z===1?'disabled':''} title="Revenir au cadrage entier">⟲</button>
-     </div>
-     <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
-       ${zones.length>1?`<select class="inp" style="max-width:190px" onchange="GAL.zone=this.value;paint()">
-         <option value="">Toutes les zones</option>
-         ${zones.map(z=>`<option value="${esc(z)}" ${GAL.zone===z?'selected':''}>${esc(zoneNom(z))}</option>`).join('')}</select>`:''}
-     </div></div>
+   <input type="file" id="galfile" accept="image/*" multiple hidden onchange="galFichiers(this)">
 
-   ${(()=>{const corps=GAL.mode==='cote'
-      ? `<div class="gcmp">${cadre(A,'Référence')}${cadre(B,'Comparaison')}</div>`
-      : (A&&B)
-        ? `<div class="ba gz" id="ba" style="margin:0 auto">
-            <img src="${photoSrc(A)}" style="${galTransform()}" alt="référence simulée">
-            <img class="af" id="baA" src="${photoSrc(B)}" style="${galTransform()}" alt="comparaison simulée">
-            <div class="hd" id="baH" style="left:${GAL.v}%"></div>
-            <div class="tg l">${DF(A.date)}</div><div class="tg r">${DF(B.date)}</div></div>
-           <input type="range" min="0" max="100" value="${GAL.v}" class="gwipe"
-             oninput="GAL.v=+this.value;setBA(this.value)">`
-        : `<div class="gvide" style="height:220px">Le superposé demande deux clichés.</div>`;
-    /* Deux clichés côte à côte occupent déjà toute la largeur de la fiche :
-       leur donner plus de place, c'est leur donner l'écran. On efface donc
-       tout le reste plutôt que d'étirer un peu la carte. */
-    return GAL.grand
-     ? `<div class="gfull">
-         <div class="gfull-h">
-          <b>${esc(fn(p))}</b>
-          <span class="mu">${A?DF(A.date):'—'} → ${B?DF(B.date):'—'}${(A&&B)?' · '+esc(galEcart(A,B)):''}</span>
-          <div class="seg" style="margin-left:auto">
-            <button class="${GAL.mode==='cote'?'on':''}" onclick="GAL.mode='cote';paint()">Côte à côte</button>
-            <button class="${GAL.mode==='fondu'?'on':''}" onclick="GAL.mode='fondu';paint()">Superposé</button></div>
-          <button class="btn s" onclick="galEchange()" ${(A&&B)?'':'disabled'}>⇄ Intervertir</button>
-          <div class="zbar">
-            <button onclick="galZoom(1/1.4,true)" ${GAL.z>1?'':'disabled'} title="Dézoomer">−</button>
-            <span id="galz">${GAL.z.toFixed(1).replace('.0','')}×</span>
-            <button onclick="galZoom(1.4,true)" ${GAL.z<4?'':'disabled'} title="Zoomer">+</button>
-            <button id="galr" onclick="galReset()" ${GAL.z===1?'disabled':''} title="Revenir au cadrage entier">⟲</button></div>
-          <button class="btn s" onclick="galVoisin(-1)" ${iB>0?'':'disabled'} title="Cliché précédent">‹</button>
-          <span class="mu" style="font-size:11px">${nB?`${Math.max(1,iB+1)} / ${nB}`:'—'}</span>
-          <button class="btn s" onclick="galVoisin(1)" ${(iB>=0&&iB<nB-1)?'':'disabled'} title="Cliché suivant">›</button>
-          <button class="btn p s" onclick="GAL.grand=false;paint()">⤡ Quitter le plein écran</button>
-         </div>
-         <div class="gfull-b">${corps}</div></div>`
-     : `<div class="card" id="gcard" style="margin-bottom:13px"><div class="b">${corps}
-    <div class="gbar">
-      ${(A&&B)?`<span class="bdg b-info">${esc(galEcart(A,B))}</span>`:''}
-      ${(A&&B&&aA&&aB&&aA.id!==aB.id)?`<span class="mu">${esc(aA.nom)} → ${esc(aB.nom)}</span>`:''}
-      <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
-        <button class="btn xs g" onclick="galVoisin(-1)" ${iB>0?'':'disabled'} title="Cliché précédent">‹</button>
-        <span class="mu" style="font-size:11px">${nB?`${Math.max(1,iB+1)} / ${nB}`:'—'}</span>
-        <button class="btn xs g" onclick="galVoisin(1)" ${(iB>=0&&iB<nB-1)?'':'disabled'} title="Cliché suivant">›</button>
-      </div></div>
-   </div></div>`})()}
-
-   <div class="fbar" style="margin-top:-2px">
-     <span class="mu" style="font-size:11.5px;font-weight:600;align-self:center">
-       ${L.length} cliché${L.length>1?'s':''}${GAL.zone?` sur ${TOUT.length}`:''}</span>
-     <button class="btn s tri-b" onclick="galTri()"
-       title="${GAL.tri<0?'Actuellement du plus récent — cliquer pour partir du plus ancien':'Actuellement du plus ancien — cliquer pour partir du plus récent'}">
-       <span class="fl">${GAL.tri<0?'▼':'▲'}</span> ${GAL.tri<0?'Du plus récent':'Du plus ancien'}</button>
-     ${GAL.zone?`<button class="btn xs g" onclick="GAL.zone='';paint()">Tout afficher</button>`:''}
-     <div style="margin-left:auto"><button class="btn s" onclick="toast('QR affiché — photographiez avec le téléphone')">＋ Importer par QR</button></div>
+   <!-- ===================================================================
+     Choisir d'abord, comparer ensuite
+     -------------------------------------------------------------------
+     La bande des présentations reste visible en permanence, éteinte tant
+     que la sélection n'a pas le compte : elle apprend le geste sans rien
+     demander, et dit elle-même combien de clichés il lui manque.
+     =================================================================== -->
+   <div class="ptpl${SEL.length?' actif':''}">
+     <div class="ptpl-t">${SEL.length
+       ? `<b>${SEL.length} cliché${SEL.length>1?'s':''} sélectionné${SEL.length>1?'s':''}</b>
+          <span class="mu">${SEL.map(x=>DF(x.date)).join(' · ')}</span>
+          <button class="btn xs g" onclick="galVider()">✕ Tout décocher</button>`
+       : `<b>Sélectionnez 2 à 4 clichés</b><span class="mu">cochez-les dans la liste, puis choisissez une présentation — le premier coché se place à gauche, ou en haut</span>`}</div>
+     <div class="ptpl-b">${GAL_TPL.map(t=>`<button class="${GAL.tpl===t.k?'on':''}"
+        ${SEL.length===t.n?'':'disabled'} onclick="galOuvrirTpl('${t.k}')"
+        title="${esc(t.l)} — demande ${t.n} clichés">${tplIcone(t.k)}<span>${t.n}</span></button>`).join('')}</div>
    </div>
-   ${L.length?`<div class="gg">${L.map(vign).join('')}</div>`
-    :`<div class="empty" style="padding:24px">Aucun cliché ne correspond à ce filtre.</div>`}
-   <div class="mu" style="font-size:11px;padding:10px 2px 0">Illustrations simulées — aucune photo réelle dans ce prototype.</div>`;
+
+   ${GAL.tpl?`<div class="card gmontc" style="margin-bottom:13px"><div class="h">
+      <h2>${esc((GAL_TPL.find(x=>x.k===GAL.tpl)||{}).l||'')}</h2>
+      <div class="r">
+        ${SEL.length===2?`<span class="bdg b-info">${esc(galEcart(SEL[0],SEL[1]))}</span>`:''}
+        <button class="btn xs" onclick="galEchange()" title="Inverser l’ordre des clichés">⇄ Inverser</button>
+        <button class="btn xs g" onclick="galVoisin(-1)" title="Cliché précédent">‹</button>
+        <button class="btn xs g" onclick="galVoisin(1)" title="Cliché suivant">›</button>
+        <div class="zbar" title="Le zoom et le cadrage portent sur tous les clichés à la fois">
+          <button onclick="galZoom(1/1.4,true)" ${GAL.z>1?'':'disabled'} title="Dézoomer">−</button>
+          <span id="galz">${GAL.z.toFixed(1).replace('.0','')}×</span>
+          <button onclick="galZoom(1.4,true)" ${GAL.z<4?'':'disabled'} title="Zoomer">+</button>
+          <button id="galr" onclick="galReset()" ${GAL.z===1?'disabled':''} title="Revenir au cadrage entier">⟲</button></div>
+        <button class="btn xs g" onclick="galFermerTpl()">✕ Fermer</button></div></div>
+     <div class="b">${montage()}</div></div>`:''}
+
+   <div class="subh"><h3>Clichés<span>${G.n}</span></h3>
+     <div class="r">
+       ${actes.length>1?`<select class="inp" style="max-width:230px" onchange="GAL.acte=this.value;paint()">
+         <option value="">Toutes les séances</option>
+         ${actes.map(a=>`<option value="${a.id}" ${GAL.acte===String(a.id)?'selected':''}>${DF(a.date)} — ${esc(a.nom)}</option>`).join('')}</select>`:''}
+       ${nRef?`<button class="chip ${GAL.ref?'on':''}" onclick="GAL.ref=!GAL.ref;paint()"
+         title="N’afficher que les clichés marqués comme référence">★ Références · ${nRef}</button>`:''}
+       <button class="btn xs" onclick="galTri()"
+         title="${GAL.tri<0?'Actuellement du plus récent':'Actuellement du plus ancien'}">${GAL.tri<0?'▼ Du plus récent':'▲ Du plus ancien'}</button>
+       <button class="btn xs" onclick="toast('QR affiché — photographiez avec le téléphone')">📱 Importer par QR</button>
+       <button class="btn xs p" onclick="galImporter(null)">＋ Importer des photos</button></div></div>
+
+   <div class="mu" style="font-size:11.5px;margin:-2px 0 10px">Un clic sur un cliché l’agrandit et ouvre le diaporama. La pastille le coche pour une présentation ; le ⊕ de chaque rangée importe directement dans cette séance.</div>
+
+   ${(G.sans.length||G.groupes.length)?`
+     ${G.sans.length?rangee('Clichés sans séance','à rattacher',G.sans,null):''}
+     ${G.groupes.map(g=>rangee(DF(g.date), esc(g.nom), g.photos, g.aid)).join('')}
+     ${(!G.sans.length&&!GAL.acte&&!GAL.ref)?rangee('Clichés sans séance','déposez-en ici',[],null):''}`
+    :`<div class="empty" style="padding:34px">${TOUT.length?'Aucun cliché ne correspond à ce filtre.':'Aucun cliché dans ce dossier.'}<br>
+      <span class="mu" style="font-size:11.5px">${TOUT.length?'':'Les clichés se prennent depuis la séance — ou s’importent ici.'}</span>
+      <div style="margin-top:11px"><button class="btn s p" onclick="galImporter(null)">＋ Importer des photos</button></div></div>`}
+
+   ${GAL.lb?(()=>{const x=photoById(GAL.lb), L=galOrdre(), i=L.findIndex(y=>y.id===GAL.lb);
+     return `<div class="plb" onclick="galFermerLb()">
+       <div class="plb-b" onclick="event.stopPropagation()">
+         <img src="${photoSrc(x)}" alt="Cliché du ${DF(x.date)}">
+         <div class="plb-h"><b>${DF(x.date)}</b>
+           <span class="mu">${esc((photoActe(x)||{}).nom||'sans séance')}${x.zone?' · '+esc(zoneNom(x.zone)):''}</span>
+           <span class="mu" style="margin-left:auto">${i+1} / ${L.length}</span>
+           <button class="btn xs g" onclick="galLbVoisin(-1)" ${i>0?'':'disabled'}>‹</button>
+           <button class="btn xs g" onclick="galLbVoisin(1)" ${i<L.length-1?'':'disabled'}>›</button>
+           <button class="btn xs ${galChoisi(x.id)>=0?'p':''}" onclick="galCocher('${x.id}')">${
+             galChoisi(x.id)>=0?'✓ Sélectionné':'Sélectionner'}</button>
+           <button class="btn xs g" onclick="galFermerLb()">✕</button></div></div></div>`})():''}
+
+   <div class="mu" style="font-size:11px;padding:10px 2px 0">Illustrations simulées — aucune photo réelle dans ce prototype, hormis celles que vous importez.</div>`;
   },
 
   docs:()=>{
@@ -13608,7 +13823,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DW';
+const BUILD='DX';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -15686,7 +15901,7 @@ const VOIX_REGLES=[
  /* --- les onglets du dossier ouvert --- */
  {re:/^(?:ouvre |affiche |montre |va (?:a|aux|au) )?(?:les |la |le )?(photos?(?: a a)?|resume|schema(?: cumule)?|documents?|facturation|envois)$/,
   besoinDossier:1,
-  quoi:m=>({photo:'Photos A/A',resum:'Résumé',schem:'Schéma cumulé',docum:'Documents',factu:'Facturation',envoi:'Envois'})[m[1].slice(0,5)],
+  quoi:m=>({photo:'Photos',resum:'Résumé',schem:'Schéma cumulé',docum:'Documents',factu:'Facturation',envoi:'Envois'})[m[1].slice(0,5)],
   run:m=>{ pTab={photo:'photos',resum:'resume',schem:'schema',docum:'docs',factu:'factu',envoi:'envois'}[m[1].slice(0,5)];
     go('patients') }},
  /* --- ce qui écrit : on montre, on attend l'accord --- */
