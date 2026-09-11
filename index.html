@@ -2162,34 +2162,62 @@ body.en-connexion aside{display:none}
 .ptpl-b button.on{border-color:var(--accent);background:var(--accent-wash)}
 .ptpl-b button.on svg{fill:var(--accent);stroke:var(--accent)}
 /* ==========================================================================
-   Le montage se dimensionne par la HAUTEUR disponible
+   Le montage, plein écran
    --------------------------------------------------------------------------
-   Il se dimensionnait par la largeur : chaque cadre prenait toute la carte,
-   et sa hauteur suivait le rapport de l'image. Mesuré : sur une fenêtre de
-   1050 px, le rideau sortait à 1728 px de haut — on en voyait un tiers, et
-   il fallait dérouler pour atteindre le bas d'une comparaison. Un montage
-   qu'on ne voit pas d'un coup ne compare rien.
+   Il vivait dans la page, dimensionné par la largeur de sa carte : deux
+   clichés plafonnaient à 567 px de haut sur une fenêtre de 1050, et le
+   rideau sortait carrément à 1728 — on en voyait un tiers.
 
-   C'est donc la hauteur qui commande, et la largeur qui suit le rapport de
-   l'image. Un cliché de visage est en portrait : deux cadres côte à côte
-   occupent alors moins que la carte, et se centrent — mieux vaut du blanc
-   sur les côtés qu'un visage rogné ou une comparaison hors écran.
-
-   Deux rangées prennent chacune la moitié du budget : quatre clichés tiennent
-   dans la même fenêtre que deux, plus petits. C'est le prix de les voir
-   ensemble, et il est assumé.
+   Il occupe maintenant toute la fenêtre. Ce n'est pas une coquetterie : on
+   compare un volume, un pli, un sillon, et cela se joue dans les derniers
+   millimètres. La hauteur disponible commande, la largeur suit le rapport de
+   l'image, et les cadres se centrent — mieux vaut du noir sur les côtés
+   qu'un visage rogné.
    ========================================================================== */
-.gmont{display:flex;gap:11px;justify-content:center;align-items:flex-start;flex-wrap:nowrap}
-.gmont.m2,.gmont.m3,.gmont.m4{--mh:54vh}
-.gmont.mv2,.gmont.mg4{--mh:31vh;display:grid;justify-content:center;row-gap:9px}
-.gmont.mv2{grid-template-columns:auto}
-.gmont.mg4{grid-template-columns:auto auto}
-.gmont .gc{margin:0;min-width:0}
-.gmontc .gz{height:var(--mh,54vh);width:auto;aspect-ratio:3/4;max-height:none;max-width:100%}
-.gmontc .ba{height:54vh;width:auto;aspect-ratio:3/4;max-width:100%;margin:0 auto}
-/* le curseur du rideau fait la largeur de l'image, pas celle de la carte :
-   un rail deux fois plus large que ce qu'il commande se lit mal */
-.gmontc .gwipe{max-width:min(40.5vh,100%)}
+.gmontf{position:fixed;inset:0;z-index:118;background:rgba(8,11,17,.95);
+  display:flex;flex-direction:column;backdrop-filter:blur(3px)}
+.gmontf-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:none;
+  padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);font-size:13px}
+.gmontf-h b{font-size:13.5px}
+.gmontf-h .mu{font-size:12px}
+.gmontf-b{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;
+  padding:14px 18px 18px}
+.gmont{display:flex;gap:14px;justify-content:center;align-items:stretch;
+  height:100%;width:100%;min-height:0}
+.gmont.mv2,.gmont.mg4{flex-direction:column;gap:10px}
+.gmont .mrow{flex:1 1 0;min-height:0;display:flex;gap:14px;justify-content:center;align-items:stretch}
+/* un cadre : l'image prend la hauteur restante, la légende reste dessous */
+/* « flex:0 1 auto » laissait la LÉGENDE fixer la largeur du cadre : un acte
+   au nom long donnait une image plus large que sa voisine, et deux clichés
+   de tailles différentes ne se comparent pas. Les cadres se partagent la
+   place à parts égales, et c'est la légende qui s'adapte. */
+.gmont .gc{flex:1 1 0;margin:0;min-width:0;min-height:0;display:flex;flex-direction:column;
+  border:none;background:none;border-radius:0}
+.gmontf .gmont .gc figcaption{flex-wrap:wrap}
+.gmontf .gmont .gc figcaption small{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gmontf .gmont .gz{flex:1;min-height:0;height:auto;width:auto;aspect-ratio:3/4;
+  max-width:100%;max-height:none;margin:0 auto;border-radius:var(--r-m)}
+.gmontf .gmont .gc figcaption{justify-content:center;padding:7px 4px 0;color:#e9edf5;flex:none}
+.gmontf .gmont .gc figcaption small{color:rgba(233,237,245,.62);text-align:center}
+.gmontf .gmont .gc .gr{background:rgba(255,255,255,.16);color:#fff;border:none}
+.gmontf .ba{height:100%;width:auto;aspect-ratio:3/4;max-width:100%;max-height:none;margin:0 auto}
+.gmontf .gwipe{max-width:min(46vh,100%);margin-top:10px}
+/* Le rideau loge son curseur et ses dates sous l'image. En pile flex, la
+   hauteur de l'image se négociait avec son propre rapport et retombait à
+   357 px : la grille, elle, donne d'abord la place au reste et laisse tout
+   le reste à l'image, qui la prend entièrement. */
+.gmontf-b .rid{display:flex;flex-direction:column;align-items:center;
+  height:100%;width:100%;min-height:0}
+/* La hauteur se donne explicitement : sous « flex:1 », le rapport d'image et
+   la base flexible se renvoyaient la balle et l'image retombait à 357 px sur
+   une place de 967. On réserve les 62 px du curseur et des dates, le reste
+   est à l'image, et la largeur suit le rapport. */
+/* et le plafond de 34vh que « .gz » pose sur toute vignette du schéma se
+   lève ici : c'est lui qui bloquait l'image à 357 px, pas la mise en page */
+.gmontf-b .rid .ba{height:calc(100% - 62px);width:auto;aspect-ratio:3/4;
+  max-width:100%;max-height:none;flex:none;min-height:0}
+.gmontf-b .rid .ridd{display:flex;gap:18px;justify-content:center;flex:none;
+  padding-top:8px;color:#e9edf5;font-size:12.5px;font-weight:600}
 .plb{position:fixed;inset:0;z-index:120;background:rgba(8,12,20,.86);
   display:grid;place-items:center;padding:24px}
 .plb-b{position:relative;max-width:min(94vw,760px);max-height:92vh;display:flex;flex-direction:column;
@@ -4201,12 +4229,8 @@ function galOuvrirTpl(k){
  const t=GAL_TPL.find(x=>x.k===k); if(!t) return;
  if(GAL.sel.length!==t.n){ toast(`Cette présentation demande ${t.n} clichés`); return }
  GAL.tpl=k; GAL.z=1; GAL.px=0; GAL.py=0; paint();
- /* Le montage tient dans la fenêtre, mais il s'ouvre sous la bande des
-    présentations, elle-même sous l'en-tête du dossier : sans cela on voyait
-    le haut d'une comparaison et il fallait dérouler pour le reste. On amène
-    donc le montage sous les yeux, puisque c'est lui qu'on vient de demander. */
- setTimeout(()=>{ const c=document.querySelector('.gmontc');
-   if(c&&c.scrollIntoView) c.scrollIntoView({block:'start', behavior:'smooth'}) },30);
+ /* le montage s'ouvre par-dessus la page : il n'y a plus rien à faire
+    défiler, et le zoom repart du cadrage entier */
 }
 function galFermerTpl(){ GAL.tpl=null; paint() }
 /* ---- les groupes : une séance, une rangée ---- */
@@ -7400,14 +7424,26 @@ function pDetail(p){
    const montage=()=>{
      const t=GAL_TPL.find(x=>x.k===GAL.tpl); if(!t||SEL.length!==t.n) return '';
      if(GAL.tpl==='rideau'){ const [A,B]=SEL;
-       return `<div class="ba gz" id="ba" style="margin:0 auto">
+       return `<div class="rid">
+         <div class="ba gz" id="ba">
           <img src="${photoSrc(A)}" style="${galTransform()}" alt="Cliché du ${DF(A.date)}">
           <img class="af" id="baA" src="${photoSrc(B)}" style="${galTransform()}" alt="Cliché du ${DF(B.date)}">
           <div class="hd" id="baH" style="left:${GAL.v}%"></div>
           <div class="tg l">${DF(A.date)}</div><div class="tg r">${DF(B.date)}</div></div>
          <input type="range" min="0" max="100" value="${GAL.v}" class="gwipe"
-           oninput="GAL.v=+this.value;setBA(this.value)">` }
-     const cls={h2:'m2',h3:'m3',h4:'m4',v2:'mv2',g4:'mg4'}[GAL.tpl];
+           oninput="GAL.v=+this.value;setBA(this.value)">
+         <div class="ridd"><span>${DF(A.date)}</span><span>${DF(B.date)}</span></div></div>` }
+     /* Deux rangées se construisent comme deux montages d'une rangée : chaque
+        rangée prend la moitié de la hauteur, et ses cadres s'y partagent la
+        largeur à parts égales. Une grille à colonnes automatiques laissait la
+        légende décider de la largeur — et deux clichés de tailles différentes
+        ne se comparent pas. */
+     if(GAL.tpl==='v2') return `<div class="gmont mv2">
+       <div class="mrow">${cadre(SEL[0],0)}</div><div class="mrow">${cadre(SEL[1],1)}</div></div>`;
+     if(GAL.tpl==='g4') return `<div class="gmont mg4">
+       <div class="mrow">${cadre(SEL[0],0)}${cadre(SEL[1],1)}</div>
+       <div class="mrow">${cadre(SEL[2],2)}${cadre(SEL[3],3)}</div></div>`;
+     const cls={h2:'m2',h3:'m3',h4:'m4'}[GAL.tpl];
      return `<div class="gmont ${cls}">${SEL.map(cadre).join('')}</div>`;
    };
 
@@ -7432,20 +7468,35 @@ function pDetail(p){
         title="${esc(t.l)} — demande ${t.n} clichés">${tplIcone(t.k)}<span>${t.n}</span></button>`).join('')}</div>
    </div>
 
-   ${GAL.tpl?`<div class="card gmontc" style="margin-bottom:13px"><div class="h">
-      <h2>${esc((GAL_TPL.find(x=>x.k===GAL.tpl)||{}).l||'')}</h2>
-      <div class="r">
+<!-- =====================================================================
+     Comparer, c'est regarder en grand
+     ---------------------------------------------------------------------
+     Le montage s'ouvrait dans la page, sous l'en-tête du dossier et sous la
+     bande des présentations : à deux clichés, chacun plafonnait à 567 px de
+     haut sur une fenêtre de 1050. On compare pourtant un volume, un sillon,
+     un pli — ce qui se joue dans les derniers millimètres.
+
+     Il sort donc de la page : plein écran, fond neutre, rien d'autre à
+     l'image que les clichés et leurs dates. La même fenêtre leur donne alors
+     près de 900 px de haut, soit 60 % de plus, et le reste de l'application
+     s'efface le temps qu'on regarde.
+     ===================================================================== -->
+   ${GAL.tpl?`<div class="gmontf" onclick="if(event.target===this)galFermerTpl()">
+      <div class="gmontf-h">
+        <b>${esc((GAL_TPL.find(x=>x.k===GAL.tpl)||{}).l||'')}</b>
+        <span class="mu">${esc(fn(p))}</span>
         ${SEL.length===2?`<span class="bdg b-info">${esc(galEcart(SEL[0],SEL[1]))}</span>`:''}
-        <button class="btn xs" onclick="galEchange()" title="Inverser l’ordre des clichés">⇄ Inverser</button>
-        <button class="btn xs g" onclick="galVoisin(-1)" title="Cliché précédent">‹</button>
-        <button class="btn xs g" onclick="galVoisin(1)" title="Cliché suivant">›</button>
-        <div class="zbar" title="Le zoom et le cadrage portent sur tous les clichés à la fois">
-          <button onclick="galZoom(1/1.4,true)" ${GAL.z>1?'':'disabled'} title="Dézoomer">−</button>
-          <span id="galz">${GAL.z.toFixed(1).replace('.0','')}×</span>
-          <button onclick="galZoom(1.4,true)" ${GAL.z<4?'':'disabled'} title="Zoomer">+</button>
-          <button id="galr" onclick="galReset()" ${GAL.z===1?'disabled':''} title="Revenir au cadrage entier">⟲</button></div>
-        <button class="btn xs g" onclick="galFermerTpl()">✕ Fermer</button></div></div>
-     <div class="b">${montage()}</div></div>`:''}
+        <div class="r" style="margin-left:auto">
+          <button class="btn xs" onclick="galEchange()" title="Inverser l’ordre des clichés">⇄ Inverser</button>
+          <button class="btn xs g" onclick="galVoisin(-1)" title="Cliché précédent">‹</button>
+          <button class="btn xs g" onclick="galVoisin(1)" title="Cliché suivant">›</button>
+          <div class="zbar" title="Le zoom et le cadrage portent sur tous les clichés à la fois">
+            <button onclick="galZoom(1/1.4,true)" ${GAL.z>1?'':'disabled'} title="Dézoomer">−</button>
+            <span id="galz">${GAL.z.toFixed(1).replace('.0','')}×</span>
+            <button onclick="galZoom(1.4,true)" ${GAL.z<4?'':'disabled'} title="Zoomer">+</button>
+            <button id="galr" onclick="galReset()" ${GAL.z===1?'disabled':''} title="Revenir au cadrage entier">⟲</button></div>
+          <button class="btn xs" onclick="galFermerTpl()" title="Fermer — ou touche Échap">✕ Fermer</button></div></div>
+      <div class="gmontf-b">${montage()}</div></div>`:''}
 
    <div class="subh"><h3>Clichés<span>${G.n}</span></h3>
      <div class="r">
@@ -13848,7 +13899,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DY';
+const BUILD='DZ';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -15496,7 +15547,8 @@ document.addEventListener('keydown',e=>{
  if(e.key==='Escape'){ if(HFEN){histoFermerFen();return}
    if(PAR){fermerParapheur();return}
    if(VX){voixFermer();return}
-   if(GAL&&GAL.grand){GAL.grand=false;paint();return}
+   if(GAL&&GAL.lb){galFermerLb();return}
+   if(GAL&&GAL.tpl){galFermerTpl();return}
    if(PV){fermerPdf();return}
    const fc=document.getElementById('famchoix'); if(fc){fc.remove();return} closeAll();return}
  if(palOn){
