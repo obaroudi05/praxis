@@ -1201,6 +1201,19 @@ tr.neuf>td{background:color-mix(in srgb,var(--accent) 9%,transparent)}
    pixel élargit chaque ligne de deux, la colonne de droite réclame plus de
    place, le visage rétrécit d'autant — et la dose tombait de 10,3 à 9,7 px à
    1280. Un effet de style ne doit rien peser sur la mise en page. */
+/* la légende des séances se clique : elle répond à « qu'a-t-on fait ce
+   jour-là », l'autre question du schéma */
+.cum-s{cursor:pointer;font-family:inherit;color:inherit;transition:.12s}
+button.cum-s:hover{border-color:var(--accent)}
+.cum-s.pale{opacity:.62}
+.cum-s.sel{border-color:var(--accent);background:var(--accent-wash);
+  box-shadow:0 0 0 1.4px var(--accent) inset}
+.cum-s.sel u{background:var(--accent)}
+.cum-s.sel b{color:var(--accent-ink);font-weight:650}
+/* la pastille de la séance désignée, dans les lignes */
+.cum-c .zc.sel{border-color:var(--accent);background:var(--accent-wash)}
+.cum-c .zc.sel u{background:var(--accent)}
+.cum-sel .vnum{background:var(--accent);flex:none}
 .cum-sel{display:flex;align-items:center;gap:7px;margin:0 0 8px;padding:6px 9px;
   border:1px solid var(--accent);border-radius:10px;background:var(--accent-wash);font-size:12.5px}
 .cum-sel b{color:var(--accent-ink)}
@@ -4711,6 +4724,11 @@ const baremePane=zAll=>baremeListe(baremeById(AS.reg), zAll||AS.z, {
  clic:'zClick', groupe:'baremeGroupe'});
 
 function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=null,clic='zClick',libre=false,ech=1,seances=null,roClic=null,selZ=null}={}){
+ /* Une désignation peut porter sur une zone — ou sur une séance, qui en touche
+    plusieurs le même jour. Le schéma n'a pas à savoir laquelle : il reçoit un
+    ensemble de zones à faire ressortir. */
+ const SELZ=selZ==null?null:new Set(Array.isArray(selZ)?selZ:[selZ]);
+ const zSel=id=>!!SELZ&&SELZ.has(id), zPale=id=>!!SELZ&&SELZ.size>0&&!SELZ.has(id);
  const R=SILH[region]?region:'visage', S=SILH[R];
  const az=z=>(zt&&zt[z])||type;                       /* l'acte de cette zone */
  const H=hist||{};
@@ -4724,7 +4742,7 @@ function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=n
   const t=az(z.id), CT=t?acteDef(t):null;
   const cls=(on?(CT?'zone act-cur':(z.p==='tox'?'zone act-tox':'zone act-ah'))
             :ant?(z.p==='tox'?'zone ant ant-tox':'zone ant ant-ah'):'zone')+(editable?'':' ro')
-            +(roClic&&(on||ant)?' cli':'')+(selZ===z.id?' sel':'')+(selZ&&selZ!==z.id?' pale':'');
+            +(roClic&&(on||ant)?' cli':'')+(zSel(z.id)?' sel':'')+(zPale(z.id)?' pale':'');
   const st=on&&CT?` style="fill:${colActe(t)};stroke:${colActe(t)}"`:'';
   /* En saisie, la zone se coche. En lecture, elle peut tout de même répondre :
      sur le cumul, cliquer une zone désigne sa ligne dans la liste de droite. */
@@ -4882,7 +4900,7 @@ const place=(x,y,w,h,pas,cadre)=>{
    const yq = qt ? (dt ? y-2*K : y) : 0;
    const yd = dt ? (qt ? y+FD+1.5*K : y) : 0;
    return fil
-        + `<g class="zpill ${plein?'on':'ant'}${selZ===z.id?' sel':''}${selZ&&selZ!==z.id?' pale':''}"
+        + `<g class="zpill ${plein?'on':'ant'}${zSel(z.id)?' sel':''}${zPale(z.id)?' pale':''}"
              data-z="${z.id}" style="--zc:${coul};--fq:${FQ.toFixed(2)}px;--fd:${FD.toFixed(2)}px"
              ${roClic?`onclick="${roClic}(event,'${z.id}')"`:''}>
              <rect class="zbg" x="${(cx-w/2).toFixed(1)}" y="${(y-h/2).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="${Math.min(6*K,h/2).toFixed(1)}"/>
@@ -7005,12 +7023,17 @@ function pDetail(p){
    /* Changer de région ou de patient périme la sélection sans qu'on ait à y
       penser : une zone qui n'est pas à l'écran ne désigne plus rien. */
    const SEL=(CUM_SEL&&CUM_SELP===p.id&&Object.prototype.hasOwnProperty.call(cur,CUM_SEL))?CUM_SEL:null;
+   /* la séance désignée doit exister dans la région affichée, comme la zone */
+   const SEA=(CUM_SEA&&CUM_SELP===p.id&&SEANCES[CUM_SEA])?CUM_SEA:null;
+   /* les zones que la désignation fait ressortir : une seule, ou toutes celles
+      d'une même journée de soin */
+   const ZSEL=SEL?[SEL]:SEA?Object.keys(cur).filter(z=>(ZH[z]||[]).some(x=>x.d===SEA)):null;
    return `<div class="fbar" style="margin-bottom:12px"><div class="seg">${ONGLETS.map(r=>{
       const n=Object.keys(parReg(r.id)).length;
       return `<button class="${schemaReg===r.id?'on':''}" onclick="schemaReg='${r.id}';paint()">${r.i} ${esc(r.n)} · ${n}</button>`}).join('')}</div></div>
    <div class="facewrap cumul">
     <div>${BAR?baremeListe(BAR,cur,{ro:true,hist:ZH,motTotal:'déjà traitée'+(Object.keys(cur).length>1?'s':'')})
-     :`<div class="facebox" onclick="cumVide(event)">${schemaSVG(cur,{editable:false,hist:ZH,region:schemaReg,zt:cumulT,ech:CUM_ECH,seances:SEANCES,roClic:'cumClic',selZ:SEL})}</div>
+     :`<div class="facebox" onclick="cumVide(event)">${schemaSVG(cur,{editable:false,hist:ZH,region:schemaReg,zt:cumulT,ech:CUM_ECH,seances:SEANCES,roClic:'cumClic',selZ:ZSEL})}</div>
      <div class="face-legend"><span><i style="background:var(--toxine)"></i>Toxine</span><span><i style="background:var(--ah)"></i>Acide hyaluronique</span>
       <span class="mu">${NSEANCES>1?'la couleur dit le produit · le numéro dit la séance':'quantité cumulée et date de la dernière séance'}</span></div>`}</div>
     <div>
@@ -7054,10 +7077,23 @@ function pDetail(p){
        return `
        ${SEL?`<div class="cum-sel"><span class="zd" style="background:${colActe(cumulT[SEL]||(zoneDef(SEL).p==='tox'?'BTX':'AH'))}"></span>
          <b>${esc(zoneNom(SEL))}</b><span class="mu">désignée sur le schéma</span>
-         <button class="chip" onclick="cumSel(null,1)">✕ tout réafficher</button></div>`:''}
-       ${plusieurs?`<div class="cum-lg"><span class="mu">Séances</span>${jours.map(d=>`<span class="cum-s" title="Séance ${nSeance[d]} du ${DF(d)}">
-          <u>${nSeance[d]}</u><b>${DFT(d)}</b></span>`).join('')}
-         <span class="mu">— le numéro se retrouve sur le schéma</span></div>`:''}
+         <button class="chip" onclick="cumRien()">✕ tout réafficher</button></div>`:''}
+       ${SEA?(()=>{
+         const zs=ZSEL||[];
+         /* une journée de soin peut tenir en un acte ou en plusieurs : on
+            n'offre de l'ouvrir que lorsqu'il n'y a aucune ambiguïté */
+         const aids=[...new Set(zs.flatMap(z=>(ZH[z]||[]).filter(x=>x.d===SEA).map(x=>x.aid)))];
+         return `<div class="cum-sel"><span class="vnum">${SEANCES[SEA].n}</span>
+         <b>${DF(SEA)}</b><span class="mu">${zs.length} zone${zs.length>1?'s':''} ce jour-là</span>
+         ${aids.length===1?`<button class="chip" onclick="openActe(${p.id},${aids[0]})">◫ Ouvrir la séance</button>`:''}
+         <button class="chip" onclick="cumRien()">✕ tout réafficher</button></div>`})():''}
+       ${plusieurs?`<div class="cum-lg"><span class="mu">Séances</span>${jours.map(d=>{
+          const nz=Object.keys(cur).filter(z=>(ZH[z]||[]).some(x=>x.d===d)).length;
+          return `<button class="cum-s${SEA===d?' sel':''}${SEA&&SEA!==d?' pale':''}"
+            onclick="cumSeance('${d}')"
+            title="Séance ${nSeance[d]} du ${DF(d)} — ${nz} zone${nz>1?'s':''} · cliquer pour les situer">
+            <u>${nSeance[d]}</u><b>${DFT(d)}</b></button>`}).join('')}
+         <span class="mu">— ${SEA?'cliquez à nouveau pour tout réafficher':'cliquez une séance pour voir ce qui a été fait ce jour-là'}</span></div>`:''}
        ${zones.sort((a,b)=>(cur[a]-cur[b])||zoneNom(a).localeCompare(zoneNom(b),'fr')).map(z=>{
          const Z=zoneDef(z), L=(ZH[z]||[]).slice().sort((x,y)=>x.d.localeCompare(y.d));
          const t=cumulT[z]||(Z.p==='tox'?'BTX':'AH'), CZ=acteDef(t);
@@ -7066,13 +7102,16 @@ function pDetail(p){
             « 3 × 4 U » d'un côté, des pastilles nues de l'autre. Deux règles
             à retenir pour un gain de place que le jeton neutre, plus étroit
             qu'une pastille colorée, rend inutile. Une seule écriture. */
-         return `<div class="zrow cum-r${SEL===z?' sel':''}${SEL&&SEL!==z?' pale':''}"
+         /* une ligne ressort si elle est la zone désignée, ou si sa zone a été
+            traitée le jour désigné */
+         const dansSel=ZSEL?ZSEL.includes(z):false;
+         return `<div class="zrow cum-r${dansSel?' sel':''}${ZSEL&&!dansSel?' pale':''}"
            onclick="cumSel('${z}',1)"
            title="${esc(zoneNom(z))} — ${esc(CZ.n)} · ${L.length} séance${L.length>1?'s':''} — cliquer pour la situer sur le schéma">
           <span class="zd" style="background:${colActe(t)}"></span>
           <span class="cum-z">${esc(zoneNom(z))}</span>
           <b class="mono cum-q">${q_(cur[z],t,CZ,z)}</b>
-          <span class="cum-c">${L.map(x=>`<button class="zc"
+          <span class="cum-c">${L.map(x=>`<button class="zc${SEA===x.d?' sel':''}"
             onclick="event.stopPropagation();openActe(${p.id},${x.aid})"
             title="Séance ${nSeance[x.d]} du ${DF(x.d)}${x.q&&CZ.unite?' — '+fmtDose(x.q,t,z):''} — ouvrir l’acte">
             <u>${plusieurs?nSeance[x.d]:DFT(x.d)}</u>${x.q&&CZ.unite?'<b>'+fmtDose(x.q,t,z)+'</b>':''}</button>`).join('')}</span>
@@ -13541,7 +13580,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DU';
+const BUILD='DV';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -16161,9 +16200,18 @@ let CUM_ECH=1, CUM_PASSE=false;
    la zone qui s'allume sur le visage. Rien ne se filtre, rien ne disparaît :
    on désigne, on ne masque pas.
    ========================================================================== */
-let CUM_SEL=null, CUM_SELP=null;
+let CUM_SEL=null, CUM_SELP=null, CUM_SEA=null;
+/* Désigner une SÉANCE, c'est poser l'autre question du schéma : non plus
+   « qu'a reçu cette zone » mais « qu'a-t-on fait ce jour-là ». Une séance
+   touche souvent plusieurs zones — front, glabelle et pattes d'oie le même
+   matin — et c'est précisément ce que le numéro raconte. La légende devient
+   donc cliquable, et le jour choisi allume toutes ses zones d'un coup.
+
+   Les deux désignations s'excluent : elles répondent à deux questions, et les
+   croiser ne laisserait qu'une intersection que personne n'a demandée. */
 function cumSel(z, doux){
  CUM_SEL=(CUM_SEL===z)?null:z;
+ CUM_SEA=null;
  /* la désignation appartient au dossier où elle a été faite : « front » existe
     chez tout le monde, et une ligne allumée en ouvrant un autre patient serait
     un reste, pas une réponse */
@@ -16176,8 +16224,19 @@ function cumSel(z, doux){
  },0);
 }
 function cumClic(e,z){ if(e){e.stopPropagation()} cumSel(z) }
+function cumSeance(d, doux){
+ CUM_SEA=(CUM_SEA===d)?null:d;
+ CUM_SEL=null;
+ CUM_SELP=CUM_SEA?pSel:null;
+ paint();
+ if(CUM_SEA&&!doux) setTimeout(()=>{
+   const l=document.querySelector('.cum-r.sel');
+   if(l&&l.scrollIntoView) l.scrollIntoView({block:'nearest'});
+ },0);
+}
+const cumRien=()=>{ CUM_SEL=null; CUM_SEA=null; CUM_SELP=null; paint() };
 /* cliquer le cadre, à côté de toute zone, relâche la sélection */
-function cumVide(e){ if(CUM_SEL&&e&&e.target&&!e.target.closest('.zone,.zpill')) cumSel(null,true) }
+function cumVide(e){ if((CUM_SEL||CUM_SEA)&&e&&e.target&&!e.target.closest('.zone,.zpill')) cumRien() }
 function calerEtiquettes(){
  const svg=document.querySelector('#main .facewrap.cumul svg.face'); if(!svg) return;
  const l=svg.getBoundingClientRect().width; if(!l) return;
