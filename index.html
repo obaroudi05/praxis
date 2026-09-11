@@ -2842,6 +2842,23 @@ function zoneHist(pid,exclure){
  return h;
 }
 const DFT=d=>new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'2-digit'});
+/* ==========================================================================
+   La date, sur le visage
+   --------------------------------------------------------------------------
+   Une étiquette du schéma ne tient sa largeur que d'une chose : sa ligne de
+   date. Mesuré — « 02/03/26 » occupe 45,7 unités sur une pastille de 71,4,
+   soit près des deux tiers. L'année en prend 14 à elle seule, et pour une
+   séance de l'année en cours elle ne dit rien que le praticien ignore.
+
+   Elle s'efface donc quand la séance date de cette année, et reparaît sinon :
+   une pastille plus large signale alors d'elle-même une séance ancienne. La
+   date complète reste partout où il y a la place — la légende des séances,
+   l'infobulle de la zone, la liste de droite.
+   ========================================================================== */
+const DFV=d=>{const s2=String(d);
+ return s2.slice(0,4)===String(TODAYS).slice(0,4)
+   ? new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})
+   : DFT(d)};
 const zoneSummary=a=>{
   if(!a.zones) return '—';
   const e=zonesOf(a).filter(([z])=>zoneDef(z));
@@ -4763,12 +4780,38 @@ const place=(x,y,w,h,pas,cadre)=>{
     if(!heurte(sx,sy)){ pris.push({x:sx,y:sy,w,h}); return [sx,sy] } }
   const [fx,fy]=serre(x,y); pris.push({x:fx,y:fy,w,h}); return [fx,fy];
  };
- /* largeur d'un texte, en unités du dessin : les chiffres et les lettres de
-    ces étiquettes tournent autour de 0,56 em, les séparateurs bien moins.
-    L'estimation est vérifiée par les tests, qui exigent que le texte rendu
-    tienne dans sa pastille. */
- const largeurTxt=(txt,fs)=>[...txt].reduce((w,c)=>
-   w + fs*(/[ .,]/.test(c)?0.30 : /[/:]/.test(c)?0.35 : /[×]/.test(c)?0.66 : /[a-z]/.test(c)?0.55 : 0.60), 0);
+ /* ------------------------------------------------------------------------
+    La largeur d'un texte : mesurée, plus estimée
+    ------------------------------------------------------------------------
+    Elle était estimée caractère par caractère — 0,60 em pour un chiffre, 0,35
+    pour une barre de fraction. Mesuré après coup : le texte réellement rendu
+    fait 18 à 23 % de plus, parce que ces étiquettes sont écrites en gras et
+    que le gras est large. L'erreur ne se voyait pas : un rembourrage de 13
+    unités l'absorbait. Autrement dit la pastille n'était pas ajustée à son
+    texte, elle était trop petite et rattrapée par du vide — et c'est ce vide
+    qui la faisait paraître large sur le visage.
+
+    On mesure donc pour de bon, avec la même fonte et la même graisse que
+    celles du rendu, via un contexte de dessin gardé en cache. L'estimation
+    reste en secours, corrigée du facteur mesuré, si le canevas manquait.
+    ------------------------------------------------------------------------ */
+ const largeurTxt=(txt,fs,gras)=>{
+  if(!txt) return 0;
+  try{
+    if(!schemaSVG._ctx) schemaSVG._ctx=document.createElement('canvas').getContext('2d');
+    const c=schemaSVG._ctx;
+    if(c){
+      if(!schemaSVG._fam) schemaSVG._fam=getComputedStyle(document.documentElement)
+        .getPropertyValue('--sans').trim()||'system-ui,sans-serif';
+      c.font=`${gras||700} ${fs}px ${schemaSVG._fam}`;
+      const m=c.measureText(txt).width;
+      /* l'interlettrage CSS (.01 à .02 em) n'entre pas dans measureText */
+      if(m>0) return m + txt.length*fs*0.02;
+    }
+  }catch(e){}
+  return [...txt].reduce((w,c2)=>
+   w + fs*(/[ .,]/.test(c2)?0.37 : /[/:]/.test(c2)?0.44 : /[×]/.test(c2)?0.82 : /[a-z]/.test(c2)?0.68 : 0.75), 0);
+ };
  /* ------------------------------------------------------------------------
     Le corps des étiquettes ne suit pas celui du dessin
     ------------------------------------------------------------------------
@@ -4791,7 +4834,7 @@ const place=(x,y,w,h,pas,cadre)=>{
    const t=az(z.id), CT=t?acteDef(t):null, UT=CT?CT.unite:null;
    /* une prestation libre n'a ni produit ni unité : on n'affiche que ce qui a un sens */
    const qt=q?(CT?(UT?fmtDose(q,t):''):(libre?(q!==1?nb(q):''):fmtQ(q,z.p))):'';
-   const dt=ant?DFT(ant[0].d)+(ant.length>1?` ×${ant.length}`:''):'';
+   const dt=ant?DFV(ant[0].d)+(ant.length>1?` ×${ant.length}`:''):'';
    if(!qt&&!dt) return '';
    const plein=!!qt;
    /* Une zone seulement traitée autrefois se colore selon SON produit, pas
@@ -4815,13 +4858,19 @@ const place=(x,y,w,h,pas,cadre)=>{
       ------------------------------------------------------------------------ */
    /* le numéro de séance n'a de sens que s'il y en a plusieurs à distinguer */
    const SC=(seances&&ant&&Object.keys(seances).length>1&&seances[ant[0].d])||null;
-   const wb=SC?FD*1.5:0;                       /* le jeton de séance */
+   const wb=SC?FD*1.4:0;                       /* le jeton de séance */
    /* La date est ancrée à gauche : toute sous-estimation de sa largeur la fait
       dépasser du fond, alors qu'un texte centré ne débordait que de moitié.
       On prend donc 8 % de marge sur l'estimation — mesuré, pas supposé : les
       tests refusent le moindre pixel de texte hors pastille. */
-   const wd=largeurTxt(dt,FD)*(SC?1.08:1)+(SC?wb+FD*0.34:0);
-   const w=Math.max(largeurTxt(qt,FQ), wd)+13*K;
+   /* la marge de 8 % compensait l'erreur d'estimation ; la mesure la rend
+      inutile — il ne reste qu'un point de sécurité contre l'arrondi */
+   const wd=largeurTxt(dt,FD,600)*1.01+(SC?wb+FD*0.3:0);
+   /* Le rembourrage passe de 13 à 9 unités : la pastille s'ajustait large
+      d'un temps où l'écriture était plus petite et le fond plus discret.
+      L'écriture, elle, ne bouge pas — il a fallu la grossir pour cesser de
+      zoomer, ce n'est pas pour la reprendre. */
+   const w=Math.max(largeurTxt(qt,FQ,700), wd)+8*K;
    const h=(qt?FQ+2*K:0)+(dt?FD+2*K:0)+6*K;
    /* une étiquette ne sort pas du cadre : au bord, elle se recentre */
    const [VX,VY,VW,VH]=S.vb.split(/\s+/).map(Number);
@@ -4843,7 +4892,7 @@ const place=(x,y,w,h,pas,cadre)=>{
                   dans l'espace restant supposait connaître sa largeur exacte ;
                   l'estimation étant approchée, elle mordait sur le carré une
                   fois sur trois. Ancrée, elle ne peut plus le recouvrir. */
-               ? (()=>{ const x0=cx-wd/2, xd=x0+wb+FD*0.34;
+               ? (()=>{ const x0=cx-wd/2, xd=x0+wb+FD*0.3;
                    return `<rect class="zsb" x="${x0.toFixed(1)}" y="${(yd-FD*0.62).toFixed(1)}"
                        width="${wb.toFixed(1)}" height="${(FD*1.24).toFixed(1)}" rx="${(FD*0.62).toFixed(1)}"/>
                      <text class="zsn" x="${(x0+wb/2).toFixed(1)}" y="${yd.toFixed(1)}">${SC.n}</text>
@@ -7630,10 +7679,25 @@ function exportFactures(){
  toast(`${L.length} facturation${L.length>1?'s':''} exportée${L.length>1?'s':''}`);
 }
 
+/* ==========================================================================
+   Un seul filtre pour l'argent qui manque
+   --------------------------------------------------------------------------
+   Il y en avait deux, et ils ne disaient pas la même chose. « Non réglé »,
+   rangé parmi les moyens de paiement, gardait les factures sans aucun
+   règlement. « Avec reste dû », dans les statuts, gardait toutes celles où il
+   manque quelque chose — les partiellement réglées comprises. Deux libellés
+   proches, deux ensembles différents, et une facture payée pour moitié qui
+   apparaissait dans l'un et pas dans l'autre.
+
+   Il n'en reste qu'un, « Restant dû » : la facture est émise, il manque
+   encore de l'argent dessus. C'est exactement ce que compte l'indicateur
+   « Reste dû » en haut de l'écran — le filtre et le chiffre s'accordent enfin.
+   Et les moyens de paiement ne parlent plus que de moyens de paiement.
+   ========================================================================== */
 function factFiltrees(){
  const q=fq.toLowerCase();
  return mesFact(FACTURES).filter(f=>inPer(f.date,perE))
-  .filter(f=>fMoyen==='tous'||(fMoyen==='impaye'?!f.moyen&&f.statut!=='annulee':f.moyen===fMoyen))
+  .filter(f=>fMoyen==='tous'||f.moyen===fMoyen)
   .filter(f=>fStatut==='tous'?true:fStatut==='annulee'?f.statut==='annulee':fStatut==='avoir'?f.avoir>0:
              fStatut==='solde'?(f.statut==='ok'&&rdu(f)===0):(f.statut==='ok'&&rdu(f)>0))
   .filter(f=>!fPrat||f.praticien===fPrat)
@@ -7648,10 +7712,9 @@ function barreFiltres(o){
   <input class="inp" id="fqi" style="min-width:240px" placeholder="N°, patient, acte…" value="${esc(fq)}"
     oninput="fq=this.value;paint();const e=document.getElementById('fqi');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
   <div class="seg"><button class="${fMoyen==='tous'?'on':''}" onclick="fMoyen='tous';paint()">Tous paiements</button>
-   ${MOYENS.map(m=>`<button class="${fMoyen===m?'on':''}" onclick="fMoyen='${m}';paint()">${m}</button>`).join('')}
-   <button class="${fMoyen==='impaye'?'on':''}" onclick="fMoyen='impaye';paint()">Non réglé</button></div>
+   ${MOYENS.map(m=>`<button class="${fMoyen===m?'on':''}" onclick="fMoyen='${m}';paint()">${m}</button>`).join('')}</div>
   <select class="inp" onchange="fStatut=this.value;paint()">
-   ${[['tous','Tous statuts'],['solde','Soldées'],['reste','Avec reste dû'],['avoir','Avec avoir'],['annulee','Annulées']]
+   ${[['tous','Tous statuts'],['solde','Soldées'],['reste','Restant dû'],['avoir','Avec avoir'],['annulee','Annulées']]
      .map(([k,l])=>`<option value="${k}" ${fStatut===k?'selected':''}>${l}</option>`).join('')}</select>
   ${cp?`<select class="inp" onchange="fPrat=this.value;paint()"><option value="">Tous praticiens</option>
    ${pratsArgent().map(x=>`<option ${fPrat===x?'selected':''}>${x}</option>`).join('')}</select>`:''}
@@ -13478,7 +13541,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DT';
+const BUILD='DU';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
