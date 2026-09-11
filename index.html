@@ -1213,6 +1213,14 @@ button.cum-s:hover{border-color:var(--accent)}
 /* la pastille de la séance désignée, dans les lignes */
 .cum-c .zc.sel{border-color:var(--accent);background:var(--accent-wash)}
 .cum-c .zc.sel u{background:var(--accent)}
+/* L'avoir n'a plus de colonne : il se pose sous l'acte, et seulement s'il y en
+   a un. Teintes reprises des badges d'alerte — mes propres valeurs sortaient
+   à 1,49 pour 1 sur fond clair, c'est-à-dire illisibles. */
+.favoir{display:flex;width:fit-content;align-items:center;gap:4px;margin-top:3px;padding:1px 6px;
+  border-radius:6px;font-size:10.5px;font-weight:640;white-space:nowrap;
+  background:var(--warn-w);color:#8a6100}
+:root[data-theme="dark"] .favoir{color:#f6c65e}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .favoir{color:#f6c65e}}
 .cum-sel .vnum{background:var(--accent);flex:none}
 .cum-sel{display:flex;align-items:center;gap:7px;margin:0 0 8px;padding:6px 9px;
   border:1px solid var(--accent);border-radius:10px;background:var(--accent-wash);font-size:12.5px}
@@ -6251,7 +6259,11 @@ function pFiche(){
  const p=pById(pSel), L=patientsTries(), i=L.findIndex(x=>x.id===pSel);
  const nav=(d,l)=>{const n=L[i+d]; return n?`<button class="btn s" onclick="pSel=${n.id};paint()" title="${esc(fn(n))}">${l}</button>`:''};
  const nA=ACTES.filter(a=>a.patient===p.id).length;
- const F=FACTURES.filter(f=>f.patient===p.id);
+ /* Le soin est commun, l'argent ne l'est pas. Cet en-tête additionnait les
+    encaissements de TOUS les praticiens sur ce patient : un médecin sans
+    « CA du cabinet » y lisait le chiffre d'un confrère, alors que les écrans
+    financiers le lui refusent. mesFact applique ici la même règle. */
+ const F=mesFact(FACTURES.filter(f=>f.patient===p.id));
  const ca=F.reduce((s,f)=>s+f.paye,0), rd=F.reduce((s,f)=>s+rdu(f),0);
  return `<div class="head" style="margin-bottom:12px">
    <div class="r" style="gap:11px">
@@ -6745,8 +6757,9 @@ function apercuAvoir(id){
 
 function pDetail(p){
  const A=ACTES.filter(a=>a.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
- const F=FACTURES.filter(f=>f.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
- const D=DEVIS.filter(d=>d.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
+ /* même règle que l'en-tête : les actes restent communs, les montants non */
+ const F=mesFact(FACTURES.filter(f=>f.patient===p.id)).sort((a,b)=>b.date.localeCompare(a.date));
+ const D=mesDevis(DEVIS.filter(d=>d.patient===p.id)).sort((a,b)=>b.date.localeCompare(a.date));
  const O=ORDONNANCES.filter(o=>o.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
  const C=A.filter(a=>(catById(a.type)||{}).cons);
  const ca=F.reduce((s,f)=>s+f.paye,0), rd=F.reduce((s,f)=>s+rdu(f),0);
@@ -7373,17 +7386,32 @@ function pDetail(p){
         onclick="${factNew&&factNew.pid===p.id?'fermerFactNew()':`ouvrirFactNew(${p.id})`}">+ Facture</button></div></div>
    ${factNew&&factNew.pid===p.id?factForm(p):''}
    ${avoirNew&&avoirNew.pid===p.id?avoirForm(p):''}
-   <div class="tw"><table class="tcomp"><thead><tr><th>N°</th><th>Date</th><th>Acte</th>${cpt?'<th class="num">HT</th><th class="num">TVA</th>':''}<th class="num">TTC</th><th class="num">Avoir</th><th class="num">Encaissé</th><th>Mode</th><th class="num">Reste</th><th>Statut</th><th></th></tr></thead>
+   <!-- ======================================================================
+     Une colonne par question qu'on se pose vraiment
+     ----------------------------------------------------------------------
+     Ce tableau comptait treize colonnes. HT et TVA en occupaient deux pour
+     une information que personne ne lit sur une fiche patient : on y vient
+     pour savoir ce qui a été facturé, encaissé, et ce qui reste. La
+     ventilation fiscale a son écran — Facturation & caisse — et son export.
+
+     La colonne Avoir en prenait une troisième pour afficher un tiret : sur
+     l'ensemble du fichier, une facture sur cinquante porte un avoir. Elle
+     devient un bandeau sous l'acte concerné, qui ne s'affiche que dans ce
+     cas-là — l'exception ne coûte plus de place aux quarante-neuf autres.
+
+     Et le praticien qui a facturé entre dans la liste : sur un patient suivi
+     à plusieurs, c'était la question sans réponse.
+     ====================================================================== -->
+   <div class="tw"><table class="tcomp"><thead><tr><th>N°</th><th>Date</th><th>Acte</th><th>Praticien</th><th class="num">TTC</th><th class="num">Encaissé</th><th>Mode</th><th class="num">Reste</th><th>Statut</th><th></th></tr></thead>
     <tbody>${F.map(f=>{const act=ACTES.find(x=>x.id===f.acte), an=f.statut==='annulee';
       const nom=act?act.nom:(f.libelle||'—');
+      const nAv=avoirsDe(f.id).length;
       return `<tr class="${an?'annul':''}">
       <td class="mono nw">${f.id}</td><td class="mono nw" title="${DF(f.date)}">${DFP(f.date)}</td>
-      <td class="el" style="max-width:138px" title="${esc(nom)}${act?'':' — facture sans acte'}">${esc(nom)}${act?'':'<div class="mu" style="font-size:10.5px">sans acte</div>'}</td>
-      ${cpt?`<td class="num nw">${EUR(fHT(f))}</td><td class="num mu nw">${EUR(fTVA(f))}</td>`:''}
+      <td class="el" style="max-width:150px" title="${esc(nom)}${act?'':' — facture sans acte'}${f.avoir?' · avoir '+EUR(f.avoir):''}">${esc(nom)}${act?'':'<div class="mu" style="font-size:10.5px">sans acte</div>'}${
+        f.avoir?`<div class="favoir" title="${nAv>1?nAv+' avoirs sur cette facture':'Avoir déduit du montant TTC'}">↩ avoir ${EUR(f.avoir)}${nAv>1?` · ${nAv}`:''}</div>`:''}</td>
+      <td class="mu el" style="max-width:96px" title="${esc(f.praticien||'—')}">${esc(f.praticien||'—')}</td>
       <td class="num nw"><b>${EUR(fTTC(f))}</b></td>
-      <td class="num nw ${f.avoir?'':'mu'}" style="${f.avoir?'color:var(--warn)':''}">${f.avoir
-        ?`− ${EUR(f.avoir)}${avoirsDe(f.id).length>1?`<div class="mu" style="font-size:10.5px">${avoirsDe(f.id).length} avoirs</div>`:''}`
-        :'—'}</td>
       <td class="num nw">${EUR(f.paye)}</td>
       <td class="mu el" style="max-width:74px" title="${esc(moyenTxt(f)||'non réglé')}">${esc(moyenCourt(f)||'—')}</td>
       <td class="num">${rdu(f)>0?`<span style="color:var(--crit);font-weight:650">${EUR(rdu(f))}</span>`
@@ -7397,8 +7425,8 @@ function pDetail(p){
         ${(an||!peutEncaisser())?'':`<button class="btn xs ${encSel===f.id?'g':''}" title="Corriger l’encaissement, même sur une facture soldée"
           onclick="event.stopPropagation();ouvrirEnc('${f.id}')">${encSel===f.id?'✕':'€ Encaisser'}</button>`}
         <button class="btn xs" onclick="toast('PDF Factur-X de ${f.id}')">PDF</button></td></tr>
-      ${encSel===f.id?`<tr class="supp"><td colspan="${cpt?12:10}">${encForm(f)}</td></tr>`:''}
-      ${retroSel===f.id?`<tr class="supp"><td colspan="${cpt?12:10}">${retroDetail(f)}</td></tr>`:''}`}).join('')}
+      ${encSel===f.id?`<tr class="supp"><td colspan="10">${encForm(f)}</td></tr>`:''}
+      ${retroSel===f.id?`<tr class="supp"><td colspan="10">${retroDetail(f)}</td></tr>`:''}`}).join('')}
     </tbody></table>${F.length?'':'<div class="empty">Aucune facture.</div>'}</div>
 
    ${(()=>{const AV=AVOIRS.filter(a=>a.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
@@ -13580,7 +13608,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DV';
+const BUILD='DW';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
