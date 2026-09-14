@@ -282,6 +282,10 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
    pas, et elle coûtait deux cents pixels dans une barre qui devait tenir sur
    une ligne. Dès qu'une recherche est en cours, le champ reste ouvert. */
 .dochead .docq{width:180px;flex:0 1 180px;min-width:120px}
+/* Le champ de recherche de la consommation vit dans une barre déjà chargée :
+   il se rétrécit avant tout le monde, mais jamais en dessous de ce qui reste
+   lisible — un champ de 60 px ne se remplit pas. */
+.cnsq{flex:1 1 190px;min-width:152px;max-width:216px}
 .perso-r{margin:-4px 0 11px}
 .dochead{margin-bottom:11px}
 /* Le pictogramme de chaque catégorie se répète déjà dans la colonne Type de
@@ -9818,6 +9822,8 @@ function exportMvt(){
 let cnsPer={k:'annee',from:'',to:''};
 let cnsQui='';   /* filtre praticien */
 let cnsCat='';   /* filtre catégorie de produit */
+let cnsRefF='';  /* filtre produit : une référence précise */
+let cnsQ='';     /* recherche libre — produit, référence, fournisseur, lot */
 function setCnsPer(p){
  /* sans droit comptable, l'horizon reste celui du reste du logiciel */
  if(!CAN('compta')){
@@ -9835,9 +9841,33 @@ function cnsSorties(per,qui,cat){
  return MVT.filter(m=>m.t==='sortie'
   && inPer(String(m.ts||'').slice(0,10),P)
   && (qui===undefined?!cnsQui||m.qui===cnsQui:(!qui||m.qui===qui))
-  && (cat===undefined?!cnsCat||cnsCatDe(m)===cnsCat:(!cat||cnsCatDe(m)===cat)));
+  && (cat===undefined?!cnsCat||cnsCatDe(m)===cnsCat:(!cat||cnsCatDe(m)===cat))
+  /* Le produit et la recherche ne se neutralisent jamais, pas même pour la
+     comparaison entre praticiens : celle-là met de côté le filtre PRATICIEN,
+     parce qu'une colonne seule ne se compare à rien — pas le produit, qui est
+     justement ce qu'on veut comparer. */
+  && (!cnsRefF||m.ref===cnsRefF)
+  && cnsMatch(m));
 }
 const cnsRef=r=>STOCK.find(x=>x.ref===r)||null;
+/* --------------------------------------------------------------------------
+   Chercher un produit
+   --------------------------------------------------------------------------
+   La recherche porte sur ce qu'on a en tête quand on cherche : le nom
+   commercial (« Vistabel »), la dénomination (« toxine botulique »), la
+   référence, la sous-famille, le fournisseur — et le NUMÉRO DE LOT, parce
+   qu'on cherche parfois un lot précis plutôt qu'un produit.
+   « sansAcc » retire accents, casse et ponctuation des deux côtés : « L-BX2601 »
+   se trouve en tapant « bx2601 », et « juvederm volift » trouve « Juvéderm Volift ».
+   -------------------------------------------------------------------------- */
+function cnsMatchRef(ref,q){
+ const t=sansAcc(q); if(!t) return true;
+ const x=cnsRef(ref);
+ return sansAcc([ref, x&&x.marque, x&&x.n, x&&x.sfam, x&&x.cat, x&&x.f]
+   .filter(Boolean).join(' ')).includes(t);
+}
+const cnsMatch=m=>{ const t=sansAcc(cnsQ); if(!t) return true;
+ return cnsMatchRef(m.ref,cnsQ)||sansAcc(m.lot||'').includes(t) };
 const cnsCatDe=m=>{const x=cnsRef(m.ref); return x?x.cat:''};
 const cnsPu=r=>{const x=cnsRef(r); return x?+x.pu||0:0};
 const cnsUnite=r=>{const x=cnsRef(r); return x?x.u:''};
@@ -9867,6 +9897,60 @@ const cnsUnites=M=>M.reduce((a,m)=>a+cnsQte(m),0);
 const cnsActes=M=>new Set(M.filter(m=>m.acte).map(m=>m.acte)).size;
 /* les catégories réellement représentées dans le stock — pas une liste figée */
 const cnsCats=()=>[...new Set(STOCK.map(x=>x.cat))].filter(Boolean).sort();
+/* Les produits RÉELLEMENT sortis sur la période, avec leur quantité : une
+   liste déroulante qui propose des lignes ne rendant rien ne sert personne.
+   Le filtre produit lui-même est mis de côté ici — sans quoi la liste se
+   réduirait à l'option déjà choisie et l'on ne pourrait plus en changer. */
+function cnsProduits(){
+ const g={};
+ MVT.forEach(m=>{ if(m.t!=='sortie') return;
+  if(!inPer(String(m.ts||'').slice(0,10),cnsPer)) return;
+  if(cnsQui&&m.qui!==cnsQui) return;
+  if(cnsCat&&cnsCatDe(m)!==cnsCat) return;
+  if(!cnsMatch(m)) return;
+  g[m.ref]=(g[m.ref]||0)+cnsQte(m) });
+ const L=Object.entries(g).map(([ref,q])=>({ref,q,n:cnsNom(ref)}))
+   .sort((a,b)=>a.n.localeCompare(b.n,'fr'));
+ /* Un produit épinglé qui ne sort plus rien reste dans la liste : sinon le
+    filtre disparaîtrait de l'écran sans qu'on puisse le retirer. */
+ if(cnsRefF&&g[cnsRefF]===undefined) L.unshift({ref:cnsRefF,q:0,n:cnsNom(cnsRefF)});
+ return L;
+}
+function setCnsRef(v){ cnsRefF=v||''; paint() }
+function setCnsQ(v){
+ cnsQ=v;
+ /* Une recherche qui ne laisse plus rien du produit épinglé le décroche :
+    l'écran se viderait sinon sans dire pourquoi. Le décrochage se voit — la
+    liste repasse à « Tous les produits ». */
+ if(cnsRefF&&!MVT.some(m=>m.t==='sortie'&&m.ref===cnsRefF
+   &&inPer(String(m.ts||'').slice(0,10),cnsPer)&&cnsMatch(m))) cnsRefF='';
+ paint();
+ const e=document.getElementById('cnsq');
+ if(e){ e.focus(); e.setSelectionRange(e.value.length,e.value.length) }
+}
+const cnsSansFiltre=()=>!cnsQui&&!cnsCat&&!cnsRefF&&!cnsQ;
+function cnsVider(){ cnsQui=''; cnsCat=''; cnsRefF=''; cnsQ=''; paint() }
+/* Ce qui est sorti d'un produit, lot par lot : ce que la période a consommé,
+   et ce qu'il reste dans la boîte aujourd'hui. Les deux ne se déduisent pas
+   l'un de l'autre — un lot reçu hier n'a rien consommé et n'est pas vide. */
+function cnsParLot(M,ref){
+ const x=cnsRef(ref);
+ const g={};
+ M.filter(m=>m.ref===ref).forEach(m=>{
+  const k=m.lot||'';
+  const o=g[k]=g[k]||{lot:k, q:0, n:0, val:0, actes:new Set(), per:m.per||null};
+  o.q+=cnsQte(m); o.n++; o.val+=cnsQte(m)*cnsPu(ref);
+  if(m.acte) o.actes.add(m.acte); });
+ /* un lot encore en rayon qui n'a rien donné sur la période a sa place ici :
+    c'est précisément celui qu'on cherche quand on se demande quoi écouler */
+ lotsDe(x||{}).forEach(l=>{ if(!lotArchive(l)&&!g[l.lot])
+   g[l.lot]={lot:l.lot, q:0, n:0, val:0, actes:new Set(), per:l.per||null} });
+ return Object.values(g).map(o=>{
+   const l=lotsDe(x||{}).find(y=>y.lot===o.lot)||null;
+   return {...o, actes:o.actes.size, per:(l&&l.per)||o.per,
+           reste:l?Math.max(0,+l.q||0):null, vivant:!!l&&!lotArchive(l)} })
+  .sort((a,b)=>b.q-a.q||String(a.per||'').localeCompare(String(b.per||'')));
+}
 
 function exportCns(){
  const M=cnsSorties();
@@ -9877,8 +9961,12 @@ function exportCns(){
     cnsPu(m.ref), +(q*cnsPu(m.ref)).toFixed(2), m.qui?partNom(m.qui):'',
     m.acte||'', m.patient?fn(pById(m.patient)):'', m.note||'']);
  });
- csvTelecharger(`praxis-consommation-${TODAYS}.csv`,L);
- toast(`${M.length} sortie${M.length>1?'s':''} exportée${M.length>1?'s':''}`);
+ /* Un export filtré qui porte le même nom qu'un export complet finit par être
+    relu pour l'autre. Le nom dit ce que le fichier contient. */
+ const part=cnsRefF?'-'+nomFichier(cnsNom(cnsRefF)):(cnsQ?'-'+nomFichier(cnsQ):(cnsCat?'-'+nomFichier(cnsCat):''));
+ csvTelecharger(`praxis-consommation${part}-${TODAYS}.csv`,L);
+ toast(`${M.length} sortie${M.length>1?'s':''} exportée${M.length>1?'s':''}`
+   +(cnsSansFiltre()?'':' · filtres appliqués'));
 }
 
 function vueConso(){
@@ -9910,27 +9998,67 @@ function vueConso(){
    v:cnsTotal(M.filter(m=>{const d=String(m.ts).slice(0,10); return d>=b.from&&d<=b.to}))}));
  const serieU=B.map((b,i)=>({label:b.label,
    v:cnsUnites(M.filter(m=>{const d=String(m.ts).slice(0,10); return d>=b.from&&d<=b.to}))}));
- const dormantes=STOCK.filter(x=>!M.some(m=>m.ref===x.ref));
- const qFiltre=cnsQui||cnsCat;
+ /* « Références sans sortie » est une phrase sur le CATALOGUE : quels produits
+    n'ont pas bougé de la période. Elle se calculait sur les sorties filtrées —
+    poser un filtre catégorie rangeait donc tout le reste du stock parmi les
+    dormantes, et une recherche sur « acide » annonçait huit références
+    endormies dont six tournaient très bien. On compte sur la période entière. */
+ const bougees=new Set(MVT.filter(m=>m.t==='sortie'
+   &&inPer(String(m.ts||'').slice(0,10),cnsPer)).map(m=>m.ref));
+ const dormantes=STOCK.filter(x=>!bougees.has(x.ref));
+ const qFiltre=!cnsSansFiltre();
+ const PROD=cnsProduits();
+ const prodSel=cnsRefF?cnsRef(cnsRefF):null;
+ /* toutes les sorties de la période, filtres produit compris mais SANS la
+    recherche ni l'épingle : de quoi dire « 12 sorties sur 84 » */
+ const TOUT=MVT.filter(m=>m.t==='sortie'&&inPer(String(m.ts||'').slice(0,10),cnsPer)).length;
 
  return `${periodBar(cnsPer,'setCnsPer',`${M.length} sortie${M.length>1?'s':''}`,PRESETS_STD,1)}
  <div class="fbar">
-  <select class="inp" style="max-width:200px" onchange="cnsQui=this.value;paint()">
+  <select class="inp" style="max-width:190px" title="N'afficher que les sorties d'un praticien"
+    onchange="cnsQui=this.value;paint()">
    <option value="">Tous les praticiens</option>
    ${[...PRATICIENS,PART_COMMUN].map(k=>`<option value="${esc(k)}" ${cnsQui===k?'selected':''}>${esc(partNom(k))}</option>`).join('')}</select>
-  <div class="seg"><button class="${cnsCat?'':'on'}" onclick="cnsCat='';paint()">Toutes catégories</button>
+  <div class="seg"><button class="${cnsCat?'':'on'}" title="Toutes les catégories de produit" onclick="cnsCat='';paint()">Toutes</button>
    ${cnsCats().map(c=>`<button class="${cnsCat===c?'on':''}" onclick="cnsCat=${JSON.stringify(c).replace(/"/g,'&quot;')};paint()">${esc(c)}s</button>`).join('')}</div>
-  ${qFiltre?`<button class="btn s" onclick="cnsQui='';cnsCat='';paint()">✕ Retirer les filtres</button>`:''}
+  <select class="inp" style="max-width:218px" title="N'afficher que les sorties d'un produit"
+    onchange="setCnsRef(this.value)">
+   <option value="">${PROD.length?`Tous les produits · ${NUM(PROD.length)}`:'Aucun produit sorti'}</option>
+   ${PROD.map(o=>`<option value="${esc(o.ref)}" ${cnsRefF===o.ref?'selected':''}>${esc(o.n)}${o.q?` · ${NUM(o.q)} ${esc(plu(o.q,cnsUnite(o.ref)))}`:' · aucune sortie'}</option>`).join('')}</select>
+  <input class="inp cnsq" id="cnsq" type="search" value="${esc(cnsQ)}"
+    placeholder="Rechercher un produit, un lot…"
+    title="Nom commercial, dénomination, référence, sous-famille, fournisseur ou numéro de lot"
+    oninput="setCnsQ(this.value)">
+  ${qFiltre?`<button class="btn s" onclick="cnsVider()">✕ Retirer les filtres</button>`:''}
   <button class="btn s" style="margin-left:auto" onclick="exportCns()">Export CSV</button></div>
+ ${qFiltre?`<div class="mu" style="font-size:11.5px;margin:-4px 0 11px">
+   ${NUM(M.length)} sortie${M.length>1?'s':''} sur ${NUM(TOUT)} ${perLabel(cnsPer)}${
+   cnsQ?` · recherche « <b style="color:var(--ink)">${esc(cnsQ)}</b> »`:''}${
+   prodSel?` · produit <b style="color:var(--ink)">${esc(nomProduit(prodSel))}</b>`:''}${
+   cnsCat?` · ${esc(cnsCat)}s`:''}${cnsQui?` · ${esc(partNom(cnsQui))}`:''}</div>`:''}
 
- ${!M.length?`<div class="empty">Aucune sortie de produit ${perLabel(cnsPer)}${qFiltre?' avec ces filtres':''}.</div>`:`
+ ${!M.length?`<div class="empty">Aucune sortie de produit ${perLabel(cnsPer)}${qFiltre?' avec ces filtres':''}.
+   ${qFiltre?`<div style="margin-top:10px"><button class="btn s" onclick="cnsVider()">✕ Retirer les filtres</button></div>`:''}</div>`:`
  <div class="grid g4" style="margin-bottom:14px">
   ${prix?kpi('Produit consommé',EUR(val),cmp.t,cmp.c)
         :kpi('Unités sorties',NUM(nU),'toutes références confondues')}
   ${kpi('Séances approvisionnées',NUM(nA),`${NUM(parRef.length)} référence${parRef.length>1?'s':''} mobilisée${parRef.length>1?'s':''}`)}
   ${prix?kpi('Coût produit par séance',nA?EUR(Math.round(val/nA)):'—','moyenne sur la période')
         :kpi('Unités par séance',nA?NUM(Math.round(nU/nA*10)/10):'—','moyenne sur la période')}
-  ${kpi('Références sans sortie',dormantes.length,
+  ${prodSel?(()=>{ /* un produit épinglé : « ce qu'il en reste » remplace
+       « ce qui ne bouge pas », qui ne parle plus que du catalogue entier */
+     /* « Reste » compte ce qui est employable : un lot périmé est encore là,
+        mais il ne se pose plus sur une peau. Il se dit à part. */
+     const L=lotsActifs(prodSel).filter(l=>!lotEpuise(l));
+     const perimes=L.filter(l=>lotPerime(l)).length;
+     const reste=stockUtile(prodSel);
+     const ecouler=L.filter(l=>!lotPerime(l)&&['alerte','critique'].includes(perNiveau(l.per).k)).length;
+     const dit=[`${NUM(L.length-perimes)} lot${L.length-perimes>1?'s':''} en rayon`,
+       ecouler?`${NUM(ecouler)} à écouler`:'', perimes?`${NUM(perimes)} périmé${perimes>1?'s':''}`:'']
+       .filter(Boolean).join(' · ');
+     return kpi('Reste en stock',`${NUM(reste)} ${esc(plu(reste,prodSel.u))}`, dit,
+       reste<prodSel.s?'dn':(ecouler||perimes)?'dn':'up')})()
+   :kpi('Références sans sortie',dormantes.length,
      dormantes.length?dormantes.slice(0,2).map(x=>nomProduit(x)).join(' · ')+(dormantes.length>2?` +${dormantes.length-2}`:''):'tout le catalogue tourne',
      dormantes.length?'dn':'up')}</div>
 
@@ -9956,8 +10084,48 @@ function vueConso(){
    </div></div>
  </div>
 
+ ${prodSel?(()=>{
+  /* ------------------------------------------------------------------------
+     Un produit épinglé : le tableau « par produit » n'aurait plus qu'une
+     ligne. Ce qu'on veut savoir à ce moment-là, c'est PAR QUEL LOT il est
+     sorti — et ce qu'il reste dans chacun. C'est la question que l'écran
+     « Stock & lots » est là pour recevoir.
+     ------------------------------------------------------------------------ */
+  const LOTS=cnsParLot(M,cnsRefF);
+  const qTot=LOTS.reduce((n,o)=>n+o.q,0);
+  return `<div class="card"><div class="h"><h2>Par lot</h2>
+   <span class="s">${esc(nomProduit(prodSel))} · ${esc(prodSel.ref)}${prodSel.sfam?' · '+esc(prodSel.sfam):''}${cnsQui?' · '+esc(partNom(cnsQui)):''}</span>
+   <div class="r">
+    <button class="btn s" title="Retrouver ces mouvements dans le journal"
+      onclick="stkTab='journal';mvtF.t='sortie';mvtF.ref='${esc(cnsRefF)}';mvtF.qui='${esc(cnsQui)}';mvtF.per='${['jour','semaine','mois','annee','tout'].includes(cnsPer.k)?cnsPer.k:'tout'}';paint()">Journal du produit →</button>
+    <button class="btn s" onclick="setCnsRef('')">✕ Tous les produits</button></div></div>
+  <div class="tw"><table>
+   <thead><tr><th>Lot</th><th>Péremption</th>
+    <th class="num" title="Quantité sortie ${esc(perLabel(cnsPer))}">Sorti</th><th class="num">Séances</th>
+    ${prix?'<th class="num">Valeur</th>':''}
+    <th class="num">Reste</th><th class="num">Part</th></tr></thead>
+   <tbody>${LOTS.map(o=>{ const nv=perNiveau(o.per), part=qTot?o.q/qTot*100:0;
+    return `<tr${o.q?'':' style="opacity:.62"'}>
+     <td class="nm mono">${o.lot?esc(o.lot):'<span class="mu">lot non renseigné</span>'}</td>
+     <td>${o.per?`${DF(o.per)} ${nv.k?bdg(nv.k==='perime'?'b-crit':nv.k==='critique'?'b-crit':'b-warn',
+        nv.k==='perime'?'périmé':perDuree(Math.max(0,nv.j)))
+        :'<span class="mu" style="font-size:11.5px">valide</span>'}`:'<span class="mu">—</span>'}</td>
+     <td class="num">${o.q?`<b>${NUM(o.q)}</b> <span class="mu">${esc(plu(o.q,prodSel.u))}</span>`:'<span class="mu">aucune sortie</span>'}</td>
+     <td class="num">${o.actes?NUM(o.actes):'<span class="mu">—</span>'}</td>
+     ${prix?`<td class="num">${o.val?EUR(o.val):'<span class="mu">—</span>'}</td>`:''}
+     <td class="num">${o.reste===null?'<span class="mu" title="Lot archivé : il n’est plus en rayon">archivé</span>'
+       :o.reste?`${NUM(o.reste)} <span class="mu">${esc(plu(o.reste,prodSel.u))}</span>`:'<span class="bdg b-neu">vide</span>'}</td>
+     <td class="num">${o.q?`<div class="cbar-l"><i style="width:${part.toFixed(1)}%"></i></div><span class="mu">${part.toFixed(0)} %</span>`:'<span class="mu">—</span>'}</td>
+    </tr>`}).join('')}</tbody></table></div>
+  <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">
+   ${(()=>{const n=LOTS.filter(o=>o.q).length;
+     return `Sur la période : <b style="color:var(--ink)">${NUM(qTot)} ${esc(plu(qTot,prodSel.u))}</b>, ${NUM(n)} lot${n>1?'s':''} mobilisé${n>1?'s':''}.`})()}
+   ${LOTS.some(o=>!o.q&&o.vivant)?`Les lignes pâles sont des lots que la période n'a pas entamés : ceux qui restent valables sont à écouler d'abord.`:''}
+   Le <b>reste</b> est celui d'aujourd'hui, pas celui de la fin de période : un lot reçu depuis compte dedans.</div></div>
+ </div>`})():`
  <div class="card"><div class="h"><h2>Par produit</h2>
-   <span class="s">${parRef.length} référence${parRef.length>1?'s':''} sortie${parRef.length>1?'s':''} ${perLabel(cnsPer)}${cnsQui?' · '+esc(partNom(cnsQui)):''}</span></div>
+   <span class="s">${parRef.length} référence${parRef.length>1?'s':''} sortie${parRef.length>1?'s':''} ${perLabel(cnsPer)}${cnsQui?' · '+esc(partNom(cnsQui)):''}</span>
+   <div class="r"><span class="mu" style="font-size:11.5px">Cliquez une ligne pour le journal · <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><path d="M3 4h18l-7 8v7l-4 2v-9z"/></svg> pour n’afficher que ce produit, lot par lot</span></div></div>
   <div class="tw"><table>
    <thead><tr>${thT('conso','nom','Produit')}
     ${thT('conso','cat','Catégorie')}
@@ -9973,7 +10141,11 @@ function vueConso(){
     }).map(o=>{const x=cnsRef(o.k), part=(prix?(val?o.val/val:0):(nU?o.q/nU:0))*100;
     return `<tr class="c" onclick="stkTab='journal';mvtF.t='sortie';mvtF.ref='${esc(o.k)}';mvtF.qui='${esc(cnsQui)}';mvtF.per='${['jour','semaine','mois','annee','tout'].includes(cnsPer.k)?cnsPer.k:'tout'}';paint()"
       title="Voir les mouvements de ce produit dans le journal">
-     <td><div class="nm">${esc(cnsNom(o.k))}</div>
+     <td><div class="nm">${esc(cnsNom(o.k))}
+       <button class="btn xs" style="margin-left:6px;vertical-align:middle"
+         aria-label="N’afficher que ce produit"
+         title="N’afficher que ce produit, lot par lot"
+         onclick="event.stopPropagation();setCnsRef('${esc(o.k)}')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><path d="M3 4h18l-7 8v7l-4 2v-9z"/></svg></button></div>
        <div class="mu" style="font-size:11.5px">${esc(o.k)}${o.lots?` · ${o.lots} lot${o.lots>1?'s':''}`:''}</div></td>
      <td class="mu">${esc(cnsCatDe({ref:o.k}))}${x&&x.sfam?`<div class="mu" style="font-size:11.5px">${esc(x.sfam)}</div>`:''}</td>
      <td class="num"><b>${NUM(o.q)}</b> <span class="mu">${esc(plu(o.q,cnsUnite(o.k)))}</span></td>
@@ -9987,7 +10159,7 @@ function vueConso(){
   <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">
    Tout vient du journal des mouvements : ${M.length} sortie${M.length>1?'s':''} enregistrée${M.length>1?'s':''} ${perLabel(cnsPer)}. Cliquez une ligne pour retrouver ses mouvements.
    ${prix?' Les valeurs sont calculées au prix d’achat unitaire de chaque référence, hors remise fournisseur.':''}</div></div>
- </div>`}`;
+ </div>`}`}`;
 }
 
 /* ---- Les archives ---- */
@@ -10150,7 +10322,8 @@ function coutParActe(){
 /* Aller voir le détail dans le stock en gardant la période — c'est la même
    question, posée depuis l'autre bout. */
 function versConso(){
- go('stock'); stkTab='conso'; cnsPer={...perS}; cnsQui=filtrePrat()||''; cnsCat=''; paint();
+ go('stock'); stkTab='conso'; cnsPer={...perS}; cnsQui=filtrePrat()||'';
+ cnsCat=''; cnsRefF=''; cnsQ=''; paint();
 }
 /* ==========================================================================
    La conversion des devis
@@ -14648,7 +14821,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='EB';
+const BUILD='EC';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
