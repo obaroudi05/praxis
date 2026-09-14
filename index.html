@@ -158,7 +158,7 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .seg.wrap{flex-wrap:wrap;max-width:100%}
 
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-l);box-shadow:var(--sh-2);overflow:hidden}
-.card>.h{padding:13px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)}
+.card>.h{padding:13px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
 .card>.h h2{margin:0;font-size:13.5px;font-weight:660;letter-spacing:-.015em}
 .card>.h .s{font-size:12px;color:var(--ink-3)}
 .card>.h .r{margin-left:auto;display:flex;gap:6px;align-items:center}
@@ -287,7 +287,12 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 /* Le pictogramme de chaque catégorie se répète déjà dans la colonne Type de
    la table, juste dessous : sur le filtre, il ne servait qu'à élargir. Le
    compte, lui, reste — c'est ce qu'on vient y lire. */
-.dochead .seg button{white-space:nowrap;gap:4px;display:inline-flex;align-items:center}
+/* Un dossier qui porte des devis affiche une sixième catégorie — c'est le cas
+   ordinaire, pas l'exception. La barre passait alors à deux lignes sur un
+   écran de 1366 px, à trente-sept pixels près. On les reprend ici, sur le
+   rembourrage des pastilles : aucune n'est retirée, aucune n'est abrégée. */
+.dochead .seg button{white-space:nowrap;gap:4px;display:inline-flex;align-items:center;
+  padding-left:8px;padding-right:8px}
 .dochead .seg button .n{font-variant-numeric:tabular-nums;font-weight:640;font-size:11px;
   color:var(--ink-3);background:var(--panel-2);border-radius:5px;padding:1px 4px}
 .dochead .seg button.on .n{color:var(--accent);background:var(--accent-wash)}
@@ -2016,6 +2021,30 @@ body.en-connexion aside{display:none}
 .hb .t i{display:block;height:100%;background:var(--series-1);border-radius:5px}
 .hb .v{width:76px;text-align:right;font-size:12.2px;font-weight:640;font-variant-numeric:tabular-nums}
 
+/* L'entonnoir des devis. Une table, pas un dessin : quatre lignes qui se lisent
+   à 380 px comme à 1600, sans que la barre n'écrase jamais son libellé. */
+.funl{display:flex;flex-direction:column;gap:10px}
+.funl-r{display:grid;grid-template-columns:minmax(92px,148px) minmax(0,1fr) auto minmax(0,132px);
+ gap:12px;align-items:center}
+.funl-r .l{font-size:12.4px;color:var(--ink-2);font-weight:620;line-height:1.3}
+.funl-r .l small{display:block;color:var(--ink-3);font-size:11px;font-weight:400}
+.funl-r .t{background:var(--grid);border-radius:5px;height:20px;overflow:hidden}
+.funl-r .t i{display:block;height:100%;background:var(--series-1);border-radius:5px}
+/* La dernière marche est celle qui compte. On la distingue par un contour, pas
+   par une teinte plus pâle : une barre éclaircie pour « se détacher » finit à
+   1,8:1 de sa piste en thème clair, c'est-à-dire invisible. */
+.funl-r.ok .t{box-shadow:inset 0 0 0 1.5px var(--accent)}
+.funl-r.ok .l{color:var(--ink);font-weight:700}
+.funl-r.ok .n b{color:var(--accent-ink)}
+.funl-r .n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;min-width:56px}
+.funl-r .n b{font-size:16px;font-weight:690}
+.funl-r .n small{display:block;color:var(--ink-2);font-size:11px;font-weight:520}
+.funl-r .q{font-size:11.5px;color:var(--ink-2);font-variant-numeric:tabular-nums;line-height:1.35}
+@media(max-width:620px){
+ .funl-r{grid-template-columns:minmax(0,1fr) auto;row-gap:5px}
+ .funl-r .t{grid-column:1/-1;order:3;height:14px}
+ .funl-r .q{grid-column:1/-1;order:4}}
+
 /* before-after */
 /* ==========================================================================
    La galerie et son comparateur
@@ -3074,20 +3103,231 @@ const DEVIS=[
   zs:[{aiss_d:null,aiss_g:null,maillot:null}], cs:['Forfait 8 séances, tarif dégressif déjà appliqué']},
  {id:'D-2607-015',patient:1054,date:'2026-07-28',cree:'2026-07-28T10:23',montant:840, statut:'envoye',  envoye:'2026-07-28',relances:0,derniere:null,lignes:[['LAS2','Cure photorajeunissement',3,280]],
   zs:[{decol:null}]},
- {id:'D-2605-006',patient:1052,date:'2026-05-14',cree:'2026-05-14T15:41',montant:390, statut:'expire',  envoye:'2026-05-14',relances:3,derniere:'2026-06-25',lignes:[['BTX','Haut du visage',1,390]],
+ {id:'D-2605-006',patient:1052,date:'2026-05-14',cree:'2026-05-14T15:41',montant:390, statut:'expire',  envoye:'2026-05-14',relances:3,derniere:'2026-06-25',decide:'2026-06-26',lignes:[['BTX','Haut du visage',1,390]],
   zs:[{front:12,glab:20,cou:16}], cs:['Retouche incluse à 15 jours si besoin']},
- {id:'D-2607-002',patient:1045,date:'2026-07-06',cree:'2026-07-06T08:58',montant:970, statut:'accepte', envoye:'2026-07-06',relances:0,derniere:null,lignes:[['AH','Acide hyaluronique',2,325],['SKB','Skinbooster',1,320]],
+ {id:'D-2607-002',patient:1045,date:'2026-07-06',cree:'2026-07-06T08:58',montant:970, statut:'accepte', envoye:'2026-07-06',relances:0,derniere:null,decide:'2026-07-09',lignes:[['AH','Acide hyaluronique',2,325],['SKB','Skinbooster',1,320]],
   zs:[{pomm_d:1,pomm_g:1,mand_d:.5,mand_g:.5},{cerne_d:null,cerne_g:null}]},
- {id:'D-2606-018',patient:1050,date:'2026-06-20',cree:'2026-06-20T17:19',montant:970, statut:'accepte', envoye:'2026-06-20',relances:1,derniere:'2026-06-24',lignes:[['AH','Acide hyaluronique',2,325],['SKB','Skinbooster',1,320]],
+ {id:'D-2606-018',patient:1050,date:'2026-06-20',cree:'2026-06-20T17:19',montant:970, statut:'accepte', envoye:'2026-06-20',relances:1,derniere:'2026-06-24',decide:'2026-06-27',lignes:[['AH','Acide hyaluronique',2,325],['SKB','Skinbooster',1,320]],
   zs:[{pomm_d:1,pomm_g:1},{cou:null}]},
  {id:'D-2607-021',patient:1042,date:'2026-07-30',cree:'2026-07-30T13:06',montant:340, statut:'brouillon',envoye:null,relances:0,derniere:null,lignes:[['MESO','Mésothérapie',1,180],['PEEL','Peeling',1,160]],
   zs:[{cou:null},{front:null,pomm_d:null,pomm_g:null}]},
- {id:'D-2604-007',patient:1048,date:'2026-04-15',cree:'2026-04-15T12:35',montant:390, statut:'refuse',  envoye:'2026-04-15',relances:2,derniere:'2026-05-06',lignes:[['BTX','Haut du visage',1,390]],
+ {id:'D-2604-007',patient:1048,date:'2026-04-15',cree:'2026-04-15T12:35',montant:390, statut:'refuse',  envoye:'2026-04-15',relances:2,derniere:'2026-05-06',decide:'2026-05-08',lignes:[['BTX','Haut du visage',1,390]],
   zs:[{front:12,glab:20,cou:16}]},
+/* --- Un an de devis clos ----------------------------------------------------
+   Sur dix devis, dont quatre décidés, un taux de conversion ne dit rien : il
+   saute de 25 points dès qu'un patient change d'avis. Les statistiques ont
+   besoin d'une histoire. Celle-ci est tirée d'un modèle — délai de réponse,
+   puis décision — et non écrite chiffre par chiffre : le nombre de relances
+   s'y DÉDUIT du calendrier J+7 / J+14 / J+21, il ne s'y choisit pas. C'est ce
+   qui rend lisible le lien entre relance et acceptation, sans le fabriquer.
+   Tous ces devis sont CLOS : ni la file de relances, ni le badge de navigation,
+   ni « devis en cours » ne bougent d'une ligne.
+   Données entièrement fictives, comme tout le jeu de démonstration.
+   -------------------------------------------------------------------------- */
+ {id:'D-2508-001',patient:1051,date:'2025-08-12',cree:'2025-08-12T09:09',montant:390,statut:'accepte',praticien:'Dr A. Merlin',envoye:'2025-08-12',relances:3,derniere:'2025-09-02',decide:'2025-09-08',
+  lignes:[['BTX','Toxine — haut du visage',1,390]],
+  zs:[{front:12,glab:20,pattes_d:8,pattes_g:8}]},
+ {id:'D-2508-002',patient:1050,date:'2025-08-19',cree:'2025-08-19T09:42',montant:740,statut:'refuse',praticien:'Dr A. Merlin',envoye:'2025-08-19',relances:1,derniere:'2025-08-26',decide:'2025-08-31',
+  lignes:[['AH','Acide hyaluronique',1,350],['BTX','Toxine — haut du visage',1,390]],
+  zs:[{cerne_d:.5,cerne_g:.5},{front:10,glab:18}]},
+ {id:'D-2508-003',patient:1049,date:'2025-08-08',cree:'2025-08-08T14:34',montant:960,statut:'expire',praticien:'Dr O. Baroudi',envoye:'2025-08-08',relances:1,derniere:'2025-08-15',decide:'2025-09-14',
+  lignes:[['LAS1','Forfait épilation',8,120]],
+  zs:[{cuisse_d:null,cuisse_g:null,mollet_d:null,mollet_g:null}]},
+ {id:'D-2508-004',patient:1048,date:'2025-08-06',cree:'2025-08-06T12:55',montant:720,statut:'refuse',praticien:'Dr A. Merlin',envoye:'2025-08-07',relances:2,derniere:'2025-08-21',decide:'2025-08-25',
+  lignes:[['MESO','Mésothérapie',4,180]],
+  zs:[{cou_c:null,decol:null}]},
+ {id:'D-2508-005',patient:1056,date:'2025-08-22',cree:'2025-08-22T16:47',montant:720,statut:'refuse',praticien:'Dr A. Merlin',envoye:'2025-08-22',relances:1,derniere:'2025-08-29',decide:'2025-09-05',
+  lignes:[['MESO','Mésothérapie',4,180]],
+  zs:[{cou_c:null,decol:null}]},
+ {id:'D-2509-001',patient:1048,date:'2025-09-12',cree:'2025-09-12T09:41',montant:720,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2025-09-12',relances:0,derniere:null,decide:'2025-09-19',
+  lignes:[['LAS1','Forfait épilation',6,120]],
+  zs:[{aiss_d:null,aiss_g:null,maillot:null}]},
+ {id:'D-2509-002',patient:1046,date:'2025-09-15',cree:'2025-09-15T09:42',montant:960,statut:'accepte',praticien:'Dr A. Merlin',envoye:'2025-09-15',relances:0,derniere:null,decide:'2025-09-22',
+  lignes:[['LAS1','Forfait épilation',8,120]],
+  zs:[{cuisse_d:null,cuisse_g:null,mollet_d:null,mollet_g:null}]},
+ {id:'D-2509-003',patient:1051,date:'2025-09-05',cree:'2025-09-05T13:36',montant:480,statut:'accepte',praticien:'Dr A. Merlin',envoye:'2025-09-05',relances:0,derniere:null,decide:'2025-09-10',
+  lignes:[['PEEL','Peeling',3,160]],
+  zs:[{front:null,pomm_d:null,pomm_g:null}]},
+ {id:'D-2509-004',patient:1043,date:'2025-09-05',cree:'2025-09-05T17:42',montant:350,statut:'accepte',praticien:'Dr A. Merlin',envoye:'2025-09-05',relances:1,derniere:'2025-09-12',decide:'2025-09-19',
+  lignes:[['AH','Acide hyaluronique',1,350]],
+  zs:[{levres:1}]},
+ {id:'D-2510-001',patient:1042,date:'2025-10-21',cree:'2025-10-21T15:11',montant:390,statut:'refuse',praticien:'Dr O. Baroudi',envoye:'2025-10-21',relances:0,derniere:null,decide:'2025-10-25',
+  lignes:[['BTX','Toxine — haut du visage',1,390]],
+  zs:[{front:12,glab:20,pattes_d:8,pattes_g:8}]},
+ {id:'D-2510-002',patient:1056,date:'2025-10-03',cree:'2025-10-03T18:54',montant:340,statut:'expire',praticien:'Dr A. Merlin',envoye:'2025-10-03',relances:1,derniere:'2025-10-10',decide:'2025-11-06',
+  lignes:[['MESO','Mésothérapie',1,180],['PEEL','Peeling',1,160]],
+  zs:[{cou_c:null},{front:null,pomm_d:null,pomm_g:null}]},
+ {id:'D-2510-003',patient:1050,date:'2025-10-03',cree:'2025-10-03T16:51',montant:350,statut:'refuse',praticien:'Dr O. Baroudi',envoye:'2025-10-04',relances:1,derniere:'2025-10-11',decide:'2025-10-17',
+  lignes:[['AH','Acide hyaluronique',1,350]],
+  zs:[{levres:1}]},
+ {id:'D-2510-004',patient:1043,date:'2025-10-10',cree:'2025-10-10T09:44',montant:600,statut:'accepte',praticien:'Dr A. Merlin',envoye:'2025-10-10',relances:1,derniere:'2025-10-17',decide:'2025-10-20',
+  lignes:[['LAS1','Forfait épilation',6,100]],
+  zs:[{aiss_d:null,aiss_g:null,maillot:null}]},
+ {id:'D-2511-001',patient:1051,date:'2025-11-21',cree:'2025-11-21T18:14',montant:480,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2025-11-22',relances:1,derniere:'2025-11-29',decide:'2025-11-30',
+  lignes:[['PEEL','Peeling',3,160]],
+  zs:[{front:null,pomm_d:null,pomm_g:null}]},
+ {id:'D-2511-002',patient:1057,date:'2025-11-21',cree:'2025-11-21T08:33',montant:880,statut:'refuse',praticien:'Dr O. Baroudi',envoye:'2025-11-21',relances:0,derniere:null,decide:'2025-11-22',
+  lignes:[['RF','Radiofréquence',4,220]],
+  zs:[{abdo:null,flanc_d:null,flanc_g:null}]},
+ {id:'D-2511-003',patient:1045,date:'2025-11-04',cree:'2025-11-04T12:35',montant:720,statut:'refuse',praticien:'Dr A. Merlin',envoye:'2025-11-05',relances:0,derniere:null,decide:'2025-11-09',
+  lignes:[['MESO','Mésothérapie',4,180]],
+  zs:[{cou_c:null,decol:null}]},
+ {id:'D-2511-004',patient:1055,date:'2025-11-03',cree:'2025-11-03T13:31',montant:340,statut:'refuse',praticien:'Dr O. Baroudi',envoye:'2025-11-04',relances:0,derniere:null,decide:'2025-11-10',
+  lignes:[['MESO','Mésothérapie',1,180],['PEEL','Peeling',1,160]],
+  zs:[{cou_c:null},{front:null,pomm_d:null,pomm_g:null}]},
+ {id:'D-2512-001',patient:1046,date:'2025-12-19',cree:'2025-12-19T14:02',montant:480,statut:'accepte',praticien:'Dr A. Merlin',envoye:'2025-12-19',relances:0,derniere:null,decide:'2025-12-24',
+  lignes:[['PEEL','Peeling',3,160]],
+  zs:[{front:null,pomm_d:null,pomm_g:null}]},
+ {id:'D-2512-002',patient:1041,date:'2025-12-03',cree:'2025-12-03T16:01',montant:2250,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2025-12-03',relances:1,derniere:'2025-12-10',decide:'2025-12-14',
+  lignes:[['AH','Acide hyaluronique',3,350],['SKB','Skinbooster',2,320],['LAS2','Photorajeunissement',2,280]],
+  zs:[{pomm_d:1,pomm_g:1,mand_d:.5,mand_g:.5},{cerne_d:null,cerne_g:null},{decol:null}]},
+ {id:'D-2512-003',patient:1054,date:'2025-12-01',cree:'2025-12-01T18:15',montant:880,statut:'accepte',praticien:'Dr A. Merlin',envoye:'2025-12-01',relances:1,derniere:'2025-12-08',decide:'2025-12-10',
+  lignes:[['RF','Radiofréquence',4,220]],
+  zs:[{abdo:null,flanc_d:null,flanc_g:null}]},
+ {id:'D-2512-004',patient:1051,date:'2025-12-12',cree:'2025-12-12T14:04',montant:680,statut:'expire',praticien:'Dr A. Merlin',envoye:'2025-12-13',relances:2,derniere:'2025-12-27',decide:'2026-01-25',
+  lignes:[['AH','Acide hyaluronique',2,340]],
+  zs:[{pomm_d:1,pomm_g:1}]},
+ {id:'D-2512-005',patient:1047,date:'2025-12-16',cree:'2025-12-16T15:39',montant:480,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2025-12-17',relances:1,derniere:'2025-12-24',decide:'2025-12-30',
+  lignes:[['PEEL','Peeling',3,160]],
+  zs:[{front:null,pomm_d:null,pomm_g:null}]},
+ {id:'D-2512-006',patient:1052,date:'2025-12-01',cree:'2025-12-01T08:28',montant:390,statut:'expire',praticien:'Dr O. Baroudi',envoye:'2025-12-02',relances:2,derniere:'2025-12-16',decide:'2026-01-14',
+  lignes:[['BTX','Toxine — haut du visage',1,390]],
+  zs:[{front:12,glab:20,pattes_d:8,pattes_g:8}]},
+ {id:'D-2601-001',patient:1044,date:'2026-01-23',cree:'2026-01-23T11:00',montant:1160,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2026-01-23',relances:1,derniere:'2026-01-30',decide:'2026-02-03',
+  lignes:[['LAS2','Photorajeunissement',2,250],['RF','Radiofréquence',3,220]],
+  zs:[{pomm_d:null,pomm_g:null},{mand_d:null,mand_g:null,menton:null}]},
+ {id:'D-2601-002',patient:1049,date:'2026-01-09',cree:'2026-01-09T11:56',montant:660,statut:'refuse',praticien:'Dr O. Baroudi',envoye:'2026-01-09',relances:1,derniere:'2026-01-16',decide:'2026-01-21',
+  lignes:[['LAS1','Forfait épilation',6,110]],
+  zs:[{aiss_d:null,aiss_g:null,maillot:null}]},
+ {id:'D-2601-003',patient:1051,date:'2026-01-27',cree:'2026-01-27T17:20',montant:390,statut:'refuse',praticien:'Dr A. Merlin',envoye:'2026-01-28',relances:0,derniere:null,decide:'2026-01-31',
+  lignes:[['BTX','Toxine — haut du visage',1,390]],
+  zs:[{front:12,glab:20,pattes_d:8,pattes_g:8}]},
+ {id:'D-2601-004',patient:1051,date:'2026-01-02',cree:'2026-01-02T12:02',montant:840,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2026-01-03',relances:0,derniere:null,decide:'2026-01-09',
+  lignes:[['LAS2','Photorajeunissement',3,280]],
+  zs:[{decol:null}]},
+ {id:'D-2601-005',patient:1058,date:'2026-01-22',cree:'2026-01-22T08:01',montant:880,statut:'refuse',praticien:'Dr O. Baroudi',envoye:'2026-01-23',relances:0,derniere:null,decide:'2026-01-27',
+  lignes:[['RF','Radiofréquence',4,220]],
+  zs:[{abdo:null,flanc_d:null,flanc_g:null}]},
+ {id:'D-2601-006',patient:1050,date:'2026-01-12',cree:'2026-01-12T12:35',montant:780,statut:'accepte',praticien:'Dr A. Merlin',envoye:'2026-01-12',relances:0,derniere:null,decide:'2026-01-18',
+  lignes:[['LAS2','Photorajeunissement',3,260]],
+  zs:[{decol:null}]},
+ {id:'D-2602-001',patient:1048,date:'2026-02-09',cree:'2026-02-09T18:58',montant:740,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2026-02-09',relances:0,derniere:null,decide:'2026-02-11',
+  lignes:[['AH','Acide hyaluronique',1,350],['BTX','Toxine — haut du visage',1,390]],
+  zs:[{cerne_d:.5,cerne_g:.5},{front:10,glab:18}]},
+ {id:'D-2602-002',patient:1053,date:'2026-02-24',cree:'2026-02-24T18:11',montant:350,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2026-02-25',relances:0,derniere:null,decide:'2026-03-01',
+  lignes:[['AH','Acide hyaluronique',1,350]],
+  zs:[{levres:1}]},
+ {id:'D-2602-003',patient:1041,date:'2026-02-26',cree:'2026-02-26T15:09',montant:840,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2026-02-26',relances:0,derniere:null,decide:'2026-02-28',
+  lignes:[['LAS2','Photorajeunissement',3,280]],
+  zs:[{decol:null}]},
+ {id:'D-2602-004',patient:1053,date:'2026-02-11',cree:'2026-02-11T15:54',montant:840,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2026-02-12',relances:0,derniere:null,decide:'2026-02-19',
+  lignes:[['LAS2','Photorajeunissement',3,280]],
+  zs:[{decol:null}]},
+ {id:'D-2602-005',patient:1050,date:'2026-01-30',cree:'2026-01-30T15:03',montant:720,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2026-01-31',relances:3,derniere:'2026-02-21',decide:'2026-02-27',
+  lignes:[['MESO','Mésothérapie',4,180]],
+  zs:[{cou_c:null,decol:null}]},
+ {id:'D-2602-006',patient:1046,date:'2026-02-10',cree:'2026-02-10T16:03',montant:720,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2026-02-10',relances:0,derniere:null,decide:'2026-02-11',
+  lignes:[['LAS1','Forfait épilation',6,120]],
+  zs:[{aiss_d:null,aiss_g:null,maillot:null}]},
+ {id:'D-2602-007',patient:1041,date:'2026-02-23',cree:'2026-02-23T13:43',montant:340,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2026-02-23',relances:0,derniere:null,decide:'2026-03-02',
+  lignes:[['MESO','Mésothérapie',1,180],['PEEL','Peeling',1,160]],
+  zs:[{cou_c:null},{front:null,pomm_d:null,pomm_g:null}]},
+ {id:'D-2602-008',patient:1044,date:'2026-02-05',cree:'2026-02-05T15:55',montant:740,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2026-02-05',relances:1,derniere:'2026-02-12',decide:'2026-02-16',
+  lignes:[['AH','Acide hyaluronique',1,350],['BTX','Toxine — haut du visage',1,390]],
+  zs:[{cerne_d:.5,cerne_g:.5},{front:10,glab:18}]},
+ {id:'D-2603-001',patient:1047,date:'2026-03-12',cree:'2026-03-12T18:33',montant:840,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2026-03-12',relances:0,derniere:null,decide:'2026-03-15',
+  lignes:[['LAS2','Photorajeunissement',3,280]],
+  zs:[{decol:null}]},
+ {id:'D-2603-002',patient:1043,date:'2026-03-13',cree:'2026-03-13T14:03',montant:720,statut:'accepte',praticien:'Dr A. Merlin',envoye:'2026-03-14',relances:0,derniere:null,decide:'2026-03-19',
+  lignes:[['MESO','Mésothérapie',4,180]],
+  zs:[{cou_c:null,decol:null}]},
+ {id:'D-2603-003',patient:1046,date:'2026-03-06',cree:'2026-03-06T15:05',montant:840,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2026-03-07',relances:1,derniere:'2026-03-14',decide:'2026-03-16',
+  lignes:[['LAS2','Photorajeunissement',3,280]],
+  zs:[{decol:null}]},
+ {id:'D-2603-004',patient:1052,date:'2026-03-09',cree:'2026-03-09T08:27',montant:740,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2026-03-09',relances:0,derniere:null,decide:'2026-03-10',
+  lignes:[['AH','Acide hyaluronique',1,350],['BTX','Toxine — haut du visage',1,390]],
+  zs:[{cerne_d:.5,cerne_g:.5},{front:10,glab:18}]},
+ {id:'D-2603-005',patient:1042,date:'2026-03-18',cree:'2026-03-18T12:48',montant:740,statut:'refuse',praticien:'Dr O. Baroudi',envoye:'2026-03-18',relances:0,derniere:null,decide:'2026-03-25',
+  lignes:[['AH','Acide hyaluronique',1,350],['BTX','Toxine — haut du visage',1,390]],
+  zs:[{cerne_d:.5,cerne_g:.5},{front:10,glab:18}]},
+ {id:'D-2603-006',patient:1046,date:'2026-03-23',cree:'2026-03-23T17:55',montant:1220,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2026-03-24',relances:0,derniere:null,decide:'2026-03-31',
+  lignes:[['LAS2','Photorajeunissement',2,280],['RF','Radiofréquence',3,220]],
+  zs:[{pomm_d:null,pomm_g:null},{mand_d:null,mand_g:null,menton:null}]},
+ {id:'D-2603-007',patient:1049,date:'2026-03-10',cree:'2026-03-10T08:19',montant:880,statut:'expire',praticien:'Dr A. Merlin',envoye:'2026-03-10',relances:3,derniere:'2026-03-31',decide:'2026-04-15',
+  lignes:[['RF','Radiofréquence',4,220]],
+  zs:[{abdo:null,flanc_d:null,flanc_g:null}]},
+ {id:'D-2603-008',patient:1053,date:'2026-03-16',cree:'2026-03-16T12:43',montant:640,statut:'expire',praticien:'Dr O. Baroudi',envoye:'2026-03-16',relances:3,derniere:'2026-04-06',decide:'2026-04-24',
+  lignes:[['MESO','Mésothérapie',4,160]],
+  zs:[{cou_c:null,decol:null}]},
+ {id:'D-2604-001',patient:1043,date:'2026-04-03',cree:'2026-04-03T11:03',montant:2250,statut:'expire',praticien:'Dr O. Baroudi',envoye:'2026-04-03',relances:1,derniere:'2026-04-10',decide:'2026-05-09',
+  lignes:[['AH','Acide hyaluronique',3,350],['SKB','Skinbooster',2,320],['LAS2','Photorajeunissement',2,280]],
+  zs:[{pomm_d:1,pomm_g:1,mand_d:.5,mand_g:.5},{cerne_d:null,cerne_g:null},{decol:null}]},
+ {id:'D-2604-002',patient:1049,date:'2026-04-24',cree:'2026-04-24T17:32',montant:1020,statut:'refuse',praticien:'Dr A. Merlin',envoye:'2026-04-24',relances:0,derniere:null,decide:'2026-04-25',
+  lignes:[['AH','Acide hyaluronique',2,350],['SKB','Skinbooster',1,320]],
+  zs:[{sillon_d:.5,sillon_g:.5,amert_d:.5,amert_g:.5},{pomm_d:null,pomm_g:null}]},
+ {id:'D-2604-003',patient:1043,date:'2026-04-03',cree:'2026-04-03T16:50',montant:480,statut:'expire',praticien:'Dr A. Merlin',envoye:'2026-04-03',relances:1,derniere:'2026-04-10',decide:'2026-05-04',
+  lignes:[['LAS1','Forfait épilation',4,120]],
+  zs:[{sslev:null,menton:null}]},
+ {id:'D-2604-004',patient:1054,date:'2026-04-01',cree:'2026-04-01T14:30',montant:720,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2026-04-02',relances:0,derniere:null,decide:'2026-04-06',
+  lignes:[['MESO','Mésothérapie',4,180]],
+  zs:[{cou_c:null,decol:null}]},
+ {id:'D-2604-005',patient:1050,date:'2026-04-21',cree:'2026-04-21T15:28',montant:390,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2026-04-21',relances:0,derniere:null,decide:'2026-04-25',
+  lignes:[['BTX','Toxine — haut du visage',1,390]],
+  zs:[{front:12,glab:20,pattes_d:8,pattes_g:8}]},
+ {id:'D-2604-006',patient:1042,date:'2026-04-10',cree:'2026-04-10T17:29',montant:1220,statut:'refuse',praticien:'Dr O. Baroudi',envoye:'2026-04-10',relances:1,derniere:'2026-04-17',decide:'2026-04-21',
+  lignes:[['LAS2','Photorajeunissement',2,280],['RF','Radiofréquence',3,220]],
+  zs:[{pomm_d:null,pomm_g:null},{mand_d:null,mand_g:null,menton:null}]},
+ {id:'D-2605-001',patient:1051,date:'2026-05-15',cree:'2026-05-15T14:42',montant:880,statut:'accepte',praticien:'Dr A. Merlin',envoye:'2026-05-15',relances:1,derniere:'2026-05-22',decide:'2026-05-25',
+  lignes:[['RF','Radiofréquence',4,220]],
+  zs:[{abdo:null,flanc_d:null,flanc_g:null}]},
+ {id:'D-2605-002',patient:1042,date:'2026-05-13',cree:'2026-05-13T08:28',montant:880,statut:'refuse',praticien:'Dr O. Baroudi',envoye:'2026-05-13',relances:3,derniere:'2026-06-03',decide:'2026-06-09',
+  lignes:[['RF','Radiofréquence',4,220]],
+  zs:[{abdo:null,flanc_d:null,flanc_g:null}]},
+ {id:'D-2605-003',patient:1050,date:'2026-05-25',cree:'2026-05-25T09:24',montant:880,statut:'expire',praticien:'Dr O. Baroudi',envoye:'2026-05-26',relances:1,derniere:'2026-06-02',decide:'2026-07-07',
+  lignes:[['RF','Radiofréquence',4,220]],
+  zs:[{abdo:null,flanc_d:null,flanc_g:null}]},
+ {id:'D-2605-004',patient:1053,date:'2026-05-22',cree:'2026-05-22T12:32',montant:390,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2026-05-22',relances:0,derniere:null,decide:'2026-05-29',
+  lignes:[['BTX','Toxine — haut du visage',1,390]],
+  zs:[{front:12,glab:20,pattes_d:8,pattes_g:8}]},
+ {id:'D-2605-005',patient:1052,date:'2026-05-11',cree:'2026-05-11T10:18',montant:700,statut:'expire',praticien:'Dr O. Baroudi',envoye:'2026-05-11',relances:3,derniere:'2026-06-01',decide:'2026-06-24',
+  lignes:[['AH','Acide hyaluronique',2,350]],
+  zs:[{pomm_d:1,pomm_g:1}]},
+ {id:'D-2605-007',patient:1050,date:'2026-05-21',cree:'2026-05-21T10:42',montant:700,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2026-05-21',relances:0,derniere:null,decide:'2026-05-26',
+  lignes:[['AH','Acide hyaluronique',2,350]],
+  zs:[{pomm_d:1,pomm_g:1}]},
+ {id:'D-2606-001',patient:1051,date:'2026-06-05',cree:'2026-06-05T09:42',montant:390,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2026-06-05',relances:3,derniere:'2026-06-26',decide:'2026-06-30',
+  lignes:[['BTX','Toxine — haut du visage',1,390]],
+  zs:[{front:12,glab:20,pattes_d:8,pattes_g:8}]},
+ {id:'D-2606-002',patient:1050,date:'2026-06-16',cree:'2026-06-16T13:40',montant:1220,statut:'expire',praticien:'Dr A. Merlin',envoye:'2026-06-16',relances:2,derniere:'2026-06-30',decide:'2026-07-26',
+  lignes:[['LAS2','Photorajeunissement',2,280],['RF','Radiofréquence',3,220]],
+  zs:[{pomm_d:null,pomm_g:null},{mand_d:null,mand_g:null,menton:null}]},
+ {id:'D-2606-003',patient:1041,date:'2026-06-05',cree:'2026-06-05T18:22',montant:650,statut:'refuse',praticien:'Dr A. Merlin',envoye:'2026-06-05',relances:1,derniere:'2026-06-12',decide:'2026-06-15',
+  lignes:[['AH','Acide hyaluronique',2,325]],
+  zs:[{pomm_d:1,pomm_g:1}]},
+ {id:'D-2606-004',patient:1047,date:'2026-06-04',cree:'2026-06-04T11:25',montant:960,statut:'refuse',praticien:'Dr O. Baroudi',envoye:'2026-06-04',relances:0,derniere:null,decide:'2026-06-10',
+  lignes:[['SKB','Skinbooster',3,320]],
+  zs:[{pomm_d:null,pomm_g:null,menton:null}]},
+ {id:'D-2606-005',patient:1045,date:'2026-06-05',cree:'2026-06-05T12:13',montant:2250,statut:'refuse',praticien:'Dr O. Baroudi',envoye:'2026-06-05',relances:0,derniere:null,decide:'2026-06-08',
+  lignes:[['AH','Acide hyaluronique',3,350],['SKB','Skinbooster',2,320],['LAS2','Photorajeunissement',2,280]],
+  zs:[{pomm_d:1,pomm_g:1,mand_d:.5,mand_g:.5},{cerne_d:null,cerne_g:null},{decol:null}]},
+ {id:'D-2606-006',patient:1050,date:'2026-06-19',cree:'2026-06-19T14:43',montant:390,statut:'accepte',praticien:'Dr O. Baroudi',envoye:'2026-06-19',relances:0,derniere:null,decide:'2026-06-24',
+  lignes:[['BTX','Toxine — haut du visage',1,390]],
+  zs:[{front:12,glab:20,pattes_d:8,pattes_g:8}]},
+ {id:'D-2606-007',patient:1051,date:'2026-06-05',cree:'2026-06-05T11:31',montant:480,statut:'accepte',praticien:'Dr A. Merlin',envoye:'2026-06-05',relances:0,derniere:null,decide:'2026-06-11',
+  lignes:[['LAS1','Forfait épilation',4,120]],
+  zs:[{sslev:null,menton:null}]},
 ];
 /* rattachement d'un devis à l'acte de la consultation où il a été établi
    (l'acte le plus proche en date chez le même patient, à 10 jours près) */
 DEVIS.forEach(d=>{ d.fam=d.fam||((d.lignes[0]&&acteDef(d.lignes[0][0]).fam)||'esth');
+ /* Un devis sans praticien n'appartient à personne : « mesDevis » le retirait
+    alors à tout le monde sauf à qui voit le cabinet entier — un médecin sans
+    droit « CA du cabinet » ne voyait aucun devis sur aucune fiche. Le devis
+    revient au médecin traitant du patient tant que rien d'autre n'est dit. */
+ if(!d.praticien) d.praticien=(pById(d.patient)||{}).prat||PRATICIENS[0];
+ /* la date où le devis a cessé d'attendre : elle porte le délai de décision */
+ if(!d.decide&&['accepte','refuse','expire'].includes(d.statut))
+   d.decide=d.derniere||d.envoye||d.date;
  if(!d.prest) d.prest=d.lignes.map((l,i)=>{ const z={...((d.zs&&d.zs[i])||{})};
    const z0=zoneDef(Object.keys(z)[0]);
    return {type:l[0], libre:null, com:(d.cs&&d.cs[i])||'', reg:z0?z0.r:'visage', z,
@@ -3732,13 +3972,15 @@ let RULES=[
 const ROLES={
  admin:{l:'Administrateur',u:'Dr O. Baroudi',i:'OB',v:['dash','stats','envois','patients','actes','devis','encaiss','relances','stock','equipe','params'],med:true,prix:true,compta:true,volumes:true,suppTrace:true,encaisse:true,caCabinet:true},
  praticien:{l:'Médecin',u:'Dr A. Merlin',i:'AM',v:['dash','stats','envois','patients','actes','devis','encaiss','relances','stock','equipe','params'],med:true,prix:true,compta:true,encaisse:true,caCabinet:false},
- assistante:{l:'Assistante',u:'L. Roche',i:'LR',v:['dash','envois','patients','actes','devis','relances','stock'],med:true,prix:true,compta:false,encaisse:true,caCabinet:false},
+ assistante:{l:'Assistante',u:'L. Roche',i:'LR',v:['dash','stats','envois','patients','actes','devis','relances','stock'],med:true,prix:true,compta:false,encaisse:true,caCabinet:false},
  secretariat:{l:'Secrétariat',u:'N. Faure',i:'NF',v:['dash','envois','patients','devis','relances','stock'],med:false,prix:true,compta:false,encaisse:true,caCabinet:false},
 };
 /* prix     = voir les montants d'un acte, d'un devis, d'une facture (métier : facturer, encaisser)
    encaisse = saisir et corriger un règlement, depuis la fiche du patient
-   compta   = suivi comptable : ventilation HT/TVA, rétrocession, statistiques,
-              périodes au-delà de la journée, et les écrans financiers globaux
+   compta   = suivi comptable : ventilation HT/TVA, rétrocession, les MONTANTS
+              des statistiques, périodes au-delà de la journée, et les écrans
+              financiers globaux. L'écran des statistiques, lui, s'ouvre par la
+              vue « stats » : une assistante suit ses devis sans voir les comptes.
    caCabinet= voir les montants de tous les praticiens. Sans lui, un médecin
               travaille sur les siens : son CA, ses factures, sa caisse.
               L'activité — actes, zones, devis, patients — reste globale. */
@@ -3810,7 +4052,7 @@ function fileRelances(){
  return o.sort((a,b)=>a.e.localeCompare(b.e));
 }
 /* ---------- Périodes personnalisables ---------- */
-const DATE_MIN=[...FACTURES.map(f=>f.date),...ACTES.map(a=>a.date)].sort()[0];
+const DATE_MIN=[...FACTURES.map(f=>f.date),...ACTES.map(a=>a.date),...DEVIS.map(d=>d.date)].sort()[0];
 const PRESET_L={jour:'Journée',semaine:'Semaine','7j':'7 jours','30j':'30 jours','90j':'90 jours',
  mois:'Mois',annee:'Année',tout:'Tout',perso:'Personnalisée',moisSel:'Mois choisi',anneeSel:'Année choisie'};
 /* ce que chaque raccourci recouvre au juste — l'infobulle le dit, la barre reste courte */
@@ -9910,6 +10152,250 @@ function coutParActe(){
 function versConso(){
  go('stock'); stkTab='conso'; cnsPer={...perS}; cnsQui=filtrePrat()||''; cnsCat=''; paint();
 }
+/* ==========================================================================
+   La conversion des devis
+   --------------------------------------------------------------------------
+   Un devis a trois âges : établi, envoyé, décidé. Tout ce qui suit se lit sur
+   ces trois dates et sur le compteur de relances. Rien n'est estimé, rien
+   n'est modélisé : ce qui n'est pas dans le devis n'est pas affiché.
+   ========================================================================== */
+const DEV_CLOS=['accepte','refuse','expire'];
+const DEV_ATT =['envoye','relance1','relance2'];
+const devEstClos=d=>DEV_CLOS.includes(d.statut);
+const devEstAtt =d=>DEV_ATT.includes(d.statut);
+/* la date où le devis a cessé d'attendre */
+const devDecide=d=>devEstClos(d)?(d.decide||d.derniere||d.envoye||d.date):null;
+/* le délai de décision : de l'envoi à la réponse. Un devis jamais envoyé n'en a pas. */
+const devDelai=d=>{const t=devDecide(d); return (t&&d.envoye)?Math.max(0,days(d.envoye,t)):null};
+const medianeN=L=>{ if(!L.length) return null;
+ const S=[...L].sort((a,b)=>a-b), i=S.length>>1;
+ return S.length%2?S[i]:Math.round((S[i-1]+S[i])/2) };
+/* Un taux sur trois devis n'est pas un taux : il bascule de trente points dès
+   qu'un patient change d'avis. En dessous de ce seuil on montre le compte, et
+   on se tait sur le pourcentage — c'est moins beau et c'est vrai. */
+const SEUIL_TAUX=8;
+const pcSur=(n,d)=>(d>=SEUIL_TAUX)?Math.round(n/d*100):null;
+const pcTxt=(n,d)=>{const t=pcSur(n,d); return t===null?'—':t+'\u202f%'};
+/* la mention qui accompagne un taux qu'on n'a pas le droit d'afficher */
+const pcTrop=d=>d?`${d} devis — trop peu pour un taux`:'aucun devis';
+function convDevis(L){
+ const som=A=>A.reduce((s,d)=>s+(+d.montant||0),0);
+ const env =L.filter(d=>d.envoye), clos=L.filter(devEstClos);
+ const acc =clos.filter(d=>d.statut==='accepte');
+ const ref =clos.filter(d=>d.statut==='refuse');
+ const exp =clos.filter(d=>d.statut==='expire');
+ const att =L.filter(devEstAtt);
+ return {L,env,clos,acc,ref,exp,att,som,
+   tx:pcSur(acc.length,clos.length),
+   delai:medianeN(acc.map(devDelai).filter(v=>v!==null))};
+}
+/* Trois paquets, selon ce que le calendrier de relance a eu le temps d'envoyer. */
+/* Un taux de conversion ne se juge pas dans l'absolu : personne ne sait ce
+   qu'est un « bon » taux pour ce cabinet-ci. Il se juge par rapport au taux du
+   cabinet lui-même — au-dessus, en dessous, ou sans écart notable. */
+const ECART_TAUX=8;
+function bdgTaux(tx,ref,n){
+ if(tx===null) return `<span class="mu" title="${esc(pcTrop(n))}">—</span>`;
+ const t=tx+'\u202f%';
+ if(ref===null) return `<span class="bdg b-neu">${t}</span>`;
+ const c=tx>=ref+ECART_TAUX?'b-good':tx<=ref-ECART_TAUX?'b-crit':'b-neu';
+ const e=tx-ref;
+ return `<span class="bdg ${c}" title="${esc(`${e>0?'+':''}${e} points par rapport au taux du cabinet (${ref} %)`)}">${t}</span>`;
+}
+const DEV_REL=[[0,'Sans relance'],[1,'Après 1 relance'],[2,'Après 2 relances ou plus']];
+const devParRelance=L=>DEV_REL.map(([n,l])=>{
+ const S=L.filter(d=>devEstClos(d)&&(n===2?(d.relances||0)>=2:(d.relances||0)===n));
+ return {n,l,S,acc:S.filter(d=>d.statut==='accepte').length,
+         exp:S.filter(d=>d.statut==='expire').length}});
+
+/* --------------------------------------------------------------------------
+   L'entonnoir : quatre marches, et ce qui tombe entre deux. Chaque barre se
+   mesure sur la première marche ; le pourcentage, lui, se lit sur la marche
+   précédente — c'est là que se perd ce qui se perd.
+   -------------------------------------------------------------------------- */
+function entonnoir(pas){
+ const base=Math.max(pas[0]?pas[0].n:0,1);
+ return `<div class="funl">${pas.map((x,i)=>`
+  <div class="funl-r${x.ok?' ok':''}">
+   <div class="l">${x.k}${x.h?`<small>${x.h}</small>`:''}</div>
+   <div class="t"><i style="width:${Math.max(x.n?2:0,x.n/base*100).toFixed(1)}%"></i></div>
+   <div class="n"><b>${NUM(x.n)}</b>${x.m!=null?`<small>${x.m}</small>`:''}</div>
+   <div class="q">${i?(x.p||'<span class="mu">—</span>'):'<span class="mu">point de départ</span>'}</div>
+  </div>`).join('')}</div>`;
+}
+/* Le bloc « devis et conversions ». Les comptes et les taux sont ceux du
+   cabinet — l'activité est commune. Les montants n'apparaissent qu'à qui a le
+   droit de voir les montants, et, pour un médecin sans « CA du cabinet »,
+   seulement les siens. */
+function blocConversion(DV,{argent,perso}={}){
+ const C=convDevis(DV), som=C.som;
+ const mien=A=>perso?mesDevis(A):A;
+ const M=A=>argent?EUR(som(mien(A))):null;
+ const N=NUM;
+ if(!C.L.length) return `<div class="card" style="margin-top:13px">
+   <div class="h"><h2>Devis et conversions</h2><span class="s">${esc(perLabel(perS))}</span></div>
+   <div class="empty">Aucun devis établi sur cette période.</div></div>`;
+
+ const pas=[
+  {k:'Établis', h:'sur la période', n:C.L.length, m:M(C.L)},
+  {k:'Envoyés', h:C.L.length-C.env.length?`${N(C.L.length-C.env.length)} brouillon${C.L.length-C.env.length>1?'s':''} jamais parti${C.L.length-C.env.length>1?'s':''}`:'tous partis',
+   n:C.env.length, m:M(C.env), p:`${pcTxt(C.env.length,C.L.length)} <span class="mu">des établis</span>`},
+  {k:'Décidés', h:C.att.length?`${N(C.att.length)} encore en attente`:'plus rien en attente',
+   n:C.clos.length, m:M(C.clos), p:`${pcTxt(C.clos.length,C.env.length)} <span class="mu">des envoyés</span>`},
+  {k:'Acceptés', h:'oui du patient', ok:1, n:C.acc.length, m:M(C.acc),
+   p:C.tx===null?`<span class="mu">${pcTrop(C.clos.length)}</span>`
+     :`<b style="color:var(--ink);font-weight:700">${pcTxt(C.acc.length,C.clos.length)}</b> <span class="mu">des décidés</span>`},
+ ];
+
+ /* ---- ce que la relance récupère ---- */
+ const R=devParRelance(C.L);
+ const tard=C.clos.filter(d=>(d.relances||0)>=1);
+ const tardA=tard.filter(d=>d.statut==='accepte');
+ const cRel=`<div class="card"><div class="h"><h2>Ce que la relance récupère</h2>
+   <span class="s">${N(C.clos.length)} devis décidés</span></div>
+  <div class="b">
+   ${R.map(x=>`<div class="rtl${x.n===0?'':' acc'}"><span>${x.l}
+      <small>${x.S.length?`${N(x.S.length)} devis décidé${x.S.length>1?'s':''}${x.exp?` · ${N(x.exp)} expiré${x.exp>1?'s':''}`:''}`:'aucun devis'}</small></span>
+     <b class="mono">${x.S.length?pcTxt(x.acc,x.S.length):'—'}</b></div>
+    <div class="rtb"><div class="rtb-p" style="width:${pcSur(x.acc,x.S.length)||0}%"></div></div>`).join('')}
+   <div class="tip" style="margin-top:11px"><span class="e">↻</span><div>
+     <b>${tard.length?pcTxt(tardA.length,tard.length):'—'}</b> des devis restés sans réponse au-delà d'une semaine
+     finissent quand même acceptés${argent&&tardA.length?` — ${EUR(som(mien(tardA)))} qui seraient partis à l'expiration`:''}.</div></div>
+   <div class="mu" style="font-size:11.5px;margin-top:9px;line-height:1.55">
+    <b style="color:var(--ink)">Ces trois lignes ne comparent pas des relances, elles comparent des patients.</b>
+    Un devis relancé est un devis sur lequel le patient a hésité : le taux baisse parce que
+    l'hésitation baisse les chances, pas parce que la relance nuit. Ce que la relance rapporte se lit
+    dans l'encadré au-dessus — pas dans l'écart entre les lignes.</div>
+  </div></div>`;
+
+ /* ---- délai de décision ---- */
+ const dA=C.acc.map(devDelai).filter(v=>v!==null).sort((a,b)=>a-b);
+ const dR=C.ref.map(devDelai).filter(v=>v!==null).sort((a,b)=>a-b);
+ const p90=dA.length?dA[Math.min(dA.length-1,Math.ceil(dA.length*.9)-1)]:null;
+ const TR=[[0,3,'Dans les 3 jours'],[4,7,'De 4 à 7 jours'],[8,14,'De 8 à 14 jours'],[15,9999,'Au-delà de 15 jours']];
+ const cDel=`<div class="card"><div class="h"><h2>Quand le patient répond</h2>
+   <span class="s">de l'envoi à la réponse</span></div>
+  <div class="b">
+   <div class="rtl acc"><span>Médiane des acceptations <small>${dA.length} devis accepté${dA.length>1?'s':''}</small></span>
+     <b class="mono">${dA.length?dA.length<SEUIL_TAUX?`${medianeN(dA)} j <small class="mu">(peu de devis)</small>`:medianeN(dA)+' j':'—'}</b></div>
+   <div class="rtl"><span>Médiane des refus <small>${dR.length} devis refusé${dR.length>1?'s':''}</small></span>
+     <b class="mono">${dR.length?medianeN(dR)+' j':'—'}</b></div>
+   <div style="margin-top:11px">${dA.length?hbars(TR.map(([a,b,l])=>({label:l,v:dA.filter(v=>v>=a&&v<=b).length})),{fmt:NUM}):'<span class="mu">Aucune acceptation sur la période.</span>'}</div>
+   ${p90!==null&&dA.length>=SEUIL_TAUX?`<div class="mu" style="font-size:11.5px;margin-top:9px;line-height:1.55">
+     Neuf acceptations sur dix tombent dans les <b style="color:var(--ink)">${p90} jours</b> qui suivent l'envoi.
+     C'est la fenêtre où une relance a encore quelque chose à sauver ; au-delà, le devis tient rarement.</div>`:''}
+  </div></div>`;
+
+ /* ---- conversion par catégorie ---- */
+ const cats=[...new Set(C.L.flatMap(devCats))].filter(Boolean).map(c=>{
+   const D=C.L.filter(d=>devCats(d).includes(c));
+   const cl=D.filter(devEstClos), ac=cl.filter(d=>d.statut==='accepte');
+   return {c, n:D.length, cl:cl.length, ac:ac.length, tx:pcSur(ac.length,cl.length), val:som(mien(ac))};
+  }).sort((a,b)=>b.val-a.val||b.n-a.n);
+ const cCat=`<div class="card"><div class="h"><h2>Conversion par catégorie</h2>
+   <span class="s">un devis compte dans chaque catégorie qu'il touche</span></div>
+  <div class="tw"><table>
+   <thead><tr><th>Catégorie</th><th class="num">Devisés</th><th class="num">Décidés</th>
+    <th class="num">Acceptés</th><th class="num">Taux</th>${argent?'<th class="num">Accepté</th>':''}</tr></thead>
+   <tbody>${cats.map(r=>`<tr><td class="nm">${esc(r.c)}</td>
+     <td class="num">${N(r.n)}</td><td class="num">${N(r.cl)}</td><td class="num">${N(r.ac)}</td>
+     <td class="num">${bdgTaux(r.tx,C.tx,r.cl)}</td>
+     ${argent?`<td class="num">${r.val?EUR(r.val):'<span class="mu">—</span>'}</td>`:''}</tr>`).join('')}
+   </tbody></table></div>
+  <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">
+   Un taux ne s'affiche qu'à partir de ${SEUIL_TAUX} devis décidés — en dessous, le compte est là, le pourcentage ne l'est pas.
+   ${C.tx===null?'':`La couleur situe la catégorie par rapport au taux du cabinet, <b style="color:var(--ink)">${pcTxt(C.acc.length,C.clos.length)}</b> : verte au-dessus de ${ECART_TAUX} points, rouge en dessous, neutre entre les deux.`}</div></div></div>`;
+
+ /* ---- ce qu'on perd ---- */
+ const moy=A=>A.length?Math.round(som(A)/A.length):null;
+ const mA=moy(C.acc), mR=moy(C.ref), mE=moy(C.exp);
+ const cPerdu=`<div class="card"><div class="h"><h2>Ce qu'on perd</h2>
+   <span class="s">${N(C.ref.length+C.exp.length)} devis</span></div>
+  <div class="b">
+   <div class="rtl"><span>Refusés <small>le patient a dit non</small></span>
+     <b class="mono">${argent?EUR(som(mien(C.ref))):N(C.ref.length)}</b></div>
+   <div class="rtl"><span>Expirés <small>personne n'a jamais répondu</small></span>
+     <b class="mono">${argent?EUR(som(mien(C.exp))):N(C.exp.length)}</b></div>
+   ${argent&&(mA||mR||mE)?`<div style="margin-top:11px">${hbars(
+     [['Devis accepté',mA],['Devis refusé',mR],['Devis expiré',mE]].filter(x=>x[1])
+       .map(([label,v])=>({label,v})))}</div>
+     <div class="mu" style="font-size:11.5px;margin-top:4px">Panier moyen, par issue.</div>`:''}
+   <div class="mu" style="font-size:11.5px;margin-top:9px;line-height:1.55">
+    ${C.exp.length?`<b style="color:var(--ink)">Un devis expiré n'est pas un refus</b> : personne n'a dit non.
+      ${N(C.exp.length)} devis ${C.exp.length>1?'sont morts':'est mort'} de silence sur la période.`:'Aucun devis n’a expiré sur la période : tout ce qui est parti a reçu une réponse.'}
+    ${(argent&&mA&&mE&&mE>mA*1.25)?` Et ce sont les <b style="color:var(--ink)">gros</b> qui s'éteignent : ${EUR(mE)} de panier moyen contre ${EUR(mA)} pour un devis accepté.`:''}</div>
+  </div></div>`;
+
+ /* ---- en attente, par ancienneté ---- */
+ const AG=[[0,7,'Moins de 8 jours'],[8,14,'De 8 à 14 jours'],[15,21,'De 15 à 21 jours'],[22,9999,'Plus de 3 semaines']];
+ const age=d=>d.envoye?days(d.envoye,TODAY):null;
+ const ATTP=mien(C.att);
+ const echues=RELS.filter(r=>r.du&&ATTP.some(d=>d.id===r.d.id)).length;
+ const cAtt=`<div class="card"><div class="h"><h2>En attente, par ancienneté</h2>
+   <span class="s">${N(ATTP.length)} devis${perso?' — les vôtres':''}</span>
+   <div class="r"><button class="btn s" onclick="go('relances')">Régler les relances →</button></div></div>
+  <div class="b">
+   ${ATTP.length?AG.map(([a,b,l])=>{const S=ATTP.filter(d=>{const g=age(d); return g!==null&&g>=a&&g<=b});
+     return `<div class="rtl${a>=15&&S.length?' acc':''}"><span>${l}<small>${S.length?`${N(S.length)} devis`:'aucun'}</small></span>
+       <b class="mono"${a>=22&&S.length?' style="color:var(--crit)"':''}>${argent?EUR(som(S)):N(S.length)}</b></div>`}).join('')
+    :`<div class="mu">Aucun devis${perso?' de vous':''} n'attend de réponse.</div>`}
+   ${echues?`<div class="tip" style="margin-top:11px"><span class="e">⚠</span><div>
+     <b>${N(echues)} relance${echues>1?'s':''} échue${echues>1?'s':''}</b> — la date prévue est passée et le message n'est pas parti.</div></div>`:''}
+  </div></div>`;
+
+ /* ---- conversion par praticien : des comptes et des taux, pas des montants ---- */
+ const PP=PRATICIENS.map(pr=>{
+   const D=C.L.filter(d=>d.praticien===pr), cl=D.filter(devEstClos);
+   const ac=cl.filter(d=>d.statut==='accepte');
+   return {pr, n:D.length, cl:cl.length, ac:ac.length, tx:pcSur(ac.length,cl.length)}}).filter(r=>r.n);
+ const cPrat=PP.length>1?`<div class="card"><div class="h"><h2>Conversion par praticien</h2>
+   <span class="s">sur les devis qu'il a établis</span></div>
+  <div class="tw"><table>
+   <thead><tr><th>Praticien</th><th class="num">Devisés</th><th class="num">Décidés</th>
+    <th class="num">Acceptés</th><th class="num">Taux</th></tr></thead>
+   <tbody>${PP.map(r=>`<tr><td class="nm">${esc(r.pr)}</td><td class="num">${N(r.n)}</td>
+     <td class="num">${N(r.cl)}</td><td class="num">${N(r.ac)}</td>
+     <td class="num">${bdgTaux(r.tx,C.tx,r.cl)}</td></tr>`).join('')}
+   </tbody></table></div>
+  <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">
+   Les montants ne figurent pas ici : ce tableau sert à comparer des conversions, pas des confrères.
+   ${C.tx===null?'':`La couleur se lit par rapport au taux du cabinet, ${pcTxt(C.acc.length,C.clos.length)}.`}
+   Un praticien ne devise pas les mêmes actes qu'un autre : l'écart tient autant aux soins proposés qu'à la façon de les proposer.</div></div></div>`:'';
+
+ /* Trois de ces quatre chiffres portent sur le cabinet : combien de devis, quelle
+    part se décide, en combien de jours. Le quatrième — ce qui attend encore une
+    réponse — est une file de travail : elle appartient à celui qui la relance. */
+ const K=[
+  kpi('Devis établis', N(C.L.length),
+      argent?(perso?`dont ${EUR(som(mien(C.L)))} sur vos devis`:`${EUR(som(C.L))} proposés`)
+            :esc(perLabel(perS))),
+  /* Aucune flèche verte ou rouge ici : personne ne sait ce qu'est un « bon »
+     taux de conversion pour ce cabinet. Le chiffre se compare à lui-même, d'une
+     période à l'autre — le logiciel n'a pas à en juger. */
+  kpi("Taux d'acceptation", C.tx===null?'—':pcTxt(C.acc.length,C.clos.length),
+      C.tx===null?pcTrop(C.clos.length):`${N(C.acc.length)} oui sur ${N(C.clos.length)} devis décidés`),
+  kpi('En attente de réponse', argent?EUR(som(mien(C.att))):N(mien(C.att).length),
+      perso?`vos devis · ${N(C.att.length)} au cabinet`:`${N(C.att.length)} devis`),
+  kpi('Délai de décision', C.delai===null?'—':C.delai+' j',
+      C.delai===null?'aucune acceptation':`médiane, de l'envoi au oui`)].join('');
+
+ return `<div class="grid g4" style="margin-top:14px;margin-bottom:13px">${K}</div>
+ <div class="card">
+  <div class="h"><h2>Devis et conversions</h2>
+   <span class="s">tout le cabinet · ${esc(perLabel(perS))}</span>
+   <div class="r"><button class="btn s" onclick="go('devis')">Ouvrir les devis →</button></div></div>
+  <div class="b">${entonnoir(pas)}
+   <div class="mu" style="font-size:11.5px;margin-top:11px;line-height:1.55">
+    Chaque barre se mesure sur les devis établis ; le pourcentage, lui, se lit sur la marche précédente.
+    ${C.tx===null?`Le taux d'acceptation demande au moins ${SEUIL_TAUX} devis décidés — il y en a ${C.clos.length}.`
+      :`Le <b style="color:var(--ink)">taux d'acceptation</b> est la dernière marche : ${C.acc.length} oui sur ${C.clos.length} devis décidés.`}
+    ${argent&&perso?' Les montants affichés sont les vôtres ; les comptes et les taux, ceux du cabinet.':''}
+    ${argent?'':' Les montants relèvent du droit « Voir les montants ».'}</div></div></div>
+ <div class="grid g3" style="margin-top:13px">${cRel}${cDel}${cAtt}</div>
+ <div style="margin-top:13px">${cCat}</div>
+ <div class="grid ${cPrat?'g2':''}" style="margin-top:13px">${cPerdu}${cPrat}</div>`;
+}
+
 V.stats=()=>{
  const acte=ROLES[role].v.includes('stats'), sous=CAN('compta');
  if(!acte&&!sous) return `<div class="head"><div><h1>Statistiques</h1></div></div><div class="empty">🔒 Les statistiques ne sont pas ouvertes au rôle « ${ROLES[role].l} ». Ce droit se règle dans Équipe &amp; droits.</div>`;
@@ -9960,15 +10446,17 @@ V.stats=()=>{
     non saisi) consomme quand même du produit — on ne l'efface pas, on le dit */
  const horsVal=AM.filter(a=>montantActe(a)==null);
  const coutHors=horsVal.reduce((x,a)=>x+coutA(a),0);
- const dvAcc=DV.filter(d=>d.statut==='accepte').length;
- const dvDec=DV.filter(d=>['accepte','refuse','expire'].includes(d.statut)).length;
- const dvAtt=DV.filter(d=>['envoye','relance1','relance2'].includes(d.statut));
- const dvM=(perso?mesDevis(dvAtt):dvAtt).reduce((s,d)=>s+d.montant,0);
+ /* Les devis : c'est le travail de l'assistante autant que celui du médecin.
+    Les comptes et les taux sont ceux du cabinet ; les montants suivent le droit
+    « Voir les montants », et pour un médecin sans « CA du cabinet », les siens. */
+ const dev=acte||CAN('prix');
+ const CV=convDevis(DV);
+ const dvAttM=(perso?mesDevis(CV.att):CV.att).reduce((s,d)=>s+d.montant,0);
  return `<div class="head"><div><h1>Statistiques</h1>
    <p>${acte?'Activité':'Suivi comptable'}${acte&&sous?' et suivi comptable':''}${perso?' — vos montants':''} · ${perLabel(perS)}</p></div></div>
  ${periodBar(perS,'setPerS',`${A.length} acte${A.length>1?'s':''}`,PRESETS_STD,1)}
  ${acte?'':`<div class="tip"><span class="e">🔒</span><div>Les <b>statistiques des actes</b> ne sont pas ouvertes à votre rôle : seuls les montants s'affichent. Ce droit se règle dans Équipe &amp; droits.</div></div>`}
- ${sous?'':`<div class="tip"><span class="e">🔒</span><div>Les montants relèvent du <b>suivi comptable</b>, qui n'est pas ouvert à votre rôle. L'activité, elle, s'affiche entièrement.</div></div>`}
+ ${sous?'':`<div class="tip"><span class="e">🔒</span><div>Le <b>chiffre d'affaires du cabinet</b> relève du <b>suivi comptable</b>, qui n'est pas ouvert à votre rôle. L'activité et les <b>devis</b> — y compris leurs montants et leur conversion — s'affichent entièrement.</div></div>`}
  ${perso?`<div class="tip"><span class="e">€</span><div><b>Les montants affichés sont les vôtres</b> — ${esc(monPrat())}, ${AM.length} acte${AM.length>1?'s':''} sur ${A.length} sur la période.
    Le chiffre d'affaires du cabinet, tous praticiens confondus, relève du droit <b>« CA du cabinet »</b>.
    L'activité — actes, catégories, zones, patients, devis — s'affiche entière : elle vous dit comment tourne le cabinet.</div></div>`:''}
@@ -9992,18 +10480,8 @@ V.stats=()=>{
   ${acte?`<div class="card"><div class="h"><h2>Actes par praticien</h2></div><div class="b">${hbars(np,{fmt:NUM})}</div></div>`:''}
   ${acte?`<div class="card"><div class="h"><h2>Zones les plus traitées</h2></div><div class="b">${hbars(pz,{fmt:NUM})}</div></div>`:''}
   ${sous?`<div class="card"><div class="h"><h2>${perso?'Votre CA par catégorie':'CA par catégorie'}</h2></div><div class="b">${hbars(pc)}</div></div>`:''}
-  ${(sous&&!perso)?`<div class="card"><div class="h"><h2>CA par praticien</h2></div><div class="b">${hbars(pp)}</div></div>`:''}
-  ${acte?`<div class="card"><div class="h"><h2>Devis et conversions</h2><span class="s">tout le cabinet</span></div>
-   <div class="b">
-    <div class="rtl"><span>Devis établis <small>sur la période</small></span><b class="mono">${NUM(DV.length)}</b></div>
-    <div class="rtl acc"><span>Acceptés <small>${dvDec?Math.round(dvAcc/dvDec*100)+' % des devis décidés':'aucun devis décidé'}</small></span>
-      <b class="mono">${NUM(dvAcc)}</b></div>
-    <div class="rtl"><span>En attente de réponse <small>${dvAtt.length} devis</small></span>
-      <b class="mono">${sous?EUR(dvM):NUM(dvAtt.length)}</b></div>
-    <div class="rtb"><div class="rtb-p" style="width:${dvDec?Math.round(dvAcc/dvDec*100):0}%"></div></div>
-    <div class="mu" style="font-size:11.5px;margin-top:8px">Le nombre de devis et le taux d'acceptation portent sur tout le cabinet.${
-      perso?` Le montant en attente, lui, est le vôtre.`:''}</div>
-   </div></div>`:''}</div>
+  ${(sous&&!perso)?`<div class="card"><div class="h"><h2>CA par praticien</h2></div><div class="b">${hbars(pp)}</div></div>`:''}</div>
+ ${dev?blocConversion(DV,{argent:CAN('prix'),perso:!!filtrePrat()}):''}
  ${coutOk&&rentab.length?`
  <div class="grid ${coutPrat.length>1&&!perso?'g2':''}" style="margin-top:13px">
   <div class="card"><div class="h"><h2>Coût produit par catégorie</h2>
@@ -11568,12 +12046,12 @@ const DROITS=[
  {l:'Créer devis / facture',        vu:'devis'},
  {l:'Encaisser',                    f:'encaisse', h:'saisir et corriger un règlement depuis la fiche du patient'},
  {l:'<b>Caisse du cabinet</b>',     vu:'encaiss', h:'facturations détaillées, totaux journaliers, caisse et rétrocession — les tableaux financiers d’ensemble'},
- {l:'<b>Suivi comptable</b>',       f:'compta', h:'CA cumulé, ventilation HT / TVA, rétrocession centre-praticien, statistiques, périodes au-delà de '+HORIZON_SANS_COMPTA+' jours'},
+ {l:'<b>Suivi comptable</b>',       f:'compta', h:'CA cumulé, ventilation HT / TVA, rétrocession centre-praticien, montants des statistiques, périodes au-delà de '+HORIZON_SANS_COMPTA+' jours'},
  {l:'<b>CA du cabinet</b>',         f:'caCabinet', h:'les montants de tous les praticiens ; sans ce droit, un médecin ne voit que les siens'},
  {l:'Gérer le stock',               vu:'stock'},
  {l:'Paramétrer le logiciel',       vu:'params'},
  {l:'Gérer les utilisateurs',       vu:'equipe'},
- {l:'<b>Statistiques des actes</b>', vu:'stats', h:'volumes par acte, par zone, par praticien — sans les montants, qui relèvent du suivi comptable'},
+ {l:'<b>Statistiques</b>',      vu:'stats', h:'activité, zones, conversion des devis — les montants du cabinet restent derrière le suivi comptable'},
  {l:'Volumes de produits injectés', f:'volumes', h:'unités de toxine et millilitres d’acide hyaluronique cumulés, en tête de la liste des actes'},
  {l:'Supprimer une séance tracée',  f:'suppTrace', h:'une séance qui a consommé du produit engage la traçabilité des lots'},
 ];
@@ -14170,7 +14648,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='EA';
+const BUILD='EB';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
