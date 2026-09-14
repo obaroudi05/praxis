@@ -3341,6 +3341,11 @@ DEVIS.forEach(d=>{ d.fam=d.fam||((d.lignes[0]&&acteDef(d.lignes[0][0]).fam)||'es
    .map(x=>({x,dd:Math.abs(days(x.date,d.date))})).filter(o=>o.dd<=10).sort((p,q)=>p.dd-q.dd);
  if(A.length) d.acte=A[0].x.id;
 });
+/* Classer des statuts par ordre alphabétique range « Accepté » avant
+   « Brouillon » : c'est vrai et ça ne veut rien dire. Un devis a un cycle de
+   vie — on le rédige, on l'envoie, on le relance, il se décide — et c'est cet
+   ordre-là qu'on veut voir quand on clique sur la colonne. */
+const RANG_DEVIS={brouillon:0, envoye:1, relance1:2, relance2:3, accepte:4, refuse:5, expire:6};
 const SD={brouillon:['Brouillon','b-neu'],envoye:['Envoyé','b-info'],relance1:['Relancé ×1','b-warn'],
  relance2:['Relancé ×2','b-warn'],accepte:['Accepté','b-good'],refuse:['Refusé','b-crit'],expire:['Expiré','b-crit']};
 /* un devis accepté dont l'acte a été réalisé se lit d'un coup d'œil */
@@ -6533,6 +6538,13 @@ const envDoc=id=>ENVOIS.filter(e=>e.docId===id).sort((a,b)=>a.ts.localeCompare(b
 const canalDe=p=>(p&&p.mail&&p.mail!=='—')?'e-mail':'SMS';
 const destDe=(p,c)=>c==='SMS'?(p.tel||'—'):(p.mail||'—');
 
+/* Une relance peut partir toute seule : c'est même le principe de l'écran
+   « Relances automatiques ». « Qui l'a envoyée » a donc deux réponses possibles
+   — la règle, ou quelqu'un. On ne met pas un nom sur ce que personne n'a fait. */
+const AUTO_RELANCE='Relance automatique';
+const envAuto=e=>e&&e.par===AUTO_RELANCE;
+/* les personnes du cabinet, telles que la matrice des rôles les nomme */
+const GENS=()=>[...new Set(Object.values(ROLES).map(r=>r.u))];
 function creerEnvoi(o){
  const t=o.t||nowStamp();
  const e={ id:'E-'+String(ENVOIS.length+1).padStart(4,'0'), ref:envRef(t), ts:t,
@@ -6713,14 +6725,21 @@ function envoyerDevis(id,o){
  const plus=(t,min)=>{const [d,h]=t.split('T'); const D=new Date(`${d}T${h}:00`);
    D.setMinutes(D.getMinutes()+min);
    return `${D.toISOString().slice(0,10)}T${String(D.getHours()).padStart(2,'0')}:${String(D.getMinutes()).padStart(2,'0')}`};
- const pose=(p,jour,docId,docNom,docK,aid,voulu)=>{
+ const pose=(p,jour,docId,docNom,docK,aid,voulu,o)=>{
   /* le scénario annonce un canal par étape ; une relance qui part par un autre
      fait mentir la file d'attente. On suit le scénario quand le patient a bien
      ce qu'il faut pour le recevoir. */
   const dv=voulu&&destDe(p,voulu);
   const canal=(dv&&dv!=='—')?voulu:canalDe(p), t=hh(jour, 9+Math.floor(rnd()*9), Math.floor(rnd()*60));
+  /* Le jeu de démonstration signait tout « Secrétariat » : une supervision
+     sur un registre où tout le monde porte le même nom ne supervise rien.
+     Le premier envoi part de qui a établi le devis ; les relances partent
+     seules la plupart du temps, et quelqu'un pousse le reste à la main. */
+  const par=o&&o.par ? o.par
+    : /relance/i.test(docNom||'') ? (rnd()<.68?AUTO_RELANCE:(rnd()<.6?'L. Roche':'N. Faure'))
+    : ((DEVIS.find(x=>x.id===docId)||{}).praticien||'L. Roche');
   const e=creerEnvoi({pid:p.id, aid, docId, docNom, docK, canal, dest:destDe(p,canal),
-    objet:objetNeutre(docK), mode:'lien', t, par:'Secrétariat'});
+    objet:objetNeutre(docK), mode:'lien', t, par});
   const r=rnd();
   if(r<.07){ avancerEnvoi(e.id,'echec',ENV_MOTIFS[Math.floor(rnd()*ENV_MOTIFS.length)],plus(t,2)); return e }
   avancerEnvoi(e.id,'serveur',null,plus(t,1));
@@ -6811,6 +6830,8 @@ const envoisDevis=id=>ENVOIS.filter(e=>e.docK==='devis'&&e.docId===id)
   .sort((a,b)=>a.ts.localeCompare(b.ts));
 const estRelance=e=>/—\s*relance/i.test(e.docNom||'');
 const relancesDe=id=>envoisDevis(id).filter(estRelance);
+/* la dernière relance partie : c'est celle dont on demande des comptes */
+const dernRelance=id=>{const R=relancesDe(id); return R.length?R[R.length-1]:null};
 const noRelance=e=>{const m=(e.docNom||'').match(/relance\s*(\d+)/i); return m?+m[1]:null};
 /* la chronologie d'un devis, prête à afficher */
 function chronoDevis(d){
@@ -6825,9 +6846,15 @@ function chronoDevis(d){
  if(fin) H.push({t:d.derniere||d.date, heure:false, ic:fin[0], lib:fin[1]});
  return H.sort((a,b)=>a.t.localeCompare(b.t));
 }
+/* « par qui » se lit sur la même ligne que « quand » : c'est la même question
+   posée à un registre, et la superviser demande de les voir ensemble. */
+const envPar=e=>!e||!e.par?'':(envAuto(e)?'règle automatique':e.par);
+const bdgPar=e=>!e||!e.par?'':`<span class="bdg ${envAuto(e)?'b-neu':'b-info'}"
+  title="${esc(envAuto(e)?'Partie seule, à l’échéance de la règle de relance':'Envoyée à la main par '+e.par)}"
+  >${envAuto(e)?'⟳ automatique':esc(e.par)}</span>`;
 const chronoLigne=x=>`<div class="tl">
    <div class="ic" style="background:var(--accent-wash);color:var(--accent-ink)">${x.ic}</div>
-   <div><div class="t">${esc(x.lib)}${x.e?' '+bdg(ENV_ST[x.e.statut][0],ENV_ST[x.e.statut][1]):''}</div>
+   <div><div class="t">${esc(x.lib)}${x.e?' '+bdg(ENV_ST[x.e.statut][0],ENV_ST[x.e.statut][1]):''}${x.e?' '+bdgPar(x.e):''}</div>
     <div class="d">${x.heure?DTS(x.t):DF(x.t)}${x.e?' · '+esc(x.e.dest)+' · '+(x.e.mode==='lien'?'lien sécurisé':'pièce jointe'):''}${
       x.e&&x.e.motif?' · '+esc(x.e.motif):''}</div></div></div>`;
 const envBandeau=()=>EXPEDITEUR.relais?'':`<div class="tip"><span class="e">✉</span><div>
@@ -8173,7 +8200,12 @@ function pDetail(p){
         return esc('Devis établi le '+e.cree+(e.maj?' · modifié le '+e.maj:''))})()}">${DF(d.date)}</td>
       <td>${d.lignes.map(l=>esc(l[1])).join(' · ')}</td>
       <td class="num">${EUR(d.montant)}</td><td>${bdgDevis(d)}</td>
-      <td class="mono mu">${d.relances||'—'}</td>
+      <td class="mu">${(()=>{ if(!d.relances) return '<span class="mono">—</span>';
+        const e=dernRelance(d.id);
+        return `<span class="mono">${d.relances}</span>`+(e?`<div class="nw" style="font-size:11px"
+          title="${esc(envAuto(e)?'Dernière relance partie seule, à l’échéance de la règle'
+            :'Dernière relance envoyée à la main par '+e.par)}"
+          >${envAuto(e)?'⟳ automatique':esc(e.par)}</div>`:'')})()}</td>
       <td class="num" style="white-space:nowrap">
         ${d.statut==='accepte'?(signOf(d.id)?`<span class="bdg b-good" title="${esc(signTxt(signOf(d.id)))}">✎ Signé</span>`:'')
           :`${lienDe(d.id)?lienBadge(d.id):`${consentsDeDevis(d.id).some(x=>!x.signe)
@@ -8361,9 +8393,26 @@ V.devis=()=>{
 
  const inP=d=>inPer(d.date,perD);
  const base=DEVIS.filter(inP);
- const L=base.filter(d=>dF==='tous'||(dF==='attente'?['envoye','relance1','relance2'].includes(d.statut):d.statut===dF))
-   .filter(devMatch)
-   .sort((a,b)=>b.date.localeCompare(a.date));
+ /* La liste arrivait ici triée une fois pour toutes, du plus récent au plus
+    ancien, sans que rien ne le dise ni ne permette de l'inverser. Elle passe
+    au mécanisme de tri du reste du logiciel : l'ordre chronologique reste
+    celui par défaut — c'est le bon — mais il s'affiche, et il se renverse.
+    La date de classement est l'HORODATAGE d'établissement, pas le seul jour :
+    deux devis du même matin gardent l'ordre où ils ont été écrits. */
+ if(!TRI.devis||!TRI.devis.c) TRI.devis={c:'date', d:-1};
+ const CLES_DEVIS={
+   num:   d=>d.id,
+   pat:   d=>fn(pById(d.patient)),
+   date:  d=>d.cree||d.date,
+   mont:  d=>+d.montant||0,
+   statut:d=>RANG_DEVIS[d.statut]!==undefined?RANG_DEVIS[d.statut]:9,
+   age:   d=>d.envoye?days(d.envoye,TODAY):null,
+   suite: d=>{const r=RELS.find(x=>x.d.id===d.id); return r?r.e:null},
+ };
+ const L=triApplique('devis',
+   base.filter(d=>dF==='tous'||(dF==='attente'?['envoye','relance1','relance2'].includes(d.statut):d.statut===dF))
+     .filter(devMatch),
+   CLES_DEVIS);
  const att=base.filter(d=>['envoye','relance1','relance2'].includes(d.statut));
  const matt=att.reduce((s,d)=>s+d.montant,0);
  const rdue=RELS.filter(r=>r.du&&inP(r.d));
@@ -8399,7 +8448,14 @@ V.devis=()=>{
     ${devSansFiltre()?'':`<button class="btn s" onclick="dCat='';dActe='';paint()">✕ Retirer les filtres</button>`}
     ${devSansFiltre()?'':`<span class="mu" style="font-size:11.5px">${L.length} devis sur ${base.length}</span>`}`})()}</div>
  <div class="card"><div class="tw"><table>
-  <thead><tr><th>N°</th><th>Patient</th><th>Date</th><th class="num">Montant</th><th>Statut</th><th>Âge</th><th>Prochaine action</th><th></th></tr></thead>
+  <thead><tr>${thT('devis','num','N°',{def:-1,aide:'Classer par numéro de devis — le dernier émis en premier'})}
+   ${thT('devis','pat','Patient',{aide:'Classer par nom de patient'})}
+   ${thT('devis','date','Date',{def:-1,aide:'Ordre chronologique — le plus récent en premier ; recliquez pour remonter au plus ancien'})}
+   ${thT('devis','mont','Montant',{num:1,def:-1,aide:'Classer par montant — le plus élevé en premier'})}
+   ${thT('devis','statut','Statut',{def:1,aide:'Classer selon l’avancement : brouillon, envoyé, relancé, puis décidé'})}
+   ${thT('devis','age','Âge',{def:-1,aide:'Classer par ancienneté d’envoi — le plus vieux en premier'})}
+   ${thT('devis','suite','Prochaine action',{def:1,aide:'Classer par date de la prochaine relance — la plus proche en premier'})}
+   <th></th></tr></thead>
   <tbody>${L.map(d=>{const nx=RELS.find(r=>r.d.id===d.id),ag=d.envoye?days(d.envoye,TODAY):null;
    return `<tr class="c" onclick="dSel='${d.id}';paint()"><td class="mono" style="white-space:nowrap">${d.id}</td>
     <td><div class="nm">${esc(fn(pById(d.patient)))}</div>
@@ -8409,7 +8465,12 @@ V.devis=()=>{
         return v+(T.length>3?` <span class="mu">+${T.length-3}</span>`:'')})()}</div></td>
     <td class="mono" title="${(()=>{const e=devisEtabliTxt(d);
       return esc('Devis établi le '+e.cree+(e.maj?' · modifié le '+e.maj:''))})()}">${DF(d.date)}</td>
-    <td class="num">${EUR(d.montant)}</td><td>${bdgDevis(d)}</td>
+    <td class="num">${EUR(d.montant)}</td>
+    <td>${bdgDevis(d)}${(()=>{const e=dernRelance(d.id); if(!e) return '';
+      return `<div class="mu nw" style="font-size:11px;margin-top:3px"
+        title="${esc(envAuto(e)?'Dernière relance partie seule, à l’échéance de la règle'
+          :'Dernière relance envoyée à la main par '+e.par)}"
+        >${envAuto(e)?'⟳ automatique':'par '+esc(e.par)}</div>`})()}</td>
     <td class="mono" style="white-space:nowrap${ag>21?';color:var(--crit);font-weight:620':''}" ${ag>21?'':'class="mono mu"'}>${ag!==null?ag+' j':'—'}</td>
     <td>${nx?(nx.du?bdg('b-crit','⚠ '+nx.r.c+' échu'):bdg('b-info',nx.r.c+' le '+DFS(nx.e))):'<span class="mu">—</span>'}</td>
     <td class="num" style="white-space:nowrap">
@@ -8990,6 +9051,7 @@ V.relances=()=>`<div class="head"><div><h1>Relances automatiques</h1><p>Le devis
     ${RELS.length?'':'<div class="empty">Rien en attente.</div>'}</div>
    <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">Sur les ${ATT.length} devis en attente (${EUR(MATT)}), une relance structurée récupère typiquement 15 à 25 % de plus qu'une relance manuelle irrégulière — soit <b style="color:var(--ink)">${EUR(Math.round(MATT*.2))}</b> par cycle.</div></div></div>
  </div>
+ ${carteQuiRelance()}
  ${histoRelances()}`;
 
 /* ==========================================================================
@@ -9001,17 +9063,85 @@ V.relances=()=>`<div class="head"><div><h1>Relances automatiques</h1><p>Le devis
    l'a-t-il seulement reçu ». Un SMS non remis relancé trois fois par SMS,
    c'est trois fois rien.
    ========================================================================== */
-let relQ='', relCanal='', relStat='';
+let relQ='', relCanal='', relStat='', relPar='';
+/* ==========================================================================
+   Qui relance
+   --------------------------------------------------------------------------
+   « Superviser » ne veut pas dire noter des gens. Ce tableau répond à trois
+   questions concrètes : combien de relances partent seules, lesquelles
+   quelqu'un a dû pousser à la main, et ce que chaque paquet a donné. Le
+   dernier chiffre — les devis acceptés ensuite — est une CO-OCCURRENCE et
+   l'écran le dit : personne ne sait si la relance a emporté la décision.
+   ========================================================================== */
+function quiRelance(){
+ const par={};
+ ENVOIS.filter(e=>e.docK==='devis'&&estRelance(e)).forEach(e=>{
+  const k=envAuto(e)?'auto':(e.par||'—');
+  const o=par[k]=par[k]||{k, auto:k==='auto', n:0, echec:0, ouvert:0, devis:new Set()};
+  o.n++;
+  if(e.statut==='echec') o.echec++;
+  if(e.statut==='ouvert') o.ouvert++;
+  o.devis.add(e.docId);
+ });
+ return Object.values(par).map(o=>{
+   const D=[...o.devis].map(id=>DEVIS.find(x=>x.id===id)).filter(Boolean);
+   const clos=D.filter(devEstClos);
+   return {...o, devis:o.devis.size,
+     acc:clos.filter(x=>x.statut==='accepte').length, clos:clos.length,
+     exp:clos.filter(x=>x.statut==='expire').length};
+  }).sort((a,b)=>b.n-a.n);
+}
+function carteQuiRelance(){
+ const Q=quiRelance();
+ if(!Q.length) return '';
+ const tot=Q.reduce((n,o)=>n+o.n,0);
+ const auto=Q.filter(o=>o.auto).reduce((n,o)=>n+o.n,0);
+ const argent=CAN('prix');
+ return `<div class="card" style="margin-top:13px"><div class="h"><h2>Qui relance</h2>
+   <span class="s">${NUM(tot)} relance${tot>1?'s':''} envoyée${tot>1?'s':''}</span></div>
+  <div class="b">
+   <div class="rtl acc"><span>Parties seules<small>à l'échéance de la règle, sans intervention</small></span>
+     <b class="mono">${pcTxt(auto,tot)}</b></div>
+   <div class="rtb"><div class="rtb-p" style="width:${tot?Math.round(auto/tot*100):0}%"></div></div>
+   <div class="mu" style="font-size:11.5px;margin-top:7px">${tot-auto
+     ?`<b style="color:var(--ink)">${NUM(tot-auto)}</b> relance${tot-auto>1?'s':''} ${tot-auto>1?'sont parties':'est partie'} à la main, ${tot-auto>1?'poussées':'poussée'} par quelqu'un.`
+     :`Aucune n'a eu besoin d'être poussée à la main.`}</div>
+  </div>
+  <div class="tw"><table>
+   <thead><tr><th>Par</th><th class="num">Relances</th><th class="num">Devis touchés</th>
+    <th class="num">Ouvertes</th><th class="num">Échecs</th>
+    <th class="num">Acceptés ensuite</th><th class="num">Expirés</th></tr></thead>
+   <tbody>${Q.map(o=>`<tr class="c" onclick="relPar='${esc(o.auto?'auto':o.k)}';paint()"
+      title="N’afficher que ces relances">
+     <td class="nm">${o.auto?'<span class="bdg b-neu">⟳ automatique</span>':esc(o.k)}</td>
+     <td class="num"><b>${NUM(o.n)}</b></td>
+     <td class="num">${NUM(o.devis)}</td>
+     <td class="num">${o.ouvert?NUM(o.ouvert):'<span class="mu">—</span>'}</td>
+     <td class="num">${o.echec?`<span class="bdg b-crit">${NUM(o.echec)}</span>`:'<span class="mu">—</span>'}</td>
+     <td class="num">${o.clos?`${NUM(o.acc)} <span class="mu">/ ${NUM(o.clos)}</span>`:'<span class="mu">—</span>'}</td>
+     <td class="num">${o.exp?NUM(o.exp):'<span class="mu">—</span>'}</td></tr>`).join('')}
+   </tbody></table></div>
+  <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px;line-height:1.55">
+   <b style="color:var(--ink)">« Acceptés ensuite » n'est pas un score.</b> C'est le nombre de devis
+   touchés par ces relances qui ont fini par être acceptés — personne ne sait si la relance a emporté
+   la décision, et les devis les plus difficiles sont précisément ceux qu'on relance à la main.
+   Ce tableau sert à voir ce qui part tout seul et ce qui demande quelqu'un, pas à comparer des personnes.
+   ${argent?'':''}</div></div></div>`;
+}
 function histoRelances(){
  const q=relQ.trim().toLowerCase();
  const L=ENVOIS.filter(e=>e.docK==='devis'&&estRelance(e))
   .filter(e=>!relCanal||e.canal===relCanal)
   .filter(e=>!relStat||e.statut===relStat)
+  .filter(e=>!relPar||(relPar==='auto'?envAuto(e):e.par===relPar))
   .filter(e=>{const p=pById(e.pid);
     return !q||[e.docId,e.dest,e.ref,p?fn(p):''].join(' ').toLowerCase().includes(q)})
   .sort((a,b)=>b.ts.localeCompare(a.ts));
  const n=k=>ENVOIS.filter(e=>e.docK==='devis'&&estRelance(e)&&(k==='tous'||e.statut===k)).length;
  const ech=n('echec');
+ /* on ne propose que des noms qui ont réellement envoyé quelque chose */
+ const qui=[...new Set(ENVOIS.filter(e=>e.docK==='devis'&&estRelance(e)&&!envAuto(e))
+   .map(e=>e.par).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
  return `<div class="card" style="margin-top:13px"><div class="h"><h2>Relances envoyées</h2>
    <div class="r"><span class="s">${L.length} sur ${n('tous')}</span>
      ${ech?bdg('b-crit',ech+' échec'+(ech>1?'s':'')):''}</div></div>
@@ -9022,12 +9152,17 @@ function histoRelances(){
    <span class="mu" style="font-size:11.5px;font-weight:600;align-self:center">État</span>
    <div class="seg">${[['','Tous'],['ouvert','Ouvertes'],['remis','Remises'],['echec','Échecs']].map(([k,l])=>
      `<button class="${relStat===k?'on':''}" onclick="relStat='${k}';paint()">${l}</button>`).join('')}</div>
-   <input class="inp" id="rqi" style="min-width:180px" placeholder="Patient, devis, référence…"
+   <select class="inp" style="max-width:186px" title="N'afficher que les relances d'une personne, ou celles parties seules"
+     onchange="relPar=this.value;paint()">
+     <option value="">Par qui : tout</option>
+     <option value="auto" ${relPar==='auto'?'selected':''}>⟳ Parties seules</option>
+     ${qui.map(k=>`<option value="${esc(k)}" ${relPar===k?'selected':''}>${esc(k)}</option>`).join('')}</select>
+   <input class="inp" id="rqi" style="min-width:164px" placeholder="Patient, devis, référence…"
      value="${esc(relQ)}" oninput="relQ=this.value;paint();const e=document.getElementById('rqi');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
-   ${(relCanal||relStat||relQ)?`<button class="chip" style="margin-left:auto"
-     onclick="relCanal='';relStat='';relQ='';paint()">Tout afficher</button>`:''}</div>
+   ${(relCanal||relStat||relQ||relPar)?`<button class="chip" style="margin-left:auto"
+     onclick="relCanal='';relStat='';relQ='';relPar='';paint()">Tout afficher</button>`:''}</div>
   <div class="tw"><table><thead><tr><th>Envoyée le</th><th>Patient</th><th>Devis</th>
-    <th class="num">Montant</th><th>N°</th><th>Canal</th><th>Destinataire</th><th>État</th><th class="mono">Référence</th></tr></thead>
+    <th class="num">Montant</th><th>N°</th><th>Par</th><th>Canal</th><th>Destinataire</th><th>État</th><th class="mono">Référence</th></tr></thead>
    <tbody>${L.map(e=>{const p=pById(e.pid), d=DEVIS.find(x=>x.id===e.docId), st=ENV_ST[e.statut];
      return `<tr class="c" onclick="go('devis','${e.docId}')" title="Ouvrir le devis ${esc(e.docId)}">
       <td class="mono nw">${DTS(e.ts)}</td>
@@ -9035,6 +9170,7 @@ function histoRelances(){
       <td class="mono">${esc(e.docId)}</td>
       <td class="num">${d?EUR(d.montant):'—'}</td>
       <td class="mono mu">${noRelance(e)||'—'}</td>
+      <td>${bdgPar(e)||'<span class="mu">—</span>'}</td>
       <td class="mu">${esc(e.canal)}</td>
       <td class="mu el" style="max-width:190px" title="${esc(e.dest)}">${esc(e.dest)}</td>
       <td>${bdg(st[0],st[1])}${e.motif?`<div class="mu" style="font-size:10.5px">${esc(e.motif)}</div>`:''}</td>
@@ -14821,7 +14957,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='EC';
+const BUILD='ED';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
