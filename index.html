@@ -2218,6 +2218,49 @@ body.en-connexion aside{display:none}
   max-width:100%;max-height:none;flex:none;min-height:0}
 .gmontf-b .rid .ridd{display:flex;gap:18px;justify-content:center;flex:none;
   padding-top:8px;color:#e9edf5;font-size:12.5px;font-weight:600}
+/* ---- la fenêtre du QR ---- */
+.qrbox{max-width:min(94vw,700px);background:var(--panel);border-radius:var(--r-l);
+  box-shadow:var(--sh-3);overflow:hidden}
+.qr-h{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:11px 14px;border-bottom:1px solid var(--line)}
+.qr-b{display:flex;gap:18px;padding:16px;flex-wrap:wrap}
+.qr-i{flex:none;background:#fff;padding:10px;border-radius:12px;border:1px solid var(--line);
+  align-self:flex-start;line-height:0}
+.qrc{display:block;shape-rendering:crispEdges}
+.qr-t{flex:1 1 300px;min-width:260px;font-size:12.8px;line-height:1.5}
+.qr-t p{margin:0 0 9px}
+.qr-l{display:flex;align-items:center;gap:8px;padding:6px 8px;margin-bottom:9px;
+  background:var(--panel-2);border:1px solid var(--line);border-radius:8px}
+.qr-l .mono{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px}
+.qr-u{margin:0 0 9px;padding-left:17px;color:var(--ink-2);font-size:12px}
+.qr-u li{margin-bottom:3px}
+.qr-w{padding:8px 10px;border-radius:8px;background:var(--warn-w);color:#8a6100;font-size:12px;line-height:1.45}
+.qr-w+.qr-w{margin-top:7px}
+.qr-w a{color:inherit;text-decoration:underline;cursor:pointer;font-weight:650}
+:root[data-theme="dark"] .qr-w{color:#f6c65e}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .qr-w{color:#f6c65e}}
+/* ---- le téléphone en prise de vue ---- */
+body.mode-prise .side,body.mode-prise .topbar{display:none}
+body.mode-prise #main{padding:0;max-width:none}
+.prise{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);z-index:130}
+.prise-h{flex:none;display:flex;align-items:center;gap:10px;padding:13px 16px;
+  border-bottom:1px solid var(--line);background:var(--panel)}
+.prise-h .lg{display:flex;align-items:center;gap:8px;font-weight:750;font-size:15px}
+.prise-h .px{display:grid;place-items:center;width:26px;height:26px;border-radius:8px;
+  background:var(--accent);color:#fff;font-size:12px;font-weight:800}
+.prise-b{flex:1;min-height:0;overflow:auto;padding:14px}
+.prise-v{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;color:var(--ink-3);text-align:center}
+.prise-v .e{font-size:40px}
+.prise-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.prise-g figure{position:relative;margin:0;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+.prise-g img{width:100%;aspect-ratio:3/4;object-fit:cover;display:block}
+.prise-g button{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;
+  border:none;background:rgba(0,0,0,.55);color:#fff;font-size:13px;cursor:pointer}
+.prise-f{flex:none;display:flex;flex-direction:column;gap:9px;padding:14px 16px calc(14px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--line);background:var(--panel)}
+.prise-f .btn{width:100%;justify-content:center;height:46px;font-size:14.5px}
+.prise-n{font-size:11.5px;line-height:1.45;text-align:center}
 .plb{position:fixed;inset:0;z-index:120;background:rgba(8,12,20,.86);
   display:grid;place-items:center;padding:24px}
 .plb-b{position:relative;max-width:min(94vw,760px);max-height:92vh;display:flex;flex-direction:column;
@@ -4248,6 +4291,209 @@ function galGroupes(pid){
  G.sort((x,y)=>GAL.tri<0?y.date.localeCompare(x.date):x.date.localeCompare(y.date));
  return {sans:sans.slice().sort((x,y)=>x.date.localeCompare(y.date)), groupes:G, n:L.length};
 }
+/* ==========================================================================
+   Un QR code, écrit ici — mode octet, correction M, versions 1 à 10
+   --------------------------------------------------------------------------
+   Aucune bibliothèque : le prototype est un fichier unique qui doit s'ouvrir
+   sans réseau. Le codage est celui de la norme ISO/IEC 18004.
+   ========================================================================== */
+const QR_EC={              /* par version : [octets de correction par bloc, [blocs×données]] */
+ 1:[10,[[1,16]]], 2:[16,[[1,28]]], 3:[26,[[1,44]]], 4:[18,[[2,32]]], 5:[24,[[2,43]]],
+ 6:[16,[[4,27]]], 7:[18,[[4,31]]], 8:[22,[[2,38],[2,39]]], 9:[22,[[3,36],[2,37]]],
+ 10:[26,[[4,43],[1,44]]]};
+const QR_ALIGN={1:[],2:[6,18],3:[6,22],4:[6,26],5:[6,30],6:[6,34],
+ 7:[6,22,38],8:[6,24,42],9:[6,26,46],10:[6,28,50]};
+/* le corps de Galois GF(256), pour Reed-Solomon */
+const GF_E=new Array(512), GF_L=new Array(256);
+(()=>{ let x=1; for(let i=0;i<255;i++){ GF_E[i]=x; GF_L[x]=i; x<<=1; if(x&256) x^=0x11d }
+ for(let i=255;i<512;i++) GF_E[i]=GF_E[i-255]; })();
+const gfMul=(a,b)=>(a===0||b===0)?0:GF_E[GF_L[a]+GF_L[b]];
+function qrGen(n){ let p=[1];
+ for(let i=0;i<n;i++){ const q=[...p,0];
+   for(let j=0;j<p.length;j++) q[j+1]^=gfMul(p[j],GF_E[i]);
+   p=q }
+ return p }
+function qrRS(data,n){ const g=qrGen(n), r=new Array(n).fill(0);
+ for(const d of data){ const f=d^r[0]; r.shift(); r.push(0);
+   if(f!==0) for(let i=0;i<n;i++) r[i]^=gfMul(g[i+1],f) }
+ return r }
+function qrVersion(len){ for(let v=1;v<=10;v++){
+   const tot=QR_EC[v][1].reduce((s,[n,d])=>s+n*d,0);
+   const max=Math.floor((tot*8-(v<10?12:20))/8);
+   if(len<=max) return v }
+ return 0 }
+function qrDonnees(bytes,v){
+ const bits=[];
+ const put=(x,n)=>{ for(let i=n-1;i>=0;i--) bits.push((x>>i)&1) };
+ put(4,4); put(bytes.length, v<10?8:16);
+ bytes.forEach(b=>put(b,8));
+ const tot=QR_EC[v][1].reduce((s,[n,d])=>s+n*d,0)*8;
+ for(let i=0;i<4&&bits.length<tot;i++) bits.push(0);
+ while(bits.length%8) bits.push(0);
+ const cw=[]; for(let i=0;i<bits.length;i+=8){ let b=0; for(let j=0;j<8;j++) b=(b<<1)|bits[i+j]; cw.push(b) }
+ const pad=[0xEC,0x11]; let k=0;
+ while(cw.length*8<tot) cw.push(pad[k++%2]);
+ /* découpe en blocs, puis entrelacement */
+ const [nec,grp]=QR_EC[v];
+ const blocs=[]; let o=0;
+ grp.forEach(([n,d])=>{ for(let i=0;i<n;i++){ const b=cw.slice(o,o+d); o+=d; blocs.push({d:b, e:qrRS(b,nec)}) } });
+ const out=[];
+ const dmax=Math.max(...blocs.map(b=>b.d.length));
+ for(let i=0;i<dmax;i++) blocs.forEach(b=>{ if(i<b.d.length) out.push(b.d[i]) });
+ for(let i=0;i<nec;i++) blocs.forEach(b=>out.push(b.e[i]));
+ return out;
+}
+function qrMatrice(txte){
+ const bytes=[...new TextEncoder().encode(txte)];
+ const v=qrVersion(bytes.length); if(!v) return null;
+ const n=17+4*v;
+ const M=Array.from({length:n},()=>new Array(n).fill(null));
+ const res=Array.from({length:n},()=>new Array(n).fill(false));  /* zones réservées */
+ const poser=(r,c,val)=>{ M[r][c]=val; res[r][c]=true };
+ /* motifs de repérage + séparateurs */
+ const finder=(R,C)=>{ for(let r=-1;r<=7;r++) for(let c=-1;c<=7;c++){
+   const rr=R+r, cc=C+c; if(rr<0||cc<0||rr>=n||cc>=n) continue;
+   const on=(r>=0&&r<=6&&(c===0||c===6))||(c>=0&&c<=6&&(r===0||r===6))||(r>=2&&r<=4&&c>=2&&c<=4);
+   poser(rr,cc,on) } };
+ finder(0,0); finder(0,n-7); finder(n-7,0);
+ /* alignement */
+ const A=QR_ALIGN[v];
+ A.forEach(r=>A.forEach(c=>{
+   if((r<=8&&c<=8)||(r<=8&&c>=n-9)||(r>=n-9&&c<=8)) return;
+   for(let dr=-2;dr<=2;dr++) for(let dc=-2;dc<=2;dc++)
+     poser(r+dr,c+dc, Math.max(Math.abs(dr),Math.abs(dc))!==1) }));
+ /* synchronisation */
+ for(let i=8;i<n-8;i++){ poser(6,i,i%2===0); poser(i,6,i%2===0) }
+ /* module sombre + zones de format */
+ poser(n-8,8,true);
+ for(let i=0;i<9;i++){ if(M[8][i]===null) poser(8,i,false); if(M[i][8]===null) poser(i,8,false) }
+ for(let i=0;i<8;i++){ if(M[8][n-1-i]===null) poser(8,n-1-i,false); if(M[n-1-i][8]===null) poser(n-1-i,8,false) }
+ /* information de version (à partir de la 7) */
+ if(v>=7){ let d=v<<12, g=0x1f25;
+   for(let i=17;i>=12;i--) if(d>>>i & 1) d^=g<<(i-12);
+   const bits=(v<<12)|d;
+   for(let i=0;i<18;i++){ const b=((bits>>i)&1)===1;
+     poser(Math.floor(i/3), n-11+i%3, b); poser(n-11+i%3, Math.floor(i/3), b) } }
+ /* placement des données, en zigzag */
+ const data=qrDonnees(bytes,v);
+ let bi=0, dir=-1, row=n-1;
+ for(let col=n-1;col>0;col-=2){
+   if(col===6) col--;
+   for(;;){
+     for(let k=0;k<2;k++){ const c=col-k;
+       if(M[row][c]===null){
+         const bit=bi<data.length*8 ? ((data[bi>>3]>>(7-(bi&7)))&1)===1 : false;
+         M[row][c]=bit; bi++ } }
+     row+=dir;
+     if(row<0||row>=n){ row-=dir; dir=-dir; break }
+   }
+ }
+ /* masques : on les essaie tous et on garde le moins pénalisant */
+ const MASQ=[(r,c)=>(r+c)%2===0,(r,c)=>r%2===0,(r,c)=>c%3===0,(r,c)=>(r+c)%3===0,
+   (r,c)=>(Math.floor(r/2)+Math.floor(c/3))%2===0,(r,c)=>(r*c)%2+(r*c)%3===0,
+   (r,c)=>((r*c)%2+(r*c)%3)%2===0,(r,c)=>((r+c)%2+(r*c)%3)%2===0];
+ const penalite=G=>{
+   let p=0;
+   for(let r=0;r<n;r++) for(let s=0;s<2;s++){
+     let run=1, prev=s?G[0][r]:G[r][0];
+     for(let i=1;i<n;i++){ const cur=s?G[i][r]:G[r][i];
+       if(cur===prev) run++; else { if(run>=5) p+=3+(run-5); run=1; prev=cur } }
+     if(run>=5) p+=3+(run-5) }
+   for(let r=0;r<n-1;r++) for(let c=0;c<n-1;c++){
+     const a=G[r][c]; if(a===G[r][c+1]&&a===G[r+1][c]&&a===G[r+1][c+1]) p+=3 }
+   const motif=[true,false,true,true,true,false,true,false,false,false,false];
+   const cherche=L=>{ let k=0;
+     for(let i=0;i+11<=L.length;i++){ let ok=true;
+       for(let j=0;j<11;j++) if(L[i+j]!==motif[j]){ ok=false; break }
+       if(ok) k++;
+       let ok2=true;
+       for(let j=0;j<11;j++) if(L[i+j]!==motif[10-j]){ ok2=false; break }
+       if(ok2) k++ }
+     return k };
+   for(let r=0;r<n;r++){ p+=40*cherche(G[r]); p+=40*cherche(G.map(x=>x[r])) }
+   const noirs=G.flat().filter(Boolean).length;
+   p+=10*Math.floor(Math.abs(noirs*100/(n*n)-50)/5);
+   return p };
+ let best=null, bestP=Infinity, bestM=0;
+ for(let m=0;m<8;m++){
+   const G=M.map((r,ri)=>r.map((v2,ci)=>res[ri][ci]?v2:(MASQ[m](ri,ci)?!v2:v2)));
+   /* format : niveau M (00) + masque, BCH(15,5) */
+   let f=(0<<3)|m, d=f<<10, g=0x537;
+   for(let i=14;i>=10;i--) if(d>>>i & 1) d^=g<<(i-10);
+   const fbits=((f<<10)|d)^0x5412;
+   /* Les quinze bits se posent du plus significatif au moins significatif,
+      sur deux chemins. Vérifié en lisant une matrice de référence position
+      par position plutôt qu'en se fiant à une transcription de la norme :
+      l'ordre inverse donnait un code que les décodeurs refusaient. */
+   const P1=[[8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],[7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]];
+   const P2=[[n-1,8],[n-2,8],[n-3,8],[n-4,8],[n-5,8],[n-6,8],[n-7,8],
+             [8,n-8],[8,n-7],[8,n-6],[8,n-5],[8,n-4],[8,n-3],[8,n-2],[8,n-1]];
+   for(let i=0;i<15;i++){ const b=((fbits>>(14-i))&1)===1;
+     G[P1[i][0]][P1[i][1]]=b; G[P2[i][0]][P2[i][1]]=b }
+   G[n-8][8]=true;
+   const p=penalite(G);
+   if(p<bestP){ bestP=p; best=G; bestM=m } }
+ return {m:best, n, v, masque:bestM};
+}
+/* le dessin : un SVG, pas une image — il reste net à toutes les tailles et
+   s'imprime sans se pixelliser */
+function qrSVG(txt, cote){
+ const r=qrMatrice(txt); if(!r) return '';
+ const B=4, T=r.n+2*B, d=[];
+ for(let y=0;y<r.n;y++){ let x=0;
+   while(x<r.n){ if(!r.m[y][x]){ x++; continue }
+     let w=0; while(x+w<r.n&&r.m[y][x+w]) w++;
+     d.push(`M${x+B} ${y+B}h${w}v1h-${w}z`); x+=w } }
+ return `<svg class="qrc" viewBox="0 0 ${T} ${T}" width="${cote}" height="${cote}"
+   role="img" aria-label="QR code — lien de prise de vue">
+   <rect width="${T}" height="${T}" fill="#fff"/>
+   <path d="${d.join('')}" fill="#0b1220"/></svg>`;
+}
+
+/* ==========================================================================
+   Prendre les photos avec le téléphone
+   --------------------------------------------------------------------------
+   Le poste du cabinet n'a pas de caméra utilisable ; le téléphone qu'on a
+   déjà en main en a une bonne. Le QR ouvre PRAXIS sur ce téléphone, en mode
+   prise de vue, sur le dossier et la séance qu'on regarde.
+
+   Le jeton est à usage unique et périmé au bout d'un quart d'heure : un lien
+   qui traîne sur un écran de salle d'examen ne doit pas rester une porte
+   ouverte. Il ne porte RIEN du patient — ni nom, ni numéro de dossier : une
+   adresse se recopie, se photographie, se retrouve dans un historique de
+   navigation, et n'a pas à révéler qui est soigné.
+   ========================================================================== */
+const QR_MINUTES=15;
+let LIENS_PH=[];
+const jetonPH=()=>{ const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let j='';
+ for(let i=0;i<10;i++) j+=A[Math.floor(Math.random()*A.length)]; return j };
+function creerLienPhoto(pid, aid){
+ const l={jeton:jetonPH(), pid, aid:aid||null, cree:Date.now(),
+   exp:Date.now()+QR_MINUTES*60000, utilise:null};
+ LIENS_PH=LIENS_PH.filter(x=>x.exp>Date.now()).slice(-20);
+ LIENS_PH.push(l); return l;
+}
+const lienPhotoValide=j=>{ const l=LIENS_PH.find(x=>x.jeton===j);
+ return (l&&!l.utilise&&l.exp>Date.now())?l:null };
+/* l'adresse de PRAXIS, telle que le téléphone devra l'ouvrir */
+const adresseApp=()=>/^https?:/.test(location.protocol)
+ ? location.origin+location.pathname : null;
+const lienPhotoURL=l=>{ const b=adresseApp(); return b?b+'#ph='+l.jeton:'#ph='+l.jeton };
+
+let QRV=null;   /* la fenêtre du QR en cours */
+function ouvrirQR(aid){
+ if(!GAL.pid){ toast('Ouvrez d’abord un dossier'); return }
+ QRV={lien:creerLienPhoto(GAL.pid, aid||null)};
+ paint();
+}
+function fermerQR(){ QRV=null; paint() }
+function copierLien(){
+ const u=lienPhotoURL(QRV.lien);
+ if(navigator.clipboard&&navigator.clipboard.writeText)
+   navigator.clipboard.writeText(u).then(()=>toast('Lien copié'),()=>toast('Copie impossible'));
+ else toast('Copie impossible sur ce navigateur');
+}
+
 /* ---- importer des clichés depuis l'ordinateur ---- */
 let galCible=null;   /* l'acte auquel rattacher ce qu'on importe, ou null */
 function galImporter(aid){
@@ -6775,7 +7021,7 @@ function pPhotos(){
  const jours=Object.keys(parJour).sort((a,b)=>b.localeCompare(a));
  return `<div class="head" style="margin-bottom:12px">
    <div><h1>Photothèque</h1><p>${L.length} photo${L.length>1?'s':''} sur ${PHOTOS.length} · ${jours.length} date${jours.length>1?'s':''} de prise de vue</p></div>
-   <div class="r"><button class="btn" onclick="toast('QR code affiché : photographiez avec le téléphone')">📱 Importer par QR code</button></div></div>
+   <div class="r"><button class="btn" onclick="pTab='photos';paint();setTimeout(()=>ouvrirQR(null),20)">📱 Importer par QR code</button></div></div>
  ${periodBar(perP,'setPerP',`${L.length} photo${L.length>1?'s':''}`,PRESETS_STD,1)}
  <div class="fbar">
   <input class="inp" id="phq" style="min-width:240px" placeholder="Nom du patient…" value="${esc(photoQ)}"
@@ -7507,7 +7753,7 @@ function pDetail(p){
          title="N’afficher que les clichés marqués comme référence">★ Références · ${nRef}</button>`:''}
        <button class="btn xs" onclick="galTri()"
          title="${GAL.tri<0?'Actuellement du plus récent':'Actuellement du plus ancien'}">${GAL.tri<0?'▼ Du plus récent':'▲ Du plus ancien'}</button>
-       <button class="btn xs" onclick="toast('QR affiché — photographiez avec le téléphone')">📱 Importer par QR</button>
+       <button class="btn xs" onclick="ouvrirQR(null)">📱 Importer par QR</button>
        <button class="btn xs p" onclick="galImporter(null)">＋ Importer des photos</button></div></div>
 
    <div class="mu" style="font-size:11.5px;margin:-2px 0 10px">Un clic sur un cliché l’agrandit et ouvre le diaporama. La pastille le coche pour une présentation ; le ⊕ de chaque rangée importe directement dans cette séance.</div>
@@ -7519,6 +7765,31 @@ function pDetail(p){
     :`<div class="empty" style="padding:34px">${TOUT.length?'Aucun cliché ne correspond à ce filtre.':'Aucun cliché dans ce dossier.'}<br>
       <span class="mu" style="font-size:11.5px">${TOUT.length?'':'Les clichés se prennent depuis la séance — ou s’importent ici.'}</span>
       <div style="margin-top:11px"><button class="btn s p" onclick="galImporter(null)">＋ Importer des photos</button></div></div>`}
+
+   ${QRV?(()=>{const l=QRV.lien, u=lienPhotoURL(l), a2=l.aid?ACTES.find(x=>String(x.id)===String(l.aid)):null;
+     const net=!!adresseApp();
+     return `<div class="plb" onclick="fermerQR()">
+       <div class="qrbox" onclick="event.stopPropagation()">
+         <div class="qr-h"><b>Prise de vue au téléphone</b>
+           <button class="btn xs g" onclick="fermerQR()">✕</button></div>
+         <div class="qr-b">
+           <div class="qr-i">${qrSVG(u,208)}</div>
+           <div class="qr-t">
+             <p><b>Photographiez ce code</b> avec l’appareil photo du téléphone :
+               PRAXIS s’y ouvre en mode prise de vue${a2?`, sur la séance du ${DF(a2.date)}`:', sans séance'}.</p>
+             <div class="qr-l"><span class="mono">${esc(u)}</span>
+               <button class="btn xs" onclick="copierLien()">Copier</button></div>
+             <ul class="qr-u">
+               <li>Valable <b>${QR_MINUTES} minutes</b>, puis le code expire.</li>
+               <li><b>Usage unique</b> : une fois la prise de vue faite, le lien ne rouvre plus.</li>
+               <li>Le lien ne porte <b>ni nom ni numéro de dossier</b> — une adresse se recopie et se photographie.</li>
+             </ul>
+             ${net?'':`<div class="qr-w">⚠ Cette page est ouverte depuis un fichier local : le téléphone ne pourra pas
+               atteindre cette adresse. Le code deviendra utilisable dès que PRAXIS sera servi sur le réseau du cabinet.</div>`}
+             <div class="qr-w b">⚠ <b>Relais de transfert non branché.</b> Le lien s’ouvre bien sur le téléphone et la
+               prise de vue fonctionne, mais les clichés ne remontent pas encore jusqu’à ce poste : cela demande le
+               serveur du cabinet. En attendant, <a onclick="fermerQR();galImporter(${l.aid?`'${l.aid}'`:'null'})">importez les fichiers depuis cet ordinateur</a>.</div>
+           </div></div></div></div>`})():''}
 
    ${GAL.lb?(()=>{const x=photoById(GAL.lb), L=galOrdre(), i=L.findIndex(y=>y.id===GAL.lb);
      return `<div class="plb" onclick="galFermerLb()">
@@ -13899,7 +14170,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='DZ';
+const BUILD='EA';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -16377,7 +16648,70 @@ function toggleTheme(){const r=document.documentElement;r.dataset.theme=r.datase
 function go(v,arg){ if(v==='devis') dSel=arg||null;
  if(v!=='patients') PE=null;    /* on ne garde pas une fiche ouverte en saisie hors de sa vue */
  view=v; document.getElementById('main').scrollTop=0; paint(); }
+/* ==========================================================================
+   Le téléphone qui a scanné le code
+   --------------------------------------------------------------------------
+   Il ouvre la même application, à la même adresse, avec un jeton dans le
+   fragment. Il n'a rien du dossier — et c'est voulu : l'appareil qui prend la
+   photo n'a pas besoin de savoir qui il photographie, et une adresse qui
+   traîne ne doit rien apprendre à qui la trouve. Il ne montre donc qu'un
+   écran de prise de vue, et ce qu'il vient de prendre.
+   ========================================================================== */
+const jetonURL=()=>{ const m=String(location.hash||'').match(/^#ph=([A-Z0-9]{4,24})$/); return m?m[1]:null };
+let PRISE=null;   /* la prise de vue en cours, côté téléphone */
+function prisePage(){
+ const j=jetonURL();
+ if(!PRISE) PRISE={jeton:j, clichés:[]};
+ const n=PRISE.clichés.length;
+ return `<div class="prise">
+   <div class="prise-h"><div class="lg"><span class="px">Px</span> PRAXIS</div>
+     <span class="mu">Prise de vue</span></div>
+   <div class="prise-b">
+     ${n?`<div class="prise-g">${PRISE.clichés.map((c,i)=>`<figure><img src="${c}" alt="Cliché ${i+1}">
+        <button onclick="priseRetirer(${i})" title="Retirer">✕</button></figure>`).join('')}</div>`
+       :`<div class="prise-v"><span class="e">📷</span>
+          <p>Prenez les clichés, ou choisissez-les dans la pellicule.</p></div>`}
+   </div>
+   <div class="prise-f">
+     <input type="file" id="prisefile" accept="image/*" capture="environment" multiple hidden
+       onchange="priseFichiers(this)">
+     <button class="btn p" onclick="document.getElementById('prisefile').click()">
+       ${n?'＋ Ajouter un cliché':'📷 Prendre une photo'}</button>
+     ${n?`<button class="btn" onclick="priseEnvoyer()">Envoyer au cabinet · ${n}</button>`:''}
+     <div class="mu prise-n">${j?`Session <span class="mono">${esc(j)}</span> — les clichés partent vers le poste
+       qui a affiché le code, et ne restent pas sur ce téléphone.`
+       :'Lien incomplet : revenez au poste du cabinet et affichez un nouveau code.'}</div>
+   </div></div>`;
+}
+function priseFichiers(input){
+ const F=[...(input.files||[])].filter(f=>/^image\//.test(f.type));
+ let reste=F.length; if(!reste){ input.value=''; return }
+ F.forEach(f=>{ const r=new FileReader();
+   r.onload=()=>{ PRISE.clichés.push(r.result); if(--reste===0){ input.value=''; peindrePrise() } };
+   r.onerror=()=>{ if(--reste===0){ input.value=''; peindrePrise() } };
+   r.readAsDataURL(f) });
+}
+function priseRetirer(i){ PRISE.clichés.splice(i,1); peindrePrise() }
+function priseEnvoyer(){
+ toast('Relais de transfert non branché — les clichés ne peuvent pas encore rejoindre le cabinet');
+}
+function peindrePrise(){ document.getElementById('main').innerHTML=prisePage() }
+
 function paint(){
+ /* Un téléphone venu par le QR ne voit pas l'application : il voit l'appareil
+    photo. On RETIRE le reste du document plutôt que de le masquer — masquer
+    laisse le contenu dans la page, où il se retrouve par un copier-coller ou
+    une lecture d'écran. En production, ce téléphone recevra d'ailleurs une
+    page à lui, servie seule : il n'aura jamais eu le reste. */
+ if(jetonURL()){
+   document.body.classList.add('mode-prise');
+   const m=document.getElementById('main');
+   if(m){ /* on sort #main de l'application, puis on retire tout le reste */
+     if(m.parentElement!==document.body) document.body.appendChild(m);
+     [...document.body.children].forEach(e=>{
+       if(e!==m && e.id!=='toast' && e.tagName!=='SCRIPT') e.remove() });
+     m.innerHTML=prisePage(); }
+   return }
  const al=ROLES[role].v; if(!al.includes(view))view='dash';
  document.querySelectorAll('#nav a[data-v]').forEach(a=>{a.classList.toggle('on',a.dataset.v===view);
   a.style.display=al.includes(a.dataset.v)?'':'none'});
