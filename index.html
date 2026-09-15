@@ -502,6 +502,9 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
   background:rgba(11,11,11,.42);backdrop-filter:blur(3px);opacity:0;transition:.18s;padding:24px}
 .famchoix.on{opacity:1}
 .famchoix .fc-t{font-size:13px;font-weight:680;color:#fff;text-align:center;margin-bottom:4px}
+/* la phrase qui explique ce qu'on s'apprête à faire, sous le titre du choix */
+.famchoix .fc-s{font-size:11.5px;color:#fff;opacity:.74;text-align:center;line-height:1.45;
+  max-width:min(420px,86vw);margin:0 auto 6px}
 .fc-b{display:flex;align-items:center;gap:13px;width:min(420px,86vw);padding:14px 16px;border-radius:14px;
   border:1px solid var(--line);background:var(--panel);cursor:pointer;text-align:left;transition:.13s;color:var(--ink)}
 .fc-b:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-2)}
@@ -775,7 +778,12 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
 .zed-n{width:100%;font-size:12px;padding:4px 7px;margin-bottom:4px}
 .zed-r{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 /* acte associé à une zone : décalé, plus discret que l'acte principal */
-.zrow.zsup{margin-left:18px;border-left:2px solid var(--line-2);padding-left:8px;opacity:.92}
+.zplus{font-weight:700}
+/* Un produit associé se lit en retrait de son porteur. Le retrait se prend
+   SUR la ligne, jamais à côté d'elle : une marge gauche sur une ligne déjà
+   large de toute la carte la poussait de 18 px hors du bord droit. */
+.zrow.zsup{margin-left:18px;width:calc(100% - 18px);
+  border-left:2px solid var(--line-2);padding-left:8px;opacity:.92}
 .zrow.zsup .zn{font-size:12px}
 .addz.zsup{margin-left:18px;padding-left:8px;border-left:2px solid var(--accent)}
 .zed-l{display:flex;align-items:center;gap:4px;font-size:10.5px;color:var(--ink-3);font-weight:500}
@@ -1318,6 +1326,21 @@ table.chrono.compact thead th{padding:7px 8px;white-space:nowrap}
 .ct-1{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px}
 .ct-1 .mch{display:inline-flex;align-items:center;gap:4px;max-width:100%;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+/* Matériel : le réglage de tête au-dessus, l'appareil en dessous — même
+   découpe que la colonne « Acte », qui pose le nom au-dessus de sa catégorie.
+   La ligne du tableau fait déjà deux étages à cause d'elle : rien ne grandit. */
+.ct-m .mreg{display:flex;align-items:center;gap:5px;min-width:0}
+.ct-m .mreg b{font-weight:660;font-size:12px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}
+.ct-m .mreg .nr{font-size:11px;font-style:italic}
+.ct-m .s{display:block;font-size:10.5px;color:var(--ink-3);font-weight:450;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3}
+/* La flèche dit le SENS, pas le bien ou le mal : baisser la fluence après une
+   réaction est un bon geste. Elle reste donc sans teinte — mais pas pâle :
+   elle porte une information qui ne figure nulle part ailleurs à l'écran, là
+   où le nom de l'appareil en dessous n'est qu'un rappel. Encre secondaire
+   (6,9:1 en clair, 7,7:1 en sombre), pas l'encre des libellés. */
+.ct-m .tnd{font-style:normal;font-size:11px;font-weight:700;color:var(--ink-2);flex:none}
 .ct-1 .mono{font-size:11px}
 .pl{font-size:10px;font-weight:700;color:var(--ink-3);margin-left:2px}
 .ct-e{white-space:nowrap}
@@ -1440,6 +1463,11 @@ th.tri.on.desc::after{content:'▼'}
 .sfr{display:grid;grid-template-columns:minmax(150px,1.35fr) minmax(0,1fr) auto;
  gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
 .sfr>.inp{width:100%}
+/* Un acte à 0 € n'est pas un acte gratuit : c'est presque toujours un tarif
+   qu'on a oublié de poser. Le champ le dit sans crier — et reste éditable,
+   ce qui n'était pas le cas quand il affichait « à l'unité » à la place. */
+.inp.sanstarif{border-style:dashed;border-color:var(--line-2);color:var(--ink-3)}
+.inp.sanstarif:focus{border-style:solid;color:var(--ink)}
 .sfr .catr-a{display:flex;flex-wrap:wrap;gap:3px;min-width:0}
 /* dans une fenêtre du stock, un champ occupe la largeur qu'on lui donne :
    un nom de produit ne doit pas se lire à travers une meurtrière */
@@ -2772,13 +2800,19 @@ let PROTOS=[
   zt:{cerne_d:'AH', cerne_g:'AH', tempe_d:'AH', tempe_g:'AH', glab:'BTX', pattes_d:'BTX', pattes_g:'BTX'}},
  {n:'Séance complète', z:{front:12, glab:20, pomm_d:1, pomm_g:1, levres:1, menton:.5},
   zt:{front:'BTX', glab:'BTX', pomm_d:'AH', pomm_g:'AH', levres:'AH', menton:'AH'}},
+ /* Deux produits sur la MÊME zone : l'acide donne le volume, le skinbooster
+    la qualité de peau. C'est le cas qui a fait changer le modèle — la zone
+    se peint des deux couleurs et chaque produit garde sa dose et sa facture. */
+ {n:'Pommettes — volume + qualité de peau', z:{pomm_d:1, pomm_g:1},
+  zt:{pomm_d:'AH', pomm_g:'AH'},
+  zx:{pomm_d:[{t:'SKB', q:.5}], pomm_g:[{t:'SKB', q:.5}]}},
 ];
 const protoActe=(P,z)=>(P.zt&&P.zt[z])||'AH';
-/* Actes associés à une zone. Le schéma ne sait poser qu'un acte par zone : la
-   zone garde son acte principal — celui qui la colore — et les actes associés
-   rejoignent la séance comme soins à part entière, sans zone propre. C'est le
-   compromis assumé tant que la séance elle-même n'accepte pas plusieurs actes
-   sur une même zone. */
+/* Actes associés à une zone — un acide hyaluronique ET un skinbooster sur la
+   même pommette. La zone garde son acte PRINCIPAL, celui qui porte sa dose ;
+   les actes associés s'y ajoutent avec la leur. Posé dans une séance, chacun
+   devient un soin à part entière — sa dose, son lot, sa ligne de facture —
+   mais tous restent attachés à la zone, qui se peint alors de leurs couleurs. */
 const protoSup=(P,z)=>((P&&P.zx&&P.zx[z])||[]);
 const protoTousSup=P=>Object.keys((P&&P.z)||{}).flatMap(z=>protoSup(P,z).map(x=>({...x, z})));
 const protoActes=P=>[...new Set(Object.keys(P.z).map(z=>protoActe(P,z))
@@ -3087,8 +3121,15 @@ const zonesOf=a=>a.zones?Object.entries(a.zones):[];
 /* historique d'injection par zone anatomique, du plus récent au plus ancien */
 function zoneHist(pid,exclure){
  const h={};
- ACTES.filter(a=>a.patient===pid&&a.id!==exclure).forEach(a=>
-   zonesOf(a).filter(([,q])=>q>0).forEach(([z,q])=>{(h[z]=h[z]||[]).push({d:a.date,q,aid:a.id})}));
+ ACTES.filter(a=>a.patient===pid&&a.id!==exclure).forEach(a=>{
+   const X=zsupActe(a)||{};
+   zonesOf(a).filter(([,q])=>q>0).forEach(([z,q])=>{
+     /* UNE entrée par séance, même si la zone a reçu deux produits : le « ×2 »
+        des étiquettes compte des séances, pas des seringues. Les produits
+        voyagent avec l'entrée, pour qui veut les lire. */
+     (h[z]=h[z]||[]).push({d:a.date, q, aid:a.id,
+       ts:[acteZone(a,z), ...((X[z]||[]).map(o=>o.t))]});
+   })});
  Object.values(h).forEach(L=>L.sort((x,y)=>y.d.localeCompare(x.d)));
  return h;
 }
@@ -4285,6 +4326,75 @@ const PHOTOS=[];
 })();
 
 /* ==========================================================================
+   La cellule « Matériel » de la chronologie
+   ==========================================================================
+   Elle n'affichait que le nom de l'appareil — « Lumière pulsée » — et rangeait
+   les réglages dans une infobulle. Or le nom de l'appareil, on le devine déjà
+   de l'acte ; c'est la fluence qui change d'une séance à l'autre, et c'est
+   elle qu'on vient lire. La colonne disait donc ce qu'on savait et cachait ce
+   qu'on cherchait.
+
+   Les deux se voient désormais, dans la même largeur : le réglage de tête sur
+   la première ligne, l'appareil sur la seconde — la même forme que la colonne
+   « Acte », qui pose le nom au-dessus de sa catégorie. La ligne du tableau
+   mesure déjà deux lignes de haut à cause d'elle : la place était payée.
+   ========================================================================== */
+function celluleMat(a){
+ const M=matsActe(a);
+ if(!M.length) return '<span class="mu">\u2014</span>';
+ const x=M[0], m=matById(x.mat);
+ if(!m) return '<span class="mu">\u2014</span>';
+ const c=paramCle(x);
+ const ZP=paramCleZones(x);
+ const nAutres=Math.max(0, paramsLisibles(x).length-(c?1:0));
+
+ /* Des réglages détaillés par zone n'ont pas une valeur mais plusieurs : on
+    affiche la fourchette. Annoncer « 16 » quand on a traité de 16 à 20 serait
+    faux, et c'est le genre de faux qu'on ne rattrape pas à la séance suivante. */
+ let tete, titreTete;
+ if(ZP.length){
+   const V=[...new Set(ZP.map(q=>q.v))];
+   const N=V.map(nbre);
+   const nom=ZP[0].n, u=ZP[0].u;
+   const rang=(V.length>1&&N.every(v=>v!==null))
+     ? `${Math.min(...N)}\u2013${Math.max(...N)}` : (V.length>1?V.join('\u2009/\u2009'):V[0]);
+   tete=`${nom} ${rang}${u?' '+u:''}`;
+   titreTete=ZP.map(q=>`${zoneNom(q.z)} : ${q.n} ${q.v}${q.u?' '+q.u:''}`).join('\n');
+ } else if(c){ tete=cleTxt(c); titreTete='' }
+ else { tete=null; titreTete='' }
+
+ const t=(!ZP.length&&c)?tendanceCle(a,x):null;
+ const FLECHE={'1':'\u2191','-1':'\u2193','0':'='};
+ const marque=(t&&t.sens!==null&&t.sens!==undefined)?FLECHE[String(t.sens)]:'';
+ const dire=t?(t.sens===0?`R\u00e9glage tenu \u2014 m\u00eame valeur qu'au ${DF(t.date)}`
+   :`S\u00e9ance pr\u00e9c\u00e9dente le ${DF(t.date)} : ${t.av}${c.u?' '+c.u:''}`
+     +(t.ecart!==null?` (${t.ecart>0?'+':''}${t.ecart}${c.u?' '+c.u:''})`:''))
+   +(t.memeZone?'':' \u2014 zones trait\u00e9es diff\u00e9rentes, \u00e0 comparer avec prudence'):'';
+
+ /* l'infobulle garde le compte complet : la cellule montre, elle ne r\u00e9sume pas
+    au prix de ce qu'elle tait */
+ const tout=paramsTexte(x);
+ const titre=[m.n+(m.marque?' \u2014 '+m.marque:''),
+   titreTete||tout||'R\u00e9glages non not\u00e9s',
+   ZP.length?`${ZP.length} zone${ZP.length>1?'s':''} d\u00e9taill\u00e9e${ZP.length>1?'s':''}`:'',
+   dire,
+   M.length>1?`+ ${M.length-1} autre${M.length>2?'s':''} appareil${M.length>2?'s':''} sur cet acte`:'']
+   .filter(Boolean).join('\n');
+
+ const bas=[esc(m.court||m.n),
+   nAutres?`<b class="pl">+${nAutres}</b>`:'',
+   ZP.length?`<b class="pl">${ZP.length} zones</b>`:'',
+   M.length>1?`<b class="pl">+${M.length-1} appareil${M.length>2?'s':''}</b>`:''
+ ].filter(Boolean).join(' ');
+
+ return `<span class="mreg" title="${esc(titre)}">
+   <span class="mdot" style="background:${m.col}"></span>
+   ${tete?`<b>${esc(tete)}</b>${marque?`<i class="tnd">${marque}</i>`:''}`
+        :'<span class="mu nr">r\u00e9glages non not\u00e9s</span>'}</span>
+   <span class="s" title="${esc(titre)}">${bas}</span>`;
+}
+
+/* ==========================================================================
    Matériels et paramètres de traitement
    ==========================================================================
    Un laser ne se note pas comme une seringue : ce qui compte, c'est le réglage.
@@ -4292,31 +4402,31 @@ const PHOTOS=[];
    l'acte enregistre les valeurs employées. Sans matériel, rien ne s'affiche :
    une injection n'a pas de fluence. */
 let MATERIELS=[
- {id:'ALEX', n:'Laser Alexandrite 755 nm', marque:'Candela GentleLase Pro', serie:'GLP-2291',
+ {id:'ALEX', n:'Laser Alexandrite 755 nm', court:'Alexandrite 755', marque:'Candela GentleLase Pro', serie:'GLP-2291',
   four:'Candela France', install:'2024-03-12', entretien:'2026-11-15', col:'#7b5cf0',
   actes:['LAS1','EPIL2'],
   params:[{n:'Fluence',u:'J/cm²'},{n:'Impulsion',u:'ms'},{n:'Spot',u:'mm'},
           {n:'Fréquence',u:'Hz'},{n:'Refroidissement',u:'ms'},{n:'Passages',u:''}]},
- {id:'NDYAG', n:'Laser Nd:YAG 1064 nm', marque:'Fotona SP Dynamis', serie:'SPD-1187',
+ {id:'NDYAG', n:'Laser Nd:YAG 1064 nm', court:'Nd:YAG 1064', marque:'Fotona SP Dynamis', serie:'SPD-1187',
   four:'Fotona France', install:'2023-09-04', entretien:'2026-09-30', col:'#1f9d8f',
   actes:['LAS1','LAS2','EPIL2'],
   params:[{n:'Fluence',u:'J/cm²'},{n:'Impulsion',u:'ms'},{n:'Spot',u:'mm'},
           {n:'Fréquence',u:'Hz'},{n:'Passages',u:''}]},
- {id:'IPL', n:'Lumière pulsée', marque:'Lumenis M22', serie:'M22-4410',
+ {id:'IPL', n:'Lumière pulsée', court:'Lumière pulsée', marque:'Lumenis M22', serie:'M22-4410',
   four:'Lumenis France', install:'2022-06-20', entretien:'2026-08-25', col:'#e0952b',
   actes:['LAS2'],
   params:[{n:'Fluence',u:'J/cm²'},{n:'Filtre',u:'nm'},{n:'Impulsion',u:'ms'},{n:'Délai',u:'ms'}]},
- {id:'RFMN', n:'Radiofréquence microneedling', marque:'Endymed Intensif', serie:'EI-0932',
+ {id:'RFMN', n:'Radiofréquence microneedling', court:'RF microneedling', marque:'Endymed Intensif', serie:'EI-0932',
   four:'EndyMed', install:'2025-01-15', entretien:'2027-01-15', col:'#c2477f',
   actes:['RF'],
   params:[{n:'Profondeur',u:'mm'},{n:'Énergie',u:'W'},{n:'Temps',u:'ms'},{n:'Passages',u:''}]},
  /* l'électrolyse ne se règle pas comme un laser : intensité, temps de pose,
     calibre d'aiguille et mode de courant — d'où son propre appareil */
- {id:'ELECT', n:'Électrolyse — épilation définitive', marque:'Apilus xCell Pro', serie:'AXP-0714',
+ {id:'ELECT', n:'Électrolyse — épilation définitive', court:'Électrolyse', marque:'Apilus xCell Pro', serie:'AXP-0714',
   four:'Dectro France', install:'2024-10-02', entretien:'2026-10-02', col:'#3f7bd1',
   actes:['ELEC'],
   params:[{n:'Mode',u:''},{n:'Intensité',u:'mA'},{n:'Temps de pose',u:'s'},
-          {n:'Aiguille',u:'mm'},{n:'Insertions',u:''}]},
+          {n:'Aiguille',u:'″'},{n:'Insertions',u:''}]},
 ];
 const matById=id=>MATERIELS.find(m=>m.id===id)||null;
 /* les matériels utilisables pour un acte du catalogue */
@@ -4332,14 +4442,71 @@ function paramsLisibles(x){ const m=matById(x&&x.mat); if(!m) return [];
  const P=(x.par)||{};
  return m.params.filter(p=>P[p.n]!==undefined&&P[p.n]!=='' && P[p.n]!==null)
    .map(p=>({n:p.n, u:p.u, v:P[p.n]})) }
+/* Une valeur s'écrit partout de la même façon. C'est fmtDose qui fait foi dans
+   ce logiciel — « 2 ml », espace ordinaire — et les réglages d'appareil n'ont
+   aucune raison de s'écrire autrement que les doses. */
 const paramsTexte=x=>paramsLisibles(x).map(p=>`${p.n} ${p.v}${p.u?' '+p.u:''}`).join(' · ');
-/* dernier réglage employé chez ce patient, pour le même acte et le même matériel */
+/* dernier réglage employé chez ce patient, pour le même acte et le même matériel.
+   On rend aussi l'acte : la séance précédente ne se lit pas sans savoir OÙ elle a
+   porté — 20 J/cm² sur les jambes et sur la lèvre ne se comparent pas. */
 function dernierReglage(pid,t,mid,saufActe){
  const L=ACTES.filter(a=>a.patient===pid&&a.id!==saufActe)
    .sort((a,b)=>b.date.localeCompare(a.date));
  for(const a of L){ for(const x of matsActe(a)){
-   if(x.t===t&&x.mat===mid&&x.par&&Object.keys(x.par).length) return {date:a.date, par:x.par} } }
+   if(x.t===t&&x.mat===mid&&x.par&&Object.keys(x.par).length) return {date:a.date, par:x.par, acte:a} } }
  return null;
+}
+
+/* ==========================================================================
+   Le réglage de tête
+   ==========================================================================
+   Un appareil porte jusqu'à six réglages ; un seul se titre d'une séance à
+   l'autre, et c'est celui-là qu'on cherche en ouvrant un dossier. Pour un
+   laser c'est la fluence ; pour la radiofréquence, la profondeur d'aiguille ;
+   pour l'électrolyse, le mode de courant.
+
+   Plutôt que de coder « Fluence » en dur — ce qui aurait laissé muet le
+   prochain appareil acheté — c'est le PREMIER paramètre déclaré par
+   l'appareil qui fait office de tête. L'ordre se change dans les Réglages,
+   flèches ↑↓ à l'appui : celui qu'on hisse en haut est celui qu'on verra. */
+function paramCle(x){
+ const m=matById(x&&x.mat); if(!m) return null;
+ const P=x.par||{};
+ /* le premier paramètre déclaré QUI PORTE UNE VALEUR : un appareil dont la
+    première case est restée vide montre la suivante plutôt que rien */
+ const p=m.params.find(q=>P[q.n]!==undefined&&P[q.n]!==''&&P[q.n]!==null);
+ return p?{n:p.n, u:p.u, v:String(P[p.n])}:null;
+}
+/* les valeurs de tête zone par zone, quand les réglages ont été détaillés */
+function paramCleZones(x){
+ const m=matById(x&&x.mat); if(!m||!x.parZ) return [];
+ const noms=m.params.map(q=>q.n);
+ return Object.entries(x.parZ).map(([z,P])=>{
+   const n=noms.find(q=>P[q]!==undefined&&P[q]!==''&&P[q]!==null);
+   return n?{z, n, u:(m.params.find(q=>q.n===n)||{}).u||'', v:String(P[n])}:null;
+ }).filter(Boolean);
+}
+const nbre=v=>{ const t=String(v).replace(',','.').trim();
+ return /^-?\d+(\.\d+)?$/.test(t)?+t:null };
+/* « Fluence 16 J/cm² » — le nom compte autant que le chiffre : « 2 mm » seul ne
+   dit pas si l'on parle de profondeur d'aiguille ou de diamètre de spot. */
+const cleTxt=c=>c?`${c.n} ${c.v}${c.u?' '+c.u:''}`:'';
+/* Le réglage de tête comparé à celui de la séance précédente.
+   Aucune couleur : baisser la fluence après une réaction est une bonne
+   pratique, pas une faute — une flèche rouge mentirait sur le sens du geste. */
+function tendanceCle(a,x){
+ const c=paramCle(x); if(!c) return null;
+ const d=dernierReglage(a.patient,x.t,x.mat,a.id);
+ if(!d||d.date>=a.date) return null;      /* rien avant : pas de tendance */
+ const av=d.par[c.n]; if(av===undefined||av==='') return null;
+ const n1=nbre(av), n2=nbre(c.v);
+ /* mêmes zones traitées ? sinon la comparaison reste affichée, mais l'infobulle
+    le dit — au praticien de juger, pas au logiciel de masquer */
+ const sig=y=>zonesOf(y).map(([z])=>z).sort().join(',');
+ const memeZone=sig(d.acte)===sig(a);
+ return {date:d.date, av:String(av), memeZone,
+   sens:(n1===null||n2===null)?(String(av)===c.v?0:null):Math.sign(n2-n1),
+   ecart:(n1===null||n2===null)?null:Math.round((n2-n1)*100)/100};
 }
 
 /* ==========================================================================
@@ -4439,7 +4606,12 @@ function st0Journal(k){ let h=0; for(const c of String(k)) h=(h*31+c.charCodeAt(
     'Spot':['12','15','18'][rang%3], 'Fréquence':['1','1.5','2'][rang%3],
     'Refroidissement':'40', 'Passages':String(1+(rang>3?1:0)),
     'Filtre':['515','560','590'][rang%3], 'Délai':'30',
-    'Profondeur':['1.5','2','2.5'][rang%3], 'Énergie':['20','25','30'][rang%3], 'Temps':'150'};
+    'Profondeur':['1.5','2','2.5'][rang%3], 'Énergie':['20','25','30'][rang%3], 'Temps':'150',
+    /* l'électrolyse ne se règle pas en joules : mode de courant, intensité,
+       temps de pose, calibre d'aiguille, nombre d'insertions */
+    'Mode':['Blend','Thermolyse','Blend'][rang%3], 'Intensité':['2.5','3','3.5'][rang%3],
+    'Temps de pose':(['Blend','Thermolyse','Blend'][rang%3]==='Blend'?'6':'0.3'),
+    'Aiguille':['0.002','0.003','0.004'][rang%3], 'Insertions':String(40+20*rang)};
   a.mat=m.id; a.par={};
   m.params.forEach(p=>{ if(val[p.n]!==undefined) a.par[p.n]=val[p.n] });
  });
@@ -5495,7 +5667,7 @@ const baremePane=zAll=>baremeListe(baremeById(AS.reg), zAll||AS.z, {
  prix:CAN('prix')&&!AS.ro&&AS.but==='devis',
  clic:'zClick', groupe:'baremeGroupe'});
 
-function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=null,clic='zClick',libre=false,ech=1,seances=null,roClic=null,selZ=null}={}){
+function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=null,zsup=null,clic='zClick',libre=false,ech=1,seances=null,roClic=null,selZ=null}={}){
  /* Une désignation peut porter sur une zone — ou sur une séance, qui en touche
     plusieurs le même jour. Le schéma n'a pas à savoir laquelle : il reçoit un
     ensemble de zones à faire ressortir. */
@@ -5503,6 +5675,17 @@ function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=n
  const zSel=id=>!!SELZ&&SELZ.has(id), zPale=id=>!!SELZ&&SELZ.size>0&&!SELZ.has(id);
  const R=SILH[region]?region:'visage', S=SILH[R];
  const az=z=>(zt&&zt[z])||type;                       /* l'acte de cette zone */
+ /* ------------------------------------------------------------------------
+    Une zone à deux produits se lit en deux couleurs
+    ------------------------------------------------------------------------
+    Une pommette comblée à l'acide ET traitée au skinbooster ne peut pas porter
+    une seule teinte sans mentir sur l'un des deux. On la remplit donc d'un
+    dégradé à arrêts francs — pas un fondu : deux aplats nets séparés en
+    diagonale, autant de bandes que de produits. La forme, son tracé et sa
+    zone de clic ne bougent pas d'un pixel ; seule la peinture change. */
+ const sup=z=>(zsup&&zsup[z])||[];
+ const SGN=(schemaSVG._n=(schemaSVG._n||0)+1);
+ const gid=z=>`zg${SGN}_${String(z).replace(/[^\w-]/g,'')}`;
  const H=hist||{};
  const L=zonesDe(R).filter(z=>!z.post);
  /* L'illustration porte le contour en pointillé de chaque zone — sauf celles
@@ -5515,12 +5698,19 @@ function schemaSVG(state,{editable=true,hist=null,type=null,region='visage',zt=n
   const cls=(on?(CT?'zone act-cur':(z.p==='tox'?'zone act-tox':'zone act-ah'))
             :ant?(z.p==='tox'?'zone ant ant-tox':'zone ant ant-ah'):'zone')+(editable?'':' ro')
             +(roClic&&(on||ant)?' cli':'')+(zSel(z.id)?' sel':'')+(zPale(z.id)?' pale':'');
-  const st=on&&CT?` style="fill:${colActe(t)};stroke:${colActe(t)}"`:'';
+  const SP=on?sup(z.id):[];
+  const st=on&&CT
+    ?(SP.length?` style="fill:url(#${gid(z.id)});stroke:${colActe(t)}"`
+              :` style="fill:${colActe(t)};stroke:${colActe(t)}"`)
+    :'';
   /* En saisie, la zone se coche. En lecture, elle peut tout de même répondre :
      sur le cumul, cliquer une zone désigne sa ligne dans la liste de droite. */
   const ev=editable?`onclick="${clic}(event,'${z.id}')" oncontextmenu="${clic}(event,'${z.id}',-1);return false"`
           :(roClic&&(on||ant)?`onclick="${roClic}(event,'${z.id}')"`:'');
-  const tt=esc(z.n)+(ant?'\n'+ant.map(x=>`${DFT(x.d)}${x.q?' · '+x.q:''}`).join('\n'):'');
+  const tt=esc(z.n)
+    +(SP.length?'\n'+[{t, q:+state[z.id]||0}, ...SP].map(o=>acteDef(o.t).n
+        +(o.q&&acteDef(o.t).unite?' · '+fmtDose(o.q,o.t,z.id):'')).join('\n'):'')
+    +(ant?'\n'+ant.map(x=>`${DFT(x.d)}${x.q?' · '+x.q:''}`).join('\n'):'');
   return z.pa?`<path class="${cls}"${st} d="${zPath(z.pa)}" ${ev}><title>${tt}</title></path>`
             :`<ellipse class="${cls}"${st} cx="${z.cx}" cy="${z.cy}" rx="${z.rx}" ry="${z.ry}" ${ev}><title>${tt}</title></ellipse>`;
  }).join('');
@@ -5623,7 +5813,14 @@ const place=(x,y,w,h,pas,cadre)=>{
    const q=+state[z.id]||0, ant=H[z.id];
    const t=az(z.id), CT=t?acteDef(t):null, UT=CT?CT.unite:null;
    /* une prestation libre n'a ni produit ni unité : on n'affiche que ce qui a un sens */
-   const qt=q?(CT?(UT?fmtDose(q,t):''):(libre?(q!==1?nb(q):''):fmtQ(q,z.p))):'';
+   const qt0=q?(CT?(UT?fmtDose(q,t):''):(libre?(q!==1?nb(q):''):fmtQ(q,z.p))):'';
+   /* deux produits, deux doses : l'étiquette les porte dans l'ordre du schéma,
+      le principal d'abord — l'infobulle de la zone dit lequel est lequel */
+   const SPL=Object.prototype.hasOwnProperty.call(state,z.id)?sup(z.id):[];
+   const qt=SPL.length
+     ? [qt0, ...SPL.map(o=>o.q&&acteDef(o.t).unite?fmtDose(o.q,o.t,z.id):acteDef(o.t).n[0])]
+         .filter(Boolean).join(' + ')
+     : qt0;
    const dt=ant?DFV(ant[0].d)+(ant.length>1?` ×${ant.length}`:''):'';
    if(!qt&&!dt) return '';
    const plein=!!qt;
@@ -5696,7 +5893,17 @@ const place=(x,y,w,h,pas,cadre)=>{
     DÉSIGNE quelque chose, la laisser transparente ferait désigner la zone
     du dessous — c'est-à-dire la mauvaise. Elle capte donc le clic, et
     répond pour la sienne : sur le schéma en lecture seule uniquement. */
- return `<svg class="face${roClic?' selq':''}" viewBox="${S.vb}">${S.g}${tr}${zs}${lbl}</svg>`;
+ /* un dégradé par zone combinée — arrêts francs, une bande par produit */
+ const defs=L.filter(z=>Object.prototype.hasOwnProperty.call(state,z.id)&&sup(z.id).length)
+  .map(z=>{ const C=[colActe(az(z.id)), ...sup(z.id).map(o=>colActe(o.t))];
+    const n=C.length;
+    const arrets=C.map((c,i)=>
+      `<stop offset="${(i/n*100).toFixed(2)}%" style="stop-color:${c}"/>`
+     +`<stop offset="${((i+1)/n*100).toFixed(2)}%" style="stop-color:${c}"/>`).join('');
+    return `<linearGradient id="${gid(z.id)}" x1="0" y1="0" x2="1" y2="1">${arrets}</linearGradient>` })
+  .join('');
+ return `<svg class="face${roClic?' selq':''}" viewBox="${S.vb}">${
+   defs?`<defs>${defs}</defs>`:''}${S.g}${tr}${zs}${lbl}</svg>`;
 }
 const faceSVG=(state,o={})=>schemaSVG(state,{...o,region:o.region||'visage'});
 
@@ -7598,9 +7805,15 @@ function pDetail(p){
  const O=ORDONNANCES.filter(o=>o.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
  const C=A.filter(a=>(catById(a.type)||{}).cons);
  const ca=F.reduce((s,f)=>s+f.paye,0), rd=F.reduce((s,f)=>s+rdu(f),0);
- const cumul={}, cumulT={};   /* dose cumulée par zone, et acte le plus récent sur cette zone */
- A.slice().sort((x,y)=>x.date.localeCompare(y.date)).forEach(a=>zonesOf(a).forEach(([z,q])=>{
-   cumul[z]=(cumul[z]||0)+q; cumulT[z]=acteZone(a,z)}));
+ const cumul={}, cumulT={}, cumulX={};   /* dose cumulée par zone, acte le plus récent, et ses produits associés */
+ A.slice().sort((x,y)=>x.date.localeCompare(y.date)).forEach(a=>{
+   const X=zsupActe(a)||{};
+   zonesOf(a).forEach(([z,q])=>{
+     cumul[z]=(cumul[z]||0)+q; cumulT[z]=acteZone(a,z);
+     /* le schéma cumulé montre la dernière séance de chaque zone : si elle a
+        porté deux produits, la zone se peint des deux */
+     if(X[z]&&X[z].length) cumulX[z]=X[z]; else delete cumulX[z];
+   })});
  const AD=AUTRES_DOCS.filter(x=>x.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
  const AG=DOCADD.filter(x=>x.patient===p.id).sort((a,b)=>b.ts.localeCompare(a.ts));   /* produits depuis un modèle */
  /* Le badge annonçait dix documents pour une liste qui en tenait six : les
@@ -7815,14 +8028,19 @@ function pDetail(p){
           a.operateur?`<span class="s">op. ${esc(a.operateur)}</span>`:''}</td>
         <td class="ct-z" title="${a.zones?esc(zonesOf(a).map(([z,q])=>{const t=acteZone(a,z);
              return zoneNom(z)+(q&&uniteDose(t,z)?' '+fmtDose(q,t,z):'')}).join(' · ')):''}">${
-           a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneDef(z); if(!Z) return '';
-           const t=acteZone(a,z), C=acteDef(t);
-           return `<span class="bdg ${C.col==='toxine'?'b-info':'b-warn'}" title="${esc(zoneTitre(z)||C.n)}">${esc(zoneNom(z))}${q&&uniteDose(t,z)?' '+fmtDose(q,t,z):''}</span>`}).join(''):`<span class="mu">${esc(noZoneTxt(a))}</span>`}</td>
-        <td class="ct-1">${M.length?M.map(x=>{const mm=matById(x.mat); if(!mm) return '';
-             const det=[paramsTexte(x), x.parZ&&Object.keys(x.parZ).length?`${Object.keys(x.parZ).length} zone(s) détaillée(s)`:'']
-               .filter(Boolean).join(' · ');
-             return `<span class="mch" title="${esc(mm.n+(det?' — '+det:''))}"><span class="mdot" style="background:${mm.col}"></span>${esc(mm.n)}</span>`
-           }).join(''):'<span class="mu">—</span>'}</td>
+           a.zones?(()=>{const X=zsupActe(a)||{};
+           return zonesOf(a).map(([z,q])=>{const Z=zoneDef(z); if(!Z) return '';
+           const t=acteZone(a,z), C=acteDef(t), SP=X[z]||[];
+           /* une zone à deux produits le dit ici aussi : le détail est dans l'infobulle,
+              la marque dans la pastille — sinon la colonne doublerait de largeur */
+           const lg=[C.n+(q&&uniteDose(t,z)?' '+fmtDose(q,t,z):''),
+             ...SP.map(o=>acteDef(o.t).n+(o.q&&uniteDose(o.t,z)?' '+fmtDose(o.q,o.t,z):''))].join(' + ');
+           return `<span class="bdg ${C.col==='toxine'?'b-info':'b-warn'}" title="${
+             esc((zoneTitre(z)||zoneNom(z))+' — '+lg)}">${esc(zoneNom(z))}${
+             q&&uniteDose(t,z)?' '+fmtDose(q,t,z):''}${
+             SP.length?`<b class="pl">+${SP.length}</b>`:''}</span>`}).join('')})()
+           :`<span class="mu">${esc(noZoneTxt(a))}</span>`}</td>
+        <td class="ct-1 ct-m">${celluleMat(a)}</td>
         <td class="ct-1 mu">${CS.length
            ? `<span title="${esc(CS.map(c=>c.nom.split(' —')[0]+' · lot '+c.lot).join('\n'))}">${esc(CS[0].nom.split(' —')[0])}
               <span class="mono">${esc(CS[0].lot)}</span>${CS.length>1?` <b class="pl">+${CS.length-1}</b>`:''}</span>`
@@ -7883,7 +8101,7 @@ function pDetail(p){
       return `<button class="${schemaReg===r.id?'on':''}" onclick="schemaReg='${r.id}';paint()">${r.i} ${esc(r.n)} · ${n}</button>`}).join('')}</div></div>
    <div class="facewrap cumul">
     <div>${BAR?baremeListe(BAR,cur,{ro:true,hist:ZH,motTotal:'déjà traitée'+(Object.keys(cur).length>1?'s':'')})
-     :`<div class="facebox" onclick="cumVide(event)">${schemaSVG(cur,{editable:false,hist:ZH,region:schemaReg,zt:cumulT,ech:CUM_ECH,seances:SEANCES,roClic:'cumClic',selZ:ZSEL})}</div>
+     :`<div class="facebox" onclick="cumVide(event)">${schemaSVG(cur,{editable:false,hist:ZH,region:schemaReg,zt:cumulT,zsup:cumulX,ech:CUM_ECH,seances:SEANCES,roClic:'cumClic',selZ:ZSEL})}</div>
      <div class="face-legend"><span><i style="background:var(--toxine)"></i>Toxine</span><span><i style="background:var(--ah)"></i>Acide hyaluronique</span>
       <span class="mu">${NSEANCES>1?'la couleur dit le produit · le numéro dit la séance':'quantité cumulée et date de la dernière séance'}</span></div>`}</div>
     <div>
@@ -11447,7 +11665,7 @@ V.params=()=>{
             <button class="btn xs p" onclick="addProtoZone(${i})">+ Ajouter</button>
           </div>
           <div class="mu" style="font-size:11px;padding:6px 2px 0">Videz la dose pour poser la zone sans quantité — vous la doserez en séance. La croix retire la zone du protocole.
-            <b>＋</b> associe un second acte à la zone : le schéma garde l’acte principal, l’acte associé rejoint la séance comme soin à part entière.</div>
+            <b>＋</b> associe un second produit à la même zone — un acide hyaluronique et un skinbooster sur la pommette, par exemple. La zone se peint alors de leurs deux couleurs sur le schéma, et chaque produit garde sa dose, son lot et sa ligne de facture.</div>
           </div>`:''}
        </div>`).join('')}
      </div></div>
@@ -11483,9 +11701,10 @@ V.params=()=>{
         <td><input class="inp catl-n" data-a="${c.id}" style="width:100%;min-width:170px" value="${esc(c.n)}"
           onchange="CATALOGUE[${i}].n=this.value;acteNouv=null;paint()"></td>
         <td><select class="inp" onchange="CATALOGUE[${i}].cat=this.value;paint()">${catsUtilisees().map(x=>`<option ${c.cat===x?'selected':''}>${esc(x)}</option>`).join('')}</select></td>
-        <td class="num">${c.zoned&&!c.prix?'<span class="mu" style="font-size:11.5px">à l’unité</span>'
-          :`<div style="display:flex;gap:4px;align-items:center;justify-content:flex-end">
-             <input class="inp" style="width:76px;text-align:right" type="number" min="0" step="10" value="${c.prix||0}" onchange="CATALOGUE[${i}].prix=+this.value||0;paint()"><span class="mu">€</span></div>`}</td>
+        <td class="num"><div style="display:flex;gap:4px;align-items:center;justify-content:flex-end">
+           <input class="inp ${c.prix?'':'sanstarif'}" style="width:76px;text-align:right" type="number" min="0" step="10"
+             value="${c.prix||0}" title="${c.prix?'':'Cet acte se facturerait \u00e0 0\u202f\u20ac'}"
+             onchange="CATALOGUE[${i}].prix=+this.value||0;paint()"><span class="mu">€</span></div></td>
         <td class="num"><div style="display:flex;gap:3px;align-items:center;justify-content:flex-end">
           <input class="inp" style="width:56px;text-align:right" type="number" min="0" max="20" value="${tauxTVA(c.id)}" onchange="FACTU.tvaParActe['${c.id}']=+this.value||0;paint()"><span class="mu">%</span></div></td>
         <td><select class="inp" title="Unité de dose : ce qui se saisit sur une zone"
@@ -12554,11 +12773,11 @@ function openActe(pid,aid,np){
         :[...new Set(a.zones?Object.keys(a.zones).map(z=>acteZone(a,z)):(a.type?[a.type]:[]))]
           .map(t=>({t, q:a.seances||1, com:a.zonesNote||'',
              ...(a.mat&&t===a.type?{mat:a.mat, par:{...(a.par||{})}}:{})}))):[],
-     draft:{t:null,z:{},com:''}, openSoin:0, devis:null, docs:[], zs:{},
+     draft:{t:null,z:{},com:''}, openSoin:0, devis:null, docs:[], zs:{}, zx:{},
      conso:[], consoOff:[], consoAdd:false, prepOpen:null, csQ:'', csFam:'', csOpen:true,
      but:a?'acte':'acte',                       /* 'acte' = consultation du jour · 'devis' = projet */
      effets:a?a.effets:'', consent:a?a.consent:false};
- rattacherZones(a&&a.zs);
+ rattacherZones(a&&a.zs, a&&a.zx);
  editMat=null; matAvant=null; suppCand=null;
  renderOver();
  document.getElementById('over').classList.add('on');
@@ -12567,9 +12786,9 @@ function openActe(pid,aid,np){
 /* une séance rouverte ou dupliquée ne connaît que le type de chaque zone :
    on donne un identifiant à chaque soin, puis on relie chaque zone au premier
    soin de son type — l'ordre d'origine est ainsi conservé */
-function rattacherZones(carte){
+function rattacherZones(carte,carteSup){
  if(!AS) return;
- AS.zs=AS.zs||{};
+ AS.zs=AS.zs||{}; AS.zx=AS.zx||{};
  (AS.soins||[]).forEach(x=>{ if(x.sid==null) x.sid=nouveauSid() });
  /* la séance enregistrée dit à quel rang de soin va chaque zone : on le relit */
  if(carte) Object.entries(carte).forEach(([z,i])=>{ const x=(AS.soins||[])[i];
@@ -12577,6 +12796,12 @@ function rattacherZones(carte){
  Object.keys(AS.z||{}).forEach(z=>{ if(AS.zs[z]!=null) return;
    const t=(AS.zt||{})[z]; const s0=t?premierDuType(t):null;
    if(s0) AS.zs[z]=s0.sid });
+ /* et les produits associés, rangés au même format : rang du soin → sid */
+ if(carteSup) Object.entries(carteSup).forEach(([z,L])=>{
+   if(!Object.prototype.hasOwnProperty.call(AS.z||{},z)) return;
+   const P=(L||[]).map(e=>{ const x=(AS.soins||[])[e&&e.i];
+     return (x&&x.sid!==AS.zs[z])?{sid:x.sid, q:e.q} : null }).filter(Boolean);
+   if(P.length) AS.zx[z]=P });
 }
 /* --------------------------------------------------------------------------
    Consommables préparés pendant la séance
@@ -12969,7 +13194,7 @@ function dupliquerActe(id){
    parZ:x.parZ?JSON.parse(JSON.stringify(x.parZ)):undefined,
    zpar:!!(x.parZ&&Object.keys(x.parZ).length)}));
  AS.type=(AS.soins.find(x=>x.t)||{}).t||null;
- AS.openSoin=0; AS.draft={t:null,z:{},com:''}; AS.zs={}; rattacherZones(a.zs);
+ AS.openSoin=0; AS.draft={t:null,z:{},com:''}; AS.zs={}; AS.zx={}; rattacherZones(a.zs, a.zx);
  AS.conso=[]; AS.consoOff=[];
  renderOver();
  toast(`Séance dupliquée du ${DF(a.date)} — ajustez, puis enregistrez`);
@@ -13169,7 +13394,7 @@ function renderOver(){
       <div class="seg">${(AS.type?regionsDe(AS.type):['visage','corps']).map(r=>{const R=regDef(r);
         return `<button class="${AS.reg===r?'on':''}" onclick="setRegion('${r}')" title="${esc(R.n)}">${R.i} ${esc(R.court||R.n)}</button>`}).join('')}</div>
       <span class="mu schbar-h" title="Un clic sur une zone choisit l’acte qu’on y pratique, un clic droit la retire">${estBareme(AS.reg)?'tarifs à la séance':'clic droit = retirer'}</span>
-      ${sel.length?`<button class="chip" onclick="AS.z={};AS.zt={};AS.zs={};elaguerSoins();renderOver()">Effacer les zones</button>`:''}
+      ${sel.length?`<button class="chip" onclick="AS.z={};AS.zt={};AS.zs={};AS.zx={};elaguerSoins();renderOver()">Effacer les zones</button>`:''}
      </div>`}
     ${AS.ro||AS.reg!=='visage'?'':`<div class="preset">
       <span class="mu" style="font-size:11px;align-self:center;margin-right:2px">Protocole :</span>
@@ -13179,7 +13404,7 @@ function renderOver(){
       const zAll={...AS.z,...dz};
       const ztAll={...AS.zt}; Object.keys(dz).forEach(k=>ztAll[k]=D.t);
       return estBareme(AS.reg)?baremePane(zAll)
-        :`<div class="facebox" id="faceLive">${schemaSVG(zAll,{editable:!AS.ro,hist:zoneHist(AS.pid,AS.aid),type:D.t||AS.type,zt:ztAll,region:AS.reg})}</div>`})()}
+        :`<div class="facebox" id="faceLive">${schemaSVG(zAll,{editable:!AS.ro,hist:zoneHist(AS.pid,AS.aid),type:D.t||AS.type,zt:ztAll,zsup:zsupCourant(),region:AS.reg})}</div>`})()}
     ${estBareme(AS.reg)?'':`
     <div class="face-legend">
       ${[...new Set([...(draftActif()?[AS.draft.t]:[]),...actesSaisis()])].map(t=>`<span><i style="background:${colActe(t)}"></i>${esc(acteDef(t).n)}${acteDef(t).unite?' ('+acteDef(t).unite+')':''}</span>`).join('')}
@@ -13302,24 +13527,40 @@ function renderOver(){
             <span class="mu sc-dose">${(()=>{const U=[...new Set(Z.map(z=>uniteDose(x.t,z)))];
               return (dose&&U.length===1&&U[0])?'total '+nb(dose)+' '+U[0]:''})()}</span></div>
           ${Z.length?`<div class="sc-z">${Z.map(z=>{
-            const qz=AS.z[z], UZ=uniteDose(x.t,z), ZB=zoneDef(z), bar=!!(ZB&&ZB.bar);
+            /* Une zone peut porter deux produits. Ce soin y est soit le porteur
+               PRINCIPAL — il tient la dose de la zone — soit un produit
+               ASSOCIé, qui a sa propre dose : les commandes doivent viser la
+               bonne, sans quoi régler l'un réglerait l'autre. */
+            const sup=estSupZone(z,x.sid);
+            const qz=sup?doseZoneSoin(z,x.sid):AS.z[z];
+            const UZ=uniteDose(x.t,z), ZB=zoneDef(z), bar=!!(ZB&&ZB.bar);
             const tar=(bar&&CAN('prix')&&AS.but==='devis')?EUR(ZB.pu):'';
-            return `<div class="zrow"><span class="zd" style="background:${colActe(x.t)}"></span>
+            const autres=zActesTous(z).filter(t2=>t2!==x.t);
+            const moins=sup?`zSupDose('${z}',${x.sid},-1)`:`bump('${z}',-1)`;
+            const plus =sup?`zSupDose('${z}',${x.sid},1)`:`bump('${z}',1)`;
+            const pose =sup?`zSupSet('${z}',${x.sid},this.value)`:`setZ('${z}',this.value)`;
+            const oter =sup?`zRetirerProduit('${z}',${x.sid})`:`delZ('${z}')`;
+            return `<div class="zrow${sup?' zsup':''}"><span class="zd" style="background:${colActe(x.t)}"></span>
              <div class="zn">${esc(zoneLabel(z))}
-              <small>${bar?(ZB.grp||''):(qz>0?((qz!==1||uniteDose(x.t,z))?fmtDose(qz,x.t,z):''):'quantité non renseignée')}</small>
+              <small>${sup?`avec ${esc(autres.map(t2=>acteDef(t2).n).join(', '))}`
+                :bar?(ZB.grp||''):(qz>0?((qz!==1||uniteDose(x.t,z))?fmtDose(qz,x.t,z):''):'quantité non renseignée')}${
+                (!sup&&autres.length)?` · aussi ${esc(autres.map(t2=>acteDef(t2).n).join(', '))}`:''}</small>
               </div>
-             ${(!AS.ro&&plusieurs)?`<button class="zmv" title="Déplacer cette zone vers un autre soin"
+             ${(!AS.ro&&!sup&&!bar&&actesZone().length>1)?`<button class="zmv zplus"
+                title="Ajouter un second produit sur cette zone"
+                onclick="event.stopPropagation();choixProduitZone('${z}')">＋</button>`:''}
+             ${(!AS.ro&&plusieurs&&!sup)?`<button class="zmv" title="Déplacer cette zone vers un autre soin"
                 onclick="event.stopPropagation();choixActeZone('${z}',1)">⇄</button>`:''}
              ${bar?`${tar?`<b class="mono">${tar}</b>`:''}
-                ${AS.ro?'':`<button class="rm" onclick="event.stopPropagation();delZ('${z}')">✕</button>`}`
+                ${AS.ro?'':`<button class="rm" onclick="event.stopPropagation();${oter}">✕</button>`}`
              :AS.ro?(qz>0?`<b class="mono">${fmtDose(qz,x.t,z)}</b>`:'<span class="mu">—</span>')
              :`<div class="step" onclick="event.stopPropagation()">
-                 <button onclick="bump('${z}',-1)">−</button>
+                 <button onclick="${moins}">−</button>
                  <input class="qin" type="number" min="0" step="${zonePas(z)}" placeholder="—" value="${qz>0?qz:''}"
-                   onchange="setZ('${z}',this.value)">
-                 <button onclick="bump('${z}',1)">+</button></div>
+                   onchange="${pose}">
+                 <button onclick="${plus}">+</button></div>
                 ${UZ?`<span class="mu" style="font-size:11px;width:15px">${esc(UZ)}</span>`:''}
-              <button class="rm" onclick="event.stopPropagation();delZ('${z}')">✕</button>`}</div>`}).join('')}</div>`
+              <button class="rm" onclick="event.stopPropagation();${oter}">✕</button>`}</div>`}).join('')}</div>`
            :`<div class="sc-vide">${AS.ro?'aucune zone renseignée':'cliquez une zone du schéma, ou écrivez-la ci-dessous'}</div>`}
           ${AS.ro?'':`<div class="dft-z" style="margin-top:6px">
             <input class="inp" id="zs${i}" placeholder="ajouter une zone — saisie libre…"
@@ -13672,11 +13913,11 @@ function zPose(id,d,t,muet){
  /* une zone d'épilation se traite ou ne se traite pas : elle n'a pas de dose */
  if(z&&z.bar){
    if(d>0&&!on) AS.z[id]=1;
-   else if(on){ delete AS.z[id]; delete AS.zt[id]; delete AS.zs[id] }
+   else if(on){ delete AS.z[id]; delete AS.zt[id]; delete AS.zs[id]; zPurgeSup(id) }
  }
  else if(d>0){ AS.z[id]=on?+(cur+pas).toFixed(2):1 }
  else { if(!on) return; const nv=+(cur-pas).toFixed(2);
-        if(!cur||nv<=0){delete AS.z[id];delete AS.zt[id];delete AS.zs[id]} else AS.z[id]=nv }
+        if(!cur||nv<=0){delete AS.z[id];delete AS.zt[id];delete AS.zs[id];zPurgeSup(id)} else AS.z[id]=nv }
  if(muet) return;
  elaguerSoins(); renderOver();
 }
@@ -13738,7 +13979,10 @@ function bump(id,d){
  if(nv<=0) AS.z[id]=null; else AS.z[id]=nv;
  renderOver();
 }
-function delZ(id){delete AS.z[id];delete AS.zt[id];if(AS.zs)delete AS.zs[id];AS.prix=null;elaguerSoins();renderOver()}
+/* Effacer une zone efface TOUT ce qui s'y trouvait, produits associés compris :
+   un produit sans zone est un produit qu'on ne saurait plus situer. */
+function delZ(id){delete AS.z[id];delete AS.zt[id];if(AS.zs)delete AS.zs[id];
+ zPurgeSup(id); AS.prix=null;elaguerSoins();renderOver()}
 /* --- liste des zones au clavier : on coche, la dose est facultative --- */
 let acteMode='schema';
 function setMode(m){ acteMode=m; if(AS) AS.mode=m; renderOver() }
@@ -13820,6 +14064,109 @@ let sidSeq=1;
 const nouveauSid=()=>sidSeq++;
 const soinBySid=sid=>(AS.soins||[]).find(x=>x.sid===sid);
 const sidZone=z=>(AS&&AS.zs)?AS.zs[z]:undefined;
+/* ==========================================================================
+   Plusieurs produits sur une même zone
+   ==========================================================================
+   Une pommette reçoit couramment deux produits le même jour — un acide
+   hyaluronique pour le volume, un skinbooster pour la qualité de peau. Le
+   modèle n'en gardait qu'un : une zone appartenait à UN soin (AS.zs), et
+   choisir le second effaçait le premier. Les protocoles savaient déjà décrire
+   la paire, mais en la posant ils perdaient la zone en route — le second
+   produit rejoignait la séance sans savoir où il avait été injecté.
+
+   La zone garde son produit PRINCIPAL — celui qui la colore et porte sa dose
+   dans AS.z — et AS.zx liste les produits ASSOCIéS qui s'y ajoutent, chacun
+   avec sa propre dose et son propre soin. Deux produits = deux soins = deux
+   lignes à facturer, chacune avec son tarif et son lot : c'est la seule
+   écriture qui garde la traçabilité par produit.
+
+   Le vocabulaire est celui des protocoles (zx), à dessein : les deux niveaux
+   décrivent la même chose et se relisent l'un l'autre. */
+const zSup=z=>((AS&&AS.zx&&AS.zx[z])||[]);
+const zMulti=z=>zSup(z).length>0;
+/* tous les soins qui passent sur cette zone, le principal d'abord */
+const zSoins=z=>[soinBySid(sidZone(z)), ...zSup(z).map(o=>soinBySid(o.sid))].filter(Boolean);
+const zActesTous=z=>[...new Set(zSoins(z).map(x=>x.t).filter(Boolean))];
+/* la dose d'un produit donné sur une zone : le principal porte AS.z, l'associé la sienne */
+const doseZoneSoin=(z,sid)=>sidZone(z)===sid?(+((AS.z||{})[z])||0)
+  :(+((zSup(z).find(o=>o.sid===sid)||{}).q)||0);
+/* ajouter un second produit sur une zone déjà posée */
+function zAjouterProduit(id,t){
+ if(!AS||AS.ro) return;
+ if(!Object.prototype.hasOwnProperty.call(AS.z||{},id)){ toast('Posez d’abord la zone'); return }
+ const x=soinPour(t,1);
+ if(sidZone(id)===x.sid||zSup(id).some(o=>o.sid===x.sid)){
+   toast(`${acteDef(t).n} est déjà posé sur ${zoneNom(id)}`); return }
+ AS.zx=AS.zx||{}; AS.zx[id]=AS.zx[id]||[];
+ AS.zx[id].push({sid:x.sid, q:acteDef(t).unite?null:1});
+ AS.prix=null; elaguerSoins();
+ /* On vient d'ajouter un produit : la question suivante est sa dose. On ouvre
+    donc sa carte, plutôt que de la laisser repliée derrière un chevron —
+    ajouter un produit sans pouvoir le doser ne rend service à personne. */
+ AS.openSoin=(AS.soins||[]).indexOf(x);
+ renderOver();
+ toast(`${acteDef(t).n} ajouté sur ${zoneNom(id)} — ${zActesTous(id).length} produits sur cette zone`);
+}
+function zRetirerProduit(id,sid){
+ if(!AS||AS.ro||!AS.zx||!AS.zx[id]) return;
+ AS.zx[id]=AS.zx[id].filter(o=>o.sid!==+sid);
+ if(!AS.zx[id].length) delete AS.zx[id];
+ AS.prix=null; elaguerSoins(); renderOver();
+}
+/* la dose d'un produit associé se règle comme celle du principal */
+function zSupDose(id,sid,d){
+ const o=zSup(id).find(y=>y.sid===+sid); if(!o) return;
+ const pas=zonePas(id), cur=+o.q||0, nv=+(cur+d*pas).toFixed(2);
+ o.q=nv<=0?null:nv; AS.prix=null; renderOver();
+}
+function zSupSet(id,sid,v){
+ const o=zSup(id).find(y=>y.sid===+sid); if(!o) return;
+ const n=+String(v).replace(',','.'); o.q=(isFinite(n)&&n>0)?Math.round(n*100)/100:null;
+ AS.prix=null; renderOver();
+}
+/* le rôle d'un soin sur une zone : porteur principal, ou produit associé */
+const estSupZone=(z,sid)=>sidZone(z)!==sid&&zSup(z).some(o=>o.sid===sid);
+/* proposer un second produit sur une zone déjà posée */
+function choixProduitZone(id){
+ const o=document.getElementById('famchoix'); if(o) o.remove();
+ const z=zoneDef(id);
+ const dej=new Set(zActesTous(id));
+ const L=actesZone().filter(c=>!dej.has(c.id));
+ const d=document.createElement('div');
+ d.id='famchoix'; d.className='famchoix';
+ d.innerHTML=`<div class="fc-t">Quel produit ajouter sur « ${esc(z?z.n:id)} » ?</div>
+  <div class="fc-s">Déjà posé${dej.size>1?'s':''} : ${[...dej].map(t=>esc(acteDef(t).n)).join(', ')}
+   — le nouveau produit s'ajoute à la même zone, avec sa dose et sa ligne de facture.</div>
+  ${L.length?catsUtilisees().map(k=>{const G=L.filter(c=>(c.cat||'Divers')===k);
+    return G.length?`<div class="fc-g">${esc(k)}</div>`+G.map(c=>`
+      <button class="fc-b" onclick="document.getElementById('famchoix').remove();zAjouterProduit('${id}','${c.id}')">
+        <span class="fc-i" style="background:${colActe(c.id)};color:#fff">${esc(c.n[0])}</span>
+        <div><b>${esc(c.n)}</b><small>tarif ${EUR(c.prix||0)}</small></div></button>`).join(''):''}).join('')
+   :'<div class="fc-s">Tous les actes de cette région sont déjà posés sur cette zone.</div>'}
+  <button class="fc-x" onclick="document.getElementById('famchoix').remove()">Annuler</button>`;
+ d.onclick=e=>{if(e.target===d) d.remove()};
+ document.body.appendChild(d);
+ setTimeout(()=>d.classList.add('on'),10);
+}
+/* effacer une zone emporte ses produits associés : rien ne doit survivre à la zone */
+function zPurgeSup(id){ if(AS&&AS.zx&&AS.zx[id]) delete AS.zx[id] }
+/* ce que le schéma attend pour peindre une zone en plusieurs couleurs */
+function zsupCourant(){
+ if(!AS||!AS.zx) return null; const o={};
+ Object.keys(AS.zx).forEach(z=>{
+   if(!Object.prototype.hasOwnProperty.call(AS.z||{},z)) return;
+   const L=zSup(z).map(e=>{ const x=soinBySid(e.sid); return x&&x.t?{t:x.t, q:e.q}:null }).filter(Boolean);
+   if(L.length) o[z]=L });
+ return Object.keys(o).length?o:null;
+}
+/* et la même table pour un acte déjà enregistré, qui range les rangs et non les sid */
+function zsupActe(a){
+ if(!a||!a.zx) return null; const o={};
+ Object.entries(a.zx).forEach(([z,L])=>{
+   const P=(L||[]).map(e=>{ const x=(a.soins||[])[e&&e.i]; return x&&x.t?{t:x.t, q:e.q}:null }).filter(Boolean);
+   if(P.length) o[z]=P });
+ return Object.keys(o).length?o:null;
+}
 /* deux soins du même acte se numérotent pour rester distinguables */
 const soinNum=x=>{const L=(AS.soins||[]).filter(y=>y.t&&y.t===x.t);
  return L.length>1?(L.indexOf(x)+1):0};
@@ -13848,11 +14195,20 @@ const lignesLibres=()=>(AS.soins||[]).filter(x=>!x.t);
 /* les zones posées pour un soin donné — par son identifiant quand il en a un,
    par son type pour les séances reprises d'anciennes versions */
 const premierDuType=t=>(AS.soins||[]).find(y=>y.t===t);
+/* Un soin couvre les zones dont il est le produit principal ET celles où il a
+   été ajouté en second : c'est cette fonction qui décide de la dose, du tarif
+   et du consommable — l'étendre suffit à ce qu'un produit associé se facture
+   et se trace comme les autres, sans ligne de plus ailleurs. */
 const zonesDuSoin=x=>{ if(!x||!AS||!AS.z) return [];
+ const assoc=sid=>Object.keys(AS.zx||{}).filter(z=>
+   Object.prototype.hasOwnProperty.call(AS.z,z)&&(AS.zx[z]||[]).some(o=>o.sid===sid));
  if(typeof x!=='object'){ const s0=premierDuType(x);
-   return Object.keys(AS.z).filter(z=>sidZone(z)!=null?!!(s0&&sidZone(z)===s0.sid):zActe(z)===x) }
- return Object.keys(AS.z).filter(z=>{const sd=sidZone(z);
-   return sd!=null ? sd===x.sid : (zActe(z)===x.t && premierDuType(x.t)===x)}) };
+   return [...new Set(Object.keys(AS.z)
+     .filter(z=>sidZone(z)!=null?!!(s0&&sidZone(z)===s0.sid):zActe(z)===x)
+     .concat(s0?assoc(s0.sid):[]))] }
+ return [...new Set(Object.keys(AS.z).filter(z=>{const sd=sidZone(z);
+   return sd!=null ? sd===x.sid : (zActe(z)===x.t && premierDuType(x.t)===x)})
+   .concat(assoc(x.sid)))] };
 /* Un acte n'a pas de prix : c'est un objet clinique. Le montant, s'il existe,
    vient des pièces qui lui sont rattachées — facture, ou à défaut le montant
    historique du jeu de démonstration. `null` = acte non facturé. */
@@ -14156,7 +14512,7 @@ function majActe(){
  const rd=document.getElementById('rcDetail');
  if(rd) rd.innerHTML=AS.ro?'':syntheseHTML();
  const f=document.getElementById('faceLive');
- if(f) f.innerHTML=schemaSVG(AS.z,{editable:!AS.ro,hist:zoneHist(AS.pid,AS.aid),type:AS.type,region:AS.reg});
+ if(f) f.innerHTML=schemaSVG(AS.z,{editable:!AS.ro,hist:zoneHist(AS.pid,AS.aid),type:AS.type,zsup:zsupCourant(),region:AS.reg});
 }
 function setZ(id,v){ AS.z[id]=(v===''||+v<=0)?null:Math.round(+v*100)/100; AS.prix=null; renderOver() }
 
@@ -14169,16 +14525,18 @@ function applyProto(i){
    const t=protoActe(P,k); AS.zs=AS.zs||{}; AS.zt[k]=t; AS.zs[k]=soinPour(t,1).sid;
    AS.z[k]=acteDef(t).unite?v:1;
  });
- /* les actes associés rejoignent la séance sans zone propre : le commentaire dit
-    d'où ils viennent, pour qu'on sache quoi doser et où */
- const parT={};
- protoTousSup(P).forEach(x=>{ (parT[x.t]=parT[x.t]||[]).push(
-   zoneNom(x.z)+(x.q>0&&acteDef(x.t).unite?` ${fmtDose(x.q,x.t,x.z)}`:'')) });
- const sup=Object.keys(parT);
- sup.forEach(t=>{
-   const sn=soinPour(t,1);
-   const m=`protocole « ${P.n} » — ${parT[t].join(', ')}`;
-   sn.com=sn.com?(sn.com.includes(m)?sn.com:sn.com+' · '+m):m;
+ /* Les produits associés GARDENT leur zone. C'était tout le défaut : le
+    protocole savait dire « skinbooster sur la pommette », et en le posant il
+    perdait la pommette en route — le produit rejoignait la séance avec, pour
+    seule trace de son emplacement, une phrase dans un commentaire. */
+ AS.zx=AS.zx||{};
+ protoTousSup(P).forEach(o=>{
+   if(!Object.prototype.hasOwnProperty.call(AS.z,o.z)) return;
+   const x=soinPour(o.t,1);
+   if(AS.zs[o.z]===x.sid) return;            /* c'est déjà le produit principal */
+   AS.zx[o.z]=AS.zx[o.z]||[];
+   if(AS.zx[o.z].some(e=>e.sid===x.sid)) return;
+   AS.zx[o.z].push({sid:x.sid, q:acteDef(o.t).unite?(o.q||null):1});
  });
  /* un protocole au forfait impose son montant ; sinon la séance additionne ses actes */
  AS.prix=protoForfait(P)?protoPrix(P):null;
@@ -14199,8 +14557,12 @@ function applyProto(i){
     ------------------------------------------------------------------------ */
  AS.openSoin=TOUS_PLIES;
  renderOver();
+ /* on annonce ce qui a été posé — et, s'il y a lieu, les zones qui portent
+    maintenant deux produits : c'est là que le protocole apporte le plus */
+ const combinees=Object.keys(AS.zx||{}).filter(z=>
+   Object.prototype.hasOwnProperty.call(AS.z,z)&&zSup(z).length);
  toast(`Protocole « ${P.n} » appliqué · ${protoActes(P).map(t=>acteDef(t).n).join(' + ')}`
-   +(sup.length?` · ${sup.length} acte${sup.length>1?'s':''} associé${sup.length>1?'s':''} à la séance`:'')
+   +(combinees.length?` · ${combinees.length} zone${combinees.length>1?'s':''} à deux produits`:'')
    +(protoForfait(P)?` · forfait ${EUR(protoPrix(P))}`:''));
 }
 function mirrorZ(){
@@ -14227,9 +14589,17 @@ function saveActe(){
  const zs=zones?Object.fromEntries(Object.keys(zones).map(z=>{
    const x=gardes.find(y=>y.sid===sidZone(z));
    return [z, x?gardes.indexOf(x):0]})):null;
+ /* Les produits associés se rangent au même format que zs : le RANG du soin,
+    jamais son sid — un sid ne vit que le temps de la fenêtre de saisie. */
+ const zx=(()=>{ const o={};
+   Object.keys(zones||{}).forEach(z=>{
+     const L=zSup(z).map(e=>{ const x=gardes.find(y=>y.sid===e.sid);
+       return x?{i:gardes.indexOf(x), q:e.q} : null }).filter(Boolean);
+     if(L.length) o[z]=L });
+   return Object.keys(o).length?o:null })();
  const LB=soins.filter(x=>!x.t);
  const C0=T.length?acteDef(T[0]):CNUL;
- ACTES.unshift({id:Date.now(),patient:AS.pid,type:C0.id,zt,zs,soins,
+ ACTES.unshift({id:Date.now(),patient:AS.pid,type:C0.id,zt,zs,zx,soins,
   nom:[...T.map(t=>acteDef(t).n),...LB.map(x=>x.libre)].join(' + ')||'Séance',
   cat:[...new Set(T.map(t=>acteDef(t).cat))].join(' + ')||'Divers',
   reg:AS.reg,fam:C0.fam||'esth',
@@ -15048,7 +15418,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='EI';
+const BUILD='EJ';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -16517,7 +16887,7 @@ function renderDevis(){
         return `<button class="apc ${on?'on':''}" onclick="dvSetActe('${c.id}')"
         title="${on?'Retirer cet acte et revenir à la liste':'Choisir '+esc(c.n)}">
      <span class="dot" style="background:var(--${c.col||'accent'})"></span>${esc(c.n)}
-     <small>${CAN('prix')&&c.prix?EUR(c.prix):'à l’unité'}</small>${on?'<span class="apx">✕</span>':''}</button>`}).join('')}</div>`:''}).join('')}</div>`}
+     <small>${CAN('prix')?(c.prix?EUR(c.prix):'tarif à définir'):''}</small>${on?'<span class="apx">✕</span>':''}</button>`}).join('')}</div>`:''}).join('')}</div>`}
   </div>
   ${C.zoned?`<div class="modebar">
     <div class="ap-t" style="width:100%;margin:0 0 2px">2 · Où ? <span class="mu" style="text-transform:none;letter-spacing:0;font-weight:500">— facultatif</span></div>
