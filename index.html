@@ -6832,6 +6832,45 @@ const estRelance=e=>/—\s*relance/i.test(e.docNom||'');
 const relancesDe=id=>envoisDevis(id).filter(estRelance);
 /* la dernière relance partie : c'est celle dont on demande des comptes */
 const dernRelance=id=>{const R=relancesDe(id); return R.length?R[R.length-1]:null};
+/* le premier envoi, celui qui a mis le devis en route */
+const premierEnvoi=id=>envoisDevis(id).find(e=>!estRelance(e))||null;
+/* --------------------------------------------------------------------------
+   Le statut d'un devis porte une date
+   --------------------------------------------------------------------------
+   « Relancé ×2 » ne dit pas si c'était hier ou en avril, et « Accepté » ne dit
+   pas si le patient a répondu dans la semaine ou six mois plus tard. Le badge
+   dit CE QUI s'est passé ; la ligne en dessous dit QUAND.
+
+   Chaque statut a son événement, donc sa date, et il n'y en a qu'une :
+     brouillon → aucune, il n'est jamais parti
+     envoyé    → la date d'envoi
+     relancé   → la dernière relance, à l'heure près quand le registre l'a
+     décidé    → la date de décision : acceptation, refus ou expiration
+   Le registre des envois fait foi quand il a la trace ; le devis prend le
+   relais quand elle manque — jamais l'inverse.
+   -------------------------------------------------------------------------- */
+const VERBE_STATUT={envoye:'Envoyé', relance1:'Relancé', relance2:'Relancé',
+  accepte:'Accepté', refuse:'Refusé', expire:'Expiré'};
+function evtStatut(d){
+ if(!d||d.statut==='brouillon') return null;
+ if(devEstClos(d)){ const t=devDecide(d); return t?{t, heure:false, e:null}:null }
+ const rel=/^relance/.test(d.statut);
+ const e=rel?dernRelance(d.id):premierEnvoi(d.id);
+ const t=(e&&e.ts)||(rel?(d.derniere||d.envoye):d.envoye);
+ return t?{t, heure:!!(e&&e.ts), e, rel}:null;
+}
+/* La ligne compacte posée sous le badge : la date, et — pour une relance —
+   qui l'a envoyée. L'infobulle donne la phrase entière, à l'heure près. */
+function sousStatut(d){
+ const x=evtStatut(d); if(!x) return '';
+ const jour=String(x.t).slice(0,10);
+ const qui=(x.rel&&x.e)?(envAuto(x.e)?'⟳ automatique':x.e.par):null;
+ const long=`${VERBE_STATUT[d.statut]||'Mis à jour'} le ${x.heure?DTS(x.t):DF(jour)}`
+   +((x.rel&&x.e)?(envAuto(x.e)?' — relance partie seule, à l’échéance de la règle'
+                              :' — relance envoyée à la main par '+x.e.par):'');
+ return `<div class="mu nw" style="font-size:11px;margin-top:3px"
+   title="${esc(long)}">${DFV(jour)}${qui?' · '+esc(qui):''}</div>`;
+}
 const noRelance=e=>{const m=(e.docNom||'').match(/relance\s*(\d+)/i); return m?+m[1]:null};
 /* la chronologie d'un devis, prête à afficher */
 function chronoDevis(d){
@@ -8199,7 +8238,7 @@ function pDetail(p){
       <td class="mono">${d.id}</td><td class="mono" title="${(()=>{const e=devisEtabliTxt(d);
         return esc('Devis établi le '+e.cree+(e.maj?' · modifié le '+e.maj:''))})()}">${DF(d.date)}</td>
       <td>${d.lignes.map(l=>esc(l[1])).join(' · ')}</td>
-      <td class="num">${EUR(d.montant)}</td><td>${bdgDevis(d)}</td>
+      <td class="num">${EUR(d.montant)}</td><td>${bdgDevis(d)}${sousStatut(d)}</td>
       <td class="mu">${(()=>{ if(!d.relances) return '<span class="mono">—</span>';
         const e=dernRelance(d.id);
         return `<span class="mono">${d.relances}</span>`+(e?`<div class="nw" style="font-size:11px"
@@ -8405,7 +8444,11 @@ V.devis=()=>{
    pat:   d=>fn(pById(d.patient)),
    date:  d=>d.cree||d.date,
    mont:  d=>+d.montant||0,
-   statut:d=>RANG_DEVIS[d.statut]!==undefined?RANG_DEVIS[d.statut]:9,
+   /* À statut égal, c'est la date du statut qui départage : sans elle, deux
+      devis acceptés se rangeaient dans l'ordre où le tableau les gardait en
+      mémoire, c'est-à-dire au hasard. */
+   statut:d=>(RANG_DEVIS[d.statut]!==undefined?RANG_DEVIS[d.statut]:9)
+     +'|'+(evtStatut(d)?String(evtStatut(d).t).slice(0,16):'0000-00-00'),
    age:   d=>d.envoye?days(d.envoye,TODAY):null,
    suite: d=>{const r=RELS.find(x=>x.d.id===d.id); return r?r.e:null},
  };
@@ -8466,12 +8509,22 @@ V.devis=()=>{
     <td class="mono" title="${(()=>{const e=devisEtabliTxt(d);
       return esc('Devis établi le '+e.cree+(e.maj?' · modifié le '+e.maj:''))})()}">${DF(d.date)}</td>
     <td class="num">${EUR(d.montant)}</td>
-    <td>${bdgDevis(d)}${(()=>{const e=dernRelance(d.id); if(!e) return '';
-      return `<div class="mu nw" style="font-size:11px;margin-top:3px"
-        title="${esc(envAuto(e)?'Dernière relance partie seule, à l’échéance de la règle'
-          :'Dernière relance envoyée à la main par '+e.par)}"
-        >${envAuto(e)?'⟳ automatique':'par '+esc(e.par)}</div>`})()}</td>
-    <td class="mono" style="white-space:nowrap${ag>21?';color:var(--crit);font-weight:620':''}" ${ag>21?'':'class="mono mu"'}>${ag!==null?ag+' j':'—'}</td>
+    <td>${bdgDevis(d)}${sousStatut(d)}</td>
+    ${(()=>{
+      /* L'âge appelait à l'action en rouge au-delà de trois semaines. Depuis
+         que le jeu porte un an d'historique, un devis ACCEPTÉ il y a onze mois
+         s'affichait « 356 j » en rouge : il n'y a pourtant rien à y faire, la
+         réponse est venue. Le rouge ne vaut que pour ce qui attend encore.
+         Et deux attributs « class » se suivaient sur la même cellule — le
+         second était ignoré, l'âge n'a jamais été grisé une seule fois. */
+      const attend=devEstAtt(d), urgent=attend&&ag!==null&&ag>21;
+      const dl=devEstClos(d)?devDelai(d):null;
+      const titre=ag===null?'Devis jamais envoyé'
+        :dl!==null?`Envoyé il y a ${ag} jour${ag>1?'s':''} — décidé en ${dl} jour${dl>1?'s':''}`
+        :`Envoyé il y a ${ag} jour${ag>1?'s':''}, toujours sans réponse`;
+      return `<td class="mono${urgent?'':' mu'}" title="${esc(titre)}"
+        style="white-space:nowrap${urgent?';color:var(--crit);font-weight:620':''}"
+        >${ag!==null?ag+' j':'—'}</td>`})()}
     <td>${nx?(nx.du?bdg('b-crit','⚠ '+nx.r.c+' échu'):bdg('b-info',nx.r.c+' le '+DFS(nx.e))):'<span class="mu">—</span>'}</td>
     <td class="num" style="white-space:nowrap">
       ${d.statut==='accepte'?(signOf(d.id)?`<span class="bdg b-good" title="${esc(signTxt(signOf(d.id)))}">✎ Signé</span>`:'')
@@ -14957,7 +15010,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='ED';
+const BUILD='EE';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
