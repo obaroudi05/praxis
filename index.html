@@ -6868,8 +6868,18 @@ function sousStatut(d){
  const long=`${VERBE_STATUT[d.statut]||'Mis à jour'} le ${x.heure?DTS(x.t):DF(jour)}`
    +((x.rel&&x.e)?(envAuto(x.e)?' — relance partie seule, à l’échéance de la règle'
                               :' — relance envoyée à la main par '+x.e.par):'');
- return `<div class="mu nw" style="font-size:11px;margin-top:3px"
-   title="${esc(long)}">${DFV(jour)}${qui?' · '+esc(qui):''}</div>`;
+ /* L'année s'écrit toujours — « 04/09/26 ». Elle avait d'abord été omise dans
+    l'année en cours, pour gagner trois caractères ; mais une date sans année,
+    dans une liste qui en couvre plusieurs, oblige à se demander laquelle. Trois
+    caractères ne valent pas cette hésitation. */
+ /* « nw » ne s'applique qu'aux cellules : sur ce <div> il ne faisait rien, et
+    « L. Roche » se coupait en « L. » / « Roche ». On protège chaque morceau
+    séparément — la date reste entière, le nom aussi — et l'on autorise le
+    repli ENTRE les deux. Interdire tout repli élargirait la colonne de 58 px
+    et ferait défiler le tableau de côté dès 1440. */
+ return `<div class="mu" style="font-size:11px;margin-top:3px;line-height:1.35"
+   title="${esc(long)}"><span style="white-space:nowrap">${DFT(jour)}</span>${
+   qui?` · <span style="white-space:nowrap">${esc(qui)}</span>`:''}</div>`;
 }
 const noRelance=e=>{const m=(e.docNom||'').match(/relance\s*(\d+)/i); return m?+m[1]:null};
 /* la chronologie d'un devis, prête à afficher */
@@ -8241,7 +8251,7 @@ function pDetail(p){
       <td class="num">${EUR(d.montant)}</td><td>${bdgDevis(d)}${sousStatut(d)}</td>
       <td class="mu">${(()=>{ if(!d.relances) return '<span class="mono">—</span>';
         const e=dernRelance(d.id);
-        return `<span class="mono">${d.relances}</span>`+(e?`<div class="nw" style="font-size:11px"
+        return `<span class="mono">${d.relances}</span>`+(e?`<div style="font-size:11px;white-space:nowrap"
           title="${esc(envAuto(e)?'Dernière relance partie seule, à l’échéance de la règle'
             :'Dernière relance envoyée à la main par '+e.par)}"
           >${envAuto(e)?'⟳ automatique':esc(e.par)}</div>`:'')})()}</td>
@@ -15010,7 +15020,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='EE';
+const BUILD='EF';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
