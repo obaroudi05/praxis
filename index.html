@@ -8011,8 +8011,13 @@ function pDetail(p){
    <div class="tw"><table class="chrono compact">
     <thead><tr><th style="width:86px">Date</th><th style="width:186px">Acte</th>
       <th style="width:104px">Praticien</th><th>Zones</th>
-      <th style="width:132px">Matériel</th><th style="width:142px">Consommables</th>
-      <th style="width:70px">Effets</th><th style="width:104px">Documents</th>
+      <!-- La colonne Matériel porte désormais une valeur chiffrée, qui ne
+           SUPPORTE pas d'être tronquée : « Fluence 16… » sans son unité ne veut
+           rien dire. Les 26 px qu'elle gagne sont pris aux consommables et aux
+           documents, qui s'abrègent sans rien perdre d'essentiel — la largeur
+           totale du tableau, elle, ne bouge pas d'un pixel. -->
+      <th style="width:158px">Matériel</th><th style="width:124px">Consommables</th>
+      <th style="width:70px">Effets</th><th style="width:96px">Documents</th>
       ${ROLES[role].prix?'<th class="num" style="width:82px">Facturé</th>':''}
       <th style="width:34px"></th><th style="width:72px"></th></tr></thead>
     <tbody>${L.map(a=>{
