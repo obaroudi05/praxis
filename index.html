@@ -1046,9 +1046,22 @@ tr.neuf>td{background:color-mix(in srgb,var(--accent) 9%,transparent)}
 .dvl{border-bottom:1px solid var(--line);cursor:pointer;transition:.12s}
 .dvl:hover{background:var(--panel)}
 .dvl.on{background:var(--accent-wash)}
-.dvl-h{display:flex;align-items:center;gap:8px;padding:8px 11px}
+.dvl-h{display:flex;align-items:center;gap:8px;padding:8px 11px;--dvti-h:26px}
 .dvl-h .dot{width:9px;height:9px;border-radius:3px;flex:none}
 .dvl-h .nm{font-size:12.4px;font-weight:620;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Le champ d'intitulé prend EXACTEMENT la place du titre : même taille, même
+   graisse, même hauteur de ligne. La carte ne doit pas grandir ni sauter selon
+   qu'on lise le nom ou qu'on l'écrive.
+   Un champ haut de 18 px ne se vise pas au doigt : c'est donc le TITRE qui,
+   sur la fiche ouverte, réserve la hauteur du champ (—dvti-h). Le texte y reste
+   centré — line-height sur une ligne unique vaut centrage — et l'ellipse des
+   noms longs continue de fonctionner, ce qu'un flex aurait cassé. Les lignes
+   repliées, elles, gardent leur hauteur compacte : elles n'ont pas de champ. */
+.dvl.on .dvl-h .nm{line-height:var(--dvti-h)}
+.dvl-h .dvti{width:100%;height:var(--dvti-h);padding:0 8px;font-size:12.4px;font-weight:620;
+  background:var(--panel);border:1px dashed var(--line-2);box-shadow:none}
+.dvl-h .dvti::placeholder{font-weight:500;color:var(--ink-3)}
+.dvl-h .dvti:focus{border-style:solid;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-wash)}
 .dvl-h b{font-size:13px;white-space:nowrap}
 .dvl-b{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:0 11px 10px 28px}
 .dvl-b label{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3);font-weight:650;display:flex;flex-direction:column;gap:4px}
@@ -15035,7 +15048,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='EH';
+const BUILD='EI';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -16045,7 +16058,9 @@ function dvRemSet(i,k,v){ const l=DV.lignes[i]; if(!l) return;
  if(k==='remise') l.remise=(v===''||v==null)?0:Math.max(0,+v||0); else l.remiseType=v;
  renderDevis() }
 function dvAddLibre(){ DV.lignes.push({type:null, libre:'', com:'', reg:DV.lignes[0]?DV.lignes[0].reg:'visage',
-  z:{}, seances:1, prix:null, remise:0, remiseType:'%'}); dvLigne=DV.lignes.length-1; dvPlie=false; renderDevis() }
+  z:{}, seances:1, prix:null, remise:0, remiseType:'%'}); dvLigne=DV.lignes.length-1; dvPlie=false; renderDevis();
+ /* on ouvre une ligne à nommer : autant y poser le curseur */
+ dvFocusTitre(dvLigne) }
 /* cliquer une prestation du récapitulatif la rouvre */
 function dvSel(i){ dvLigne=i; dvPlie=false; renderDevis() }
 function dvSetLibre(i,v){ DV.lignes[i].libre=v }
@@ -16085,7 +16100,11 @@ function dvRetirerActe(i){
 function dvSetActe(t){ dvPlie=false;
  const l=dvL(), av=acteDef(l.type), ap=acteDef(t);
  if(l.type===t) return dvRetirerActe();     /* le même acte : on le repose */
- l.type=t; l.prix=null;
+ /* Une prestation est un acte du catalogue OU une ligne libre, jamais les deux.
+    Un intitulé laissé derrière soi ne se voit nulle part — chaque affichage
+    regarde le type d'abord — mais il traîne dans le devis enregistré, et le
+    prochain qui relira ces données se demandera lequel des deux fait foi. */
+ l.type=t; l.prix=null; l.libre=null;
  if(av.unite!==ap.unite) Object.keys(l.z).forEach(z=>l.z[z]=null);
  if(!regionsDe(t).includes(l.reg)){ l.reg=regionDef(t); l.z={} }
  dvMajFam();
@@ -16155,9 +16174,16 @@ function dvZoneAjout(i){
  e.value=''; l.z[id]=(l.type!==null&&acteDef(l.type).unite)?null:1; dvRecalc(l); renderDevis();
 }
 /* une prestation peut être libre d'emblée : rien n'oblige à passer par un acte */
-function dvLibreIci(i){ dvPlie=false; const l=DV.lignes[i!=null?i:dvLigne]; if(!l) return;
+function dvLibreIci(i){ const k=(i!=null?i:dvLigne); const l=DV.lignes[k]; if(!l) return;
+ dvPlie=false; dvLigne=k;
  l.type=null; l.libre=l.libre||''; l.z={}; renderDevis();
- const e=document.getElementById('dvLibre'); if(e) e.focus();
+ dvFocusTitre(k);
+}
+/* le champ d'intitulé de la prestation ouverte, s'il est à l'écran */
+function dvFocusTitre(i){
+ const e=document.getElementById('dvti'+(i!=null?i:dvLigne));
+ if(e){ e.focus(); e.setSelectionRange(e.value.length,e.value.length) }
+ return !!e;
 }
 /* barème : une zone se coche ou se décoche, un groupe entier d'un seul clic */
 function dvBarClic(ev,id,d){ dvPlie=false; if(ev&&ev.preventDefault) ev.preventDefault();
@@ -16219,10 +16245,13 @@ function dvAdd(){ DV.lignes.push({type:null,libre:null,com:'',reg:'visage',z:{},
 /* ✓ Confirmer : la prestation en cours est vérifiée, puis repliée dans la liste */
 function dvConfirmer(){
  const l=dvL(); if(!l) return false;
- if(l.type===null&&l.libre==null){
-   toast(`Prestation ${dvLigne+1} : choisissez l’acte, ou écrivez une ligne libre`); return false }
+ /* Un refus sans direction est un refus de plus. Le champ d'intitulé est sur la
+    fiche : on y pose le curseur en même temps qu'on dit ce qui manque. */
  if(l.type===null&&!String(l.libre||'').trim()){
-   toast(`Prestation ${dvLigne+1} : donnez un intitulé à la ligne libre`); return false }
+   if(l.libre==null){ l.libre=''; dvPlie=false; renderDevis() }
+   dvFocusTitre(dvLigne);
+   toast(`Prestation ${dvLigne+1} : donnez-lui un intitulé, ou choisissez un acte du catalogue`);
+   return false }
  dvPlie=true; renderDevis();
  toast((l.type===null?String(l.libre).trim():acteDef(l.type).n)+' — prestation confirmée');
  return true;
@@ -16242,12 +16271,11 @@ function dvPrixSet(i,v){ DV.lignes[i].prix=(v===''||v==null)?null:+v; renderDevi
 function dvEnregistrer(envoyer){
  const {net,rem}=dvNet();
  /* aucune ligne à 0 € sur un document remis au patient */
- const rien=DV.lignes.findIndex(l=>l.type===null&&l.libre==null);
- if(rien>=0){ dvLigne=rien; renderDevis();
-   toast(`Prestation ${rien+1} : choisissez l’acte`); return }
  const vide=DV.lignes.findIndex(l=>l.type===null&&!String(l.libre||'').trim());
- if(vide>=0){ dvLigne=vide; renderDevis();
-   toast(`Prestation ${vide+1} : donnez un intitulé à la ligne libre`); return }
+ if(vide>=0){ const l=DV.lignes[vide];
+   if(l.libre==null) l.libre='';
+   dvLigne=vide; dvPlie=false; renderDevis(); dvFocusTitre(vide);
+   toast(`Prestation ${vide+1} : donnez-lui un intitulé, ou choisissez un acte du catalogue`); return }
 
 
  const prest=DV.lignes.map(l=>({...l, z:{...l.z}, brut:dvPrix(l), montant:dvNetL(l),
@@ -16482,8 +16510,7 @@ function renderDevis(){
     :(L.type!==null?`<div class="ap-vide"><span class="mu">Acte retenu : <b style="color:var(--ink)">${esc(acteDef(L.type).n)}</b> —</span>
       <button class="btn xs" onclick="dvRetirerActe(${dvLigne})">✕ Retirer l’acte</button>
       <span class="mu">ou cliquez-en un autre ci-dessous</span></div>`:'')}
-   ${LIB?`<div class="ap-libre"><input class="inp" id="dvLibre" placeholder="Intitulé de la prestation — « Forfait 3 séances », « Consultation »…" value="${esc(L.libre||'')}"
-      oninput="dvSetLibre(${dvLigne},this.value)" onchange="renderDevis()">
+   ${LIB?`<div class="ap-libre"><span class="mu">Prestation libre — l’intitulé se saisit sur la fiche, en bas.</span>
       <button class="btn xs" onclick="dvReprendreActe(${dvLigne})">↩ Reprendre un acte du catalogue</button></div>`
     :`<div class="ap-l">${catsUtilisees().map(k=>{const G=actesDeCat(k);
        return G.length?`<div class="ap-g"><span class="ap-c">${esc(k)}</span>${G.map(c=>{const on=L.type===c.id;
@@ -16522,8 +16549,19 @@ function renderDevis(){
        const ouv=i===dvLigne&&!dvPlie;
        return `<div class="dvl ${ouv?'on':''}" onclick="dvSel(${i})">
         <div class="dvl-h"><span class="dot" style="background:${(lb||vd)?'var(--ink-3)':'var(--'+(c.col||'accent')+')'}"></span>
-         <div style="flex:1;min-width:0"><div class="nm">${vd?'<span class="mu">Acte à choisir</span>':esc(lb?(l.libre||'Prestation libre'):c.n)}</div>
-          <div class="mu" style="font-size:10.5px">${vd?'rien de sélectionné':lb?('ligne libre'+(zs?' · '+zs+' zone'+(zs>1?'s':''):'')):(regDef(l.reg).n||'')+(zs?' · '+zs+' zone'+(zs>1?'s':''):' · sans zone')}${dvRemL(l)?` · <b style="color:var(--good)">remise ${l.remiseType==='%'?nb(l.remise)+' %':EUR(l.remise)}</b>`:''}</div></div>
+         <div style="flex:1;min-width:0">${(ouv&&l.type===null)
+          /* Une prestation sans acte du catalogue se nomme À LA MAIN, et elle se
+             nomme LÀ : sur la fiche, au-dessus de la quantité, du montant et du
+             commentaire — pas dans un champ perdu en haut de la fenêtre. La carte
+             demandait tout sauf la seule chose qui la rende valide. */
+          ?`<input class="inp dvti" id="dvti${i}" autocomplete="off"
+             placeholder="Intitulé de la prestation — « Forfait 3 séances », « Consultation »…"
+             value="${esc(l.libre||'')}" onclick="event.stopPropagation()"
+             oninput="dvSetLibre(${i},this.value)" onchange="renderDevis()">`
+          :`<div class="nm">${vd?'<span class="mu">Acte à choisir</span>':esc(lb?(l.libre||'Prestation libre'):c.n)}</div>`}
+          <div class="mu" style="font-size:10.5px">${(ouv&&l.type===null)
+            ?'prestation libre — ou choisissez un acte du catalogue ci-dessus'
+            :vd?'rien de sélectionné':lb?('ligne libre'+(zs?' · '+zs+' zone'+(zs>1?'s':''):'')):(regDef(l.reg).n||'')+(zs?' · '+zs+' zone'+(zs>1?'s':''):' · sans zone')}${dvRemL(l)?` · <b style="color:var(--good)">remise ${l.remiseType==='%'?nb(l.remise)+' %':EUR(l.remise)}</b>`:''}</div></div>
          ${CAN('prix')?`<b>${EUR(dvNetL(l))}</b>`:''}
          <button class="rm" onclick="event.stopPropagation();dvDel(${i})">✕</button></div>
         ${ouv?`<div class="dvl-b">
