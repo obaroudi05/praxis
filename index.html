@@ -1074,6 +1074,14 @@ tr.neuf>td{background:color-mix(in srgb,var(--accent) 9%,transparent)}
 .dvl-b{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:0 11px 10px 28px}
 .dvl-b label{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3);font-weight:650;display:flex;flex-direction:column;gap:4px}
 .dvl-b .pxin .inp{width:100%}
+/* « Trois » ne veut rien dire tout seul : le mot qui suit le chiffre est
+   aussi important que le chiffre, et il se choisit — il ne se devine pas. */
+.qnat{display:flex;gap:6px;align-items:center}
+.qnat .step{flex:none}
+.qnat .inp{height:30px;font-size:12px;padding:0 22px 0 8px;min-width:0;flex:1;
+  text-transform:none;letter-spacing:0;font-weight:600}
+.qnat-n{display:block;margin-top:4px;font-size:10.5px;color:var(--accent);
+  text-transform:none;letter-spacing:0;font-weight:650}
 .recap{border:1px solid var(--line);border-radius:13px;background:var(--panel-2);overflow:hidden}
 .rc-h{display:flex;align-items:center;gap:6px;padding:9px 12px;font-size:12.5px;font-weight:680;
   border-bottom:1px solid var(--line);background:var(--panel-3);flex-wrap:wrap;row-gap:3px;
@@ -1348,6 +1356,29 @@ table.chrono.compact thead th{padding:7px 8px;white-space:nowrap}
 .forfc-r b{display:block;font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums}
 .forfc-r small{font-size:10.5px;color:var(--ink-3)}
 @media(max-width:900px){.forfc-j{display:none}}
+/* Le détail d'un forfait : ses séances, avec leurs dates. Un compte doit se
+   VÉRIFIER, pas se croire — surtout sur un soin déjà payé. */
+.forfd{margin:-3px 0 7px 11px;padding:7px 11px;border-left:2px solid var(--line-2)}
+.forfd-r{display:flex;align-items:center;gap:9px;padding:4px 0;font-size:12px;cursor:pointer;
+  border-bottom:1px solid var(--line)}
+.forfd-r:last-child{border-bottom:0}
+.forfd-r:hover{color:var(--accent)}
+.forfd-i{width:19px;height:19px;flex:none;border-radius:6px;background:var(--panel-3);
+  display:grid;place-items:center;font-size:10.5px;font-weight:700;color:var(--ink-2)}
+.forfd-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:560}
+.forfd-v,.forfd-a{font-size:11.5px;color:var(--ink-3);padding:4px 0}
+.forfd-a .chip{margin:3px 4px 0 0}
+/* Le formulaire d'ouverture */
+.forff{background:var(--panel-2);border:1px solid var(--line-2);border-radius:12px;
+  padding:12px 13px;margin-bottom:12px}
+.forff-t{font-size:13px;font-weight:660;margin-bottom:9px}
+.forff-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:9px}
+.forff-g label{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3);
+  font-weight:650;display:flex;flex-direction:column;gap:4px;min-width:0}
+.forff-g .inp{width:100%;text-transform:none;letter-spacing:0;font-weight:500}
+.forff-g small{font-size:10.5px;color:var(--ink-3);text-transform:none;letter-spacing:0;font-weight:500}
+.forff-r{margin-top:10px;padding-top:9px;border-top:1px dashed var(--line)}
+.forff-b{display:flex;justify-content:flex-end;gap:7px;margin-top:11px}
 .ct-a .s,.ct-p .s{display:block;font-size:10.5px;color:var(--ink-3);font-weight:450;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3}
 .ct-p{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -3457,53 +3488,207 @@ DEVIS.forEach(d=>{ d.fam=d.fam||((d.lignes[0]&&acteDef(d.lignes[0][0]).fam)||'es
    ========================================================================== */
 const FORF_SEUIL=2;                 /* en deçà, c'est une séance, pas un forfait */
 /* ---------------------------------------------------------------------------
-   Deux, de quoi ?
+   « Trois », de quoi ?
    ---------------------------------------------------------------------------
-   « Acide hyaluronique × 2 à 350 € », ce sont deux SERINGUES en une séance.
-   « Laser épilation × 8 à 120 € », ce sont huit SÉANCES. La quantité d'une
-   ligne de devis dit les deux, et rien ne les distinguait : tout se comptait
-   en forfaits, si bien qu'une patiente venue une fois pour deux seringues se
-   retrouvait avec un forfait à moitié consommé qu'elle n'avait jamais acheté.
+   « Acide hyaluronique × 3 », ce sont trois SERINGUES en une séance. « Laser
+   × 3 », ce sont trois SÉANCES. Le même chiffre, deux sens opposés, et un
+   forfait fantôme à la clé si l'on se trompe.
 
-   Ce qui les sépare est déjà dans le catalogue : un acte qui se DOSE (ml, U)
-   vend ses doses ; un acte sans dose — laser, peeling, radiofréquence — ne
-   peut vendre que des séances. La ligne garde le dernier mot : `forfait:true`
-   ou `false` sur la prestation tranche, pour le cas qui échappe à la règle. */
+   La première version DÉDUISAIT : un acte qui se dose vend des doses, un acte
+   sans dose vend des séances. Ça tombe juste presque toujours — et ça tombe
+   faux le jour où l'on vend une cure de trois séances de skinbooster, qui se
+   dose en ml. « Presque toujours » ne vaut rien sur un soin déjà payé : la
+   dispute au comptoir, c'est le cabinet qui la perd.
+
+   On ne déduit donc plus : la quantité PORTE sa nature. `p.qn:'seances'` ou
+   `p.qn:'dose'` est écrit au moment de la vente, par la personne qui sait ce
+   qu'elle vend. L'ancienne règle ne sert plus qu'à relire les devis saisis
+   avant ce jour — c'est une reprise d'historique, pas une décision. */
 const ligneEstForfait=p=>{
  if(!p) return false;
- if(p.forfait===true||p.forfait===false) return p.forfait;
+ if(p.qn==='seances') return Math.max(1,+p.seances||1)>=FORF_SEUIL;
+ if(p.qn==='dose') return false;
+ if(p.forfait===true||p.forfait===false) return p.forfait;   /* ancien dépassement */
  if(Math.max(1,+p.seances||1)<FORF_SEUIL) return false;
- return !(p.type&&acteDef(p.type).unite);
+ return !(p.type&&acteDef(p.type).unite);                    /* reprise d'historique */
 };
-const clefForf=(did,i)=>String(did)+'#'+i;
+/* la nature par défaut d'une quantité, pour un acte donné : celle qu'on
+   proposera, jamais celle qu'on imposera */
+const qnDefaut=t=>(t&&acteDef(t).unite)?'dose':'seances';
+const qnMot=(t,n)=>((t&&acteDef(t).unite&&qnDefaut(t)==='dose')?acteDef(t).unite
+  :`séance${(n||1)>1?'s':''}`);
+
+/* ==========================================================================
+   Le registre des forfaits
+   ==========================================================================
+   Un forfait était lu dans la ligne de devis qui l'avait vendu. C'était
+   économe, et ça interdisait le cas le plus courant du comptoir : six séances
+   vendues de vive voix, encaissées, sans devis. Fabriquer un devis fantôme
+   pour contourner ça aurait été pire — il serait entré dans le taux de
+   conversion et aurait fait croire à des devis acceptés qui n'ont jamais été
+   proposés. On ne truque pas les chiffres de pilotage pour s'éviter une table.
+
+   Le forfait est donc un objet à part entière. Il naît d'un devis accepté ou
+   d'une saisie directe ; dans les deux cas il vit au même endroit, et l'acte
+   n'en retient que l'identifiant. */
+let FORFAITS=[];
+let forfSeq=1;
+const forfNouvelId=()=>'F-'+String(forfSeq++).padStart(4,'0');
+const forfaitById=id=>FORFAITS.find(f=>f.id===id)||null;
 /* les actes rattachés à un forfait, dans l'ordre où ils ont été faits */
-const seancesForf=k=>ACTES.filter(a=>a.forfait&&clefForf(a.forfait.d,a.forfait.i)===k)
+const seancesForf=id=>ACTES.filter(a=>a.forfait===id)
   .sort((a,b)=>String(a.date).localeCompare(String(b.date))||(a.id-b.id));
-/* tout ce qu'on sait d'un forfait, à partir de la ligne de devis qui l'a vendu */
-function forfaitInfo(d,i){
- if(!d) return null;
- const p=(d.prest||[])[i]; if(!p) return null;
- const n=Math.max(1,+p.seances||1);
- const k=clefForf(d.id,i), S=seancesForf(k);
- return {k, devis:d.id, i, t:p.type||null,
-   nom:(p.libre||'').trim()||(p.type?acteDef(p.type).n:'Prestation'),
-   n, montant:+p.montant||0, pu:n?Math.round((+p.montant||0)/n):0,
-   date:d.decide||d.date, seances:S, faites:S.length, reste:Math.max(0,n-S.length)};
+/* tout ce qu'on sait d'un forfait — son état se recalcule, il ne se stocke pas :
+   un compteur qu'on incrémente finit toujours par mentir après une suppression */
+function forfaitInfo(f){
+ if(!f) return null;
+ const n=Math.max(1,+f.n||1), S=seancesForf(f.id);
+ return {k:f.id, id:f.id, patient:f.patient, t:f.t||null, nom:f.nom,
+   n, montant:+f.montant||0, pu:n?Math.round((+f.montant||0)/n):0,
+   date:f.date, devis:f.devis||null, source:f.devis?'devis':'direct', note:f.note||'',
+   seances:S, faites:S.length, reste:Math.max(0,n-S.length)};
 }
-const forfaitParClef=k=>{ const [did,i]=String(k).split('#');
- return forfaitInfo(DEVIS.find(d=>String(d.id)===did), +i) };
+const forfaitParClef=id=>forfaitInfo(forfaitById(id));
 /* les forfaits d'un patient — le plus récent d'abord */
-function forfaitsDe(pid){
- return DEVIS.filter(d=>d.patient===pid&&d.statut==='accepte')
-   .flatMap(d=>(d.prest||[]).map((p,i)=>({d,i,p})))
-   .filter(o=>ligneEstForfait(o.p))
-   .map(o=>forfaitInfo(o.d,o.i)).filter(Boolean)
-   .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-}
+const forfaitsDe=pid=>FORFAITS.filter(f=>f.patient===pid)
+  .map(forfaitInfo).filter(Boolean)
+  .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
 /* ceux qu'on peut encore honorer, pour un acte donné */
 const forfaitsOuverts=(pid,t)=>forfaitsDe(pid)
   .filter(f=>f.reste>0&&(!t||f.t===t));
-const forfaitDe=a=>(a&&a.forfait)?forfaitParClef(clefForf(a.forfait.d,a.forfait.i)):null;
+const forfaitDe=a=>(a&&a.forfait)?forfaitParClef(a.forfait):null;
+/* ouvrir un forfait — par un devis accepté, ou au comptoir */
+function creerForfait({patient,t,nom,n,montant,date,devis,ligne,note}){
+ const f={id:forfNouvelId(), patient, t:t||null,
+   nom:(nom||'').trim()||(t?acteDef(t).n:'Forfait'),
+   n:Math.max(1,+n||1), montant:+montant||0, date:date||TODAYS,
+   devis:devis||null, ligne:(ligne==null?null:ligne), note:note||''};
+ FORFAITS.push(f); return f;
+}
+/* Un devis s'accepte PAR ICI, et nulle part ailleurs. Quatre endroits du
+   logiciel posaient « accepté » chacun de son côté — la signature dans
+   l'encadré, la signature à distance, le parapheur, la réalisation en séance.
+   Ouvrir les forfaits depuis l'un d'eux seulement, c'était garantir qu'un
+   patient sur quatre n'aurait pas le sien. Une seule porte, donc. */
+function accepterDevis(d,quand){
+ if(!d) return [];
+ d.statut='accepte'; d.derniere=quand||TODAYS;
+ if(!d.decide) d.decide=d.derniere;
+ const F=forfaitsDuDevis(d);
+ if(F.length) toast(F.length>1
+   ? `${F.length} forfaits ouverts — ${F.map(f=>f.n+' séances de '+f.nom).join(', ')}`
+   : `Forfait ouvert — ${F[0].n} séances de ${F[0].nom}`);
+ return F;
+}
+/* un devis accepté ouvre ses forfaits — une fois, et pas deux */
+function forfaitsDuDevis(d){
+ if(!d||d.statut!=='accepte') return [];
+ return (d.prest||[]).map((p,i)=>{
+   if(!ligneEstForfait(p)) return null;
+   const dej=FORFAITS.find(f=>f.devis===d.id&&f.ligne===i);
+   if(dej) return dej;
+   return creerForfait({patient:d.patient, t:p.type,
+     nom:(p.libre||'').trim()||(p.type?acteDef(p.type).n:'Prestation'),
+     n:p.seances, montant:p.montant, date:d.decide||d.date, devis:d.id, ligne:i});
+ }).filter(Boolean);
+}
+/* ==========================================================================
+   Ouvrir un forfait au comptoir, et rattraper ce qui a déjà été fait
+   ==========================================================================
+   Six séances vendues de vive voix, encaissées, sans devis : c'est le cas le
+   plus courant et c'était le seul impossible. Et lorsqu'un forfait se vend à
+   quelqu'un qui a déjà fait deux séances au coup par coup, ces deux-là
+   doivent pouvoir y entrer — sans quoi le compte démarre à 1/6 quand il en
+   est déjà à 3/6, et c'est le patient qui a raison. */
+let FRF=null;                       /* le formulaire d'ouverture, quand il est à l'écran */
+let FORF_VU=null;                   /* le forfait dont on a déplié les séances */
+/* Le formulaire d'ouverture. Il montre, dans le même écran, les séances déjà
+   faites de cet acte : c'est le moment où l'on sait si elles font partie du
+   marché, et le seul où l'on y pensera. */
+function formForfait(p){
+ if(!FRF||FRF.pid!==p.id) return '';
+ const T=CATALOGUE.filter(c=>!c.unite||c.zoned);
+ const R=frfRattrapables(p.id,FRF.t);
+ const n=Math.max(1,+FRF.n||1);
+ const pu=n?Math.round((+String(FRF.montant).replace(',','.')||0)/n):0;
+ return `<div class="forff">
+  <div class="forff-t">◉ Ouvrir un forfait pour ${esc(fn(p))}</div>
+  <div class="forff-g">
+   <label>Acte<select class="inp" onchange="frfSet('t',this.value)">
+     ${T.map(c=>`<option value="${c.id}" ${FRF.t===c.id?'selected':''}>${esc(c.n)}</option>`).join('')}</select></label>
+   <label>Nombre de séances<input class="inp" type="number" min="2" max="60"
+     value="${n}" onchange="frfSet('n',this.value)"></label>
+   ${CAN('prix')?`<label>Montant total<div class="pxin">
+     <input class="inp" type="number" min="0" step="10" value="${esc(String(FRF.montant))}"
+       onchange="frfSet('montant',this.value)"><span>€</span></div>
+     <small>${pu?EUR(pu)+' la séance':'à renseigner'}</small></label>`:''}
+   <label>Vendu le<input class="inp" type="date" value="${esc(FRF.date)}"
+     onchange="frfSet('date',this.value)"></label>
+  </div>
+  ${R.length?`<div class="forff-r">
+    <div class="sc-lb" style="margin:0 0 5px">Séances déjà faites, hors forfait
+      <span class="mu" style="text-transform:none;letter-spacing:0;font-weight:500">— cochez celles que ce forfait couvre</span></div>
+    <div class="chips">${R.map(a=>`<button class="chip xs ${FRF.rattrape.includes(a.id)?'on':''}"
+      onclick="frfToggle(${a.id})" title="${esc(a.nom+' — '+DF(a.date))}">${FRF.rattrape.includes(a.id)?'✓ ':''}${DF(a.date)}</button>`).join('')}</div>
+    ${FRF.rattrape.length?`<div class="mu" style="font-size:11px;margin-top:5px">Le forfait démarrera à ${FRF.rattrape.length}/${n}.</div>`:''}
+   </div>`:''}
+  <div class="forff-b">
+   <button class="btn" onclick="frfAnnuler()">Annuler</button>
+   <button class="btn p" onclick="frfValider()">Ouvrir le forfait</button></div>
+ </div>`;
+}
+function ouvrirForfait(pid){
+ const T=CATALOGUE.filter(c=>c.zoned||!c.unite);
+ FRF={pid, t:(T[0]||CATALOGUE[0]).id, n:6, montant:'', date:TODAYS, note:'', rattrape:[]};
+ FRF.montant=String((acteDef(FRF.t).prix||0)*FRF.n);
+ paint();
+}
+function frfSet(k,v){ if(!FRF) return;
+ if(k==='t'){ FRF.t=v; FRF.rattrape=[]; FRF.montant=String((acteDef(v).prix||0)*Math.max(1,+FRF.n||1)) }
+ else if(k==='n'){ FRF.n=Math.max(1,Math.min(60,+v||1));
+   FRF.rattrape=FRF.rattrape.slice(0,FRF.n);
+   FRF.montant=String((acteDef(FRF.t).prix||0)*FRF.n) }
+ else FRF[k]=v;
+ paint();
+}
+/* les séances déjà faites qu'on peut ranger dans ce forfait : même patient,
+   même acte, et pas déjà rangées ailleurs */
+const frfRattrapables=(pid,t)=>ACTES.filter(a=>a.patient===pid&&a.type===t&&!a.forfait)
+  .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+function frfToggle(id){ if(!FRF) return;
+ const i=FRF.rattrape.indexOf(id);
+ if(i>=0) FRF.rattrape.splice(i,1);
+ else { if(FRF.rattrape.length>=FRF.n){
+     toast(`Ce forfait ne compte que ${FRF.n} séance${FRF.n>1?'s':''}`); return }
+   FRF.rattrape.push(id) }
+ paint();
+}
+function frfValider(){
+ if(!FRF) return;
+ const n=Math.max(1,+FRF.n||1);
+ if(n<FORF_SEUIL){ toast('Un forfait compte au moins deux séances'); return }
+ const f=creerForfait({patient:FRF.pid, t:FRF.t, nom:acteDef(FRF.t).n, n,
+   montant:+String(FRF.montant).replace(',','.')||0, date:FRF.date, note:FRF.note});
+ FRF.rattrape.forEach(id=>{ const a=ACTES.find(x=>x.id===id); if(a) a.forfait=f.id });
+ const r=FRF.rattrape.length;
+ FRF=null; paint();
+ toast(`Forfait ouvert — ${n} séances de ${acteDef(f.t).n}`
+   +(r?` · ${r} séance${r>1?'s':''} déjà faite${r>1?'s':''} y ${r>1?'ont':'a'} été rangée${r>1?'s':''}`:''));
+}
+function frfAnnuler(){ FRF=null; paint() }
+/* ranger ou sortir une séance DÉJÀ enregistrée */
+function acteVersForfait(aid,fid){
+ const a=ACTES.find(x=>x.id===aid); if(!a) return;
+ if(!fid){ a.forfait=null; paint(); if(AS&&AS.aid===aid){AS.forfait=null;AS.forfaitOff=true;renderOver()}
+   toast('Séance sortie du forfait'); return }
+ const f=forfaitParClef(fid); if(!f) return;
+ if(f.reste<=0&&a.forfait!==fid){
+   toast(`« ${f.nom} » est complet — ses ${f.n} séances sont faites`); return }
+ a.forfait=fid; paint();
+ if(AS&&AS.aid===aid){ AS.forfait=fid; AS.forfaitOff=false; renderOver() }
+ const g=forfaitParClef(fid);
+ toast(`Séance rangée dans « ${g.nom} » — ${g.faites}/${g.n}`);
+}
 /* le rang de CETTE séance dans son forfait */
 function rangSeance(a){
  const f=forfaitDe(a); if(!f) return null;
@@ -3603,7 +3788,10 @@ function bdgSeance(a){
     const L=ACTES.filter(a=>a.patient===d.patient&&a.type===p.type
         &&String(a.date)>=String(dep)&&!pris.has(a.id))
       .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
-    L.slice(0,n).forEach(a=>{ a.forfait={d:d.id, i}; pris.add(a.id) });
+    const f=creerForfait({patient:d.patient, t:p.type,
+      nom:(p.libre||'').trim()||acteDef(p.type).n,
+      n, montant:p.montant, date:dep, devis:d.id, ligne:i});
+    L.slice(0,n).forEach(a=>{ a.forfait=f.id; pris.add(a.id) });
     /* Un jeu de démonstration doit être CRÉDIBLE, sans quoi il fait douter du
        logiciel plutôt que de lui-même. Les devis de la démo ont été tirés
        indépendamment des actes : beaucoup vendaient des séances qu'aucune
@@ -3612,7 +3800,9 @@ function bdgSeance(a){
        Une vente récente sans séance reste un forfait — c'est le cas normal du
        patient qui prendra rendez-vous. Une vente ancienne qui n'a JAMAIS rien
        produit redevient ce qu'elle était : une ligne à plusieurs unités. */
-    if(!L.length && days(dep, TODAY) > 120) p.forfait=false;
+    if(!L.length && days(dep, TODAY) > 120){
+      p.qn='dose'; FORFAITS.splice(FORFAITS.indexOf(f),1);
+    }
   }));
 })();
 
@@ -8160,21 +8350,44 @@ function pDetail(p){
    </div>`}
    ${antBloquants(p).length?`<div class="tip" style="margin:0 0 14px;background:var(--warn-w)"><span class="e">⚠</span><div><b>Antécédent bloquant.</b> ${antBloquants(p).map(a=>esc(a)).join(' · ')} — un avertissement s'affiche avant toute saisie d'acte injectable.</div></div>`:''}
    ${(()=>{ const F=forfaitsDe(p.id).filter(f=>f.reste>0);
-     if(!F.length) return '';
+     const form=(FRF&&FRF.pid===p.id)?formForfait(p):'';
+     if(!F.length) return form?`<div class="subh"><h3>Forfaits</h3></div>${form}`
+       :`<div class="subh"><h3>Forfaits</h3>
+          <div class="r"><button class="btn xs" onclick="ouvrirForfait(${p.id})">◉ Ouvrir un forfait</button></div></div>
+        <div class="v mu" style="margin-bottom:14px">Aucun forfait en cours. Un devis accepté vendu en séances en ouvre un ;
+          « Ouvrir un forfait » sert quand la vente s'est faite au comptoir, sans devis.</div>`;
      /* « Combien lui en reste-t-il ? » est la question qu'on pose au comptoir,
         et il fallait jusqu'ici ouvrir un acte pour y répondre. Aucune alerte,
         aucune échéance : l'espacement entre deux séances ne regarde pas le
         logiciel. On compte, on affiche. */
-     return `<div class="subh"><h3>Forfaits en cours<span>${F.length}</span></h3></div>
-      <div class="forfl">${F.map(f=>`<div class="forfc" title="${esc(
-        `Vendu le ${DF(f.date)} — devis ${f.devis}`+(f.montant?` · ${EUR(f.montant)}`:''))}">
+     return `<div class="subh"><h3>Forfaits en cours<span>${F.length}</span></h3>
+        <div class="r"><button class="btn xs" onclick="ouvrirForfait(${p.id})">◉ Ouvrir un forfait</button></div></div>
+      ${form}
+      <div class="forfl">${F.map(f=>`<div class="forfc">
         <div class="forfc-n">${esc(f.nom)}
-          <small>vendu le ${DF(f.date)}${CAN('prix')&&f.montant?` · ${EUR(f.pu)} la séance`:''}</small></div>
-        <div class="forfc-j"><div class="forfc-b" style="width:${Math.round(f.faites/f.n*100)}%"></div></div>
+          <small>${f.source==='devis'?`vendu le ${DF(f.date)} · devis ${esc(f.devis)}`
+            :`ouvert le ${DF(f.date)} au comptoir`}${CAN('prix')&&f.montant?` · ${EUR(f.pu)} la séance`:''}</small></div>
+        <div class="forfc-j" title="${esc(f.faites+' séance'+(f.faites>1?'s':'')+' sur '+f.n)}"><div class="forfc-b" style="width:${Math.round(f.faites/f.n*100)}%"></div></div>
         <div class="forfc-r"><b>${f.faites}/${f.n}</b>
           <small>${f.reste} à venir</small></div>
-        <button class="btn xs" onclick="go('devis','${esc(f.devis)}')" title="Voir le devis qui l’a vendu">◫</button>
-      </div>`).join('')}</div>` })()}
+        ${f.devis?`<button class="btn xs" onclick="go('devis','${esc(f.devis)}')" title="Voir le devis qui l’a vendu">◫</button>`:''}
+        <button class="btn xs" onclick="FORF_VU=(FORF_VU==='${esc(f.id)}'?null:'${esc(f.id)}');paint()"
+          title="Voir les séances qui décomptent ce forfait">${FORF_VU===f.id?'▾':'›'}</button>
+      </div>
+      ${FORF_VU===f.id?`<div class="forfd">
+        ${f.seances.length?f.seances.map((a,j)=>`<div class="forfd-r" onclick="openActe(${a.patient},${a.id})">
+            <span class="forfd-i">${j+1}</span>
+            <span class="mono">${DF(a.date)}</span>
+            <span class="forfd-n">${esc(a.nom)}</span>
+            <span class="mu">${esc(a.praticien||'')}</span>
+            <button class="btn xs" onclick="event.stopPropagation();acteVersForfait(${a.id},null)"
+              title="Sortir cette séance du forfait">✕</button></div>`).join('')
+          :'<div class="forfd-v">Aucune séance encore rangée dans ce forfait.</div>'}
+        ${(()=>{ const R=frfRattrapables(p.id,f.t).slice(0,6);
+          return (f.reste>0&&R.length)?`<div class="forfd-a">À rattraper — séances de cet acte hors forfait :
+            ${R.map(a=>`<button class="chip xs" onclick="acteVersForfait(${a.id},'${esc(f.id)}')"
+              title="Ranger cette séance dans le forfait">${DF(a.date)}</button>`).join('')}</div>`:'' })()}
+      </div>`:''}`).join('')}</div>` })()}
    <div class="subh"><h3>Actes réalisés<span>${A.length}</span></h3>
      <div class="r">${A.length?`<button class="btn xs" onclick="pTab='schema';paint()">Voir le schéma cumulé</button>`:''}
      <button class="btn xs" onclick="dvChoix(${p.id})">📄 Devis sans acte</button>
@@ -13010,7 +13223,7 @@ function openActe(pid,aid,np){
      /* Une séance déjà enregistrée montre le forfait où elle EST rangée, pas
         celui où elle irait. Et une séance enregistrée hors forfait le reste :
         rouvrir un dossier ne doit rien décompter. */
-     forfait:(a&&a.forfait)?clefForf(a.forfait.d,a.forfait.i):null,
+     forfait:(a&&a.forfait)||null,
      forfaitOff:!!(a&&!a.forfait),
      conso:[], consoOff:[], consoAdd:false, prepOpen:null, csQ:'', csFam:'', csOpen:true,
      but:a?'acte':'acte',                       /* 'acte' = consultation du jour · 'devis' = projet */
@@ -14847,16 +15060,14 @@ function saveActe(){
   conso:C.conso,zones,consent:AS.consent,effets:AS.effets||'',note:AS.note||'',
   seances:seancesMax(), devis:AS.devis||null,
   /* la séance se range sous le forfait qui l'a vendue — ou sous rien du tout */
-  forfait:(()=>{ const f=forfaitSeance();
-    if(!f) return null; const [d0,i0]=String(f.k).split('#');
-    return {d:(DEVIS.find(x=>String(x.id)===d0)||{}).id, i:+i0} })(),
+  forfait:(()=>{ const f=forfaitSeance(); return f?f.id:null })(),
   zonesNote:(AS.soins||[]).map(x=>(x.com||'').trim()).filter(Boolean).join(' · ')||AS.zonesNote||'',
   prix:null});                       /* l'acte ne porte pas de montant : il se facture après */
  DEVIS.filter(d=>!d.acte&&d.patient===AS.pid&&d.date===AS.date).forEach(d=>{d.acte=ACTES[0].id});
  const nDoc=(AS.docs||[]).filter(m=>addDocActe(ACTES[0].id,m,true)).length;
  if(AS.devis){ const dv=DEVIS.find(x=>x.id===AS.devis);
   if(dv){ dv.realise=ACTES[0].id; dv.acte=dv.acte||ACTES[0].id;
-   if(dv.statut!=='accepte'){ dv.statut='accepte'; dv.derniere=TODAYS }
+   if(dv.statut!=='accepte') accepterDevis(dv);
    logDoc(dv.id,`Devis réalisé — consultation du ${DF(AS.date)}`) } }
  /* les consommables préparés deviennent les lignes tracées de l'acte,
     et ce sont eux — et rien d'autre — qui décomptent le stock */
@@ -15009,7 +15220,7 @@ function signerDevis(id){
  if(d.statut==='accepte'&&signOf(id)){toast('Ce devis est déjà signé');return}
  const p=pById(d.patient);
  ouvrirSign(id, nomDevis(d), `${d.id} · ${fn(p)}${CAN('prix')?' · '+EUR(d.montant):''}`, fn(p), mode=>{
-  d.statut='accepte'; d.derniere=TODAYS;
+  accepterDevis(d);
   logDoc(id, mode==='papier'
     ? 'Devis accepté — signé à la main sur un exemplaire papier'
     : 'Devis accepté — signé dans l’encadré par le patient', fn(p));
@@ -15661,7 +15872,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='EK';
+const BUILD='EL';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -16290,8 +16501,7 @@ function signerADistance(j){
   logDoc(l.docId, mode==='papier'
     ? 'Signé à la main et retourné au cabinet'
     : 'Signé à distance par le patient — lien sécurisé', fn(p));
-  if(l.docK==='devis'){ const d=DEVIS.find(x=>x.id===l.docId);
-    if(d){ d.statut='accepte'; d.derniere=TODAYS } }
+  if(l.docK==='devis'){ const d=DEVIS.find(x=>x.id===l.docId); if(d) accepterDevis(d) }
   else { const a=ACTES.find(x=>x.id===l.aid); if(a) a.consent=true;
     const lb=libById(l.docId); if(lb) lb.signe=l.signe }
   paint(); if(AS) renderOver();
@@ -16429,8 +16639,7 @@ function parCorps(pc){
 }
 /* ce que la signature d'une pièce change dans le dossier */
 function parEffet(pc, mode, t){
- if(pc.ref.t==='devis'){ const d=DEVIS.find(x=>x.id===pc.ref.id);
-   if(d){ d.statut='accepte'; d.derniere=TODAYS } return }
+ if(pc.ref.t==='devis'){ const d=DEVIS.find(x=>x.id===pc.ref.id); if(d) accepterDevis(d); return }
  if(pc.ref.t==='lib'){ const x=libById(pc.ref.id); if(x) x.signe=t; return }
  const a=ACTES.find(y=>y.id===pc.ref.aid); if(!a) return;
  if(pc.id==='CONS-'+a.id){ a.consent=true; if(AS&&AS.aid===a.id) AS.consent=true }
@@ -16878,6 +17087,18 @@ function dvKey(e){
 }
 function dvDel(i){ if(DV.lignes.length<2){toast('Un devis comporte au moins une prestation');return} DV.lignes.splice(i,1); dvLigne=Math.max(0,dvLigne-(i<=dvLigne?1:0)); dvMajFam(); renderDevis() }
 function dvSeances(i,d,v){ const l=DV.lignes[i]; l.seances=Math.max(1, v!=null?v:((l.seances||1)+d)); l.prix=null; renderDevis() }
+/* la nature d'une quantité, sur une ligne de devis : ce que dit le chiffre */
+const uniteLigne=l=>((l&&l.type&&acteDef(l.type).unite)||'prestations');
+const qnLigne=l=>{ if(!l) return 'seances';
+ if(l.qn==='seances'||l.qn==='dose') return l.qn;
+ return qnDefaut(l.type) };
+function dvQn(i,v){ const l=DV.lignes[i]; if(!l) return;
+ l.qn=(v==='dose')?'dose':'seances'; renderDevis();
+ if(l.qn==='seances'&&(l.seances||1)>=FORF_SEUIL)
+   toast(`${l.seances} séances — un forfait s'ouvrira à l'acceptation du devis`);
+ else if(l.qn==='dose')
+   toast(`${l.seances||1} ${uniteLigne(l)} — une seule séance, aucun forfait`);
+}
 function dvCom(i,v){ DV.lignes[i].com=v }
 function dvPrixSet(i,v){ DV.lignes[i].prix=(v===''||v==null)?null:+v; renderDevis() }
 
@@ -17178,9 +17399,19 @@ function renderDevis(){
          ${CAN('prix')?`<b>${EUR(dvNetL(l))}</b>`:''}
          <button class="rm" onclick="event.stopPropagation();dvDel(${i})">✕</button></div>
         ${ouv?`<div class="dvl-b">
-          <label>Quantité<div class="step"><button onclick="event.stopPropagation();dvSeances(${i},-1)">−</button>
-            <input class="qin" type="number" min="1" value="${l.seances||1}" onclick="event.stopPropagation()" onchange="dvSeances(${i},0,+this.value)">
-            <button onclick="event.stopPropagation();dvSeances(${i},1)">+</button></div></label>
+          <label>Quantité
+            <div class="qnat">
+              <div class="step"><button onclick="event.stopPropagation();dvSeances(${i},-1)">−</button>
+                <input class="qin" type="number" min="1" value="${l.seances||1}" onclick="event.stopPropagation()" onchange="dvSeances(${i},0,+this.value)">
+                <button onclick="event.stopPropagation();dvSeances(${i},1)">+</button></div>
+              <select class="inp" onclick="event.stopPropagation()" onchange="dvQn(${i},this.value)"
+                title="« 3 », est-ce trois séances ou trois ${esc(uniteLigne(l))} ? C'est ici que ça se dit — le logiciel ne le devine pas.">
+                <option value="seances" ${qnLigne(l)==='seances'?'selected':''}>séance${(l.seances||1)>1?'s':''}</option>
+                <option value="dose" ${qnLigne(l)==='dose'?'selected':''}>${esc(uniteLigne(l))}</option>
+              </select>
+            </div>
+            ${(l.seances||1)>=2&&qnLigne(l)==='seances'
+              ?`<span class="qnat-n">forfait de ${l.seances} séances</span>`:''}</label>
           ${CAN('prix')?`<label>Montant<div class="pxin"><input class="inp" type="number" min="0" step="5" value="${dvPrix(l)}"
             onclick="event.stopPropagation()" onchange="dvPrixSet(${i},this.value)"><span>€</span></div></label>
           <label>Remise sur cette prestation<div style="display:flex;gap:4px">
