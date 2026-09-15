@@ -12365,7 +12365,11 @@ function openMsg(modId,pid,list){
  const m=modById(modId)||MODELES[0];
  MS={mod:m.id, ids:list&&list.length?list:[pid], texte:m.texte, canal:m.canal};
  renderMsg();
- document.getElementById('over').classList.add('on');
+ /* Écrire un message n'est pas saisir une séance : il n'y a ni schéma de visage
+    ni longue trame à remplir. Cette fenêtre prenait pourtant tout l'écran,
+    comme le composeur d'acte, alors qu'elle tient dans une modale — et que le
+    rappel du patient perdu de vue, juste à côté, s'ouvrait déjà ainsi. */
+ const o=document.getElementById('over'); o.classList.add('mini'); o.classList.add('on');
  document.getElementById('scrim').classList.add('on');
 }
 function bulkMsg(modId,ids){ if(!ids||!ids.length){toast('Aucun destinataire sur cette liste');return} openMsg(modId,null,ids) }
@@ -15020,7 +15024,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='EF';
+const BUILD='EG';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
