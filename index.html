@@ -1318,6 +1318,36 @@ table.chrono.compact tr.c td{vertical-align:middle;padding:6px 8px;font-size:12p
 table.chrono.compact thead th{padding:7px 8px;white-space:nowrap}
 .ct-a b{display:block;font-weight:650;font-size:12.5px;line-height:1.25;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Le rang d'une séance dans son forfait. Il vit dans une sous-ligne sourde
+   sans en prendre la couleur : c'est la seule information de cette ligne que
+   le praticien vient vraiment y chercher. */
+.sean{color:var(--ink-2);font-weight:520;white-space:nowrap}
+/* `display:inline` n'est pas décoratif : dans la colonne « Acte », `.ct-a b`
+   est un BLOC — c'est lui qui pose le nom de l'acte au-dessus de sa catégorie.
+   Un <b> posé dans la sous-ligne héritait de cette règle, passait à la ligne
+   et faisait grandir toute la rangée de 13 px. */
+.sean b{display:inline;font-weight:700;font-size:inherit;font-variant-numeric:tabular-nums;
+  min-width:0;flex:initial;color:inherit}
+/* le forfait se distingue du rappel de devis sans crier : un liseré, pas un fond */
+.dvi.forf{border:1px solid var(--line-2)}
+.dvi.forf .sean{font-size:12px}
+.forf-b{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.forf-b .btn{margin-top:0}
+/* Les forfaits en cours, sur la fiche : une ligne par forfait, une jauge qui
+   dit d'un regard où l'on en est. Pas de rouge, pas d'alerte — un forfait qui
+   traîne n'est pas une anomalie, c'est un patient qui prend son temps. */
+.forfl{display:grid;gap:7px;margin-bottom:14px}
+.forfc{display:flex;align-items:center;gap:11px;padding:8px 11px;background:var(--panel-2);
+  border:1px solid var(--line);border-radius:11px}
+.forfc-n{flex:1;min-width:0;font-size:12.5px;font-weight:620;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.forfc-n small{display:block;font-size:10.5px;color:var(--ink-3);font-weight:450;margin-top:1px}
+.forfc-j{flex:none;width:96px;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.forfc-b{height:100%;background:var(--accent);border-radius:3px}
+.forfc-r{flex:none;text-align:right;min-width:62px}
+.forfc-r b{display:block;font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums}
+.forfc-r small{font-size:10.5px;color:var(--ink-3)}
+@media(max-width:900px){.forfc-j{display:none}}
 .ct-a .s,.ct-p .s{display:block;font-size:10.5px;color:var(--ink-3);font-weight:450;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3}
 .ct-p{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -3406,6 +3436,186 @@ DEVIS.forEach(d=>{ d.fam=d.fam||((d.lignes[0]&&acteDef(d.lignes[0][0]).fam)||'es
    .map(x=>({x,dd:Math.abs(days(x.date,d.date))})).filter(o=>o.dd<=10).sort((p,q)=>p.dd-q.dd);
  if(A.length) d.acte=A[0].x.id;
 });
+/* ==========================================================================
+   Les forfaits — un soin vendu en plusieurs séances
+   ==========================================================================
+   Un forfait naît d'une VENTE, pas du catalogue : « épilation, 8 séances à
+   120 € » se décide devis par devis, parce qu'une patiente en prend six et
+   une autre huit. Une ligne de devis accepté vendue en plusieurs séances EST
+   donc un forfait — il n'y a rien de plus à saisir, et rien à tenir à jour
+   en double.
+
+   Chaque séance réalisée reste un acte à part entière : sa date, ses zones,
+   ses réglages, son praticien, ses consommables. Elle se rattache au forfait
+   et en porte le rang — séance 3/8.
+
+   Ce que le logiciel ne fait PAS, et c'est délibéré : il ne relance pas, il
+   ne pose pas de date limite. L'espacement entre deux séances dépend du cycle
+   pilaire, de la saison, de la peau et du patient ; un logiciel qui s'en
+   mêlerait se tromperait plus souvent qu'il n'aiderait. Il compte, il affiche,
+   et il se tait.
+   ========================================================================== */
+const FORF_SEUIL=2;                 /* en deçà, c'est une séance, pas un forfait */
+/* ---------------------------------------------------------------------------
+   Deux, de quoi ?
+   ---------------------------------------------------------------------------
+   « Acide hyaluronique × 2 à 350 € », ce sont deux SERINGUES en une séance.
+   « Laser épilation × 8 à 120 € », ce sont huit SÉANCES. La quantité d'une
+   ligne de devis dit les deux, et rien ne les distinguait : tout se comptait
+   en forfaits, si bien qu'une patiente venue une fois pour deux seringues se
+   retrouvait avec un forfait à moitié consommé qu'elle n'avait jamais acheté.
+
+   Ce qui les sépare est déjà dans le catalogue : un acte qui se DOSE (ml, U)
+   vend ses doses ; un acte sans dose — laser, peeling, radiofréquence — ne
+   peut vendre que des séances. La ligne garde le dernier mot : `forfait:true`
+   ou `false` sur la prestation tranche, pour le cas qui échappe à la règle. */
+const ligneEstForfait=p=>{
+ if(!p) return false;
+ if(p.forfait===true||p.forfait===false) return p.forfait;
+ if(Math.max(1,+p.seances||1)<FORF_SEUIL) return false;
+ return !(p.type&&acteDef(p.type).unite);
+};
+const clefForf=(did,i)=>String(did)+'#'+i;
+/* les actes rattachés à un forfait, dans l'ordre où ils ont été faits */
+const seancesForf=k=>ACTES.filter(a=>a.forfait&&clefForf(a.forfait.d,a.forfait.i)===k)
+  .sort((a,b)=>String(a.date).localeCompare(String(b.date))||(a.id-b.id));
+/* tout ce qu'on sait d'un forfait, à partir de la ligne de devis qui l'a vendu */
+function forfaitInfo(d,i){
+ if(!d) return null;
+ const p=(d.prest||[])[i]; if(!p) return null;
+ const n=Math.max(1,+p.seances||1);
+ const k=clefForf(d.id,i), S=seancesForf(k);
+ return {k, devis:d.id, i, t:p.type||null,
+   nom:(p.libre||'').trim()||(p.type?acteDef(p.type).n:'Prestation'),
+   n, montant:+p.montant||0, pu:n?Math.round((+p.montant||0)/n):0,
+   date:d.decide||d.date, seances:S, faites:S.length, reste:Math.max(0,n-S.length)};
+}
+const forfaitParClef=k=>{ const [did,i]=String(k).split('#');
+ return forfaitInfo(DEVIS.find(d=>String(d.id)===did), +i) };
+/* les forfaits d'un patient — le plus récent d'abord */
+function forfaitsDe(pid){
+ return DEVIS.filter(d=>d.patient===pid&&d.statut==='accepte')
+   .flatMap(d=>(d.prest||[]).map((p,i)=>({d,i,p})))
+   .filter(o=>ligneEstForfait(o.p))
+   .map(o=>forfaitInfo(o.d,o.i)).filter(Boolean)
+   .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+}
+/* ceux qu'on peut encore honorer, pour un acte donné */
+const forfaitsOuverts=(pid,t)=>forfaitsDe(pid)
+  .filter(f=>f.reste>0&&(!t||f.t===t));
+const forfaitDe=a=>(a&&a.forfait)?forfaitParClef(clefForf(a.forfait.d,a.forfait.i)):null;
+/* le rang de CETTE séance dans son forfait */
+function rangSeance(a){
+ const f=forfaitDe(a); if(!f) return null;
+ const j=f.seances.findIndex(x=>x.id===a.id);
+ return j<0?null:{rang:j+1, n:f.n, f};
+}
+const seanceTxt=a=>{ const r=rangSeance(a); return r?`séance ${r.rang}/${r.n}`:'' };
+/* Le rang, tel qu'il s'affiche dans une liste d'actes. Il n'est pas sourd : le
+   reste de la sous-ligne rappelle une catégorie qu'on connaît déjà, là où
+   « 3/8 » répond à la question qu'on se pose vraiment devant un forfait —
+   combien en reste-t-il ? */
+/* ==========================================================================
+   Le forfait dans la fenêtre de consultation
+   ==========================================================================
+   Quand le patient a un forfait en cours pour l'acte qu'on saisit, la séance
+   doit s'y ranger d'elle-même : personne n'ira cocher une case pour la
+   troisième séance d'une épilation, et une séance oubliée fausse le compte
+   pour toutes les suivantes. Elle se rattache donc toute seule, et se
+   détache d'un clic — une séance hors forfait, ça existe aussi (une retouche,
+   une zone en plus), et c'est au praticien de le dire, pas au logiciel de le
+   deviner à sa place. */
+function forfaitCandidat(){
+ if(!AS||!AS.pid) return null;
+ const T=[...new Set((AS.soins||[]).map(x=>x.t).filter(Boolean))];
+ if(!T.length) return null;
+ /* le plus ancien forfait ouvert : on écoule ce qui a été vendu en premier */
+ const L=T.flatMap(t=>forfaitsOuverts(AS.pid,t))
+   .filter(f=>!AS.aid||!f.seances.some(x=>x.id===AS.aid))
+   .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+ return L[0]||null;
+}
+/* le forfait retenu pour cette séance : celui qu'on a détaché reste détaché */
+function forfaitSeance(){
+ if(!AS) return null;
+ if(AS.forfaitOff) return null;
+ if(AS.forfait) return forfaitParClef(AS.forfait);
+ return forfaitCandidat();
+}
+function detacherForfait(){ AS.forfaitOff=true; AS.forfait=null; renderOver();
+ toast('Séance hors forfait — elle ne décompte aucune séance vendue') }
+function rattacherForfait(k){ AS.forfaitOff=false; AS.forfait=k||null; renderOver();
+ const f=forfaitSeance();
+ toast(f?`Séance ${Math.min(f.faites+1,f.n)}/${f.n} du forfait « ${f.nom} »`
+        :'Aucun forfait en cours pour cet acte') }
+function blocForfait(){
+ if(!AS||AS.but==='devis') return '';
+ /* Tant qu'aucun acte n'est choisi, il n'y a rien à dire : annoncer « hors
+    forfait » devant une séance vide serait du bruit, et un bruit trompeur.
+    C'est `autres`, dérivé des actes choisis, qui s'en charge : un garde
+    supplémentaire sur T ne changerait rien ici, et masquerait le seul cas où
+    il compterait — une séance déjà rangée dans un forfait, rouverte. */
+ const T=[...new Set((AS.soins||[]).map(x=>x.t).filter(Boolean))];
+ const f=forfaitSeance();
+ /* Un patient peut tenir deux forfaits ouverts du même acte — deux zones
+    achetées séparément, par exemple. On propose les autres, sans choisir à
+    sa place lequel décompter. */
+ const autres=AS.pid?T.flatMap(t=>forfaitsOuverts(AS.pid,t)).filter(x=>!f||x.k!==f.k):[];
+ const boutons=x=>`<button class="btn xs" style="margin-top:5px"
+     onclick="rattacherForfait('${esc(x.k)}')" title="${esc('Vendu le '+DF(x.date)+' — '+x.faites+' séance'+(x.faites>1?'s':'')+' faite'+(x.faites>1?'s':''))}"
+     >${f?'Plutôt':'La ranger dans'} « ${esc(x.nom)} » — ${x.reste} à venir</button>`;
+ if(!f&&!autres.length) return '';
+ if(!f) return `<div class="dvi forf"><div class="dvi-t">◉ Forfait</div>
+   <div class="dvi-l"><b>Hors forfait</b>cette séance ne décompte rien.</div>
+   ${autres.map(boutons).join('')}</div>`;
+ const rang=AS.ro?null:Math.min(f.faites+1,f.n);
+ const apres=Math.max(0,f.n-(rang||f.faites));
+ return `<div class="dvi forf">
+   <div class="dvi-t">◉ Forfait « ${esc(f.nom)} »</div>
+   <div class="dvi-l"><b>Cette séance</b><span class="sean">séance <b>${rang||'—'}/${f.n}</b></span></div>
+   <div class="dvi-l"><b>Vendu le</b>${DF(f.date)}${CAN('prix')&&f.montant?` · ${EUR(f.montant)} — ${EUR(f.pu)} la séance`:''}</div>
+   <div class="dvi-l"><b>Après celle-ci</b>${apres?`${apres} séance${apres>1?'s':''} à venir`:'forfait terminé'}</div>
+   ${AS.ro?'':`<div class="forf-b"><button class="btn xs" onclick="detacherForfait()"
+     title="Une retouche ou une zone supplémentaire ne décompte pas une séance du forfait">Sortir du forfait</button>
+     ${autres.map(boutons).join('')}</div>`}</div>`;
+}
+function bdgSeance(a){
+ const r=rangSeance(a); if(!r) return '';
+ const f=r.f;
+ const t=`Forfait « ${f.nom} » vendu le ${DF(f.date)} — ${f.n} séances`
+   +(f.montant?` pour ${EUR(f.montant)}, soit ${EUR(f.pu)} la séance`:'')
+   +`\n${f.faites} faite${f.faites>1?'s':''}, ${f.reste} à venir`
+   +`\nDevis ${f.devis}`;
+ return `<span class="sean" title="${esc(t)}">séance <b>${r.rang}/${r.n}</b></span>`;
+}
+/* Amorce : les séances déjà faites se rangent sous le forfait qui les a
+   vendues — même patient, même acte, à partir du jour de l'accord. Un acte ne
+   se rattache qu'une fois, et les forfaits les plus anciens servent d'abord :
+   c'est ainsi qu'on écoule un forfait, pas en piochant au hasard. */
+(function(){
+ const pris=new Set();
+ DEVIS.filter(d=>d.statut==='accepte')
+  .slice().sort((a,b)=>String(a.decide||a.date).localeCompare(String(b.decide||b.date)))
+  .forEach(d=>(d.prest||[]).forEach((p,i)=>{
+    const n=Math.max(1,+p.seances||1);
+    if(!ligneEstForfait(p)||!p.type) return;
+    const dep=d.decide||d.date;
+    const L=ACTES.filter(a=>a.patient===d.patient&&a.type===p.type
+        &&String(a.date)>=String(dep)&&!pris.has(a.id))
+      .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    L.slice(0,n).forEach(a=>{ a.forfait={d:d.id, i}; pris.add(a.id) });
+    /* Un jeu de démonstration doit être CRÉDIBLE, sans quoi il fait douter du
+       logiciel plutôt que de lui-même. Les devis de la démo ont été tirés
+       indépendamment des actes : beaucoup vendaient des séances qu'aucune
+       consultation ne vient honorer. Un cabinet où les trois quarts des
+       forfaits vendus ne démarrent jamais n'existe pas.
+       Une vente récente sans séance reste un forfait — c'est le cas normal du
+       patient qui prendra rendez-vous. Une vente ancienne qui n'a JAMAIS rien
+       produit redevient ce qu'elle était : une ligne à plusieurs unités. */
+    if(!L.length && days(dep, TODAY) > 120) p.forfait=false;
+  }));
+})();
+
 /* Classer des statuts par ordre alphabétique range « Accepté » avant
    « Brouillon » : c'est vrai et ça ne veut rien dire. Un devis a un cycle de
    vie — on le rédige, on l'envoie, on le relance, il se décide — et c'est cet
@@ -7949,6 +8159,22 @@ function pDetail(p){
        :'<div class="v mu">Aucun</div>'}</div>
    </div>`}
    ${antBloquants(p).length?`<div class="tip" style="margin:0 0 14px;background:var(--warn-w)"><span class="e">⚠</span><div><b>Antécédent bloquant.</b> ${antBloquants(p).map(a=>esc(a)).join(' · ')} — un avertissement s'affiche avant toute saisie d'acte injectable.</div></div>`:''}
+   ${(()=>{ const F=forfaitsDe(p.id).filter(f=>f.reste>0);
+     if(!F.length) return '';
+     /* « Combien lui en reste-t-il ? » est la question qu'on pose au comptoir,
+        et il fallait jusqu'ici ouvrir un acte pour y répondre. Aucune alerte,
+        aucune échéance : l'espacement entre deux séances ne regarde pas le
+        logiciel. On compte, on affiche. */
+     return `<div class="subh"><h3>Forfaits en cours<span>${F.length}</span></h3></div>
+      <div class="forfl">${F.map(f=>`<div class="forfc" title="${esc(
+        `Vendu le ${DF(f.date)} — devis ${f.devis}`+(f.montant?` · ${EUR(f.montant)}`:''))}">
+        <div class="forfc-n">${esc(f.nom)}
+          <small>vendu le ${DF(f.date)}${CAN('prix')&&f.montant?` · ${EUR(f.pu)} la séance`:''}</small></div>
+        <div class="forfc-j"><div class="forfc-b" style="width:${Math.round(f.faites/f.n*100)}%"></div></div>
+        <div class="forfc-r"><b>${f.faites}/${f.n}</b>
+          <small>${f.reste} à venir</small></div>
+        <button class="btn xs" onclick="go('devis','${esc(f.devis)}')" title="Voir le devis qui l’a vendu">◫</button>
+      </div>`).join('')}</div>` })()}
    <div class="subh"><h3>Actes réalisés<span>${A.length}</span></h3>
      <div class="r">${A.length?`<button class="btn xs" onclick="pTab='schema';paint()">Voir le schéma cumulé</button>`:''}
      <button class="btn xs" onclick="dvChoix(${p.id})">📄 Devis sans acte</button>
@@ -8028,7 +8254,8 @@ function pDetail(p){
       <tr class="c" onclick="openActe(${a.patient},${a.id})">
         <td class="mono">${DF(a.date)}</td>
         <td class="ct-a"><b title="${esc(a.nom)}${a.cat?' · '+esc(a.cat):''}">${esc(a.nom)}</b>
-          <span class="s">${esc(a.cat||'—')}</span></td>
+          <span class="s">${esc(a.cat||'—')}${(()=>{const b2=bdgSeance(a);
+            return b2?' · '+b2:''})()}</span></td>
         <td class="mu ct-p" title="${esc(a.praticien)}${a.operateur?' · opérateur '+esc(a.operateur):''}">${esc(a.praticien)}${
           a.operateur?`<span class="s">op. ${esc(a.operateur)}</span>`:''}</td>
         <td class="ct-z" title="${a.zones?esc(zonesOf(a).map(([z,q])=>{const t=acteZone(a,z);
@@ -8620,7 +8847,8 @@ V.actes=()=>{
   <tbody>${L.map(a=>`<tr class="c" onclick="openActe(${a.patient},${a.id})">
    <td class="mono">${DF(a.date)}</td>
    <td class="nm">${esc(fn(pById(a.patient)))}</td>
-   <td>${esc(a.nom)}<div class="mu" style="font-size:11px">${esc(a.praticien)}${a.operateur?' · '+esc(a.operateur):''}</div></td>
+   <td>${esc(a.nom)}<div class="mu" style="font-size:11px">${esc(a.praticien)}${a.operateur?' · '+esc(a.operateur):''}${(()=>{const b2=bdgSeance(a);
+     return b2?' · '+b2:''})()}</div></td>
    <td style="max-width:300px">${a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneDef(z);
      return `<span class="bdg ${Z.p==='tox'?'b-info':'b-warn'}" style="margin:0 3px 3px 0">${esc(zoneNom(z))} · ${fmtQ(q,Z.p)}</span>`}).join(''):`<span class="mu">${noZoneTxt(a)}</span>`}</td>
    <td class="mono mu" style="font-size:11.5px">${a.lot||'—'}</td>
@@ -12779,6 +13007,11 @@ function openActe(pid,aid,np){
           .map(t=>({t, q:a.seances||1, com:a.zonesNote||'',
              ...(a.mat&&t===a.type?{mat:a.mat, par:{...(a.par||{})}}:{})}))):[],
      draft:{t:null,z:{},com:''}, openSoin:0, devis:null, docs:[], zs:{}, zx:{},
+     /* Une séance déjà enregistrée montre le forfait où elle EST rangée, pas
+        celui où elle irait. Et une séance enregistrée hors forfait le reste :
+        rouvrir un dossier ne doit rien décompter. */
+     forfait:(a&&a.forfait)?clefForf(a.forfait.d,a.forfait.i):null,
+     forfaitOff:!!(a&&!a.forfait),
      conso:[], consoOff:[], consoAdd:false, prepOpen:null, csQ:'', csFam:'', csOpen:true,
      but:a?'acte':'acte',                       /* 'acte' = consultation du jour · 'devis' = projet */
      effets:a?a.effets:'', consent:a?a.consent:false};
@@ -13690,6 +13923,7 @@ function consultPane(prix){
    ${d?`<div class="dvi"><div class="dvi-t">◫ Devis ${esc(d.id)}</div>
      <div class="dvi-l"><b>Établi le</b>${DF(d.date)}${CAN('prix')?' · '+EUR(d.montant):''}</div>
      <div class="dvi-l"><b>Soins</b>repris tels quels — ajustez librement, le devis sera marqué réalisé.</div></div>`:''}
+   ${blocForfait()}
    <div class="fld"><label>Note de séance</label>
      <textarea class="note" style="min-height:88px" oninput="AS.note=this.value"
        placeholder="produit et lot, paramètres, ressenti du patient, suites annoncées…">${esc(AS.note||'')}</textarea></div>
@@ -14612,6 +14846,10 @@ function saveActe(){
   lot:C.conso?(C.conso==='AH-VOLB'?'L-AH2409':C.conso==='BTX-100'?'L-BX2601':null):null,
   conso:C.conso,zones,consent:AS.consent,effets:AS.effets||'',note:AS.note||'',
   seances:seancesMax(), devis:AS.devis||null,
+  /* la séance se range sous le forfait qui l'a vendue — ou sous rien du tout */
+  forfait:(()=>{ const f=forfaitSeance();
+    if(!f) return null; const [d0,i0]=String(f.k).split('#');
+    return {d:(DEVIS.find(x=>String(x.id)===d0)||{}).id, i:+i0} })(),
   zonesNote:(AS.soins||[]).map(x=>(x.com||'').trim()).filter(Boolean).join(' · ')||AS.zonesNote||'',
   prix:null});                       /* l'acte ne porte pas de montant : il se facture après */
  DEVIS.filter(d=>!d.acte&&d.patient===AS.pid&&d.date===AS.date).forEach(d=>{d.acte=ACTES[0].id});
@@ -15423,7 +15661,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='EJ';
+const BUILD='EK';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
