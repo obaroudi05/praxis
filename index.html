@@ -29,6 +29,12 @@
   --ah:#eb6834;
   --grid:#e9ebf1;
   --good:#0ca30c;--warn:#fab219;--crit:#d03b3b;
+  /* Le rouge d'un APLAT et le rouge d'un TEXTE ne peuvent pas être le même.
+     Sur un bouton plein, --crit porte du blanc à 4,4:1 ; posé en texte sur le
+     fond sombre des panneaux, il tombe à 3,8:1 — sous le seuil de lisibilité,
+     et c'est précisément sur des montants dus qu'il s'écrit. D'où ce second
+     rouge, réservé aux chiffres : 4,8:1 en clair, 4,9:1 en sombre. */
+  --crit-txt:#d03b3b;
   --good-w:#e9f7e9;--warn-w:#fdf4de;--crit-w:#fceaea;
   --skb:#1baf7a;--meso:#4a3aa7;--peel:#eda100;--las:#e87ba4;--rf:#e34948;--epil:#008300;
   --sh-1:0 1px 2px rgba(13,14,20,.05);
@@ -59,6 +65,7 @@
   --toxine:#3987e5;
   --ah:#e07a4a;
   --grid:#242833;
+  --crit-txt:#ef5f63;
   --good-w:#122a12;--warn-w:#2c2410;--crit-w:#2e1616;
   --skb:#199e70;--meso:#9085e9;--peel:#c98500;--las:#d55181;--rf:#e66767;--epil:#008300;
   --sh-2:0 1px 3px rgba(0,0,0,.5), 0 8px 24px -8px rgba(0,0,0,.6);
@@ -1421,6 +1428,31 @@ table.chrono.compact thead th{padding:7px 8px;white-space:nowrap}
 .ct-1 .mono{font-size:11px}
 .pl{font-size:10px;font-weight:700;color:var(--ink-3);margin-left:2px}
 .ct-e{white-space:nowrap}
+/* Le montant encore dû. Il n'est rouge que s'il existe : une colonne rouge en
+   permanence ne se voit plus, et c'est précisément ce qu'on lui demande —
+   qu'on ne prenne pas une séance impayée pour une séance réglée. */
+.ct-r{white-space:nowrap}
+.ct-r .rst{display:block}
+.ct-r .rst b{display:block;color:var(--crit-txt);font-weight:700;font-size:12px;
+  line-height:1.25;font-variant-numeric:tabular-nums}
+/* « à facturer » ne dit pas la même dette : il n'y a rien à relancer, il faut
+   d'abord éditer la facture. Teinte des alertes, comme le bandeau d'avoir. */
+.ct-r .rst i{display:block;font-style:normal;font-size:10px;font-weight:650;
+  color:#8a6100;line-height:1.3;overflow:hidden;text-overflow:ellipsis}
+:root[data-theme="dark"] .ct-r .rst i{color:#f6c65e}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .ct-r .rst i{color:#f6c65e}}
+/* L'effet secondaire signalé, sous le nom de l'acte. Même principe que l'avoir
+   sous sa facture : l'exception ne coûte plus une colonne aux séances qui se
+   passent bien, et elle en dit davantage qu'une pastille — on lit ce que le
+   patient a rapporté, pas seulement qu'il a rapporté quelque chose. */
+/* `display:inline` n'est pas décoratif, ici non plus : `.ct-a b` est un BLOC
+   — c'est lui qui pose le nom de l'acte au-dessus de sa catégorie. Sans cette
+   ligne, le grade de l'effet casserait la sous-ligne en deux et la séance ne
+   tiendrait plus sur une ligne. */
+.ct-a .s .eff{display:inline;font-weight:700;color:var(--ink-2);white-space:nowrap}
+.ct-a .s .eff.g-modere{color:#8a6100}
+.ct-a .s .eff.g-severe{color:var(--crit-txt)}
+:root[data-theme="dark"] .ct-a .s .eff.g-modere{color:#f6c65e}
 .ct-c{text-align:center}
 .ct-c .com{cursor:help;font-size:12px;opacity:.75}
 /* les pièces d'une séance, en pastilles */
@@ -3884,6 +3916,24 @@ const devCreance=d=>{
 };
 /* les devis d'un patient qui attendent leur facture — au sens de la créance */
 const devisAFacturer=pid=>DEVIS.filter(d=>d.patient===pid&&devCreance(d)>0);
+/* Ce qu'un devis laisse à encaisser, les deux dettes réunies : ce qui est
+   facturé et non réglé, plus ce qui n'est pas encore facturé — au sens de la
+   créance, là encore : un accord de l'an dernier jamais réalisé ne doit rien. */
+const devReste=d=>devCreance(d)+facturesDuDevis(d).reduce((s,f)=>s+rdu(f),0);
+const celluleDevReste=d=>{ const r=devReste(d);
+ /* Un devis accepté l'an dernier que personne n'a réalisé reste facturable —
+    le bouton le propose — mais il ne DOIT rien : ce n'est pas une créance
+    (voir devCreance). Le montant s'affiche quand même, sourd : la colonne
+    répond « il reste 840 € sur ce devis » sans compter cet argent comme dû.
+    Sans cela on lirait « — » à côté d'un bouton « Convertir en facture », et
+    c'est exactement le genre de contradiction qui fait douter d'un écran. */
+ if(!r){ const f=devAFacturer(d);
+   return f?`<span class="mu" title="${esc('Devis accepté il y a plus de '+CREANCE_J+' jours et jamais réalisé — facturable, mais ce n’est pas une créance')}">${EUR(f)}</span>`
+          :'<span class="mu">—</span>' }
+ const c=devCreance(d);
+ return `<span class="rst" title="${esc(c&&c<r?`${EUR(r-c)} facturés et non réglés · ${EUR(c)} pas encore facturés`
+   :c?'Devis accepté — la facture reste à établir':'Facture émise, non soldée')}"><b>${EUR(r)}</b>${
+   c?'<i>à facturer</i>':''}</span>` };
 
 /* Un devis se rencontre à quatre endroits : l'onglet Facturation d'une fiche,
    son onglet Documents, la liste « Devis et conversions » et la fiche du devis
@@ -5050,7 +5100,9 @@ const FICHIERS=[];   /* {id, acte, patient, nom, ext, ko, date, par} */
 const EFF_TYPES=['Ecchymose','Œdème','Rougeur persistante','Douleur','Asymétrie',
                  'Nodule','Céphalée','Ptosis palpébral','Réaction allergique','Autre'];
 const EFF_GRADE=[['leger','Léger','b-neu'],['modere','Modéré','b-warn'],['severe','Sévère','b-crit']];
-const gradeBdg=g=>{const G=EFF_GRADE.find(x=>x[0]===g)||EFF_GRADE[0]; return bdg(G[2],G[1])};
+const gradeDef=g=>EFF_GRADE.find(x=>x[0]===g)||EFF_GRADE[0];
+const gradeNom=g=>gradeDef(g)[1];
+const gradeBdg=g=>{const G=gradeDef(g); return bdg(G[2],G[1])};
 
 /* amorce : les actes du jeu de démonstration ont consommé leurs produits */
 (function(){ let n=1, m=1;
@@ -5063,7 +5115,7 @@ const gradeBdg=g=>{const G=EFF_GRADE.find(x=>x[0]===g)||EFF_GRADE[0]; return bdg
      lot:st.lot||'—', per:st.per, q:1+(i%2), u:st.u, ts:st0(a.date,'CS'+a.id), par:a.praticien,
      qui:a.praticien}) }
   if(i%9===0) CONSO.push({id:'CS-'+n++, acte:a.id, patient:a.patient, ref:'ANE-EML',
-    nom:'Crème anesthésiante 30 g', lot:'L-EM2508', per:'2026-08-31', q:1, u:'tube',
+    nom:nomProduit(STOCK.find(x=>x.ref==='ANE-EML')), lot:'L-EM2508', per:'2026-08-31', q:1, u:'tube',
     ts:st0(a.date,'CS2'+a.id), par:a.praticien, qui:a.praticien});
   if(i%11===3) EFFETS.push({id:'ES-'+m++, acte:a.id, patient:a.patient, date:addD(a.date,2),
     quoi:EFF_TYPES[i%4], grade:i%13===3?'modere':'leger',
@@ -8566,7 +8618,7 @@ function pDetail(p){
       le nom de l'acte, dont elle n'est qu'une précision ; le commentaire
       devient une pastille qu'on survole.
       --------------------------------------------------------------------- */
-   const nCols=ROLES[role].prix?10:9;
+   const nCols=ROLES[role].prix?10:8;
    return `<div class="fbar">
      <span class="mu" style="font-size:11.5px;font-weight:600;align-self:center">Chronologie</span>
      <button class="btn s" onclick="actTri=actTri==='desc'?'asc':'desc';paint()"
@@ -8593,15 +8645,16 @@ function pDetail(p){
      · ${nE} effet${nE>1?'s':''} secondaire${nE>1?'s':''} signalé${nE>1?'s':''}</div>
    <div class="tw"><table class="chrono compact">
     <thead><tr><th style="width:86px">Date</th><th style="width:186px">Acte</th>
-      <th style="width:104px">Praticien</th><th>Zones</th>
+      <th style="width:96px">Praticien</th><th>Zones</th>
       <!-- La colonne Matériel porte désormais une valeur chiffrée, qui ne
            SUPPORTE pas d'être tronquée : « Fluence 16… » sans son unité ne veut
            rien dire. Les 26 px qu'elle gagne sont pris aux consommables et aux
            documents, qui s'abrègent sans rien perdre d'essentiel — la largeur
            totale du tableau, elle, ne bouge pas d'un pixel. -->
       <th style="width:158px">Matériel</th><th style="width:124px">Consommables</th>
-      <th style="width:70px">Effets</th><th style="width:96px">Documents</th>
-      ${ROLES[role].prix?'<th class="num" style="width:82px">Facturé</th>':''}
+      <th style="width:96px">Documents</th>
+      ${ROLES[role].prix?`<th class="num" style="width:82px">Facturé</th>
+        <th class="num" style="width:78px" title="Ce que le patient doit encore sur cette séance — facture non soldée, ou soin délivré pas encore facturé">Reste dû</th>`:''}
       <th style="width:34px"></th><th style="width:72px"></th></tr></thead>
     <tbody>${L.map(a=>{
       const y=a.date.slice(0,4), sep=(y!==an); an=y;
@@ -8611,8 +8664,18 @@ function pDetail(p){
       <tr class="c" onclick="openActe(${a.patient},${a.id})">
         <td class="mono">${DF(a.date)}</td>
         <td class="ct-a"><b title="${esc(a.nom)}${a.cat?' · '+esc(a.cat):''}">${esc(a.nom)}</b>
-          <span class="s">${esc(a.cat||'—')}${(()=>{const b2=bdgSeance(a);
-            return b2?' · '+b2:''})()}</span></td>
+          <span class="s"${ES.length?` title="${esc(ES.map(e=>gradeNom(e.grade)+' — '+e.quoi+(e.resolu?' (résolu)':'')).join('\n'))}"`:''
+          /* L'effet secondaire n'a plus de colonne : sur l'ensemble du fichier
+             une séance sur onze en porte un, et les dix autres payaient un
+             tiret. Il rejoint la sous-ligne de l'acte, là où se trouve déjà
+             le rang de la séance — et il y gagne : la colonne n'affichait
+             qu'une pastille de couleur, on lit maintenant ce qui est arrivé.
+             La règle de cette chronologie ne bouge pas pour autant : une
+             séance tient sur UNE ligne, et ce qui dépasse s'abrège. */
+          }>${esc(a.cat||'—')}${(()=>{const b2=bdgSeance(a);
+            return b2?' · '+b2:''})()}${ES.length
+          ?` · <b class="eff g-${esc(ES[0].grade)}">⚠ ${esc(gradeNom(ES[0].grade))}</b> — ${
+             esc(ES[0].quoi)}${ES.length>1?` +${ES.length-1}`:''}`:''}</span></td>
         <td class="mu ct-p" title="${esc(a.praticien)}${a.operateur?' · opérateur '+esc(a.operateur):''}">${esc(a.praticien)}${
           a.operateur?`<span class="s">op. ${esc(a.operateur)}</span>`:''}</td>
         <td class="ct-z" title="${a.zones?esc(zonesOf(a).map(([z,q])=>{const t=acteZone(a,z);
@@ -8631,14 +8694,12 @@ function pDetail(p){
            :`<span class="mu">${esc(noZoneTxt(a))}</span>`}</td>
         <td class="ct-1 ct-m">${celluleMat(a)}</td>
         <td class="ct-1 mu">${CS.length
-           ? `<span title="${esc(CS.map(c=>c.nom.split(' —')[0]+' · lot '+c.lot).join('\n'))}">${esc(CS[0].nom.split(' —')[0])}
+           ? `<span title="${esc(CS.map(c=>cnsNom(c.ref,c.nom)+' · lot '+c.lot).join('\n'))}">${esc(cnsNom(CS[0].ref,CS[0].nom))}
               <span class="mono">${esc(CS[0].lot)}</span>${CS.length>1?` <b class="pl">+${CS.length-1}</b>`:''}</span>`
            : '—'}</td>
-        <td class="ct-e">${ES.length
-           ? `<span title="${esc(ES.map(e=>e.quoi).join('\n'))}">${gradeBdg(ES[0].grade)}${ES.length>1?`<b class="pl">+${ES.length-1}</b>`:''}</span>`
-           : '<span class="mu">—</span>'}</td>
         <td class="ct-d">${colDocsMini(a)}</td>
-        ${ROLES[role].prix?`<td class="num">${montantTxt(a)}</td>`:''}
+        ${ROLES[role].prix?`<td class="num">${montantTxt(a)}</td>
+          <td class="num ct-r">${celluleReste(a)}</td>`:''}
         <td class="ct-c">${com?`<span class="com" title="${esc(com)}">💬</span>`:''}</td>
         ${tdActions(a)}
       </tr>
@@ -9081,12 +9142,16 @@ function pDetail(p){
    <div class="subh" style="border-top:none;padding-top:0"><h3>Devis<span>${D.length}</span></h3>
      <div class="r"><button class="btn xs" onclick="openDevis(${p.id},'epil')">+ Devis épilation</button>
      <button class="btn xs p" onclick="openDevis(${p.id},'esth')">+ Devis esthétique</button></div></div>
-   <div class="tw"><table><thead><tr><th>N°</th><th>Date</th><th>Prestations</th><th class="num">Montant</th><th>Statut</th><th>Relances</th><th></th></tr></thead>
+   <div class="tw"><table><thead><tr><th>N°</th><th>Date</th><th>Prestations</th><th class="num">Montant</th>
+     <th class="num ct-r" style="width:96px" title="Ce que ce devis laisse à encaisser — facture non soldée, ou prestation pas encore facturée">Reste dû</th>
+     <th>Statut</th><th>Relances</th><th></th></tr></thead>
     <tbody>${D.map(d=>`<tr class="c" onclick="go('devis','${d.id}')">
       <td class="mono">${d.id}</td><td class="mono" title="${(()=>{const e=devisEtabliTxt(d);
         return esc('Devis établi le '+e.cree+(e.maj?' · modifié le '+e.maj:''))})()}">${DF(d.date)}</td>
       <td>${d.lignes.map(l=>esc(l[1])).join(' · ')}</td>
-      <td class="num">${EUR(d.montant)}</td><td>${bdgDevis(d)}${sousStatut(d)}${bdgAFacturer(d)}</td>
+      <td class="num">${EUR(d.montant)}</td>
+      <td class="num ct-r">${celluleDevReste(d)}</td>
+      <td>${bdgDevis(d)}${sousStatut(d)}${bdgAFacturer(d)}</td>
       <td class="mu">${(()=>{ if(!d.relances) return '<span class="mono">—</span>';
         const e=dernRelance(d.id);
         return `<span class="mono">${d.relances}</span>`+(e?`<div style="font-size:11px;white-space:nowrap"
@@ -9130,7 +9195,7 @@ function pDetail(p){
      Et le praticien qui a facturé entre dans la liste : sur un patient suivi
      à plusieurs, c'était la question sans réponse.
      ====================================================================== -->
-   <div class="tw"><table class="tcomp"><thead><tr><th>N°</th><th>Date</th><th>Acte</th><th>Praticien</th><th class="num">TTC</th><th class="num">Encaissé</th><th>Mode</th><th class="num">Reste</th><th>Statut</th><th></th></tr></thead>
+   <div class="tw"><table class="tcomp"><thead><tr><th>N°</th><th>Date</th><th>Acte</th><th>Praticien</th><th class="num">TTC</th><th class="num">Encaissé</th><th>Mode</th><th class="num">Reste dû</th><th>Statut</th><th></th></tr></thead>
     <tbody>${F.map(f=>{const act=ACTES.find(x=>x.id===f.acte), an=f.statut==='annulee';
       const nom=act?act.nom:(f.libelle||'—');
       const nAv=avoirsDe(f.id).length;
@@ -9142,7 +9207,7 @@ function pDetail(p){
       <td class="num nw"><b>${EUR(fTTC(f))}</b></td>
       <td class="num nw">${EUR(f.paye)}</td>
       <td class="mu el" style="max-width:74px" title="${esc(moyenTxt(f)||'non réglé')}">${esc(moyenCourt(f)||'—')}</td>
-      <td class="num">${rdu(f)>0?`<span style="color:var(--crit);font-weight:650">${EUR(rdu(f))}</span>`
+      <td class="num">${rdu(f)>0?`<span style="color:var(--crit-txt);font-weight:650">${EUR(rdu(f))}</span>`
         :trop(f)?`<span style="color:var(--warn);font-weight:650" title="Encaissé au-delà du dû après avoir">↩ ${EUR(trop(f))}</span>`
         :'<span class="mu">—</span>'}</td>
       <td>${an?bdg('b-crit','⊘ Annulée'):f.avoir?bdg('b-warn','Avoir'):rdu(f)>0?bdg('b-warn','Partielle'):bdg('b-good','Soldée')}</td>
@@ -9208,7 +9273,8 @@ V.actes=()=>{
  </div>
  ${periodBar(perA,'setPerA',`${L.length} acte${L.length>1?'s':''}`,PRESETS_STD,1)}
  <div class="card"><div class="tw"><table>
-  <thead><tr><th>Date</th><th>Patient</th><th>Acte</th><th>Zones &amp; quantités</th><th>Lot</th>${ROLES[role].prix?'<th class="num">Montant</th>':''}<th style="width:74px"></th></tr></thead>
+  <thead><tr><th>Date</th><th>Patient</th><th>Acte</th><th>Zones &amp; quantités</th><th>Lot</th>${ROLES[role].prix?`<th class="num">Montant</th>
+    <th class="num ct-r" style="width:86px" title="Ce que le patient doit encore sur cette séance">Reste dû</th>`:''}<th style="width:74px"></th></tr></thead>
   <tbody>${L.map(a=>`<tr class="c" onclick="openActe(${a.patient},${a.id})">
    <td class="mono">${DF(a.date)}</td>
    <td class="nm">${esc(fn(pById(a.patient)))}</td>
@@ -9217,9 +9283,10 @@ V.actes=()=>{
    <td style="max-width:300px">${a.zones?zonesOf(a).map(([z,q])=>{const Z=zoneDef(z);
      return `<span class="bdg ${Z.p==='tox'?'b-info':'b-warn'}" style="margin:0 3px 3px 0">${esc(zoneNom(z))} · ${fmtQ(q,Z.p)}</span>`}).join(''):`<span class="mu">${noZoneTxt(a)}</span>`}</td>
    <td class="mono mu" style="font-size:11.5px">${a.lot||'—'}</td>
-   ${ROLES[role].prix?`<td class="num">${montantTxt(a)}</td>`:''}
+   ${ROLES[role].prix?`<td class="num">${montantTxt(a)}</td>
+     <td class="num ct-r">${celluleReste(a)}</td>`:''}
    ${tdActions(a)}</tr>
-   ${trConfirm(a,ROLES[role].prix?7:6)}`).join('')}</tbody></table>
+   ${trConfirm(a,ROLES[role].prix?8:6)}`).join('')}</tbody></table>
   ${L.length?'':'<div class="empty">Aucun acte sur cette période.</div>'}</div></div>`;
 };
 
@@ -9597,7 +9664,7 @@ function eDetail(){
   <thead><tr><th>N°</th><th>Date</th><th>Patient</th><th>Acte</th><th>Praticien</th>
    ${cpt?'<th class="num">HT</th><th class="num">TVA</th>':''}<th class="num">TTC</th>
    ${dbl?'<th class="num" title="Part revenant au centre">Centre</th><th class="num" title="Part rétrocédée au praticien">Rétroc.</th>':''}
-   <th class="num">Encaissé</th><th>Mode</th><th class="num">Reste</th><th>Statut</th></tr></thead>
+   <th class="num">Encaissé</th><th>Mode</th><th class="num">Reste dû</th><th>Statut</th></tr></thead>
   <tbody>${L.map(f=>{const p=pById(f.patient), a=ACTES.find(x=>x.id===f.acte), an=f.statut==='annulee';
    const acte=a?a.nom:(f.libelle||'—'), md=moyenCourt(f);
    return `<tr class="c ${an?'annul':''}" onclick="openPatient(${f.patient})">
@@ -9610,7 +9677,7 @@ function eDetail(){
     ${dbl?`<td class="num mu nw">${EUR(partCentre(f))}</td><td class="num nw" style="color:var(--accent);font-weight:640">${EUR(partPrat(f))}</td>`:''}
     <td class="num nw">${EUR(f.paye)}</td>
     <td class="mu el" style="max-width:78px" title="${esc(moyenTxt(f)||'non réglé')}">${esc(md||'—')}</td>
-    <td class="num nw">${rdu(f)>0?`<span style="color:var(--crit);font-weight:650">${EUR(rdu(f))}</span>`:'<span class="mu">—</span>'}</td>
+    <td class="num nw">${rdu(f)>0?`<span style="color:var(--crit-txt);font-weight:650">${EUR(rdu(f))}</span>`:'<span class="mu">—</span>'}</td>
     <td class="nw">${an?bdg('b-crit','Annulée'):f.avoir?bdg('b-warn','Avoir'):rdu(f)>0?bdg('b-warn','Partielle'):bdg('b-good','Soldée')}</td></tr>`}).join('')}
   </tbody></table>${L.length?'':'<div class="empty">Aucune facturation avec ces filtres.</div>'}</div></div>
  <div class="mu" style="font-size:11.5px;margin-top:10px">⊘ Les facturations annulées ne sont pas prises en compte dans les totaux. Les avoirs sont déduits des montants HT et TTC.
@@ -9818,7 +9885,7 @@ function eRetro(){
    <thead><tr><th>N°</th><th>Date</th><th>Patient</th><th>Prestation</th>
     <th>Praticien</th><th class="num">TTC</th><th class="num">Taux</th>
     <th class="num" title="Part rétrocédée au praticien">Rétroc.</th><th class="num" title="Part revenant au centre">Centre</th>
-    <th class="num">Encaissé</th><th class="num">Reste</th></tr></thead>
+    <th class="num">Encaissé</th><th class="num">Reste dû</th></tr></thead>
    <tbody>${L.map(f=>{const p=pById(f.patient), a=ACTES.find(x=>x.id===f.acte);
     const nom=a?a.nom:(f.libelle||'—');
     return `<tr class="c" onclick="openPatient(${f.patient})">
@@ -9833,7 +9900,7 @@ function eRetro(){
      <td class="num" style="color:var(--accent);font-weight:640">${EUR(partPrat(f))}</td>
      <td class="num mu">${EUR(partCentre(f))}</td>
      <td class="num">${EUR(f.paye)}</td>
-     <td class="num">${rdu(f)>0?`<span style="color:var(--crit);font-weight:650">${EUR(rdu(f))}</span>`:'<span class="mu">—</span>'}</td></tr>`}).join('')}
+     <td class="num">${rdu(f)>0?`<span style="color:var(--crit-txt);font-weight:650">${EUR(rdu(f))}</span>`:'<span class="mu">—</span>'}</td></tr>`}).join('')}
    </tbody>
    ${L.length?`<tfoot><tr><td colspan="5"><b>Total${fPrat?' — '+esc(fPrat):''}</b></td>
      <td class="num"><b>${EUR(L.reduce((s,f)=>s+fTTC(f),0))}</b></td><td></td>
@@ -9880,7 +9947,7 @@ function eJours(){
       <td class="num" style="color:var(--accent-ink);font-weight:620">${EUR(ok.reduce((s,f)=>s+partPrat(f),0))}</td>`:''}
     <td class="num">${EUR(ok.reduce((s,f)=>s+f.paye,0))}</td>
     <td>${Object.keys(modes).length?Object.entries(modes).map(([m,v])=>`<span class="bdg b-neu" style="margin:0 3px 2px 0">${m} ${EUR(v)}</span>`).join(''):'<span class="mu">—</span>'}</td>
-    <td class="num">${ok.reduce((s,f)=>s+rdu(f),0)?`<span style="color:var(--crit);font-weight:650">${EUR(ok.reduce((s,f)=>s+rdu(f),0))}</span>`:'<span class="mu">—</span>'}</td></tr>`}).join('')}
+    <td class="num">${ok.reduce((s,f)=>s+rdu(f),0)?`<span style="color:var(--crit-txt);font-weight:650">${EUR(ok.reduce((s,f)=>s+rdu(f),0))}</span>`:'<span class="mu">—</span>'}</td></tr>`}).join('')}
   </tbody></table>${jours.length?'':'<div class="empty">Aucune facturation sur cette période.</div>'}</div></div>
  <div class="mu" style="font-size:11.5px;margin-top:10px">Cliquez une ligne pour ouvrir le détail de la journée. Les avoirs sont déduits des montants HT et TTC, les remboursements des montants encaissés.</div>`;
 }
@@ -9922,7 +9989,7 @@ function eCaisse(){
    <div class="b">${bars(serie,{h:190})}</div></div></div>
  <div class="card"><div class="h"><h2>Restes dus</h2><div class="r">${bdg('b-warn',EUR(reste)+' à recouvrer')}
    ${im.length?`<button class="btn s" onclick="toast('${im.length} relances de paiement envoyées')">Tout relancer</button>`:''}</div></div>
-  <div class="tw"><table><thead><tr><th>Facture</th><th>Patient</th><th>Date</th><th class="num">TTC</th><th class="num">Payé</th><th class="num">Reste</th><th>Âge</th><th></th></tr></thead>
+  <div class="tw"><table><thead><tr><th>Facture</th><th>Patient</th><th>Date</th><th class="num">TTC</th><th class="num">Payé</th><th class="num">Reste dû</th><th>Âge</th><th></th></tr></thead>
   <tbody>${im.map(f=>`<tr><td class="mono">${f.id}</td><td class="nm">${esc(fn(pById(f.patient)))}</td>
    <td class="mono">${DF(f.date)}</td><td class="num">${EUR(fTTC(f))}</td><td class="num">${EUR(f.paye)}</td>
    <td class="num" style="color:var(--crit);font-weight:660">${EUR(rdu(f))}</td><td class="mono">${days(f.date,TODAY)} j</td>
@@ -14817,6 +14884,46 @@ function montantActe(a){ if(!a) return null;
  if(F.length) return F.reduce((s2,f)=>s2+fTTC(f),0);
  return a.prix!=null?a.prix:null }
 const montantTxt=a=>{const m=montantActe(a); return m==null?'<span class="mu">—</span>':EUR(m)};
+/* --------------------------------------------------------------------------
+   Ce qui reste dû sur une séance
+   --------------------------------------------------------------------------
+   Deux dettes différentes s'y additionnent, et il faut les distinguer sans
+   les séparer en deux colonnes :
+
+     · une FACTURE ÉMISE et non soldée — le patient a la pièce en main, on
+       peut la relancer ;
+     · un SOIN DÉLIVRÉ qui n'a pas encore de facture — rien à relancer, il
+       faut d'abord l'éditer. C'est le cas qui se perd le plus facilement,
+       puisque aucun document ne le rappelle.
+
+   Un acte sans prix n'est pas une dette : retouche offerte, geste inclus
+   dans un forfait, séance non facturée volontairement. Il rend zéro, et la
+   colonne reste muette — un montant rouge sur une gratuité ferait réclamer
+   au patient de l'argent qu'on a décidé de ne pas lui demander.
+   -------------------------------------------------------------------------- */
+function resteActe(a){
+ if(!a) return {du:0, afact:0, total:0};
+ const du=FACTURES.filter(f=>f.acte===a.id).reduce((s2,f)=>s2+rdu(f),0);
+ /* le devis que cette séance a réalisé : ce qu'il reste à en facturer n'est
+    compté qu'au sens de la créance — un accord ancien jamais réalisé n'est
+    pas de l'argent dû (voir devCreance) */
+ const d=DEVIS.find(x=>x.realise===a.id);
+ const afact=d?devCreance(d):0;
+ return {du, afact, total:du+afact};
+}
+const resteTitre=R=>R.du&&R.afact
+   ? `${EUR(R.du)} facturés et non réglés · ${EUR(R.afact)} pas encore facturés`
+   : R.du ? 'Facture émise, non soldée'
+   : R.afact ? 'Soin délivré — la facture reste à établir'
+   : 'Rien à encaisser sur cette séance';
+/* La couleur ne sert qu'à une chose : qu'on ne croie pas une séance réglée
+   quand elle ne l'est pas. Elle ne s'allume donc que sur un montant réel. */
+function celluleReste(a){
+ const R=resteActe(a);
+ if(!R.total) return '<span class="mu">—</span>';
+ return `<span class="rst" title="${esc(resteTitre(R))}"><b>${EUR(R.total)}</b>${
+   R.afact?'<i>à facturer</i>':''}</span>`;
+}
 /* prix unitaire d'un soin : le tarif du jour, sauf si le soin vient d'un devis
    qui a figé le sien (pu) — un devis engage le prix qu'il annonce */
 /* le tarif d'un soin d'épilation est la somme des zones cochées à son barème ;
@@ -16020,7 +16127,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='ER';
+const BUILD='ES';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
