@@ -4093,8 +4093,23 @@ let SFAMS={
 };
 const sfamDe=x=>x.sfam||x.cat||'Divers';
 /* le nom qu'on lit sur la boîte passe devant la désignation clinique */
-const nomProduit=x=>(x&&x.marque)?x.marque:((x&&x.n)||'');
-const sousTitre=x=>(x&&x.marque&&x.n&&x.marque!==x.n)?x.n:'';
+/* ==========================================================================
+   Un produit, un nom
+   ==========================================================================
+   Une référence portait deux noms : le nom commercial — ce qui est écrit sur
+   la boîte, ce qu'on cherche des yeux dans le tiroir — et une « désignation »
+   qui redécrivait le produit. Deux champs à remplir, deux à tenir à jour, et
+   deux qui finissent par se contredire.
+
+   La famille, la sous-famille et l'unité disent déjà ce QU'EST le produit :
+   « Profhilo · seringue · Skinboosters » ne laisse personne dans le doute. La
+   désignation ne servait qu'à le répéter.
+
+   C'est donc le nom commercial qui identifie la référence, partout : à la
+   réception, dans le tiroir, sur le mouvement de stock et sur l'acte où le
+   produit a été employé. `n` reste lu en dernier recours, pour les références
+   saisies avant ce jour — on ne perd pas ce qui a été écrit. */
+const nomProduit=x=>(x&&String(x.marque||'').trim())?String(x.marque).trim():((x&&x.n)||'');
 /* les sous-familles d'une famille : celles réglées, plus celles déjà employées */
 const sfamsDe=fam=>{const L=(SFAMS[fam]||[]).slice();
  STOCK.filter(x=>(x.cat||'Divers')===fam).forEach(x=>{const k=sfamDe(x);
@@ -4433,7 +4448,7 @@ function sortirLot(x,n,q,qui,info){
  const l=lotDe(x,n)||lotFEFO(x);
  if(!l){ x.q=Math.max(0,(x.q||0)-q); return 0 }
  const r=retirerPart(l,q,qui);
- if(r.pris||r.manque) logMvt({t:(info&&info.t)||'sortie', ref:x.ref, nom:x.n, lot:l.lot, per:l.per,
+ if(r.pris||r.manque) logMvt({t:(info&&info.t)||'sortie', ref:x.ref, nom:nomProduit(x), lot:l.lot, per:l.per,
    q:r.pris, qui:qui||null, detail:r.detail, emprunts:r.emprunts, manque:r.manque,
    note:(info&&info.note)||'', acte:(info&&info.acte)||null, patient:(info&&info.patient)||null});
  majEpuise(l); recalcStock(x); return r.pris;
@@ -4444,7 +4459,7 @@ function rendreLot(x,n,q,per,qui,info){
  let l=lotDe(x,n);
  if(!l){ l={lot:(n&&n!=='—')?n:null, per:per||x.per||null, q:0, p:{}}; (x.lots=x.lots||[]).push(l) }
  crediterPart(l,q,qui);
- logMvt({t:(info&&info.t)||'retour', ref:x.ref, nom:x.n, lot:l.lot, per:l.per,
+ logMvt({t:(info&&info.t)||'retour', ref:x.ref, nom:nomProduit(x), lot:l.lot, per:l.per,
    q:Math.max(0,+q||0), qui:qui||null, note:(info&&info.note)||'',
    acte:(info&&info.acte)||null, patient:(info&&info.patient)||null});
  majEpuise(l); recalcStock(x);
@@ -5044,7 +5059,7 @@ const gradeBdg=g=>{const G=EFF_GRADE.find(x=>x[0]===g)||EFF_GRADE[0]; return bdg
  ACTES.forEach((a,i)=>{
   const c=a.type?CATALOGUE.find(x=>x.id===a.type):null;
   if(c&&c.conso){ const st=STOCK.find(x=>x.ref===c.conso);
-   if(st) CONSO.push({id:'CS-'+n++, acte:a.id, patient:a.patient, ref:st.ref, nom:st.n,
+   if(st) CONSO.push({id:'CS-'+n++, acte:a.id, patient:a.patient, ref:st.ref, nom:nomProduit(st),
      lot:st.lot||'—', per:st.per, q:1+(i%2), u:st.u, ts:st0(a.date,'CS'+a.id), par:a.praticien,
      qui:a.praticien}) }
   if(i%9===0) CONSO.push({id:'CS-'+n++, acte:a.id, patient:a.patient, ref:'ANE-EML',
@@ -5073,7 +5088,7 @@ const gradeBdg=g=>{const G=EFF_GRADE.find(x=>x[0]===g)||EFF_GRADE[0]; return bdg
   const c=conso[x.ref+'|'+(l.lot||'')]||{};
   const qui=new Set([...Object.keys(lotParts(l)||{}), ...Object.keys(c)]);
   qui.forEach(k=>{ const q=lotPart(l,k)+(c[k]||0); if(!q) return;
-   recu.push({t:'reception', ref:x.ref, nom:x.n, lot:l.lot, per:l.per, q, qui:k,
+   recu.push({t:'reception', ref:x.ref, nom:nomProduit(x), lot:l.lot, per:l.per, q, qui:k,
      ts:st0Journal(x.ref+(l.lot||'')+k), par:(k===PART_COMMUN?PRATICIENS[0]:k),
      note:'Réception initiale'}) }) }));
  /* du plus ancien au plus récent : le journal se lit à l'envers, il se construit à l'endroit */
@@ -5923,7 +5938,7 @@ function partirPraticien(nom, repreneur){
           c'est un stock qu'on ne saura plus expliquer. */
        if(typeof MVT!=='undefined') MVT.unshift({
          id:'MV-'+(MVT.length+1), ts:new Date().toISOString().slice(0,16),
-         par:monPrat(), t:'transfert', ref:x.ref, nom:x.n, lot:l.lot||'', per:l.per,
+         par:monPrat(), t:'transfert', ref:x.ref, nom:nomProduit(x), lot:l.lot||'', per:l.per,
          q, qui:PART_COMMUN, acte:null, patient:null,
          note:`Départ de ${nom} — parts rendues au pot commun`});
      }
@@ -10199,7 +10214,7 @@ function rcPart(k,v){ if(!RC) return; RC.parts[k]=Math.max(0,+v||0); renderRC() 
 function validerReception(){
  if(!RC) return;
  const q=rcTotal();
- if(!RC.ref&&!RC.n) { toast('Indiquez le produit'); return }
+ if(!RC.ref&&!String(RC.marque||'').trim()) { toast('Indiquez le nom commercial du produit'); return }
  if(q<=0){ toast('Indiquez au moins une quantité'); return }
  /* une boîte périmée n'entre pas au stock : le contrôle se fait à la porte */
  const V=verdictReception(RC.per);
@@ -10208,7 +10223,9 @@ function validerReception(){
  let x=STOCK.find(y=>y.ref===RC.ref);
  if(!x){
   const ref=(RC.ref||('REF-'+(STOCK.length+1))).toUpperCase().replace(/\s+/g,'-');
-  x={ref, n:RC.n||RC.marque||ref, marque:(RC.marque||'').trim()||undefined,
+  /* un seul nom : celui de la boîte. `n` le recopie pour les écrans qui le
+     lisent encore, sans qu'on ait deux champs à tenir. */
+  x={ref, n:(RC.marque||'').trim()||ref, marque:(RC.marque||'').trim()||undefined,
      cat:RC.cat||'Injectable', sfam:RC.sfam||RC.cat||'Divers',
      u:RC.u||'unité', s:Math.max(0,+RC.seuil||0), pu:Math.max(0,+RC.pu||0),
      f:RC.f||'—', lots:[]};
@@ -10357,20 +10374,19 @@ function renommerRef(av,ap){
 function validerModifRef(){
  if(!MR) return;
  const x=STOCK.find(y=>y.ref===MR.ref0); if(!x){ toast('Référence introuvable'); return }
- const nom=(MR.n||'').trim(), ref=(MR.ref||'').trim().toUpperCase().replace(/\s+/g,'-');
- if(!nom){ toast('La désignation ne peut pas être vide'); return }
+ const nom=(MR.marque||'').trim(), ref=(MR.ref||'').trim().toUpperCase().replace(/\s+/g,'-');
+ if(!nom){ toast('Le nom commercial ne peut pas être vide'); return }
  if(!ref){ toast('La référence ne peut pas être vide'); return }
  if(ref!==MR.ref0&&STOCK.some(y=>y.ref===ref)){ toast(`La référence ${ref} existe déjà`); return }
  const chg=[];
- if(nom!==x.n) chg.push(`désignation « ${x.n} » → « ${nom} »`);
- if((MR.marque||'')!==(x.marque||'')) chg.push(MR.marque?`nom commercial « ${MR.marque} »`:'nom commercial retiré');
+ if(nom!==nomProduit(x)) chg.push(`nom « ${nomProduit(x)} » → « ${nom} »`);
  if(ref!==MR.ref0) chg.push(`référence ${MR.ref0} → ${ref}`);
  if(MR.cat!==x.cat) chg.push(`famille ${x.cat} → ${MR.cat}`);
  if(MR.sfam!==sfamDe(x)) chg.push(`sous-famille ${sfamDe(x)} → ${MR.sfam}`);
  let cite=0;
  if(ref!==MR.ref0) cite=renommerRef(MR.ref0,ref);
- x.ref=ref; x.n=nom;
- MR.marque?(x.marque=MR.marque.trim()):delete x.marque;
+ /* le nom commercial est le nom : `n` le recopie, il ne vit plus sa vie */
+ x.ref=ref; x.n=nom; x.marque=nom;
  x.cat=MR.cat; x.sfam=MR.sfam; x.u=MR.u||x.u;
  if(MR.pu!=='') x.pu=Math.max(0,+MR.pu||0);
  x.f=MR.f||x.f;
@@ -10489,13 +10505,10 @@ function renderRC(){
     <div class="fld"><label>Nom commercial <span class="mu">— ce qui est écrit sur la boîte</span></label>
      <input class="inp" value="${esc(RC.marque)}" oninput="RC.marque=this.value"
        placeholder="ex. Juvéderm Volift"></div>
-    ${x?`<div class="mu" style="font-size:11.5px;margin:-4px 0 9px">Désignation : ${esc(x.n)}${
-        (RC.marque||'').trim()&&(RC.marque||'').trim()!==(x.marque||'')?' · le nom commercial sera mis à jour sur la référence':''}
+    ${x?`<div class="mu" style="font-size:11.5px;margin:-4px 0 9px">${
+        (RC.marque||'').trim()&&(RC.marque||'').trim()!==(x.marque||'')?'Le nom commercial sera mis à jour sur la référence.':'Référence déjà au stock — on y ajoute un lot.'}
       <button class="btn xs g" style="margin-left:6px" onclick="fermerStock();ouvrirModifRef('${x.ref}')">Modifier la référence</button></div>`
-     :`<div class="fld"><label>Désignation</label>
-      <input class="inp" value="${esc(RC.n)}" oninput="RC.n=this.value"
-        placeholder="ex. Acide hyaluronique — volumateur 1 ml"></div>
-     <div class="cadd" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:9px">
+     :`<div class="cadd" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:9px">
       <div class="fld" style="margin:0"><label>Famille</label>
        <select class="inp" onchange="rcSet('cat',this.value)">${FAMS.map(f=>`<option value="${f}" ${RC.cat===f?'selected':''}>${esc(FAM_L[f]||f)}</option>`).join('')}</select></div>
       <div class="fld" style="margin:0"><label>Sous-famille</label>
@@ -10577,10 +10590,6 @@ function renderMR(){
     <div class="fld"><label>Nom commercial <span class="mu">— ce qui est écrit sur la boîte</span></label>
      <input class="inp" value="${esc(MR.marque)}" oninput="MR.marque=this.value"
        placeholder="ex. Juvéderm Volift"></div>
-    <div class="fld"><label>Désignation</label>
-     <input class="inp" value="${esc(MR.n)}" oninput="MR.n=this.value"
-       placeholder="ex. Acide hyaluronique — volumateur 1 ml">
-     <div class="mu" style="font-size:11px;margin-top:4px">Sans nom commercial, c’est elle qu’on lit partout.</div></div>
     <div class="cadd" style="grid-template-columns:1fr 1fr;margin-bottom:9px">
      <div class="fld" style="margin:0"><label>Famille</label>
       <select class="inp" onchange="mrSet('cat',this.value)">${FAMS.map(f=>`<option value="${f}" ${MR.cat===f?'selected':''}>${esc(FAM_L[f]||f)}</option>`).join('')}</select></div>
@@ -11288,7 +11297,6 @@ V.stock=()=>{
    bas=sousSeuilPrat(s), sp=seuilPrat(s), A=lotsRanges(s),
    bes=Math.max(0,s.s*2-s.q);
    return `<tr><td><b>${esc(nomProduit(s))}</b>
-    ${sousTitre(s)?`<div class="mu" style="font-size:11.5px">${esc(sousTitre(s))}</div>`:''}
     <div class="mu mono" style="font-size:11px">${s.ref} · ${esc(sfamDe(s))}${CAN('prix')?` · ${EUR(s.pu)}/${s.u}`:''} · ${esc(s.f)}</div></td>
     <td class="num"><b>${s.q}</b> <span class="mu" style="font-size:11px">/ ${s.s}</span>
       ${stockPerime(s)?`<div class="mu" style="font-size:10px;color:var(--crit);font-weight:640;white-space:nowrap">dont ${stockPerime(s)} périmé${stockPerime(s)>1?'s':''}</div>`:''}</td>
@@ -12104,7 +12112,7 @@ V.params=()=>{
        nom: x=>nomProduit(x), fam:x=>FAM_L[x.cat]||x.cat||'', sfam:x=>sfamDe(x),
        q:x=>x.q, s:x=>x.s, sp:x=>seuilPrat(x),
       }).map(x=>`<tr>
-       <td><b>${esc(nomProduit(x))}</b>${sousTitre(x)?`<div class="mu" style="font-size:11.5px">${esc(sousTitre(x))}</div>`:''}
+       <td><b>${esc(nomProduit(x))}</b>
         <div class="mu mono" style="font-size:11px">${x.ref}</div></td>
        <td class="mu">${esc(FAM_L[x.cat]||x.cat||'—')}</td>
        <td>${esc(sfamDe(x))}</td>
@@ -16011,7 +16019,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='EP';
+const BUILD='EQ';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
