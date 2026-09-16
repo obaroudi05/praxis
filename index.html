@@ -4150,7 +4150,7 @@ const reprendreSfam=(fam,k)=>{ (SFAMS[fam]=SFAMS[fam]||[]).push(k); cfgPlanifier
 function stockRange(q,fam){
  const t=(q||'').trim().toLowerCase();
  const L=STOCK.filter(x=>(!fam||x.cat===fam)
-   && (!t || (x.n+' '+x.ref+' '+(x.lot||'')+' '+sfamDe(x)+' '+(x.f||'')).toLowerCase().includes(t)));
+   && (!t || (nomProduit(x)+' '+x.n+' '+x.ref+' '+(x.lot||'')+' '+sfamDe(x)+' '+(x.f||'')).toLowerCase().includes(t)));
  const ordre=f=>{const i=FAMS.indexOf(f); return i<0?99:i};
  const par={};
  L.forEach(x=>{const f=x.cat||'Divers', k=sfamDe(x);
@@ -6438,7 +6438,7 @@ V.dash=()=>{
    cl:'c', go:`apercuDevis('${r.d.id}')`, ti:'Voir le devis',
    a:`<button class="btn s" onclick="event.stopPropagation();apercuDevis('${r.d.id}')">◉ Aperçu</button>
       <button class="btn s p" onclick="event.stopPropagation();composerRelance('${r.d.id}')">Relancer</button>`}));
- ALERTES.forEach(s=>todo.push({i:'▧',b:'var(--crit-w)',c:'#a52a2a',t:`${sst(s).l} — ${s.n}`,
+ ALERTES.forEach(s=>todo.push({i:'▧',b:'var(--crit-w)',c:'#a52a2a',t:`${sst(s).l} — ${nomProduit(s)}`,
    d:`${s.q} ${s.u} en stock · seuil ${s.s} · ${s.f}`,
    a:`<button class="btn s" onclick="toast('Bon de commande préparé pour ${esc(s.f)}')">Commander</button>`}));
  consentKO().forEach(a=>todo.push({i:'✎',b:'var(--accent-wash)',c:'var(--accent-ink)',
@@ -10175,7 +10175,7 @@ function verdictReception(per){
 /* ---- Réception ---- */
 function ouvrirReception(ref,lot){
  const x=ref?STOCK.find(y=>y.ref===ref):null;
- RC={ref:(x&&x.ref)||'', lot:lot||'', per:'', seuil:'', sp:'', f:'', n:'', marque:'', u:'', cat:'Injectable',
+ RC={ref:(x&&x.ref)||'', lot:lot||'', per:'', seuil:'', sp:'', f:'', marque:'', u:'', cat:'Injectable',
      sfam:'', pu:'', parts:{}, note:'', nouveau:!x, gs1:null};
  if(x) rcDepuisRef(x);
  scanCible=rcScan;
@@ -10184,8 +10184,8 @@ function ouvrirReception(ref,lot){
 /* Reprendre les méta-données d'une référence connue : on ne les ressaisit pas */
 function rcDepuisRef(x){
  if(!x) return;
- RC.ref=x.ref; RC.n=x.n; RC.f=x.f||''; RC.u=x.u||''; RC.cat=x.cat||'Injectable';
- RC.sfam=sfamDe(x); RC.marque=x.marque||''; RC.pu=x.pu!=null?x.pu:''; RC.seuil=x.s!=null?x.s:'';
+ RC.ref=x.ref; RC.f=x.f||''; RC.u=x.u||''; RC.cat=x.cat||'Injectable';
+ RC.sfam=sfamDe(x); RC.marque=nomProduit(x); RC.pu=x.pu!=null?x.pu:''; RC.seuil=x.s!=null?x.s:'';
  RC.sp=(x.sp===undefined||x.sp===null)?'':x.sp; RC.nouveau=false;
  const l=RC.lot?lotDe(x,RC.lot):null;
  if(l&&l.per) RC.per=l.per;
@@ -10198,7 +10198,7 @@ function rcScan(L){
  if(L.per) RC.per=L.per;
  RC.gs1=L.gs1?L.brut:null;
  if(L.gtin){ const x=STOCK.find(y=>y.gtin&&y.gtin===L.gtin);
-   if(x){ rcDepuisRef(x); toast(`Étiquette reconnue · ${x.n}`) }
+   if(x){ rcDepuisRef(x); toast(`Étiquette reconnue · ${nomProduit(x)}`) }
    else RC.gtinVu=L.gtin }
  else if(!RC.ref){ const x=STOCK.find(y=>lotDe(y,L.lot)); if(x) rcDepuisRef(x) }
  renderRC();
@@ -10232,7 +10232,7 @@ function validerReception(){
   if(RC.sp!=='') x.sp=+RC.sp;
   if(RC.gtinVu) x.gtin=RC.gtinVu;
   STOCK.push(x);
-  logMvt({t:'edit', ref:x.ref, nom:x.n, q:0, note:'Référence créée'});
+  logMvt({t:'edit', ref:x.ref, nom:nomProduit(x), q:0, note:'Référence créée'});
  } else {
   if(RC.seuil!=='') x.s=Math.max(0,+RC.seuil||0);
   if(RC.sp!=='') x.sp=+RC.sp; 
@@ -10249,12 +10249,12 @@ function validerReception(){
  else if(RC.per) l.per=RC.per;
  PARTS_CIBLE().forEach(k=>{ const v=Math.max(0,+RC.parts[k]||0); if(!v) return;
   crediterPart(l,v,k);
-  logMvt({t:'reception', ref:x.ref, nom:x.n, lot:l.lot, per:l.per, q:v, qui:k,
+  logMvt({t:'reception', ref:x.ref, nom:nomProduit(x), lot:l.lot, per:l.per, q:v, qui:k,
     note:RC.note||(neuf?'Nouveau lot':'Réapprovisionnement')}) });
  majEpuise(l); recalcStock(x); cfgPlanifier();
  const det=PARTS_CIBLE().filter(k=>+RC.parts[k]>0)
    .map(k=>`${k===PART_COMMUN?'commun':k.replace('Dr ','')} +${+RC.parts[k]}`).join(' · ');
- toast(`${x.n} · lot ${nLot||'sans n°'} — ${det}`);
+ toast(`${nomProduit(x)} · lot ${nLot||'sans n°'} — ${det}`);
  RC=null; scanCible=null; closeAll(); go('stock');
 }
 
@@ -10311,7 +10311,7 @@ function validerUtilisation(){
  const n=new Date();
  const csId='CS-'+(CONSO.length+1+9000);
  CONSO.push({id:csId, acte:a.id, patient:a.patient, ref:x.ref,
-   nom:x.n, lot:l.lot||'—', per:l.per, q:r.pris, u:x.u,
+   nom:nomProduit(x), lot:l.lot||'—', per:l.per, q:r.pris, u:x.u,
    ts:`${d}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`,
    par:ROLES[role].u, qui:UT.qui, retouche:ret, note:(UT.note||'').trim()||null});
  /* une retouche saisie ici est la même chose qu'une retouche saisie dans la
@@ -10320,7 +10320,7 @@ function validerUtilisation(){
    date:d, prat:UT.qui, note:(UT.note||'').trim(), conso:csId,
    ts:`${d}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`,
    par:ROLES[role].u});
- logMvt({t:'sortie', ref:x.ref, nom:x.n, lot:l.lot, per:l.per, q:r.pris, qui:UT.qui,
+ logMvt({t:'sortie', ref:x.ref, nom:nomProduit(x), lot:l.lot, per:l.per, q:r.pris, qui:UT.qui,
    detail:r.detail, emprunts:r.emprunts, manque:r.manque, acte:a.id, patient:a.patient,
    ts:`${d}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`,
    note:`${ret?'Retouche':a.nom} — ${fn(pById(a.patient))}${UT.note?' · '+UT.note.trim():''}`});
@@ -10339,7 +10339,7 @@ function validerUtilisation(){
 let MR=null;
 function ouvrirModifRef(ref){
  const x=STOCK.find(y=>y.ref===ref); if(!x){ toast('Référence introuvable'); return }
- MR={ref0:x.ref, ref:x.ref, n:x.n||'', marque:x.marque||'', cat:x.cat||'Injectable',
+ MR={ref0:x.ref, ref:x.ref, marque:nomProduit(x), cat:x.cat||'Injectable',
      sfam:sfamDe(x), u:x.u||'', pu:x.pu!=null?x.pu:'', f:x.f||'',
      s:x.s!=null?x.s:'', sp:(x.sp===undefined||x.sp===null)?'':x.sp, gtin:x.gtin||'',
      lots:lotsDe(x).map(l=>({lot:l.lot, per:l.per||'',
@@ -10407,12 +10407,12 @@ function validerModifRef(){
   if(tAp===tAv){
    const vers=Object.keys(ap).filter(k=>(ap[k]||0)>(av[k]||0));
    const de  =Object.keys(av).filter(k=>(av[k]||0)>(ap[k]||0));
-   logMvt({t:'transfert', ref:x.ref, nom:x.n, lot:l.lot, per:l.per,
+   logMvt({t:'transfert', ref:x.ref, nom:nomProduit(x), lot:l.lot, per:l.per,
      q:vers.reduce((n,k)=>n+(ap[k]-(av[k]||0)),0),
      qui:vers[0]||null, emprunts:de,
      note:`Répartition modifiée — ${de.map(k=>partNom(k)).join(', ')||'—'} → ${vers.map(k=>partNom(k)).join(', ')||'—'}`});
   } else {
-   logMvt({t:'ajust', ref:x.ref, nom:x.n, lot:l.lot, per:l.per, q:Math.abs(tAp-tAv),
+   logMvt({t:'ajust', ref:x.ref, nom:nomProduit(x), lot:l.lot, per:l.per, q:Math.abs(tAp-tAv),
      qui:null, note:`Inventaire corrigé — ${tAv} → ${tAp} ${x.u||'unité'}${tAp>1?'s':''}`});
   }
  });
@@ -10428,7 +10428,7 @@ function supprimerRef(){
  if(x.q>0){ toast(`Il reste ${x.q} ${x.u||'unité'}${x.q>1?'s':''} en stock — sortez-les d’abord`); return }
  if(cite){ toast(`${cite} consommation${cite>1?'s tracées':' tracée'} citent ce produit — il reste au catalogue`); return }
  const i=STOCK.indexOf(x); STOCK.splice(i,1);
- logMvt({t:'edit', ref:x.ref, nom:x.n, q:0, note:'Référence supprimée du catalogue'});
+ logMvt({t:'edit', ref:x.ref, nom:nomProduit(x), q:0, note:'Référence supprimée du catalogue'});
  MR=null; scanCible=null; closeAll(); cfgPlanifier(); go('stock');
  toast(`${nomProduit(x)} retiré du catalogue`);
 }
@@ -10444,7 +10444,7 @@ function ouvrirSortie(ref,lot){
 }
 function soScan(L){ if(!SO||!L||!L.lot) return;
  const x=STOCK.find(y=>lotDe(y,L.lot));
- if(x){ SO.ref=x.ref; SO.lot=L.lot; renderSO(); toast(`Lot ${L.lot} · ${x.n}`) }
+ if(x){ SO.ref=x.ref; SO.lot=L.lot; renderSO(); toast(`Lot ${L.lot} · ${nomProduit(x)}`) }
  else toast(`Lot ${L.lot} inconnu au stock`);
 }
 function soSet(k,v){ if(!SO) return; SO[k]=v;
@@ -10457,12 +10457,12 @@ function validerSortie(){
  const l=lotDe(x,SO.lot)||lotFEFO(x); if(!l){ toast('Aucun lot à sortir'); return }
  const dispo=lotDispo(l,SO.qui);
  const r=retirerPart(l,q,SO.qui);
- logMvt({t:(SO.motif==='Écart d’inventaire'?'ajust':'sortie'), ref:x.ref, nom:x.n, lot:l.lot,
+ logMvt({t:(SO.motif==='Écart d’inventaire'?'ajust':'sortie'), ref:x.ref, nom:nomProduit(x), lot:l.lot,
    per:l.per, q:r.pris, qui:SO.qui, detail:r.detail, emprunts:r.emprunts, manque:r.manque,
    note:SO.motif+(SO.note?' — '+SO.note:'')});
  majEpuise(l); recalcStock(x); cfgPlanifier();
- toast(r.manque?`${x.n} · ${r.pris} sorti${r.pris>1?'s':''} — il en manquait ${r.manque}`
-              :`${x.n} · ${r.pris} sorti${r.pris>1?'s':''} du lot ${l.lot||'sans n°'}`);
+ toast(r.manque?`${nomProduit(x)} · ${r.pris} sorti${r.pris>1?'s':''} — il en manquait ${r.manque}`
+              :`${nomProduit(x)} · ${r.pris} sorti${r.pris>1?'s':''} du lot ${l.lot||'sans n°'}`);
  SO=null; scanCible=null; closeAll(); go('stock');
 }
 
@@ -10491,7 +10491,7 @@ function renderRC(){
   <button class="btn g s" onclick="fermerStock()">✕</button>
   <div><h2>Réception de lot</h2><div class="mu" style="font-size:11.5px">
     ${lotExistant?`réapprovisionnement du lot ${esc(RC.lot)}`
-      :(x?`nouveau lot pour ${esc(x.n)}`:'nouvelle référence au stock')}</div></div>`;
+      :(x?`nouveau lot pour ${esc(nomProduit(x))}`:'nouvelle référence au stock')}</div></div>`;
  document.getElementById('overb').innerHTML=`
   ${barreScan('scannez l’étiquette de la boîte : n° de lot et péremption se remplissent seuls')}
   <div class="grid g2" style="grid-template-columns:1fr 1fr;gap:14px;margin-top:12px">
@@ -10500,7 +10500,7 @@ function renderRC(){
      <select class="inp" onchange="rcSet('ref',this.value)">
       <option value="">— nouvelle référence —</option>
       ${FAMS.map(f=>`<optgroup label="${esc(FAM_L[f]||f)}">${STOCK.filter(y=>y.cat===f)
-        .map(y=>`<option value="${y.ref}" ${RC.ref===y.ref?'selected':''}>${esc(y.n)}</option>`).join('')}</optgroup>`).join('')}
+        .map(y=>`<option value="${y.ref}" ${RC.ref===y.ref?'selected':''}>${esc(nomProduit(y))}</option>`).join('')}</optgroup>`).join('')}
      </select></div>
     <div class="fld"><label>Nom commercial <span class="mu">— ce qui est écrit sur la boîte</span></label>
      <input class="inp" value="${esc(RC.marque)}" oninput="RC.marque=this.value"
@@ -10738,7 +10738,7 @@ function renderSO(){
     <div class="fld"><label>Produit</label>
      <select class="inp" onchange="soSet('ref',this.value)">
       ${FAMS.map(f=>`<optgroup label="${esc(FAM_L[f]||f)}">${STOCK.filter(y=>y.cat===f)
-        .map(y=>`<option value="${y.ref}" ${SO.ref===y.ref?'selected':''}>${esc(y.n)} — ${y.q} en stock</option>`).join('')}</optgroup>`).join('')}
+        .map(y=>`<option value="${y.ref}" ${SO.ref===y.ref?'selected':''}>${esc(nomProduit(y))} — ${y.q} en stock</option>`).join('')}</optgroup>`).join('')}
      </select></div>
     <div class="fld"><label>Lot</label>
      <select class="inp" onchange="soSet('lot',this.value)">
@@ -11218,7 +11218,7 @@ function vueArchives(){
      vide:o=>o.l.videLe||'',
      exp: o=>ACTES.filter(a=>a.lot===o.l.lot).length,
     }).map(({x,l})=>{const exp=ACTES.filter(a=>a.lot===l.lot).length;
-    return `<tr><td><b>${esc(x.n)}</b><div class="mu mono" style="font-size:11px">${x.ref}</div></td>
+    return `<tr><td><b>${esc(nomProduit(x))}</b><div class="mu mono" style="font-size:11px">${x.ref}</div></td>
      <td class="mono">${l.lot?esc(l.lot):'<span class="mu">n/a</span>'}</td>
      <td class="mono" style="font-size:11.5px">${DFP(l.per)}${lotPerime(l)?' '+bdg('b-neu','périmé'):''}</td>
      <td class="mono" style="font-size:11.5px">${DF(l.videLe)} <span class="mu">· il y a ${days(l.videLe,TODAY)} j</span></td>
@@ -13432,7 +13432,7 @@ function ajouterProduit(ref){
  if(ex){ ex.q+=1; ex.auto=false }
  else {const f=lotFEFO(st); AS.conso.push({ref, q:1, auto:false,
    lot:(f&&f.lot)||st.lot||'', per:(f&&f.per)||st.per||''})}
- toast(`${st.n} ajouté à la séance`); renderOver();
+ toast(`${nomProduit(st)} ajouté à la séance`); renderOver();
 }
 /* le lot et sa péremption se corrigent ligne par ligne : deux boîtes du même
    produit, voire du même lot, ne se périment pas toujours à la même date */
@@ -14308,9 +14308,9 @@ function consultPane(prix){
           ${f.sfams.map(g=>`<div class="cpick-s">${esc(g.sfam)}</div>`+
             g.items.map(x=>{const dedans=CS.some(l=>l.ref===x.ref);
               return `<button class="cpick-b ${dedans?'in':''}" onclick="ajouterProduit('${x.ref}')"
-                title="${esc(x.n)}${x.f?' · '+esc(x.f):''}${x.per?' · exp. '+DFP(x.per):''}">
+                title="${esc(nomProduit(x))}${x.f?' · '+esc(x.f):''}${x.per?' · exp. '+DFP(x.per):''}">
                 <span class="pk">${dedans?'✓':'+'}</span>
-                <span class="nm">${esc(x.n)}</span>
+                <span class="nm">${esc(nomProduit(x))}</span>
                 <span class="lo">${x.lot?esc(x.lot):'—'}${lotsDe(x).length>1?` <b class="lm">+${lotsDe(x).length-1}</b>`:''}${x.per?`<i>${DFP(x.per)}</i>`:''}</span>
                 <span class="st ${x.q<=x.s?'bas':''}">${x.q}</span></button>`}).join('')).join('')}`).join('')
          :`<div class="mu" style="font-size:11.5px;padding:10px 4px">Aucun produit ne correspond.</div>`}
@@ -14319,11 +14319,12 @@ function consultPane(prix){
      const st=STOCK.find(x=>x.ref===l.ref)||{};
      const PV2=consoEtatHtml(l,AS.prat), per=l.per||st.per||'';
      const perime=per&&per<TODAYS, proche=per&&!perime&&per<addD(TODAYS,90);
-     /* Le nom du produit tient sa propre ligne, sur toute la largeur : tronqué,
-        « Acide hyaluronique — volumateur » et « — comblement profond » se
-        ressemblent trop pour qu'on les distingue. */
+     /* Le nom commercial tient sa propre ligne, sur toute la largeur : c'est
+        lui qu'on lit sur la boîte, et deux références voisines ne se
+        distinguent parfois que par les derniers mots. */
+     const nomP=nomProduit(st)||l.ref;
      return `<div class="crow c-s">
-       <div class="cn"><b title="${esc(st.n||l.ref)}">${esc(st.n||l.ref)}</b></div>
+       <div class="cn"><b title="${esc(nomP)}">${esc(nomP)}</b></div>
          ${(()=>{const LO=lotsDe(st), cur=l.lot||st.lot||'';
            /* plusieurs lots en stock : on choisit lequel on a réellement utilisé */
            const menu=LO.length>1&&!l.lotLibre;
@@ -15222,7 +15223,7 @@ function saveActe(){
  (AS.conso||[]).forEach(l=>{ const st=STOCK.find(x=>x.ref===l.ref); if(!st) return;
   /* le produit sort du stock de celui qui a fait l'acte, pas d'un pot anonyme */
   CONSO.push({id:'CS-'+(CONSO.length+1+9000), acte:ACTES[0].id, patient:AS.pid, ref:st.ref,
-    nom:st.n, lot:(l.lot||st.lot||'—'), per:(l.per||st.per), q:l.q, u:st.u,
+    nom:nomProduit(st), lot:(l.lot||st.lot||'—'), per:(l.per||st.per), q:l.q, u:st.u,
     ts:nowStamp(), par:ROLES[role].u, qui:AS.prat});
   sortirLot(st, l.lot, l.q, AS.prat, {acte:ACTES[0].id, patient:AS.pid,
     note:`${acteDef(T[0]||'').n||'Séance'} — ${fn(pById(AS.pid))}`}) });
@@ -15691,12 +15692,12 @@ function addConso(aid){
  /* le lot vient du menu quand la référence en tient plusieurs, sinon du FEFO */
  const nLot=(document.getElementById('csLot')||{}).value;
  const lot=lotDe(st,nLot)||lotFEFO(st);
- CONSO.push({id:'CS-'+(CONSO.length+1+9000), acte:a.id, patient:a.patient, ref:st.ref, nom:st.n,
+ CONSO.push({id:'CS-'+(CONSO.length+1+9000), acte:a.id, patient:a.patient, ref:st.ref, nom:nomProduit(st),
    lot:(lot&&lot.lot)||'—', per:lot?lot.per:st.per, q, u:st.u, ts:nowStamp(), par:ROLES[role].u,
    qui:a.praticien});
  sortirLot(st, lot&&lot.lot, q, a.praticien, {acte:a.id, patient:a.patient,
    note:`${a.nom} — ${fn(pById(a.patient))}`});
- consoAdd=false; toast(`${st.n} × ${q} · lot ${(lot&&lot.lot)||'—'} — stock à ${st.q}`); rafraichirConso();
+ consoAdd=false; toast(`${nomProduit(st)} × ${q} · lot ${(lot&&lot.lot)||'—'} — stock à ${st.q}`); rafraichirConso();
 }
 /* Depuis que le stock sait tracer une utilisation, une ligne de consommable
    n'appartient plus à la seule fenêtre de saisie d'acte : on redessine ce qui
@@ -15721,7 +15722,7 @@ function secConso(a){
    <div class="mu" style="font-size:11px">${L.length?`${L.length} ligne${L.length>1?'s':''} · traçabilité des lots`:'rien de tracé sur cet acte'}</div></div>
    <div class="r"><button class="btn xs ${consoAdd?'g':'p'}" onclick="toggleConso()">${consoAdd?'✕':'＋ Produit'}</button></div></div>
   ${consoAdd?`<div class="cadd">
-    <select class="inp" id="csRef" onchange="csRefSel=this.value;renderOver()">${STOCK.map(x=>`<option value="${x.ref}" ${csRefSel===x.ref?'selected':''}>${esc(x.n)} — ${x.q} en stock${lotsDe(x).length>1?' · '+lotsDe(x).length+' lots':''}</option>`).join('')}</select>
+    <select class="inp" id="csRef" onchange="csRefSel=this.value;renderOver()">${STOCK.map(x=>`<option value="${x.ref}" ${csRefSel===x.ref?'selected':''}>${esc(nomProduit(x))} — ${x.q} en stock${lotsDe(x).length>1?' · '+lotsDe(x).length+' lots':''}</option>`).join('')}</select>
     <input class="inp" id="csQ" type="number" min="1" value="1" style="width:64px">
     <button class="btn xs p" onclick="addConso(${a.id})">Ajouter</button>
     ${(()=>{const st=STOCK.find(x=>x.ref===csRefSel)||STOCK[0], LO=lotsDe(st);
@@ -15775,10 +15776,10 @@ function addRetouche(aid){
   const q=Math.max(1,+RT.q||1);
   const r=retirerPart(l,q,RT.qui);
   csId='CS-'+(CONSO.length+1+9000);
-  CONSO.push({id:csId, acte:a.id, patient:a.patient, ref:x.ref, nom:x.n,
+  CONSO.push({id:csId, acte:a.id, patient:a.patient, ref:x.ref, nom:nomProduit(x),
     lot:l.lot||'—', per:l.per, q:r.pris, u:x.u, ts, par:ROLES[role].u,
     qui:RT.qui, retouche:true, note:(RT.note||'').trim()||null});
-  logMvt({t:'sortie', ref:x.ref, nom:x.n, lot:l.lot, per:l.per, q:r.pris, qui:RT.qui,
+  logMvt({t:'sortie', ref:x.ref, nom:nomProduit(x), lot:l.lot, per:l.per, q:r.pris, qui:RT.qui,
     detail:r.detail, emprunts:r.emprunts, manque:r.manque, acte:a.id, patient:a.patient, ts,
     note:`Retouche — ${fn(pById(a.patient))}${RT.note?' · '+RT.note.trim():''}`});
   majEpuise(l); recalcStock(x); cfgPlanifier();
@@ -16019,7 +16020,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='EQ';
+const BUILD='ER';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -17687,8 +17688,8 @@ function buildPal(q){
    .forEach(p=>it.push({t:fn(p),s:`${ageTxt(p)} · ${ACTES.filter(a=>a.patient===p.id).length} actes · dossier ${p.id}`,ic:ini(p),k:'Patient',go:()=>{closeAll();openPatient(p.id)}}));
   DEVIS.filter(d=>d.id.toLowerCase().includes(q)||fn(pById(d.patient)).toLowerCase().includes(q)).slice(0,4)
    .forEach(d=>it.push({t:d.id,s:`${fn(pById(d.patient))} · ${EUR(d.montant)} · ${SD[d.statut][0]}`,ic:'◫',k:'Devis',go:()=>{closeAll();go('devis',d.id)}}));
-  STOCK.filter(s=>(s.n+' '+s.ref+' '+(s.lot||'')).toLowerCase().includes(q)).slice(0,4)
-   .forEach(s=>it.push({t:s.n,s:`${s.q} ${s.u} · ${s.lot||'sans lot'}`,ic:'▧',k:'Stock',go:()=>{closeAll();go('stock')}}));
+  STOCK.filter(s=>(nomProduit(s)+' '+s.n+' '+s.ref+' '+(s.lot||'')).toLowerCase().includes(q)).slice(0,4)
+   .forEach(s=>it.push({t:nomProduit(s),s:`${s.q} ${s.u} · ${s.lot||'sans lot'}`,ic:'▧',k:'Stock',go:()=>{closeAll();go('stock')}}));
   [...new Set(ACTES.filter(a=>a.lot&&a.lot.toLowerCase().includes(q)).map(a=>a.lot))].slice(0,3)
    .forEach(l=>it.push({t:'Lot '+l,s:ACTES.filter(a=>a.lot===l).length+' patients exposés',ic:'⚠',k:'Traçabilité',go:()=>{closeAll();lotSel=l;go('stock')}}));
   ZONES.filter(z=>z.n.toLowerCase().includes(q)).slice(0,3)
