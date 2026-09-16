@@ -3885,6 +3885,21 @@ const devCreance=d=>{
 /* les devis d'un patient qui attendent leur facture — au sens de la créance */
 const devisAFacturer=pid=>DEVIS.filter(d=>d.patient===pid&&devCreance(d)>0);
 
+/* Un devis se rencontre à quatre endroits : l'onglet Facturation d'une fiche,
+   son onglet Documents, la liste « Devis et conversions » et la fiche du devis
+   lui-même. Le geste doit être le MÊME partout — quatre copies auraient divergé
+   à la première retouche, et on aurait cherché longtemps pourquoi le bouton
+   manque « seulement dans Documents ». */
+function btnFacturerDevis(d,gros){
+ if(!CAN('prix')||!d||devAFacturer(d)<=0) return '';
+ const r=devAFacturer(d), part=devFacture(d)>0;
+ return `<button class="btn ${gros?'':'xs '}p"
+   title="${esc(`Établir la facture d’après ce devis — ${EUR(r)}`
+     +(part?` (${EUR(devFacture(d))} déjà facturé)`:'')
+     +(d.realise?'':' — le soin n’a pas encore été saisi'))}"
+   onclick="event.stopPropagation();devisEnFacture('${d.id}')"
+   >€ ${gros?'Convertir en facture':(part?'Facturer le reste':'Convertir en facture')}</button>`;
+}
 /* « Réalisé » ne dit rien de l'argent : on ajoute ce qui manque, en toutes
    lettres, et seulement quand il manque quelque chose. */
 function bdgAFacturer(d){
@@ -8401,6 +8416,7 @@ function pDetail(p){
     a:`<button class="btn xs" onclick="event.stopPropagation();apercuDevis('${d.id}')">◫ PDF</button>
         ${d.realise?'':`<button class="btn xs p" title="Reprendre ces soins pour la consultation d’aujourd’hui"
           onclick="event.stopPropagation();realiserDevis('${d.id}')">✚ Réaliser</button>`}
+        ${btnFacturerDevis(d)}
         ${d.statut==='accepte'?''
           :consentsDeDevis(d.id).some(x=>!x.signe)
            ?`<button class="btn xs" title="Lire le devis et ses consentements, puis signer en une fois"
@@ -9072,9 +9088,7 @@ function pDetail(p){
             <button class="btn xs" title="Envoyer un lien de signature au patient"
              onclick="event.stopPropagation();composerEnvoi(null,null,'${d.id}')">✉ Signature à distance</button>`}`}
         ${lienDe(d.id)?`<button class="btn xs" onclick="event.stopPropagation();pageSignature('${lienDe(d.id).jeton}')">🔗 Page du patient</button>`:''}
-        ${(CAN('prix')&&devAFacturer(d)>0)?`<button class="btn xs p"
-          title="${esc('Établir la facture d’après ce devis — '+EUR(devAFacturer(d)))}"
-          onclick="event.stopPropagation();devisEnFacture('${d.id}')">€ Facturer</button>`:''}
+        ${btnFacturerDevis(d)}
         <button class="btn xs" onclick="event.stopPropagation();apercuDevis('${d.id}')">PDF</button></td></tr>`).join('')}
     </tbody></table>${D.length?'':'<div class="empty">Aucun devis.</div>'}</div>
 
@@ -9228,6 +9242,7 @@ V.devis=()=>{
     ${d.realise
       ? `<button class="btn" onclick="const a=ACTES.find(x=>x.id===${d.realise}); a&&openActe(a.patient,a.id)">✚ Voir l'acte réalisé</button>`
       : `<button class="btn" onclick="realiserDevis('${d.id}')" title="Reprendre ces soins pour la consultation d'aujourd'hui">✚ Réaliser l'acte</button>`}
+    ${btnFacturerDevis(d,1)}
     ${d.statut==='accepte'&&signOf(d.id)?`<span class="bdg b-good" style="align-self:center" title="${esc(signTxt(signOf(d.id)))}">✎ ${esc(signTxt(signOf(d.id)))}</span>`
       :`<button class="btn p" title="Ouvrir le message d’envoi — lien sécurisé et signature à distance"
         onclick="composerEnvoi(null,null,'${d.id}')">✉ Envoyer pour signature</button>`}
@@ -9357,6 +9372,7 @@ V.devis=()=>{
           onclick="event.stopPropagation();composerRelance('${d.id}')">↻ Relancer</button>`:''}
       ${(d.realise||['refuse','expire'].includes(d.statut))?'':`<button class="btn xs" title="Reprendre ces soins pour la consultation d’aujourd’hui"
         onclick="event.stopPropagation();realiserDevis('${d.id}')">✚ Réaliser</button>`}
+      ${btnFacturerDevis(d)}
       ${btnSuppDevis(d)}</td></tr>${confirmSuppDevis(d,8)}`}).join('')}
   </tbody></table>${L.length?'':`<div class="empty">Aucun devis ${devSansFiltre()?'sur cette période':'ne correspond à ces filtres'}.${
     devSansFiltre()?'':' <a onclick="dCat=\'\';dActe=\'\';paint()">Retirer les filtres →</a>'}</div>`}</div></div>`;
@@ -15995,7 +16011,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='EO';
+const BUILD='EP';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
