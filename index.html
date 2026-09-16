@@ -688,6 +688,12 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
 .hf-ed.ro{background:var(--panel-2);color:var(--ink-3)}
 .vx-aide{margin-top:9px;padding:7px 10px;border-radius:10px;background:var(--panel-2);
   border:1px solid var(--line);font-size:11.5px;line-height:1.5;color:var(--ink-3)}
+/* Le rappel des deux raccourcis, dans l'en-tête de la fenêtre. (La liste
+   d'exemples, elle, existait déjà : `.vx-ex` est défini plus bas, et poser un
+   second jeu de règles sur la même classe l'aurait silencieusement écrasé.) */
+.vx-kb{display:inline-block;margin-left:7px;padding:1px 6px;border-radius:6px;
+  background:var(--panel-3);font-size:10.5px;font-weight:650;color:var(--ink-2);white-space:nowrap}
+@media(max-width:560px){.vx-kb{display:block;margin:3px 0 0}}
 .vx-aide b{color:var(--ink-2);font-weight:640}
 .vtag{display:inline-block;padding:0 6px;border-radius:6px;font-size:11.5px;font-weight:620;
   background:var(--accent-wash);color:var(--accent);
@@ -2478,7 +2484,7 @@ body.mode-prise #main{padding:0;max-width:none}
         Rechercher…<kbd>⌘K</kbd>
       </button>
       <button class="vxb" id="vxb" onclick="voixOuvrir()" aria-label="Commande vocale"
-              title="Dicter — commande ou consultation  (⌘⇧V)">
+              title="Parler — commande (⌘⇧V) ou dictée de consultation (⌘⇧D)">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"
              stroke-linecap="round" stroke-linejoin="round">
           <rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
@@ -15872,7 +15878,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='EL';
+const BUILD='EM';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -17522,7 +17528,8 @@ function buildPal(q){
  q=q.toLowerCase().trim(); const it=[];
  const ACT=[
   {t:'Nouvel acte + schéma de visage',s:'saisir une séance d’injection',ic:'✚',k:'Action',go:()=>{closeAll();openActe()}},
-  {t:'Commande vocale / dictée de consultation',s:'parler plutôt que cliquer — ⌘⇧V',ic:'◉',k:'Action',go:()=>{closeAll();voixOuvrir()}},
+  {t:'Commande vocale',s:'parler plutôt que cliquer — ⌘⇧V',ic:'◉',k:'Action',go:()=>{closeAll();voixOuvrir()}},
+  {t:'Dictée de consultation',s:'parler en soignant, le relevé se fait tout seul — ⌘⇧D',ic:'◉',k:'Action',go:()=>{closeAll();voixOuvrir('consultation')}},
   {t:'Envoyer toutes les relances échues',s:RDUE.length+' devis',ic:'↻',k:'Action',go:()=>{closeAll();allRel()}},
   {t:'Bon de commande fournisseurs',s:ALERTES.length+' références sous le seuil',ic:'▧',k:'Action',go:()=>{closeAll();toast('Bon de commande généré')}},
   {t:'Tableau de bord',s:'',ic:'◈',k:'Aller à',go:()=>{closeAll();go('dash')}},
@@ -17562,6 +17569,14 @@ document.addEventListener('keydown',e=>{
  const palOn=document.getElementById('pal').classList.contains('on');
  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();palOn?closeAll():openPal();return}
  if((e.metaKey||e.ctrlKey)&&e.shiftKey&&e.key.toLowerCase()==='v'){e.preventDefault();VX?voixFermer():voixOuvrir();return}
+ /* ⌘⇧D — droit à la dictée. S'il écoute déjà une commande, on bascule sans
+    fermer : la même touche ne doit pas dire « ouvre » puis « ferme » selon
+    l'humeur de l'écran. */
+ if((e.metaKey||e.ctrlKey)&&e.shiftKey&&e.key.toLowerCase()==='d'){e.preventDefault();
+   if(!VX) voixOuvrir('consultation');
+   else if(VX.mode!=='consultation') voixMode('consultation');
+   else voixFermer();
+   return}
  if(e.key==='Escape'){ if(HFEN){histoFermerFen();return}
    if(PAR){fermerParapheur();return}
    if(VX){voixFermer();return}
@@ -17935,7 +17950,11 @@ const VOIX_MSG={
 const VOIX_EX=[
  ['Naviguer', ['va au stock','ouvre les patients','statistiques','facturation']],
  ['Un dossier', ['ouvre le dossier de Martin Claire','photos','documents']],
- ['Agir', ['nouvel acte','ajoute un consentement','ajoute une ordonnance','ajoute une photo','ajoute une retouche']],
+ /* Demander, c'est la moitié de l'intérêt de parler : les mains prises, on ne
+    veut pas « aller à la caisse », on veut le chiffre. */
+ ['Demander', ['le chiffre d’affaires du mois','combien de patients aujourd’hui',
+   'il reste combien de séances','devis en attente']],
+ ['Agir', ['nouvel acte','un devis','ajoute un consentement','ajoute une photo','enregistre','ferme']],
  ['Le stock', ['réception de lot','sortie de stock','utilisation']],
 ];
 
@@ -18029,6 +18048,86 @@ const VOIX_REGLES=[
   sur:1, quoi:()=>'Sortie de stock', run:()=>{go('stock'); ouvrirSortie()}},
  {re:/^(?:ouvre |fais |saisis |nouvelle? )?(?:une |la |un )?(utilisation)(?: sur un patient)?$/,
   sur:1, quoi:()=>'Utilisation sur un patient', run:()=>{go('stock'); ouvrirUtilisation()}},
+
+ /* ------------------------------------------------------------------------
+    Les mots qu'on dit sans y penser
+    ------------------------------------------------------------------------
+    « Ferme », « annule », « retour » : personne ne les apprend, tout le monde
+    les dit. Les ignorer, c'était répondre « commande non reconnue » à la
+    phrase la plus naturelle de toutes, et obliger à reposer la seringue pour
+    cliquer une croix. */
+ {re:/^(?:c'?est bon|ferme|fermer|annule|annuler|stop|arrete|arreter|termine|terminer|quitte|quitter|laisse tomber|rien)$/,
+  quoi:()=>'Fermer', run:()=>{ voixFermer() }},
+ {re:/^(?:(?:retour|reviens|revenir|reviens en arriere|revenir en arriere|retour en arriere|en arriere)|precedent|echap|escape)$/,
+  quoi:()=>'Retour', run:()=>{ voixFermer(); closeAll() }},
+ /* « enregistre » écrit : il attend un accord, comme tout le reste qui écrit */
+ {re:/^(?:enregistre|enregistrer|valide|valider|sauvegarde|sauvegarder|confirme|confirmer)(?: (?:la|le|ce|cette) ?(?:seance|consultation|acte|devis))?$/,
+  sur:1,
+  quoi:()=>{ if(typeof DV==='object'&&DV) return 'Enregistrer le devis en cours';
+    if(typeof AS==='object'&&AS&&!AS.ro) return `Enregistrer la ${AS.but==='devis'?'proposition':'consultation'} du ${DF(AS.date)}`;
+    return null },
+  run:()=>{ if(typeof DV==='object'&&DV) dvEnregistrer();
+    else if(typeof AS==='object'&&AS&&!AS.ro) saveActe() }},
+
+ /* ------------------------------------------------------------------------
+    Les questions
+    ------------------------------------------------------------------------
+    Les mains prises, on ne veut pas « aller à la caisse » : on veut le
+    chiffre. La réponse s'affiche, et l'écran qui la justifie s'ouvre derrière
+    — on peut vérifier d'un regard au lieu de croire sur parole. */
+ {re:/^(?:quel est |quel |c ?est quoi |donne moi |dis moi )?(?:le |la )?(?:chiffre d ?affaires?|ca|recette|caisse)(?: (?:du |de la |de )?(jour|aujourd ?hui|mois|semaine|annee))?$/,
+  quoi:m=>{ if(!CAN('prix')) return 'Ce chiffre n\u2019est pas accessible \u00e0 ce r\u00f4le';
+    const q=m[1]||'jour';
+    const per=/mois/.test(q)?'mois':/semaine/.test(q)?'semaine':/annee/.test(q)?'annee':'jour';
+    const lib={jour:'aujourd\u2019hui', semaine:'cette semaine', mois:'ce mois-ci', annee:'cette ann\u00e9e'}[per];
+    const F=FACTURES.filter(f=>f.statut!=='annulee'&&inPer(f.date,{k:per}));
+    const enc=F.reduce((s2,f)=>s2+(+f.paye||0),0);
+    const du=F.reduce((s2,f)=>s2+rdu(f),0);
+    return `Encaiss\u00e9 ${lib} : ${EUR(enc)}${du?` \u00b7 reste d\u00fb ${EUR(du)}`:''}` },
+  run:()=>go('encaiss')},
+ {re:/^(?:combien (?:de |d')?)?(?:patients?|dossiers?|consultations?|seances?|actes?)(?: (?:vus?|faits?|realises?))?(?: (?:aujourd ?hui|du jour|ce jour))$/,
+  quoi:()=>{ const A=ACTES.filter(a=>a.date===TODAYS);
+    const P=new Set(A.map(a=>a.patient));
+    return A.length?`${A.length} s\u00e9ance${A.length>1?'s':''} aujourd\u2019hui \u00b7 ${P.size} patient${P.size>1?'s':''}`
+      :'Aucune s\u00e9ance enregistr\u00e9e aujourd\u2019hui' },
+  run:()=>go('actes')},
+ {re:/^(?:combien (?:de |d )?)?(?:devis)(?: en attente| en cours| a relancer)?$/,
+  quoi:()=>{ const D=DEVIS.filter(d=>devEstAtt(d));
+    return D.length?`${D.length} devis en attente${CAN('prix')?` \u00b7 ${EUR(D.reduce((s2,d)=>s2+(+d.montant||0),0))}`:''}`
+      :'Aucun devis en attente' },
+  run:()=>go('devis')},
+ /* « il lui reste combien de séances ? » — la question du comptoir */
+ {re:/^(?:il (?:lui )?reste (?:combien de |quelles )?|combien (?:de |il reste de )?|reste )?(?:seances?|forfaits?)(?: (?:restantes?|dans le forfait|au forfait))?$/,
+  besoinDossier:1,
+  quoi:()=>{ const p=vxDossier(); const F=forfaitsDe(p.id).filter(f=>f.reste>0);
+    if(!F.length) return `${fn(p)} n\u2019a aucun forfait en cours`;
+    return F.map(f=>`${f.nom} : ${f.faites}/${f.n}, ${f.reste} \u00e0 venir`).join(' \u00b7 ') },
+  run:()=>{ pTab='resume'; go('patients') }},
+
+ /* ------------------------------------------------------------------------
+    Les gestes de facturation
+    ------------------------------------------------------------------------ */
+ {re:/^(?:va (?:a|au|aux) |ouvre |affiche )?(?:la |l )?(?:facturation|caisse|encaissement|encaisse|encaisser|facture|facturer)$/,
+  quoi:()=>'Facturation & caisse', run:()=>go('encaiss')},
+ {re:/^(?:relance|relancer|relances)(?: (?:les |le |la ))?(?:devis|patients?)?$/,
+  quoi:()=>'Relances automatiques', run:()=>go('relances')},
+
+ /* ------------------------------------------------------------------------
+    Ce que le logiciel ne sait pas encore faire
+    ------------------------------------------------------------------------
+    Répondre « commande non reconnue » à « agenda » laisse croire à une faute
+    de prononciation. Mieux vaut dire ce qu'il en est : l'agenda vient en
+    phase 2. On ne fait pas semblant, et on ne laisse pas chercher. */
+ {re:/^(?:imprime|imprimer|edite|editer|sors|sortir)(?: (?:le|la|ce|cette))? ?(devis|facture|ordonnance|consentement|document)?$/,
+  sur:1,
+  quoi:m=>{ const q=m[1]||'document';
+    if(typeof DV==='object'&&DV) return 'Imprimer le devis en cours';
+    const p=vxDossier(); return p?`Pi\u00e8ces de ${fn(p)} \u2014 \u00e0 choisir avant impression`:null },
+  run:()=>{ if(typeof DV==='object'&&DV){ dvImprimer?dvImprimer():window.print(); return }
+    pTab='docs'; go('patients') }},
+ {re:/^(?:ouvre |va (?:a|au) |affiche |montre )?(?:l )?(?:agenda|planning|rendez ?vous|rdv|calendrier|prochaine? (?:seance|consultation|rendez ?vous))(?: .*)?$/,
+  quoi:()=>'L\u2019agenda arrive en phase 2 \u2014 les rendez-vous restent sur Doctolib pour l\u2019instant',
+  run:()=>{}},
 ];
 
 /* Ce que la phrase veut dire. Rien d'inventé : sans règle qui corresponde,
@@ -18162,9 +18261,14 @@ function vxRelever(texte){
 }
 
 /* ---- Le moteur ---- */
-function voixOuvrir(){
+function voixOuvrir(mode){
  if(!VOIX_OK){ VX={on:false, erreur:'absent'}; renderVoix(); return }
- VX={on:false, mode:'commande', texte:'', partiel:'', intention:null, erreur:null,
+ /* Deux façons de parler, deux raccourcis. ⌘⇧V ouvre sur la commande — trois
+    mots, une action. ⌘⇧D ouvre sur la dictée — on parle plusieurs minutes en
+    soignant. Obliger à cliquer un onglet entre les deux, c'est reposer ce
+    qu'on tient : exactement ce que la commande vocale devait éviter. */
+ VX={on:false, mode:(mode==='consultation'?'consultation':'commande'),
+     texte:'', partiel:'', intention:null, erreur:null,
      dictee:'', brut:'', lignes:[], perm:null};
  renderVoix();
  /* on tient le micro pendant toute la séance : sinon chaque relance de
@@ -18210,7 +18314,8 @@ function renderVoix(){
   <div class="vx-h">
     <span class="vx-p ${VX.on?'on':''}"><i></i><i></i><i></i></span>
     <div style="min-width:0"><b>${VX.on?(dic?'Dictée en cours…':'Je vous écoute…'):(it&&it.ok?'Compris':er?'Écoute interrompue':'Commande vocale')}</b>
-      <div class="mu" style="font-size:11.5px">${p?`dossier ouvert : ${esc(fn(p))}`:'aucun dossier ouvert'}</div></div>
+      <div class="mu" style="font-size:11.5px">${p?`dossier ouvert : ${esc(fn(p))}`:'aucun dossier ouvert'}
+        <span class="vx-kb">⌘⇧V commande · ⌘⇧D dictée</span></div></div>
     <button class="btn g s" style="margin-left:auto" onclick="voixFermer()">✕</button>
   </div>
   <div class="vx-seg"><div class="seg">
