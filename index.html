@@ -281,9 +281,13 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .npbar input.ko{border-color:var(--crit);background:var(--crit-w)}
 @media(max-width:900px){.npbar{grid-template-columns:1fr 1fr}
   .npbar .npf{grid-column:span 1 !important}}
-/* horodatage d'une signature, sous le statut de la pièce */
+/* La date d'un statut, posée sous sa pastille — partout la même.
+   Interdire tout repli élargirait les colonnes étroites de près de 60 px et
+   ferait défiler les tableaux de côté : on protège chaque morceau séparément,
+   la date reste entière, le nom aussi, et le repli se fait ENTRE les deux. */
 .horo{font-size:10.5px;color:var(--ink-3);font-variant-numeric:tabular-nums;margin-top:3px;
-  white-space:nowrap;letter-spacing:.01em}
+  letter-spacing:.01em;line-height:1.35}
+.horo .nw{white-space:nowrap}
 .perbar{align-items:center;flex-wrap:wrap}
 .perbar .perms{width:auto;min-width:104px;flex:none}
 .drange{display:flex;align-items:center;gap:6px;padding:3px 4px;border-radius:10px;border:1px solid transparent}
@@ -4039,13 +4043,30 @@ const FACTURES=ACTES.map((a,i)=>{
  const avoir=(i%29===0&&statut==='ok')?Math.round(a.prix*0.2/5)*5:0;
  /* un avoir réduit ce qui est dû : on n'encaisse jamais au-delà du net à payer */
  const encaisse=Math.min(paye, Math.max(0, a.prix-avoir));
+ /* Une facture porte la date de son règlement, et pas seulement sa date
+    d'émission : sans elle, « ✓ Soldée » ne dit pas QUAND, et c'est
+    précisément ce qu'on vient y chercher. Au cabinet le patient règle à la
+    séance — y compris la première échéance d'un règlement échelonné, seule
+    encaissée à ce stade. Une annulation, elle, suit l'émission de peu. */
+ const jPlus=(d,n)=>{const t=new Date(new Date(d).getTime()+n*864e5).toISOString().slice(0,10);
+   return t>TODAYS?TODAYS:t};
  return {id:'F-'+(2600+i),patient:a.patient,acte:a.id,date:a.date,montant:a.prix,
-         paye:encaisse,
+         paye:encaisse, regle:encaisse>0?a.date:null,
+         annule:statut==='annulee'?jPlus(a.date,3):null,
          moyen:(statut==='annulee'||encaisse===0)?null:MOYENS[i%4],
          plan:frac?{n:frac,faites:1}:null,
          praticien:a.praticien, cat:a.cat, type:a.type, statut, avoir};
 }).filter(Boolean);
 const rdu=f=>f.statut==='annulee'?0:Math.max(0,f.montant-f.avoir-f.paye);
+/* Le statut d'une facture a son événement, donc sa date : l'émission tant que
+   rien n'est entré en caisse, le dernier encaissement ensuite, l'annulation
+   si elle a eu lieu. Même règle que pour un devis, même ligne en dessous. */
+const factEvt=f=>!f?null
+ :f.statut==='annulee'?{t:f.annule||f.date, verbe:'Annulée'}
+ :!f.paye?{t:f.date, verbe:'Émise'}
+ :rdu(f)>0?{t:f.regle||f.date, verbe:'Dernier encaissement'}
+ :{t:f.regle||f.date, verbe:'Soldée'};
+const sousFacture=f=>{const x=factEvt(f); return x?ligneStatut(x.t,{verbe:x.verbe}):''};
 const fTTC=f=>f.statut==='annulee'?0:f.montant-f.avoir;
 const fHT =f=>Math.round(fTTC(f)/(1+tauxTVA(f.type)/100)*100)/100;
 const fTVA=f=>Math.round((fTTC(f)-fHT(f))*100)/100;
@@ -7589,7 +7610,9 @@ const envLigne=(e,avecPatient)=>{
    <td><b>${esc(e.docNom)}</b><div class="mu" style="font-size:11.5px">${esc(e.objet)}</div></td>
    <td class="mu">${esc(e.canal)}<div style="font-size:11.5px">${esc(e.dest)}</div></td>
    <td class="mu" style="font-size:11.5px;white-space:nowrap">${e.mode==='lien'?'Lien sécurisé':'Pièce jointe'}</td>
-   <td>${bdg(st[0],st[1])}${e.motif?`<div class="mu" style="font-size:10.5px">${esc(e.motif)}</div>`:''}</td>
+   <td>${bdg(st[0],st[1])}${(()=>{const l=(e.evts||[])[(e.evts||[]).length-1];
+     return ligneStatut((l&&l.t)||e.ts,{verbe:(l&&l.ev)||'Remis'})})()}${
+     e.motif?`<div class="mu" style="font-size:10.5px">${esc(e.motif)}</div>`:''}</td>
    <td class="mono mu" style="font-size:11px;white-space:nowrap">${esc(e.ref)}</td>
    <td class="num"><span class="chev2">${ouvert?'▾':'▸'}</span></td></tr>
   ${ouvert?`<tr class="envd"><td colspan="${avecPatient?8:7}">
@@ -7648,33 +7671,60 @@ const VERBE_STATUT={envoye:'Envoyé', relance1:'Relancé', relance2:'Relancé',
   accepte:'Accepté', refuse:'Refusé', expire:'Expiré'};
 function evtStatut(d){
  if(!d||d.statut==='brouillon') return null;
+ /* « ✓ Réalisé » prend le pas sur « Accepté » dans la pastille : sa date est
+    donc celle de la SÉANCE, pas celle de l'accord — sans quoi le badge et la
+    ligne en dessous parleraient de deux événements différents. */
+ if(d.realise){ const a=ACTES.find(x=>x.id===d.realise);
+   if(a) return {t:a.date, heure:false, e:null} }
  if(devEstClos(d)){ const t=devDecide(d); return t?{t, heure:false, e:null}:null }
  const rel=/^relance/.test(d.statut);
  const e=rel?dernRelance(d.id):premierEnvoi(d.id);
  const t=(e&&e.ts)||(rel?(d.derniere||d.envoye):d.envoye);
  return t?{t, heure:!!(e&&e.ts), e, rel}:null;
 }
-/* La ligne compacte posée sous le badge : la date, et — pour une relance —
-   qui l'a envoyée. L'infobulle donne la phrase entière, à l'heure près. */
+/* --------------------------------------------------------------------------
+   Une pastille de statut porte TOUJOURS sa date
+   --------------------------------------------------------------------------
+   « Relancé ×1 » ne dit pas si c'était hier ou en avril ; « Éditée » non plus,
+   ni « Envoyé », ni « Archivé ». La règle ne valait que pour les devis de
+   l'onglet Facturation ; elle vaut désormais pour toute pastille, sur tous
+   les écrans, et sous UNE seule forme — d'où cette fonction, qui est le seul
+   endroit où cette ligne s'écrit.
+
+   L'année s'écrit toujours — « 04/09/26 ». Elle avait d'abord été omise dans
+   l'année en cours, pour gagner trois caractères ; mais une date sans année,
+   dans une liste qui en couvre plusieurs, oblige à se demander laquelle.
+
+   Un statut qui ne correspond à AUCUN événement n'invente pas de date : un
+   devis en brouillon n'est parti nulle part, un consentement non signé n'a
+   rien à horodater. Le silence est alors la seule réponse juste — une date
+   approchée serait pire que pas de date du tout.
+   -------------------------------------------------------------------------- */
+function ligneStatut(t,o){
+ if(!t) return '';
+ o=o||{};
+ const s=String(t), jour=s.slice(0,10), heure=s.length>10;
+ /* Le JOUR seul est affiché : c'est la question qu'on se pose devant une
+    pastille — hier, ou en avril ? L'heure, quand le registre l'a, part dans
+    l'infobulle : la sortir ici coûterait vingt-trois pixels à chaque colonne
+    de statut, et ferait défiler de côté trois tableaux dès 1366. */
+ const court=DFT(jour);
+ const long=o.long||`${o.verbe||'Mis à jour'} le ${heure?DTS(s):DF(jour)}`;
+ /* pas de pictogramme : une date se reconnaît sans qu'on la présente, et
+    l'horloge coûtait seize pixels à chaque colonne étroite du logiciel */
+ return `<div class="horo" title="${esc(long)}"><span class="nw">${court}</span>${
+   o.qui?` · <span class="nw">${esc(o.qui)}</span>`:''}</div>`;
+}
+/* La ligne d'un devis : la date de son statut, et — pour une relance — qui
+   l'a envoyée. L'infobulle donne la phrase entière, à l'heure près. */
 function sousStatut(d){
  const x=evtStatut(d); if(!x) return '';
- const jour=String(x.t).slice(0,10);
  const qui=(x.rel&&x.e)?(envAuto(x.e)?'⟳ automatique':x.e.par):null;
- const long=`${VERBE_STATUT[d.statut]||'Mis à jour'} le ${x.heure?DTS(x.t):DF(jour)}`
+ const verbe=(d&&d.realise)?'Réalisé':(VERBE_STATUT[d.statut]||'Mis à jour');
+ const long=`${verbe} le ${x.heure?DTS(x.t):DF(String(x.t).slice(0,10))}`
    +((x.rel&&x.e)?(envAuto(x.e)?' — relance partie seule, à l’échéance de la règle'
                               :' — relance envoyée à la main par '+x.e.par):'');
- /* L'année s'écrit toujours — « 04/09/26 ». Elle avait d'abord été omise dans
-    l'année en cours, pour gagner trois caractères ; mais une date sans année,
-    dans une liste qui en couvre plusieurs, oblige à se demander laquelle. Trois
-    caractères ne valent pas cette hésitation. */
- /* « nw » ne s'applique qu'aux cellules : sur ce <div> il ne faisait rien, et
-    « L. Roche » se coupait en « L. » / « Roche ». On protège chaque morceau
-    séparément — la date reste entière, le nom aussi — et l'on autorise le
-    repli ENTRE les deux. Interdire tout repli élargirait la colonne de 58 px
-    et ferait défiler le tableau de côté dès 1440. */
- return `<div class="mu" style="font-size:11px;margin-top:3px;line-height:1.35"
-   title="${esc(long)}"><span style="white-space:nowrap">${DFT(jour)}</span>${
-   qui?` · <span style="white-space:nowrap">${esc(qui)}</span>`:''}</div>`;
+ return ligneStatut(x.t, {long, qui, heure:x.heure});
 }
 const noRelance=e=>{const m=(e.docNom||'').match(/relance\s*(\d+)/i); return m?+m[1]:null};
 /* la chronologie d'un devis, prête à afficher */
@@ -8470,16 +8520,24 @@ function pDetail(p){
  const pdfBtn=(aid,id)=>`<button class="btn xs" onclick="event.stopPropagation();apercuDoc(${aid},'${id}')">◫ PDF</button>`;
  /* une pièce signée dit quand : la date seule ne suffit pas à un consentement.
     À défaut d'horodatage réel, la même heure plausible que partout ailleurs. */
- const horoBdg=(id,jour,off)=>{const t=signeLe(id, jour?hStamp(jour,id,off==null?1:off):null);
-   return t?`<div class="horo" title="Horodatage de la signature">🕘 ${DTS(t)}</div>`:''};
+ const horoBdg=(id,jour,off,verbe)=>{const t=signeLe(id, jour?hStamp(jour,id,off==null?1:off):null);
+   return ligneStatut(t,{verbe:verbe||'Signé'})};
  const DOCS=[
-  ...O.map(o=>({k:'ordonnance',id:o.id,date:o.date, cf:confirmSuppOrd(o.id,5),
+  /* une ordonnance envoyée le disait déjà dans la colonne Documents d'une
+     séance, et pas ici : le même document portait deux statuts selon l'écran */
+  ...O.map(o=>{ const env=(DOCH[o.id]||[]).filter(h=>/Envoy/.test(h.ev)).pop();
+   return {k:'ordonnance',id:o.id,date:o.date, cf:confirmSuppOrd(o.id,5),
     t:`Ordonnance — ${o.lignes.length} ligne${o.lignes.length>1?'s':''}`,
     s:o.lignes[0].split(' —')[0]+(o.lignes.length>1?` + ${o.lignes.length-1} autre${o.lignes.length>2?'s':''}`:''),
-    st:bdg('b-neu','Éditée'), a:pdfBtn(o.acte,o.id)+btnSuppOrd(o.id)})),
+    st:(env?bdg('b-info','✉ Envoyée'):bdg('b-neu','Éditée'))
+       +ligneStatut(env?env.t:o.date,{verbe:env?'Envoyée':'Éditée et remise'}),
+    a:pdfBtn(o.acte,o.id)+btnSuppOrd(o.id)}}),
   ...D.map(d=>({k:'devis',id:d.id,date:d.date,t:nomDevis(d),
     s:`${d.id} · ${d.lignes.length} prestation${d.lignes.length>1?'s':''}${CAN('prix')?' · '+EUR(d.montant):''}${d.infos?' · fiche d’information jointe':''}`,
-    st:bdgDevis(d)+(d.statut==='accepte'?horoBdg(d.id,d.derniere||d.date,2):''),
+    /* le MÊME sous-titre que l'onglet Facturation : envoi, relance (et qui
+       l'a envoyée), décision, réalisation — un devis ne change pas d'état
+       selon l'écran d'où on le regarde */
+    st:bdgDevis(d)+sousStatut(d),
     a:`<button class="btn xs" onclick="event.stopPropagation();apercuDevis('${d.id}')">◫ PDF</button>
         ${d.realise?'':`<button class="btn xs p" title="Reprendre ces soins pour la consultation d’aujourd’hui"
           onclick="event.stopPropagation();realiserDevis('${d.id}')">✚ Réaliser</button>`}
@@ -8500,6 +8558,8 @@ function pDetail(p){
    return {k:'consentement',id:'CONS-'+a.id,date:a.date,
     t:`Consentement — ${esc(a.nom)}`,
     s:`acte du ${DF(a.date)}`+(suiv?` · couvre ${suiv} séance${suiv>1?'s':''} suivante${suiv>1?'s':''}`:''),
+    /* non signé : aucun événement, donc aucune date — la sous-ligne dit déjà
+       de quelle séance la pièce relève */
     st:a.consent?bdg('b-good','Signé')+horoBdg('CONS-'+a.id,a.date):bdg('b-crit','⚠ Non signé'),
     a:pdfBtn(a.id,'CONS-'+a.id)
       +(a.consent?'':`<button class="btn xs p" onclick="event.stopPropagation();signDoc(${a.id},'CONS-${a.id}')">✎ Faire signer</button>`)
@@ -8507,16 +8567,23 @@ function pDetail(p){
     cf:confirmSuppCons(a,5)}}),
   ...AG.map(x=>({k:x.cat==='Courrier'?'courrier':x.cat.toLowerCase(),id:x.id,date:x.ts.slice(0,10),
     t:esc(x.nom), s:`${esc(x.cat)} · généré le ${DTS(x.ts)}`,
-    st:x.signe?bdg('b-good','Signé')+horoBdg(x.id,x.signe):x.envoye?bdg('b-info','Envoyé'):bdg('b-neu','Généré'),
+    st:x.signe?bdg('b-good','Signé')+horoBdg(x.id,x.signe)
+      :x.envoye?bdg('b-info','Envoyé')+ligneStatut(x.envoye,{verbe:'Envoyé'})
+      :bdg('b-neu','Généré')+ligneStatut(x.ts,{verbe:'Généré depuis le modèle'}),
     a:pdfBtn(x.acte,x.id)})),
   ...AD.map(x=>({k:x.cat==='Courrier'?'courrier':'information',id:x.id,date:x.date,
-    t:esc(x.nom), s:esc(x.sous), st:bdg('b-neu','Archivé'),
+    t:esc(x.nom), s:esc(x.sous),
+    st:bdg('b-neu','Archivé')+ligneStatut(x.date,{verbe:'Versé au dossier'}),
     a:`<button class="btn xs" onclick="event.stopPropagation();apercuAutre('${x.id}')">◫ PDF</button>`})),
   /* les pièces établies hors séance : mêmes commandes que les autres */
   ...libDe(p.id).map(x=>({k:x.k, id:x.id, date:x.date,
     t:esc(x.nom), s:`${x.id} · établi hors séance le ${DTS(x.ts)} par ${esc(x.par)}`,
-    st:(x.signe?bdg('b-good','Signé')+horoBdg(x.id,x.date):lienDe(x.id)?lienBadge(x.id)
-        :x.k==='consentement'?bdg('b-crit','⚠ Non signé'):bdg('b-neu','Établie'))
+    st:(x.signe?bdg('b-good','Signé')+horoBdg(x.id,x.date)
+        :lienDe(x.id)?lienBadge(x.id)+(()=>{const l=lienDe(x.id), e=lienEtat(l);
+            return ligneStatut(e==='ouvert'?l.ouvert:l.cree,
+              {verbe:e==='ouvert'?'Ouvert par le patient':'Lien envoyé'})})()
+        :x.k==='consentement'?bdg('b-crit','⚠ Non signé')
+        :bdg('b-neu','Établie')+ligneStatut(x.ts,{verbe:'Établie hors séance'}))
        +bdg('b-neu','hors séance'),
     a:`<button class="btn xs" onclick="event.stopPropagation();apercuLib('${x.id}')">◫ PDF</button>
        ${x.signe?'':`<button class="btn xs" title="Le patient signe dans l’encadré, ici"
@@ -9210,7 +9277,7 @@ function pDetail(p){
       <td class="num">${rdu(f)>0?`<span style="color:var(--crit-txt);font-weight:650">${EUR(rdu(f))}</span>`
         :trop(f)?`<span style="color:var(--warn);font-weight:650" title="Encaissé au-delà du dû après avoir">↩ ${EUR(trop(f))}</span>`
         :'<span class="mu">—</span>'}</td>
-      <td>${an?bdg('b-crit','⊘ Annulée'):f.avoir?bdg('b-warn','Avoir'):rdu(f)>0?bdg('b-warn','Partielle'):bdg('b-good','Soldée')}</td>
+      <td>${an?bdg('b-crit','⊘ Annulée'):f.avoir?bdg('b-warn','Avoir'):rdu(f)>0?bdg('b-warn','Partielle'):bdg('b-good','Soldée')}${sousFacture(f)}</td>
       <td class="num" style="white-space:nowrap">
         ${(an||!voitRetro())?'':`<button class="btn xs ${retroSel===f.id?'g':''}"
           title="Part centre et part praticien rétrocédée"
@@ -9315,6 +9382,9 @@ V.devis=()=>{
   const nx=RELS.find(r=>r.d.id===d.id);
   return `<div class="head"><div><h1>${d.id}</h1><p>${esc(fn(p))} · ${(()=>{const e=devisEtabliTxt(d);
     return `établi le ${e.cree}`+(e.maj?` <span class="mu">· modifié le ${e.maj}</span>`:'')})()} · ${bdgDevis(d)}${
+    (()=>{const x=evtStatut(d); if(!x) return '';
+      const v=d.realise?'réalisé':(VERBE_STATUT[d.statut]||'mis à jour').toLowerCase();
+      return ` <span class="mu" style="font-size:12px">${v} le ${DFT(String(x.t).slice(0,10))}</span>`})()}${
     d.realise?(()=>{const a2=ACTES.find(x=>x.id===d.realise);return a2?` · acte du ${DF(a2.date)}`:''})():''}</p></div>
    <div class="r"><button class="btn g" onclick="dSel=null;paint()">← Retour</button>
     <button class="btn" onclick="openPatient(${p.id})">Fiche patient</button>
@@ -9678,7 +9748,7 @@ function eDetail(){
     <td class="num nw">${EUR(f.paye)}</td>
     <td class="mu el" style="max-width:78px" title="${esc(moyenTxt(f)||'non réglé')}">${esc(md||'—')}</td>
     <td class="num nw">${rdu(f)>0?`<span style="color:var(--crit-txt);font-weight:650">${EUR(rdu(f))}</span>`:'<span class="mu">—</span>'}</td>
-    <td class="nw">${an?bdg('b-crit','Annulée'):f.avoir?bdg('b-warn','Avoir'):rdu(f)>0?bdg('b-warn','Partielle'):bdg('b-good','Soldée')}</td></tr>`}).join('')}
+    <td>${an?bdg('b-crit','Annulée'):f.avoir?bdg('b-warn','Avoir'):rdu(f)>0?bdg('b-warn','Partielle'):bdg('b-good','Soldée')}${sousFacture(f)}</td></tr>`}).join('')}
   </tbody></table>${L.length?'':'<div class="empty">Aucune facturation avec ces filtres.</div>'}</div></div>
  <div class="mu" style="font-size:11.5px;margin-top:10px">⊘ Les facturations annulées ne sont pas prises en compte dans les totaux. Les avoirs sont déduits des montants HT et TTC.
    La catégorie et l’émetteur de la facture restent lisibles en infobulle et dans le relevé exporté.</div>`;
@@ -10145,7 +10215,9 @@ function histoRelances(){
       <td>${bdgPar(e)||'<span class="mu">—</span>'}</td>
       <td class="mu">${esc(e.canal)}</td>
       <td class="mu el" style="max-width:190px" title="${esc(e.dest)}">${esc(e.dest)}</td>
-      <td>${bdg(st[0],st[1])}${e.motif?`<div class="mu" style="font-size:10.5px">${esc(e.motif)}</div>`:''}</td>
+      <td>${bdg(st[0],st[1])}${(()=>{const l=(e.evts||[])[(e.evts||[]).length-1];
+        return ligneStatut((l&&l.t)||e.ts,{verbe:(l&&l.ev)||'Remis'})})()}${
+        e.motif?`<div class="mu" style="font-size:10.5px">${esc(e.motif)}</div>`:''}</td>
       <td class="mono mu" style="font-size:11px">${esc(e.ref)}</td></tr>`}).join('')}</tbody></table>
    ${L.length?'':`<div class="empty">${n('tous')?'Aucune relance ne correspond à ces filtres.':'Aucune relance envoyée pour l’instant.'}</div>`}</div></div>`;
 }
@@ -15418,10 +15490,10 @@ function docsActe(a){
       /* un règlement fractionné laisse une trace par échéance réglée */
       f.paye?(f.plan&&f.plan.n>1
         ? Array.from({length:Math.min(f.plan.faites||0,f.plan.n)},(_,k)=>({
-            t:hStamp(f.date,f.id,1+k),
+            t:hStamp(f.regle||f.date,f.id,1+k),
             ev:`Échéance ${k+1}/${f.plan.n} encaissée — ${EUR(echeance(f))} par ${f.moyen}`,
             par:'Secrétariat'}))
-        : [{t:hStamp(f.date,f.id,1),ev:`Encaissée${f.moyen?' — '+f.moyen:''}`,par:'Secrétariat'}]):[]),
+        : [{t:hStamp(f.regle||f.date,f.id,1),ev:`Encaissée${f.moyen?' — '+f.moyen:''}`,par:'Secrétariat'}]):[]),
     env:(DOCH[f.id]||[]).every(h=>!/Envoy/.test(h.ev))});
  });
  DOCADD.filter(d=>d.acte===a.id).forEach(d=>{
@@ -16127,7 +16199,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='ES';
+const BUILD='ET';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -16625,6 +16697,10 @@ function majEnc(id){
  f.paye=moyen?m:0;
  f.moyen=moyen||null;
  f.plan=(moyen&&n>1)?{n,faites}:null;
+ /* la date du règlement suit le règlement : remettre une facture à zéro la
+    remet à « émise », et elle ne doit pas garder la date d'un encaissement
+    qui n'existe plus */
+ f.regle=f.paye>0?TODAYS:null;
  /* on garde trace de l'avant et de l'après : c'est une pièce comptable */
  const dit=x=>`${EUR(x.paye)}${x.moyen?' · '+x.moyen:' · non encaissé'}${(x.plan&&x.plan.n>1)?` · ${x.plan.n} fois (${x.plan.faites}/${x.plan.n})`:''}`;
  const apres={paye:f.paye, moyen:f.moyen, plan:f.plan};
