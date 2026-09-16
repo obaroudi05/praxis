@@ -15878,7 +15878,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='EM';
+const BUILD='EN';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -17964,6 +17964,11 @@ const vxNorm=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
 
 /* Chercher un patient par ce qui a été entendu : un nom, un prénom, les deux.
    On ne retient que ce qui est franchement plus proche que le reste. */
+/* « madame », « monsieur » : on les dit toujours, ils ne désignent personne.
+   Ils n'ont pas besoin d'être retirés pour autant — le score ci-dessous ne
+   compte que les mots qui RESSEMBLENT à un nom du fichier, et une civilité
+   n'en fait jamais partie. Une ligne de décapage aurait eu l'air prudente et
+   n'aurait rien changé : mesuré, pas supposé. */
 function vxPatient(mots){
  const q=vxNorm(mots); if(q.length<3) return null;
  const parts=q.split(' ').filter(w=>w.length>2);
@@ -17979,7 +17984,11 @@ function vxPatient(mots){
  if(L.length>1&&L[1].n===L[0].n) return {ambigu:L.filter(x=>x.n===L[0].n).slice(0,4).map(x=>x.p)};
  return {p:L[0].p};
 }
-const vxDossier=()=>view==='patients'&&pSel?pById(pSel):null;
+/* Le dossier que la phrase vient de nommer vaut dossier ouvert — le temps de
+   la comprendre. Sans ça, « crée un devis pour madame Adams » butait sur
+   « ouvrez d'abord un dossier » alors que la phrase disait lequel. */
+let VX_CTX=null;
+const vxDossier=()=>VX_CTX||(view==='patients'&&pSel?pById(pSel):null);
 const vxActeOuvert=()=>(AS&&AS.aid)?ACTES.find(a=>a.id===AS.aid):null;
 
 /* ---- La grammaire ----
@@ -18130,9 +18139,77 @@ const VOIX_REGLES=[
   run:()=>{}},
 ];
 
+/* ==========================================================================
+   « Crée un devis pour madame Adams »
+   ==========================================================================
+   Toutes les actions exigeaient qu'un dossier soit DÉJÀ ouvert. Dire « crée
+   un devis » depuis le tableau de bord répondait « ouvrez d'abord un dossier
+   patient » : le logiciel avait compris, et ne faisait rien. Vu du fauteuil,
+   ça ne s'appelle pas comprendre.
+
+   Or on ne parle pas ainsi. On dit la personne dans la phrase : « pour madame
+   Adams », « chez Martin », « à Mme Garcia ». Le suffixe se détache donc
+   avant de chercher la règle : on ouvre le dossier nommé, puis on exécute ce
+   qui reste de la phrase.
+
+   L'ordre compte : les règles existantes gardent la priorité (« ouvre le
+   dossier de madame Adams » a la sienne, et sait déjà faire). Le suffixe
+   n'intervient que si rien n'a marché, ou si l'action réclamait un dossier. */
+const VX_POUR=/^(.*?)\s+(?:pour|chez|a|au|sur|de|du)\s+((?:m|mme|madame|mr|monsieur|mlle|mademoiselle|dr|docteur)\s+)?([a-z][a-z ]{2,})$/;
+function vxDetacherPatient(t){
+ const m=t.match(VX_POUR); if(!m) return null;
+ const reste=(m[1]||'').trim(); if(!reste) return null;
+ const c=vxPatient((m[2]||'')+(m[3]||''));
+ return c?{reste, cible:c}:null;
+}
+/* Nommer quelqu'un, c'est vouloir agir SUR son dossier. « Devis pour madame
+   Adams » n'est pas une demande d'aller voir la liste des devis : c'est une
+   demande d'en faire un. Ces mots-là, quand une personne suit, prennent donc
+   leur sens d'action — et seulement dans ce cas. */
+const VX_SUR_DOSSIER={devis:'cree un devis', consultation:'nouvelle consultation',
+ acte:'nouvel acte', seance:'nouvelle consultation', consentement:'ajoute un consentement',
+ ordonnance:'ajoute une ordonnance', photo:'ajoute une photo', document:'ajoute un document',
+ retouche:'ajoute une retouche'};
+const vxSurDossier=r=>{ const k=String(r||'').replace(/^(?:un |une |le |la |les )/,'').trim();
+ return VX_SUR_DOSSIER[k]||null };
+/* comprendre une phrase COMME SI le dossier nommé était ouvert */
+function vxAvecDossier(p,phrase){
+ const av=VX_CTX; VX_CTX=p;
+ try{ return voixIntention(phrase,1) } finally{ VX_CTX=av }
+}
+const vxRunPour=(p,sous)=>()=>{ pView='liste'; pSel=p.id; pTab='resume';
+ go('patients'); paint(); sous.run() };
+function vxPour(d,texte){
+ const p=d.cible.p;
+ const direct=vxSurDossier(d.reste);
+ const sous=vxAvecDossier(p, direct||d.reste);
+ if(!sous.ok) return null;
+ return {...sous, texte,
+   quoi:String(sous.quoi).replace(new RegExp(' \u2014 .*$'),'')+' \u2014 '+fn(p),
+   run:vxRunPour(p,sous)};
+}
+/* les dossiers qu'on propose quand l'action en réclame un : ceux qu'on vient
+   de voir, parce que c'est presque toujours de ceux-là qu'il s'agit */
+function vxRecents(n){
+ const vus={};
+ ACTES.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)))
+   .forEach(a=>{ if(vus[a.patient]===undefined) vus[a.patient]=a.date });
+ return Object.keys(vus).map(id=>pById(+id)).filter(Boolean).slice(0,n||4);
+}
+/* ouvrir un dossier, puis reprendre la phrase où elle en était */
+function voixPuis(pid,phrase){
+ const p=pById(pid); if(!p) return;
+ pView='liste'; pSel=pid; pTab='resume'; go('patients'); paint();
+ if(!phrase){ voixFermer(); return }
+ const r=voixIntention(phrase);
+ if(!r.ok){ VX&&(VX.intention=r); renderVoix(); return }
+ if(r.sur){ VX&&(VX.intention=r); renderVoix(); return }   /* ça écrit : on demande */
+ r.run(); voixFermer();
+}
+
 /* Ce que la phrase veut dire. Rien d'inventé : sans règle qui corresponde,
    on le dit plutôt que de choisir au hasard. */
-function voixIntention(texte){
+function voixIntention(texte, sansSuffixe){
  const t=vxNorm(texte);
  if(!t) return {ok:false, raison:'vide'};
  for(const r of VOIX_REGLES){
@@ -18141,12 +18218,34 @@ function voixIntention(texte){
   if(r.cible&&!c) return {ok:false, raison:'patient', texte, quoi:`Aucun patient ne correspond à « ${m[1]} »`};
   if(c&&c.ambigu) return {ok:false, raison:'ambigu', texte, choix:c.ambigu,
     quoi:`Plusieurs patients correspondent`};
-  if(r.besoinDossier&&!vxDossier()) return {ok:false, raison:'dossier', texte,
-    quoi:'Ouvrez d’abord un dossier patient'};
+  if(r.besoinDossier&&!vxDossier()){
+    /* « pour madame Adams » était peut-être dans la phrase : on regarde avant
+       de renvoyer l'utilisateur à ses clics */
+    const d=sansSuffixe?null:vxDetacherPatient(t);
+    if(d&&d.cible&&d.cible.p){ const x=vxPour(d,texte); if(x) return x }
+    if(d&&d.cible&&d.cible.ambigu) return {ok:false, raison:'ambigu', texte,
+      choix:d.cible.ambigu, suite:d.reste, quoi:'Plusieurs patients correspondent'};
+    /* sinon, on propose — un dossier se choisit, il ne se réclame pas */
+    return {ok:false, raison:'dossier', texte, choix:vxRecents(4), suite:t,
+      quoi:'Pour quel patient ?'};
+  }
   const q=r.quoi?r.quoi(m,c):null;
   if(!q) return {ok:false, raison:'contexte', texte,
     quoi:'Cette action demande une séance ouverte'};
   return {ok:true, texte, quoi:q, sur:!!r.sur, run:()=>r.run(m,c)};
+ }
+ /* Rien n'a marché : la phrase nomme peut-être la personne à la fin. */
+ if(!sansSuffixe){
+  const d=vxDetacherPatient(t);
+  if(d&&d.cible&&d.cible.p){ const x=vxPour(d,texte); if(x) return x }
+  if(d&&d.cible&&d.cible.ambigu) return {ok:false, raison:'ambigu', texte,
+    choix:d.cible.ambigu, suite:d.reste, quoi:'Plusieurs patients correspondent'};
+  /* et un nom dit seul ouvre le dossier : « madame Adams » suffit */
+  const seul=vxPatient(t);
+  if(seul&&seul.p) return {ok:true, texte, quoi:`Dossier de ${fn(seul.p)}`, sur:false,
+    run:()=>{ pView='liste'; pSel=seul.p.id; pTab='resume'; go('patients'); paint() }};
+  if(seul&&seul.ambigu) return {ok:false, raison:'ambigu', texte,
+    choix:seul.ambigu, quoi:'Plusieurs patients correspondent'};
  }
  return {ok:false, raison:'inconnu', texte, quoi:'Commande non reconnue'};
 }
@@ -18334,8 +18433,9 @@ function renderVoix(){
        <button class="btn" onclick="voixEcouter()">Redire</button>
        <button class="btn g" onclick="voixFermer()">Annuler</button></div></div>`:''}
    ${(it&&!it.ok)?`<div class="tip wa"><span class="e">?</span><div><b>${esc(it.quoi||'Non compris')}</b>
+     ${it.suite&&it.raison==='dossier'?`<div class="mu" style="font-size:11.5px;margin-top:3px">Choisissez le dossier : la commande reprendra toute seule.</div>`:''}
      ${it.choix?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px">
-       ${it.choix.map(q=>`<button class="btn xs" onclick="voixFermer();openPatient(${q.id})">${esc(fn(q))}</button>`).join('')}</div>`
+       ${it.choix.map(q=>`<button class="btn xs" onclick="voixPuis(${q.id}${it.suite?`,'${esc(it.suite).replace(/'/g,"\\'")}'`:''})">${esc(fn(q))}</button>`).join('')}</div>`
       :`<br><span class="mu">Reprenez, ou choisissez ci-dessous.</span>`}</div></div>`:''}
    ${(!dic&&!VX.on&&!it&&!er)?'<div class="mu" style="font-size:12px">Appuyez sur Écouter et dites votre commande.</div>':''}
    ${dic?(()=>{const L=VX.lignes||[], G=vxGardees();
