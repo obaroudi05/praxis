@@ -691,6 +691,16 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
 /* Le rappel des deux raccourcis, dans l'en-tête de la fenêtre. (La liste
    d'exemples, elle, existait déjà : `.vx-ex` est défini plus bas, et poser un
    second jeu de règles sur la même classe l'aurait silencieusement écrasé.) */
+/* Ce qui reste à facturer sur un devis. Ce n'est pas une alerte — personne
+   n'a fait de faute — mais ça doit se voir sans être cherché : c'est de
+   l'argent dû au cabinet que rien d'autre ne compte. */
+.afact{margin-top:3px;font-size:11px;font-weight:660;color:var(--warn-i,#8a5a00);
+  background:var(--warn-w);border:1px solid rgba(190,140,0,.28);border-radius:7px;
+  padding:1px 6px;display:inline-block;max-width:100%}
+/* Le montant ne se coupe jamais en deux ; le libellé qui le précède, si.
+   Une marque qui élargit la colonne fait défiler tout le tableau — le prix
+   d'une information est de ne pas en coûter une autre. */
+.afact b,.afact .m{white-space:nowrap}
 .vx-kb{display:inline-block;margin-left:7px;padding:1px 6px;border-radius:6px;
   background:var(--panel-3);font-size:10.5px;font-weight:650;color:var(--ink-2);white-space:nowrap}
 @media(max-width:560px){.vx-kb{display:block;margin:3px 0 0}}
@@ -3819,6 +3829,72 @@ function bdgSeance(a){
 const RANG_DEVIS={brouillon:0, envoye:1, relance1:2, relance2:3, accepte:4, refuse:5, expire:6};
 const SD={brouillon:['Brouillon','b-neu'],envoye:['Envoyé','b-info'],relance1:['Relancé ×1','b-warn'],
  relance2:['Relancé ×2','b-warn'],accepte:['Accepté','b-good'],refuse:['Refusé','b-crit'],expire:['Expiré','b-crit']};
+/* ==========================================================================
+   Un devis accepté n'est pas une facture
+   ==========================================================================
+   « Réalisé » veut dire : le soin a été donné. Il ne veut pas dire encaissé,
+   ni même facturé — un acte est un objet clinique, la facture se fait après,
+   et c'est volontaire : on ne facture pas à la place du praticien.
+
+   Mais rien ne le DISAIT. Un devis à 1 400 € marqué « Réalisé », aucune
+   facture en face, et le bandeau qui annonce tranquillement « reste dû :
+   0 € » : le soin est donné, le patient doit l'argent, et aucun écran ne le
+   sait. C'est la seule sorte de défaut qui coûte directement de l'argent.
+
+   Trois fonctions suffisent : ce qu'un devis a déjà produit comme factures,
+   ce qu'il reste à facturer, et de quoi le convertir d'un geste. */
+const facturesDuDevis=d=>{ if(!d) return [];
+ const a=d.realise?d.realise:null;
+ return FACTURES.filter(f=>f.statut!=='annulee'
+   && (f.devis===d.id || (a!=null&&f.acte===a)));
+};
+const devFacture=d=>facturesDuDevis(d).reduce((s,f)=>s+fTTC(f),0);
+/* Ce qu'il reste à facturer sur un devis accepté. On ne compte QUE les devis
+   acceptés : un devis en attente n'engage personne, et un devis refusé encore
+   moins. Un centime d'écart ne fait pas une créance — on arrondit à l'euro. */
+const devAFacturer=d=>{
+ if(!d||d.statut!=='accepte') return 0;
+ const r=Math.round((+d.montant||0)-devFacture(d));
+ return r>0?r:0;
+};
+const devEstFacture=d=>!!d&&d.statut==='accepte'&&devAFacturer(d)===0&&facturesDuDevis(d).length>0;
+
+/* --------------------------------------------------------------------------
+   Facturable, et créance : deux choses différentes
+   --------------------------------------------------------------------------
+   Tout devis accepté non soldé PEUT se facturer — le bouton reste offert, même
+   sur un devis de l'an dernier : c'est au cabinet de savoir.
+
+   Mais tout devis accepté non soldé n'est pas de l'argent dû. Un devis
+   accepté il y a huit mois que personne n'a jamais réalisé n'est pas une
+   créance : c'est un projet qui a fait long feu. Le signaler comme « à
+   facturer » reviendrait à annoncer au cabinet des dizaines de milliers
+   d'euros qu'il n'a jamais gagnés — et à rendre l'indicateur inutile, parce
+   qu'un voyant toujours allumé ne se regarde plus.
+
+   Une créance, c'est donc : le soin a été DÉLIVRÉ (le devis a été réalisé en
+   séance) et rien n'a été facturé ; ou l'accord est RÉCENT et attend encore
+   sa facture — le cas du forfait, réglé à la vente avant la première séance. */
+const CREANCE_J=60;
+const devCreance=d=>{
+ const r=devAFacturer(d); if(!r) return 0;
+ if(d.realise) return r;
+ const j=days(d.decide||d.date, TODAY);
+ return (j>=0&&j<=CREANCE_J)?r:0;
+};
+/* les devis d'un patient qui attendent leur facture — au sens de la créance */
+const devisAFacturer=pid=>DEVIS.filter(d=>d.patient===pid&&devCreance(d)>0);
+
+/* « Réalisé » ne dit rien de l'argent : on ajoute ce qui manque, en toutes
+   lettres, et seulement quand il manque quelque chose. */
+function bdgAFacturer(d){
+ if(!CAN('prix')) return '';
+ const r=devCreance(d); if(r<=0) return '';
+ const dej=devFacture(d);
+ return `<div class="afact" title="${esc(
+   `Soin ${d.realise?'délivré':'accepté'} et non facturé`
+   +(dej?` — ${EUR(dej)} déjà facturé sur ${EUR(d.montant)}`:''))}">à facturer <b>${EUR(r)}</b></div>`;
+}
 /* un devis accepté dont l'acte a été réalisé se lit d'un coup d'œil */
 const bdgDevis=d=>d&&d.realise?bdg('b-good','✓ Réalisé'):bdg(SD[d.statut][1],SD[d.statut][0]);
 
@@ -8030,12 +8106,40 @@ const libFact=f=>{const a=ACTES.find(x=>x.id===f.acte); return a?a.nom:(f.libell
 })();
 
 /* ---------------- facture ---------------- */
-function ouvrirFactNew(pid){
+function ouvrirFactNew(pid,pre){
  if(!ROLES[role].prix){ toast('Les montants ne sont pas accessibles à ce rôle'); return }
  avoirNew=null;
- factNew={pid, acte:'', libelle:'', date:TODAYS, montant:'', type:'', prat:PRATICIENS[0], moyen:'', frac:1};
+ factNew={pid, acte:'', libelle:'', date:TODAYS, montant:'', type:'', prat:PRATICIENS[0], moyen:'', frac:1,
+   ...(pre||{})};
  paint();
- const e=document.getElementById('fnM'); if(e) e.focus();
+ /* préremplie, on n'a plus rien à saisir : le curseur va où la décision reste
+    à prendre — le moyen de paiement. Sinon il s'assoit sur un montant juste. */
+ const e=document.getElementById((pre&&pre.montant)?'fnMoyen':'fnM'); if(e) e.focus();
+}
+/* ==========================================================================
+   Convertir un devis en facture
+   ==========================================================================
+   Le montant a déjà été discuté, écrit, signé. Le retaper à la main, c'est
+   se donner une chance de se tromper sur un chiffre que le patient, lui,
+   connaît par cœur.
+
+   Vaut aussi pour un forfait : six séances se règlent à la vente, avant la
+   première — le devis n'a pas besoin d'être « réalisé » pour être dû. */
+function devisEnFacture(id){
+ const d=DEVIS.find(x=>x.id===id); if(!d) return;
+ if(!ROLES[role].prix){ toast('Les montants ne sont pas accessibles à ce rôle'); return }
+ if(d.statut!=='accepte'){ toast('Un devis se facture une fois accepté'); return }
+ const reste=devAFacturer(d);
+ if(reste<=0){ toast(`${d.id} est déjà facturé — ${EUR(devFacture(d))}`); return }
+ const a=d.realise?ACTES.find(x=>x.id===d.realise):null;
+ pView='liste'; pSel=d.patient; pTab='factu'; go('patients');
+ ouvrirFactNew(d.patient, {acte:a?String(a.id):'', devis:d.id,
+   libelle:a?'':((d.lignes||[]).map(l=>l[1]).filter(Boolean).join(' · ')||nomDevis(d)),
+   montant:String(reste),
+   type:a?a.type:((d.prest&&d.prest[0]&&d.prest[0].type)||''),
+   prat:d.praticien||(a?a.praticien:PRATICIENS[0])});
+ toast(`Facture préparée d'après ${d.id} — ${EUR(reste)}`
+   +(devFacture(d)?` (solde : ${EUR(devFacture(d))} déjà facturé)`:''));
 }
 const fermerFactNew=()=>{ factNew=null; paint() };
 function fnMaj(k,v){ if(!factNew) return; factNew[k]=v;
@@ -8055,6 +8159,9 @@ function creerFacture(){
  const frac=(factNew.moyen&&n>1)?n:0;
  const id=numFact();
  FACTURES.unshift({id, patient:p.id, acte:a?a.id:null, libelle:a?'':lib,
+   /* d'où elle vient : c'est ce lien qui permet de savoir qu'un devis est soldé,
+      même quand aucun acte n'a encore été saisi */
+   devis:factNew.devis||null,
    date:factNew.date, montant:m,
    paye:factNew.moyen?(frac?Math.round(m/frac):m):0, moyen:factNew.moyen||null,
    plan:frac?{n:frac,faites:1}:null,
@@ -8093,7 +8200,7 @@ function factForm(p){
      <select class="inp" onchange="fnMaj('prat',this.value)">
        ${PRATICIENS.map(x=>`<option ${factNew.prat===x?'selected':''}>${esc(x)}</option>`).join('')}</select></label>`}
    <label>Encaissement
-     <select class="inp" onchange="fnMaj('moyen',this.value)">
+     <select class="inp" id="fnMoyen" onchange="fnMaj('moyen',this.value)">
        <option value="">à encaisser plus tard</option>
        ${MOYENS.map(x=>`<option ${factNew.moyen===x?'selected':''}>${esc(x)}</option>`).join('')}</select></label>
    <label>Étalement
@@ -8929,7 +9036,14 @@ function pDetail(p){
    return `<div class="grid g4" style="margin-bottom:14px">
      ${kpi('Total facturé',EUR(ca),`${F.filter(x=>x.statut==='ok').length} facture(s)`)}
      ${kpi('Reste dû',EUR(rd),rd?F.filter(f=>rdu(f)>0).length+' facture(s)':'tout est soldé',rd?'dn':'up')}
-     ${kpi('Devis en attente',EUR(enAttente.reduce((s,d)=>s+d.montant,0)),`${enAttente.length} devis`)}
+     ${(()=>{ const AF=devisAFacturer(p.id);
+        const m=AF.reduce((s2,d)=>s2+devCreance(d),0);
+        /* À facturer prend la place des devis en attente quand il y en a : un
+           soin délivré et non facturé passe avant une proposition qui dort. */
+        return AF.length
+          ? kpi('À facturer',EUR(m),
+              `${AF.length} devis accepté${AF.length>1?'s':''} · soin ${AF.some(d=>d.realise)?'délivré':'à venir'}`,'dn')
+          : kpi('Devis en attente',EUR(enAttente.reduce((s2,d)=>s2+d.montant,0)),`${enAttente.length} devis`) })()}
      ${(()=>{const AV=AVOIRS.filter(a=>a.patient===p.id);
        return kpi('Avoirs',AV.length?EUR(AV.reduce((s2,a)=>s2+a.montant,0)):'—',
          AV.length?`${AV.length} pièce${AV.length>1?'s':''} sur ${avoirs.length} facture${avoirs.length>1?'s':''}`:'aucun')})()}</div>
@@ -8941,7 +9055,7 @@ function pDetail(p){
       <td class="mono">${d.id}</td><td class="mono" title="${(()=>{const e=devisEtabliTxt(d);
         return esc('Devis établi le '+e.cree+(e.maj?' · modifié le '+e.maj:''))})()}">${DF(d.date)}</td>
       <td>${d.lignes.map(l=>esc(l[1])).join(' · ')}</td>
-      <td class="num">${EUR(d.montant)}</td><td>${bdgDevis(d)}${sousStatut(d)}</td>
+      <td class="num">${EUR(d.montant)}</td><td>${bdgDevis(d)}${sousStatut(d)}${bdgAFacturer(d)}</td>
       <td class="mu">${(()=>{ if(!d.relances) return '<span class="mono">—</span>';
         const e=dernRelance(d.id);
         return `<span class="mono">${d.relances}</span>`+(e?`<div style="font-size:11px;white-space:nowrap"
@@ -8958,6 +9072,9 @@ function pDetail(p){
             <button class="btn xs" title="Envoyer un lien de signature au patient"
              onclick="event.stopPropagation();composerEnvoi(null,null,'${d.id}')">✉ Signature à distance</button>`}`}
         ${lienDe(d.id)?`<button class="btn xs" onclick="event.stopPropagation();pageSignature('${lienDe(d.id).jeton}')">🔗 Page du patient</button>`:''}
+        ${(CAN('prix')&&devAFacturer(d)>0)?`<button class="btn xs p"
+          title="${esc('Établir la facture d’après ce devis — '+EUR(devAFacturer(d)))}"
+          onclick="event.stopPropagation();devisEnFacture('${d.id}')">€ Facturer</button>`:''}
         <button class="btn xs" onclick="event.stopPropagation();apercuDevis('${d.id}')">PDF</button></td></tr>`).join('')}
     </tbody></table>${D.length?'':'<div class="empty">Aucun devis.</div>'}</div>
 
@@ -9213,7 +9330,7 @@ V.devis=()=>{
     <td class="mono" title="${(()=>{const e=devisEtabliTxt(d);
       return esc('Devis établi le '+e.cree+(e.maj?' · modifié le '+e.maj:''))})()}">${DF(d.date)}</td>
     <td class="num">${EUR(d.montant)}</td>
-    <td>${bdgDevis(d)}${sousStatut(d)}</td>
+    <td>${bdgDevis(d)}${sousStatut(d)}${bdgAFacturer(d)}</td>
     ${(()=>{
       /* L'âge appelait à l'action en rouge au-delà de trois semaines. Depuis
          que le jeu porte un an d'historique, un devis ACCEPTÉ il y a onze mois
@@ -15878,7 +15995,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='EN';
+const BUILD='EO';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
