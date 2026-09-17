@@ -16367,7 +16367,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='EX';
+const BUILD='EY';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -17527,27 +17527,75 @@ function dvProto(i){
  let cible=dvLigne;
  const SUP={};
  protoTousSup(P).forEach(x=>{ (SUP[x.t]=SUP[x.t]||[]).push(zoneNom(x.z)) });
- /* au forfait, le devis porte le montant sur la première prestation : les autres
-    sont comprises dedans, et le total reste exactement celui du protocole */
+ /* ==========================================================================
+    Un forfait ne met pas zéro en face d'un acte
+    --------------------------------------------------------------------------
+    Le devis portait tout le forfait sur la PREMIÈRE prestation et 0 € sur les
+    suivantes, avec la mention « compris dans le forfait ». Deux actes associés
+    — une Radiesse et un acide hyaluronique posés dans la même séance — et le
+    patient signait un document où l'un des deux ne valait rien.
+
+    Chaque acte porte donc SON tarif, et l'écart avec le forfait se dit en bas,
+    en remise : le patient lit ce qu'il paie pour chaque geste, puis ce que le
+    package lui fait gagner. Le total, lui, reste exactement le forfait.
+
+    Reste le cas d'un acte sans tarif au catalogue : il absorbe ce qui manque
+    pour atteindre le forfait. Ce n'est pas une estimation — le forfait dit ce
+    que l'ensemble vaut, les autres actes disent ce qu'ils valent, la
+    différence est la sienne. Et le montant reste modifiable sur sa ligne.
+    ========================================================================== */
  const forf=protoForfait(P);
+ const posees=[];
  T.forEach((t,k)=>{
   const z={};
   Object.keys(P.z).forEach(zn=>{ if(protoActe(P,zn)===t) z[zn]=acteDef(t).unite?P.z[zn]:1 });
   /* un acte seulement associé n'a pas de zone à lui : on note où il était prévu */
-  const ou=(!Object.keys(z).length&&SUP[t])?`associé à ${SUP[t].join(', ')}`:'';
-  const dans=(forf&&k>0)?`compris dans le forfait « ${P.n} »`:'';
-  const com=[ou,dans].filter(Boolean).join(' · ');
-  const prix=forf?(k===0?protoPrix(P):0):null;
+  const com=(!Object.keys(z).length&&SUP[t])?`associé à ${SUP[t].join(', ')}`:'';
   const cur=DV.lignes[cible];
   const vide=cur&&cur.type===null&&cur.libre==null;
-  if(k===0&&vide) Object.assign(cur,{type:t, libre:null, reg:'visage', z, com, prix});
+  if(k===0&&vide){ Object.assign(cur,{type:t, libre:null, reg:'visage', z, com, prix:null});
+                   posees.push(cible) }
   else { DV.lignes.push({type:t, libre:null, com, reg:'visage', z,
-          seances:1, prix, remise:0, remiseType:'%'});
-         cible=DV.lignes.length-1 }
+          seances:1, prix:null, remise:0, remiseType:'%'});
+         cible=DV.lignes.length-1; posees.push(cible) }
  });
+ /* --- le forfait se répartit --- */
+ let ecart=0, comble=0;
+ if(forf){
+  const forfEur=protoPrix(P);
+  const tarif=i=>dvPrix(DV.lignes[i]);
+  const sans=posees.filter(i=>!(tarif(i)>0));
+  let somme=posees.reduce((s2,i)=>s2+tarif(i),0);
+  if(sans.length&&somme<forfEur){
+    /* ce qui manque revient aux actes que le catalogue ne chiffre pas */
+    const part=Math.round((forfEur-somme)/sans.length);
+    sans.forEach(i=>{ DV.lignes[i].prix=part;
+      DV.lignes[i].com=[DV.lignes[i].com, `part du forfait « ${P.n} »`].filter(Boolean).join(' · ') });
+    comble=part;
+    somme=posees.reduce((s2,i)=>s2+tarif(i),0);
+  }
+  ecart=somme-forfEur;
+  if(ecart>0){
+   const av=+DV.remise||0;
+   if(!av||DV.remiseType==='€'){ DV.remise=av+ecart; DV.remiseType='€' }
+   else {
+     /* une remise en pourcentage est déjà posée : on ne la convertit pas sous
+        les pieds de celui qui l'a saisie — l'écart se pose alors sur la
+        première prestation du protocole, où il reste visible */
+     const i0=posees[0];
+     DV.lignes[i0].remise=(+DV.lignes[i0].remise||0)+ecart;
+     DV.lignes[i0].remiseType='€';
+   }
+  }
+ }
  dvLigne=cible; dvPlie=false; renderDevis();
- toast(`Protocole « ${P.n} » · ${T.map(t=>acteDef(t).n).join(' + ')}`
-   +(forf?` · forfait ${EUR(protoPrix(P))}`:''));
+ const detail=forf
+   ? (ecart>0 ? ` · forfait ${EUR(protoPrix(P))} — remise de ${EUR(ecart)} appliquée`
+     : comble ? ` · forfait ${EUR(protoPrix(P))} — ${EUR(comble)} portés sur l’acte sans tarif`
+     : ecart<0 ? ` · forfait ${EUR(protoPrix(P))} non atteint : les tarifs n’en font que ${EUR(protoPrix(P)+ecart)}`
+     : ` · forfait ${EUR(protoPrix(P))}`)
+   : '';
+ toast(`Protocole « ${P.n} » · ${T.map(t=>acteDef(t).n).join(' + ')}${detail}`);
 }
 /* reporter à gauche ce qui est posé à droite, et l'inverse */
 function dvMirror(){
