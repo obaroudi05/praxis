@@ -913,12 +913,30 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
  .schbar{margin-bottom:6px}
  .face-legend{margin-top:5px}
 }
-.sc-min{flex:1;min-width:0;font-size:10.5px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Le bloc d'identité d'un soin : son nom, et sous lui ce qui le qualifie —
+   la même découpe qu'une ligne de devis (.dvl-h > div > .nm + .mu). */
+.soinc-h .sc-id{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+/* Le nom et ce qui le qualifie tiennent une RANGÉE : sans elle, la pastille
+   « en cours » devient un élément de colonne et s'étire sur toute la largeur. */
+/* Le nom et la pastille « en cours » tiennent la MÊME hauteur de ligne —
+   17 px pour l'un, 13 px de texte plus 2×2 px de marge pour l'autre. Sans
+   cela la carte qui porte la mention est un pixel plus haute que ses
+   voisines, et une liste dont les lignes ne s'alignent pas se lit moins bien
+   qu'une liste qui s'aligne. */
+.soinc-h .sc-nl{display:flex;align-items:center;gap:7px;min-width:0}
+.soinc-h .sc-nl .sc-nom{flex:0 1 auto}
+.soinc-h .sc-nl .sc-libl{flex:1}
+.sc-min{min-width:0;font-size:10.5px;color:var(--ink-3);line-height:1.35;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sc-libl{display:flex;align-items:center;gap:6px;min-width:0}
 .soinc.plie .sc-lib{pointer-events:none}
-.soinc-h{display:flex;align-items:center;gap:7px;padding:6px 10px;background:var(--panel-2);border-bottom:1px solid var(--line)}
-.soinc-h .sc-nom{font-size:12.7px;font-weight:660;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.soinc-h{display:flex;align-items:center;gap:8px;padding:8px 11px;background:var(--panel-2);border-bottom:1px solid var(--line)}
+/* la même pastille que sur une ligne de devis : la couleur dit le produit */
+.soinc-h>.dot{width:9px;height:9px;border-radius:3px;flex:none}
+.soinc-h .sc-nom{display:block;font-size:12.7px;font-weight:660;letter-spacing:-.01em;line-height:17px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .soinc-h .pu{font-size:11px;color:var(--ink-3);font-weight:500;flex:none}
-.sc-cur{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;flex:none;
+.sc-cur{font-size:9.5px;line-height:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;flex:none;
   color:var(--accent-ink);background:var(--accent-wash);border-radius:5px;padding:2px 5px}
 .soinc-h .sc-tot{margin-left:auto;font-size:13px;font-weight:680;font-variant-numeric:tabular-nums;flex:none}
 .soinc-h .rm{flex:none}
@@ -14275,19 +14293,27 @@ function renderOver(){
           ${AS.ro?'':`onclick="ouvrirSoin(${i})" title="${ouvert?'Les zones cliquées sur le schéma iront à ce soin':'Déplier ce soin'}"`}>
         <div class="soinc-h">
           <span class="dot" style="background:${x.t?colActe(x.t):'var(--ink-3)'}"></span>
+          <!-- Même découpe qu'une ligne de devis : le nom au-dessus, ce qui le
+               qualifie en dessous. La sous-ligne ne disparaît plus quand la
+               carte s'ouvre — sur un devis elle reste, et c'est elle qui dit
+               en un mot ce que la carte détaille en dix. -->
+          <div class="sc-id">
+          <div class="sc-nl">
           ${x.t?`<b class="sc-nom">${esc(soinNom(x))}</b>${encours&&plusieurs?'<span class="sc-cur">en cours</span>':''}${EUROS&&puSoin(x)?(()=>{const fige=x.pu!=null&&x.pu!==(c.prix||0);
              return `<span class="pu${fige?' fige':''}"${fige?` title="prix figé par le devis — tarif du jour ${EUR(c.prix||0)}"`:''}>${EUR(puSoin(x))}</span>`})():''}`
            :((AS.ro||!ouvert)?`<b class="sc-nom">${esc((x.libre||'').trim()||'Prestation libre')}</b>`
-            :`<input class="inp sc-lib" placeholder="Soin non catalogué…" value="${esc(x.libre||'')}"
+            :`<div class="sc-libl"><input class="inp sc-lib" placeholder="Soin non catalogué…" value="${esc(x.libre||'')}"
                 onclick="event.stopPropagation()" oninput="majLibre(${i},'libre',this.value)">
               ${CAN('prix')?`<input class="inp sc-px" type="number" min="0" step="5" placeholder="0"
-                value="${x.prix==null?'':x.prix}" onclick="event.stopPropagation()" oninput="majLibre(${i},'prix',this.value)"><span class="mu">€</span>`:''}`)}
-          ${ouvert?'':(()=>{const RZ=zonesResume(Z,3);
-            return `<span class="sc-min" title="${esc(nz?`${nz} zone${nz>1?'s':''} — ${RZ.complet}`:'')}">${
+                value="${x.prix==null?'':x.prix}" onclick="event.stopPropagation()" oninput="majLibre(${i},'prix',this.value)"><span class="mu">€</span>`:''}</div>`)}
+          </div>
+          ${(()=>{const RZ=zonesResume(Z,3);
+            return `<div class="sc-min" title="${esc(nz?`${nz} zone${nz>1?'s':''} — ${RZ.complet}`:'')}">${
             [nz?esc(RZ.texte):(x.t?'sans zone':''),
             q>1?`× ${q}`:'', (EUROS&&rr)?`− ${EUR(rr)}`:'',
             x.mat?esc(paramsTexte(x)||matById(x.mat).n):'', (x.com||'').trim()?esc(x.com.trim()):'']
-            .filter(Boolean).join(' · ')||'à compléter'}</span>`})()}
+            .filter(Boolean).join(' · ')||'à compléter'}</div>`})()}
+          </div>
           ${EUROS?`<b class="sc-tot">${EUR(tot)}</b>`:''}
           ${AS.ro?'':`<button class="sc-ch" onclick="event.stopPropagation();replierSoin(${i})"
              title="${ouvert?'Replier ce soin':'Déplier ce soin'}" aria-label="${ouvert?'Replier':'Déplier'}">${ouvert?'▾':'›'}</button>`}
@@ -15189,6 +15215,11 @@ function confirmerSoin(){
  if(nouv) nouv.com=com;
  AS.zs=AS.zs||{};
  Object.entries(z).forEach(([k,q])=>{ AS.zt[k]=t; if(nouv) AS.zs[k]=nouv.sid; AS.z[k]=q });
+ /* Confirmer REPLIE — exactement ce que fait dvConfirmer sur un devis. Un
+    soin validé n'a plus rien à demander : il devient une ligne, la liste se
+    lit d'un coup d'œil, et la grille reste à portée pour le suivant. Un clic
+    sur la ligne la rouvre si l'on veut l'ajuster. */
+ AS.openSoin=TOUS_PLIES;
  AS.prix=null; renderOver();
  toast(acteDef(t).n+' ajouté à la séance');
  return true;
@@ -16239,7 +16270,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='EU';
+const BUILD='EV';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
