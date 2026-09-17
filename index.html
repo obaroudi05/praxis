@@ -2954,6 +2954,34 @@ let CATS=['Injections','Laser','Peeling','Mésothérapie','Radiofréquence','Ép
 /* les catégories du catalogue, celles des paramètres d'abord, puis les orphelines */
 const catsUtilisees=()=>[...CATS,...[...new Set(CATALOGUE.map(c=>c.cat||'Divers'))].filter(k=>!CATS.includes(k))];
 const actesDeCat=k=>CATALOGUE.filter(c=>(c.cat||'Divers')===k);
+/* --------------------------------------------------------------------------
+   Choisir un acte : une seule grille, deux écrans
+   --------------------------------------------------------------------------
+   Le devis présentait le catalogue à plat, en pastilles groupées par
+   catégorie : on voit tout ce qu'on peut proposer, et on en ajoute un second
+   sans rien rouvrir. La consultation, elle, cachait le MÊME catalogue dans un
+   menu déroulant — il fallait le déplier pour savoir ce qu'il contenait, le
+   replier pour en poser un autre, et recommencer. Deux gestes, et une liste
+   qu'on ne voit jamais en entier, pour la question qu'on se pose le plus
+   souvent de la journée.
+
+   C'est donc la même grille aux deux endroits, et c'est cette fonction. Ce
+   qui change est le TARIF, et seulement lui : un devis annonce un prix, c'est
+   sa raison d'être. Un acte n'en porte pas — il est un objet clinique, et la
+   facturation vient après, sur l'acte ; le bandeau du bas le dit déjà.
+   -------------------------------------------------------------------------- */
+function grilleActes(o){
+ o=o||{};
+ const sel=o.sel==null?null:o.sel, prix=!!o.prix, pick=o.pick||'dvSetActe';
+ const garde=o.filtre||(()=>true);
+ return `<div class="ap-l">${catsUtilisees().map(k=>{ const G=actesDeCat(k).filter(garde);
+   return G.length?`<div class="ap-g"><span class="ap-c">${esc(k)}</span>${G.map(c=>{ const on=sel===c.id;
+     return `<button class="apc ${on?'on':''}" onclick="${pick}('${c.id}')"
+       title="${on?'Retirer cet acte et revenir à la liste':'Choisir '+esc(c.n)}">
+     <span class="dot" style="background:var(--${c.col||'accent'})"></span>${esc(c.n)}${
+     prix?`<small>${c.prix?EUR(c.prix):'tarif à définir'}</small>`:''}${
+     on?'<span class="apx">✕</span>':''}</button>`}).join('')}</div>`:''}).join('')}</div>`;
+}
 /* renommer une catégorie la renomme partout : catalogue, actes réalisés, filtres */
 function renomCat(i,v){
  const av=CATS[i], nv=String(v||'').trim();
@@ -14165,14 +14193,18 @@ function renderOver(){
       const dispo=CATALOGUE.slice();   /* un acte déjà présent peut être repris : deux produits, deux séries */
       const D=AS.draft||{t:null,z:{},com:''}, CD=D.t?acteDef(D.t):null, UD=CD?CD.unite:null;
       const DZ=draftZones();
-      return `<div class="soins ${D.t?'on':''}" onkeydown="soinsKey(event)">
-       ${((AS.soins||[]).length&&!D.t)?'':`<div class="soins-h"><span class="soins-t">Soins de la séance</span>
-         ${D.t?`<button class="chip xs" style="margin-left:auto" onclick="setDraftActe('')">Annuler</button>`:''}</div>`}
-       <div class="soins-a">
-         <select class="inp" id="addSoin" ${dispo.length?'':'disabled'} onchange="setDraftActe(this.value)">
-           ${dispo.length?`<option value="">Choisir un acte…</option>`+optionsActes(D.t,EUROS,c=>dispo.some(d=>d.id===c.id))
-             :'<option value="">tous les soins du catalogue sont déjà dans la séance</option>'}</select>
-       </div>
+      /* La MÊME grille que le devis — sans les tarifs : un acte est un objet
+         clinique, la facturation se fait après, sur l'acte. En mode devis de
+         cette même fenêtre, EUROS repasse à vrai et les tarifs reviennent. */
+      return `<div class="soins ${D.t?'on':''}" onkeydown="soinsKey(event)" id="picSoins">
+       <div class="soins-h"><span class="soins-t">Soins de la séance</span></div>
+       ${D.t?`<div class="ap-vide"><span class="mu">Soin retenu : <b style="color:var(--ink)">${esc(CD.n)}</b> —</span>
+          <button class="btn xs" onclick="setDraftActe('')">✕ Retirer</button>
+          <span class="mu">ou cliquez-en un autre ci-dessous</span></div>`
+        :`<div class="ap-vide"><span class="mu">Choisissez un acte ci-dessous${
+          estBareme(AS.reg)?'':', ou cliquez une zone du schéma'}.</span></div>`}
+       ${grilleActes({sel:D.t, prix:EUROS, pick:'picSoin',
+         filtre:c=>dispo.some(d=>d.id===c.id)})}
        ${D.t?`
        <div class="dft">
         ${CD.zoned?`<div class="sc-lb">Zones traitées <span class="n">${DZ.length||'—'}</span>
@@ -14207,9 +14239,12 @@ function renderOver(){
       </div>`})()}
 
     ${(()=>{const S0=AS.ro?soinsLecture():(AS.soins||[]);
-      if(!S0.length) return AS.ro?'':`<div class="sc-vide" style="padding:2px 0 4px">${draftActif()
-        ?'Ce soin n’est pas encore dans la séance — validez-le avec ✓ Confirmer, ou la touche Entrée.'
-        :'Aucun soin pour l’instant — choisissez un acte ci-dessus, ou cliquez une zone du schéma.'}</div>`;
+      /* La consigne « choisissez un acte » est désormais posée juste au-dessus
+         de la grille, à l'endroit où l'on choisit. La répéter ici la disait
+         deux fois à cent cinquante pixels d'écart. Ne reste que ce que la
+         grille ne dit pas : qu'un soin composé n'est pas encore entré. */
+      if(!S0.length) return (AS.ro||!draftActif())?'':`<div class="sc-vide" style="padding:2px 0 4px"
+        >Ce soin n’est pas encore dans la séance — validez-le avec ✓ Confirmer, ou la touche Entrée.</div>`;
       const plusieurs=S0.filter(x=>x.t).length>1;
       /* le soin en cours vient en tête : ses zones sont juste sous la liste d'ajout */
       /* un seul soin reçoit les zones cliquées : celui qu'on a ouvert, à défaut
@@ -15109,6 +15144,9 @@ function setDraftActe(t){
  if(!regionsDe(t).includes(AS.reg)) AS.reg=regionDef(t);
  renderOver();
 }
+/* Cliquer l'acte déjà retenu le REPOSE — même geste qu'au devis, où la
+   pastille porte une croix pour le dire. */
+function picSoin(t){ const D=AS&&AS.draft; setDraftActe((D&&D.t===t)?'':t) }
 function draftCom(v){ AS.draft=AS.draft||{t:null,z:{},com:''}; AS.draft.com=v }
 /* poser, doser ou retirer une zone du brouillon */
 function draftZone(id,d){
@@ -15159,8 +15197,10 @@ function confirmerSoin(){
    des actes pour composer le suivant. */
 function ajouterSoinCompose(){
  if((AS.draft||{}).t&&!confirmerSoin()) return;
- const e=document.getElementById('addSoin');
- if(e&&!e.disabled){ e.focus(); e.scrollIntoView({block:'nearest'}) }
+ /* la grille ne se referme plus : il n'y a rien à rouvrir, seulement à
+    remonter dessus si la liste des soins l'a poussée hors de vue */
+ const e=document.getElementById('picSoins');
+ if(e) e.scrollIntoView({block:'nearest'});
 }
 /* Entrée valide le soin en cours — sauf dans la saisie libre de zone,
    qui possède déjà son propre Entrée. */
@@ -16199,7 +16239,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='ET';
+const BUILD='EU';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -17677,12 +17717,7 @@ function renderDevis(){
       <span class="mu">ou cliquez-en un autre ci-dessous</span></div>`:'')}
    ${LIB?`<div class="ap-libre"><span class="mu">Prestation libre — l’intitulé se saisit sur la fiche, en bas.</span>
       <button class="btn xs" onclick="dvReprendreActe(${dvLigne})">↩ Reprendre un acte du catalogue</button></div>`
-    :`<div class="ap-l">${catsUtilisees().map(k=>{const G=actesDeCat(k);
-       return G.length?`<div class="ap-g"><span class="ap-c">${esc(k)}</span>${G.map(c=>{const on=L.type===c.id;
-        return `<button class="apc ${on?'on':''}" onclick="dvSetActe('${c.id}')"
-        title="${on?'Retirer cet acte et revenir à la liste':'Choisir '+esc(c.n)}">
-     <span class="dot" style="background:var(--${c.col||'accent'})"></span>${esc(c.n)}
-     <small>${CAN('prix')?(c.prix?EUR(c.prix):'tarif à définir'):''}</small>${on?'<span class="apx">✕</span>':''}</button>`}).join('')}</div>`:''}).join('')}</div>`}
+    :grilleActes({sel:L.type, prix:CAN('prix'), pick:'dvSetActe'})}
   </div>
   ${C.zoned?`<div class="modebar">
     <div class="ap-t" style="width:100%;margin:0 0 2px">2 · Où ? <span class="mu" style="text-transform:none;letter-spacing:0;font-weight:500">— facultatif</span></div>
