@@ -7950,7 +7950,11 @@ const PCOL={
  nom:    {l:'Patient',            sens: 1, v:p=>p.nom+' '+p.prenom},
  actes:  {l:'Actes',              sens:-1, v:p=>ACTES.filter(a=>a.patient===p.id).length},
  dernier:{l:'Dernier acte',       sens:-1, v:p=>lastActe(p)||''},
- prat:   {l:'Praticien référent', sens: 1, v:p=>p.prat||''},
+ /* L'en-tête dit « Praticien » et non « Praticien référent » : sur une liste
+    de patients, la colonne ne peut désigner que lui, et les soixante pixels
+    que coûtait le mot en trop revenaient au nom du patient, qui, lui, se
+    coupait en deux lignes à 1280. L'infobulle de tri garde le libellé entier. */
+ prat:   {l:'Praticien', long:'Praticien référent', sens: 1, v:p=>p.prat||''},
 };
 let pTri='nom', pSens=1;      /* par défaut : ordre alphabétique */
 function trierPatients(k){
@@ -7960,7 +7964,7 @@ function trierPatients(k){
 }
 const flechePat=k=>pTri===k?`<span class="fl on">${pSens>0?'▲':'▼'}</span>`:'<span class="fl">↕</span>';
 const thPat=(k,cls)=>`<th class="tri${cls?' '+cls:''}" onclick="trierPatients('${k}')"
-  title="Classer par ${PCOL[k].l.toLowerCase()}">${PCOL[k].l}${flechePat(k)}</th>`;
+  title="Classer par ${(PCOL[k].long||PCOL[k].l).toLowerCase()}">${PCOL[k].l}${flechePat(k)}</th>`;
 const triTxt=()=>`${PCOL[pTri].l.toLowerCase()} ${pSens>0?'croissant':'décroissant'}`;
 function patientsTries(){
  const L=patientsActifs().filter(p=>{const q=pq.toLowerCase();
@@ -8081,7 +8085,14 @@ function pListe(){
       <td class="mono mu" style="white-space:nowrap">${d?DF(d):'jamais'}</td>
       <td class="mu" style="white-space:nowrap">${esc(p.prat)}</td>
       <td class="mu" style="font-size:11.5px">${esc(p.tel)}<div>${esc(p.mail)}</div></td>
-      <td class="num"><button class="btn xs" onclick="event.stopPropagation();openPatient(${p.id})">Ouvrir</button></td></tr>`}).join('')}
+      <!-- Un devis se demande au téléphone, sans que personne ne soit venu :
+           il fallait pourtant ouvrir le dossier, trouver l'onglet, et alors
+           seulement le bouton. Il est ici, sur la ligne du patient — un devis
+           n'enregistre aucun acte et ne décrémente aucun stock, il n'y a donc
+           rien à ouvrir pour l'établir. -->
+      <td class="num nw"><button class="btn xs" title="Établir un devis — aucun acte n’est enregistré"
+          onclick="event.stopPropagation();dvChoix(${p.id})">◫ Devis</button>
+        <button class="btn xs" onclick="event.stopPropagation();openPatient(${p.id})">Ouvrir</button></td></tr>`}).join('')}
    </tbody></table>${L.length?'':'<div class="empty">Aucun résultat.</div>'}</div>
   </div>
  </div>`;
@@ -16356,7 +16367,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='EW';
+const BUILD='EX';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
