@@ -503,6 +503,16 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
 .apc .dot{width:9px;height:9px;border-radius:3px;flex:none}
 .apc small{font-weight:450;color:var(--ink-3);font-size:10.5px;margin-left:2px}
 .apc.on small{color:var(--accent-ink);opacity:.8}
+/* Un acte COCHÉ qu'on ne compose pas porte une coche, pas une croix : le
+   cliquer le ramène sous la main, il ne le retire pas. Celui qu'on compose a
+   la croix, et le trait plein qui le distingue des autres cochés. */
+.apc.on.main{box-shadow:0 2px 10px rgba(42,120,214,.13), inset 0 0 0 1px var(--accent)}
+.apk{margin-left:5px;font-size:10px;opacity:.7;font-weight:700}
+/* ce qui est retenu en plus de l'acte composé, rappelé sous sa fiche */
+.dft-a{margin-top:9px;padding-top:8px;border-top:1px dashed var(--line);
+  font-size:10.5px;color:var(--ink-3);font-weight:650;text-transform:uppercase;letter-spacing:.04em;
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.dft-a .chip.xs{text-transform:none;letter-spacing:0;font-weight:600;font-size:11px;padding:3px 9px}
 /* la croix de l'acte retenu : elle dit qu'un second clic le repose */
 .apx{margin-left:5px;font-size:10px;opacity:.55;font-weight:700}
 .apc.on:hover .apx{opacity:1}
@@ -2990,15 +3000,23 @@ const actesDeCat=k=>CATALOGUE.filter(c=>(c.cat||'Divers')===k);
    -------------------------------------------------------------------------- */
 function grilleActes(o){
  o=o||{};
- const sel=o.sel==null?null:o.sel, prix=!!o.prix, pick=o.pick||'dvSetActe';
+ /* `sel` accepte un acte ou une LISTE : le devis n'en retient qu'un, la
+    consultation peut en cocher plusieurs. `cur` est celui qu'on compose —
+    c'est lui qui porte la croix, parce que c'est lui qu'un second clic
+    décoche. */
+ const selL=Array.isArray(o.sel)?o.sel:(o.sel==null?[]:[o.sel]);
+ const cur=o.cur===undefined?(selL.length===1?selL[0]:null):o.cur;
+ const prix=!!o.prix, pick=o.pick||'dvSetActe';
  const garde=o.filtre||(()=>true);
  return `<div class="ap-l">${catsUtilisees().map(k=>{ const G=actesDeCat(k).filter(garde);
-   return G.length?`<div class="ap-g"><span class="ap-c">${esc(k)}</span>${G.map(c=>{ const on=sel===c.id;
-     return `<button class="apc ${on?'on':''}" onclick="${pick}('${c.id}')"
-       title="${on?'Retirer cet acte et revenir à la liste':'Choisir '+esc(c.n)}">
+   return G.length?`<div class="ap-g"><span class="ap-c">${esc(k)}</span>${G.map(c=>{
+     const on=selL.indexOf(c.id)>=0, main=on&&cur===c.id;
+     return `<button class="apc ${on?'on':''} ${main?'main':''}" onclick="${pick}('${c.id}')"
+       title="${main?'Retirer cet acte et revenir à la liste'
+         :on?'Reprendre '+esc(c.n)+' — il reste retenu':'Choisir '+esc(c.n)}">
      <span class="dot" style="background:var(--${c.col||'accent'})"></span>${esc(c.n)}${
      prix?`<small>${c.prix?EUR(c.prix):'tarif à définir'}</small>`:''}${
-     on?'<span class="apx">✕</span>':''}</button>`}).join('')}</div>`:''}).join('')}</div>`;
+     main?'<span class="apx">✕</span>':on?'<span class="apk">✓</span>':''}</button>`}).join('')}</div>`:''}).join('')}</div>`;
 }
 /* renommer une catégorie la renomme partout : catalogue, actes réalisés, filtres */
 function renomCat(i,v){
@@ -13551,7 +13569,7 @@ function openActe(pid,aid,np){
         :[...new Set(a.zones?Object.keys(a.zones).map(z=>acteZone(a,z)):(a.type?[a.type]:[]))]
           .map(t=>({t, q:a.seances||1, com:a.zonesNote||'',
              ...(a.mat&&t===a.type?{mat:a.mat, par:{...(a.par||{})}}:{})}))):[],
-     draft:{t:null,z:{},com:''}, openSoin:0, devis:null, docs:[], zs:{}, zx:{},
+     draft:DRAFT0(), openSoin:0, devis:null, docs:[], zs:{}, zx:{},
      /* Une séance déjà enregistrée montre le forfait où elle EST rangée, pas
         celui où elle irait. Et une séance enregistrée hors forfait le reste :
         rouvrir un dossier ne doit rien décompter. */
@@ -13977,7 +13995,7 @@ function dupliquerActe(id){
    parZ:x.parZ?JSON.parse(JSON.stringify(x.parZ)):undefined,
    zpar:!!(x.parZ&&Object.keys(x.parZ).length)}));
  AS.type=(AS.soins.find(x=>x.t)||{}).t||null;
- AS.openSoin=0; AS.draft={t:null,z:{},com:''}; AS.zs={}; AS.zx={}; rattacherZones(a.zs, a.zx);
+ AS.openSoin=0; AS.draft=DRAFT0(); AS.zs={}; AS.zx={}; rattacherZones(a.zs, a.zx);
  AS.conso=[]; AS.consoOff=[];
  renderOver();
  toast(`Séance dupliquée du ${DF(a.date)} — ajustez, puis enregistrez`);
@@ -14166,7 +14184,7 @@ function renderOver(){
     <input class="inp" type="date" value="${AS.date}" onchange="AS.date=this.value">
     <select class="inp" onchange="AS.prat=this.value">${PRATICIENS.map(x=>`<option ${AS.prat===x?'selected':''}>${x}</option>`).join('')}</select>
     <select class="inp" onchange="AS.oper=this.value"><option value="">Sans opérateur</option>${OPERATEURS.map(x=>`<option ${AS.oper===x?'selected':''}>${x}</option>`).join('')}</select>
-    ${AS.np?'':histoHtml(AS.pid, [...actesSaisis(), (AS.draft||{}).t])}
+    ${AS.np?'':histoHtml(AS.pid, [...actesSaisis(), ...draftTs()])}
     <div class="seg but" style="margin-left:auto">${BUTS.map(([k,l,t])=>
       `<button class="${AS.but===k?'on':''}" title="${esc(t)}" onclick="setBut('${k}')">${l}</button>`).join('')}</div>
    </div>`}
@@ -14183,14 +14201,16 @@ function renderOver(){
       <span class="mu" style="font-size:11px;align-self:center;margin-right:2px">Protocole :</span>
       ${PROTOS.map((x,i)=>`<button class="chip" onclick="applyProto(${i})" title="${esc(protoResume(x))}">${esc(x.n)}</button>`).join('')}
       <button class="chip" onclick="mirrorZ()">⇄ Symétriser</button></div>`}
-    ${(()=>{const D=AS.draft||{}, dz=D.t?D.z:{};
+    ${(()=>{const DT=draftZonesTotal(), dz=DT.z;
       const zAll={...AS.z,...dz};
-      const ztAll={...AS.zt}; Object.keys(dz).forEach(k=>ztAll[k]=D.t);
+      /* chaque zone du brouillon garde la couleur de SON acte : sur une séance
+         à deux produits, le schéma les distingue avant même la confirmation */
+      const ztAll={...AS.zt}; Object.keys(dz).forEach(k=>ztAll[k]=DT.zt[k]);
       return estBareme(AS.reg)?baremePane(zAll)
-        :`<div class="facebox" id="faceLive">${schemaSVG(zAll,{editable:!AS.ro,hist:zoneHist(AS.pid,AS.aid),type:D.t||AS.type,zt:ztAll,zsup:zsupCourant(),region:AS.reg})}</div>`})()}
+        :`<div class="facebox" id="faceLive">${schemaSVG(zAll,{editable:!AS.ro,hist:zoneHist(AS.pid,AS.aid),type:((AS.draft||{}).t)||AS.type,zt:ztAll,zsup:zsupCourant(),region:AS.reg})}</div>`})()}
     ${estBareme(AS.reg)?'':`
     <div class="face-legend">
-      ${[...new Set([...(draftActif()?[AS.draft.t]:[]),...actesSaisis()])].map(t=>`<span><i style="background:${colActe(t)}"></i>${esc(acteDef(t).n)}${acteDef(t).unite?' ('+acteDef(t).unite+')':''}</span>`).join('')}
+      ${[...new Set([...draftTs(),...actesSaisis()])].map(t=>`<span><i style="background:${colActe(t)}"></i>${esc(acteDef(t).n)}${acteDef(t).unite?' ('+acteDef(t).unite+')':''}</span>`).join('')}
       ${Object.keys(zoneHist(AS.pid,AS.aid)).length?'<span><i class="ant"></i>Séances précédentes — date en petit</span>':''}
 
       </div>
@@ -14209,26 +14229,37 @@ function renderOver(){
    <div>
     ${AS.ro?'':(()=>{const T=actesSaisis();
       const dispo=CATALOGUE.slice();   /* un acte déjà présent peut être repris : deux produits, deux séries */
-      const D=AS.draft||{t:null,z:{},com:''}, CD=D.t?acteDef(D.t):null, UD=CD?CD.unite:null;
-      const DZ=draftZones();
+      const D=AS.draft||DRAFT0(), TS=draftTs();
+      const CD=D.t?acteDef(D.t):null, UD=CD?CD.unite:null;
+      const DZ=draftZones(), DC=dCur()||{z:{},com:''};
+      /* ce qui est déjà posé sur les AUTRES actes cochés : on le rappelle en
+         une ligne, sinon cocher le second donnerait l'impression d'avoir
+         perdu les zones du premier */
+      const autres=TS.filter(t=>t!==D.t).map(t=>{const f=(D.par||{})[t]||{z:{}};
+        const n=Object.keys(f.z).length;
+        return {t, n, nom:acteDef(t).n}});
       /* La MÊME grille que le devis — sans les tarifs : un acte est un objet
          clinique, la facturation se fait après, sur l'acte. En mode devis de
          cette même fenêtre, EUROS repasse à vrai et les tarifs reviennent. */
-      return `<div class="soins ${D.t?'on':''}" onkeydown="soinsKey(event)" id="picSoins">
+      return `<div class="soins ${TS.length?'on':''}" onkeydown="soinsKey(event)" id="picSoins">
        <div class="soins-h"><span class="soins-t">Soins de la séance</span></div>
-       ${D.t?`<div class="ap-vide"><span class="mu">Soin retenu : <b style="color:var(--ink)">${esc(CD.n)}</b> —</span>
-          <button class="btn xs" onclick="setDraftActe('')">✕ Retirer</button>
-          <span class="mu">ou cliquez-en un autre ci-dessous</span></div>`
-        :`<div class="ap-vide"><span class="mu">Choisissez un acte ci-dessous${
+       ${TS.length?`<div class="ap-vide"><span class="mu">${TS.length>1
+            ?`${TS.length} soins retenus : <b style="color:var(--ink)">${esc(TS.map(t=>acteDef(t).n).join(' + '))}</b> —`
+            :`Soin retenu : <b style="color:var(--ink)">${esc(CD.n)}</b> —`}</span>
+          <button class="btn xs" onclick="setDraftActe('')">✕ ${TS.length>1?'Tout retirer':'Retirer'}</button>
+          <span class="mu">${TS.length>1
+            ?'ils entreront ensemble ; cliquez l’un d’eux pour le reprendre'
+            :'ou cochez-en un autre pour les poser ensemble'}</span></div>`
+        :`<div class="ap-vide"><span class="mu">Choisissez un ou plusieurs actes ci-dessous${
           estBareme(AS.reg)?'':', ou cliquez une zone du schéma'}.</span></div>`}
-       ${grilleActes({sel:D.t, prix:EUROS, pick:'picSoin',
+       ${grilleActes({sel:TS, cur:D.t, prix:EUROS, pick:'picSoin',
          filtre:c=>dispo.some(d=>d.id===c.id)})}
        ${D.t?`
        <div class="dft">
         ${CD.zoned?`<div class="sc-lb">Zones traitées <span class="n">${DZ.length||'—'}</span>
           <span class="mu">clic sur le schéma</span></div>
          ${DZ.length?`<div class="sc-z">${DZ.map(z=>{
-            const qz=D.z[z], ZB=zoneDef(z), bar=!!(ZB&&ZB.bar);
+            const qz=DC.z[z], ZB=zoneDef(z), bar=!!(ZB&&ZB.bar);
             return `<div class="zrow"><span class="zd" style="background:${colActe(D.t)}"></span>
              <div class="zn">${esc(zoneLabel(z))}<small>${bar?(ZB.grp||''):(qz>0?((qz!==1||uniteDose(D.t,z))?fmtDose(qz,D.t,z):''):'traitée')}</small></div>
              ${bar?`${(CAN('prix')&&AS.but==='devis')?`<b class="mono">${EUR(ZB.pu)}</b>`:''}`
@@ -14246,11 +14277,14 @@ function renderOver(){
         :`<div class="sc-vide">${esc(CD.n)} ne se localise pas sur un schéma.</div>`}
         <div class="sc-lb" style="margin-top:9px">Commentaire</div>
         <input class="inp sc-note" style="margin-top:0" placeholder="précision libre sur ce soin…"
-          value="${esc(D.com||'')}" oninput="draftCom(this.value)">
+          value="${esc(DC.com||'')}" oninput="draftCom(this.value)">
+        ${autres.length?`<div class="dft-a">Aussi retenu${autres.length>1?'s':''} :
+          ${autres.map(a2=>`<button class="chip xs" onclick="picSoin('${a2.t}')"
+            title="Reprendre ${esc(a2.nom)}">${esc(a2.nom)}${a2.n?` · ${a2.n} zone${a2.n>1?'s':''}`:''}</button>`).join('')}</div>`:''}
        </div>`:''}
        <div class="soins-a" style="margin-top:${D.t?'9px':'6px'}">
-         <button class="btn xs p" id="btnConfSoin" ${D.t?'':'disabled'} onclick="confirmerSoin()"
-           title="Entrée">✓ Confirmer</button>
+         <button class="btn xs p" id="btnConfSoin" ${TS.length?'':'disabled'} onclick="confirmerSoin()"
+           title="Entrée">✓ Confirmer${TS.length>1?` · ${TS.length} soins`:''}</button>
          <button class="btn xs" id="btnAddSoin" onclick="ajouterSoinCompose()">＋ Ajouter un soin</button>
          <button class="btn xs" onclick="ajouterLibreCompose()">＋ Ligne libre</button>
        </div>
@@ -14261,8 +14295,10 @@ function renderOver(){
          de la grille, à l'endroit où l'on choisit. La répéter ici la disait
          deux fois à cent cinquante pixels d'écart. Ne reste que ce que la
          grille ne dit pas : qu'un soin composé n'est pas encore entré. */
-      if(!S0.length) return (AS.ro||!draftActif())?'':`<div class="sc-vide" style="padding:2px 0 4px"
-        >Ce soin n’est pas encore dans la séance — validez-le avec ✓ Confirmer, ou la touche Entrée.</div>`;
+      if(!S0.length) return (AS.ro||!draftActif())?'':(()=>{const n=draftTs().length;
+        return `<div class="sc-vide" style="padding:2px 0 4px">${n>1
+          ?`Ces ${n} soins ne sont pas encore dans la séance — validez-les`
+          :'Ce soin n’est pas encore dans la séance — validez-le'} avec ✓ Confirmer, ou la touche Entrée.</div>`})();
       const plusieurs=S0.filter(x=>x.t).length>1;
       /* le soin en cours vient en tête : ses zones sont juste sous la liste d'ajout */
       /* un seul soin reçoit les zones cliquées : celui qu'on a ouvert, à défaut
@@ -14725,7 +14761,7 @@ function zPose(id,d,t,muet){
 function baremeGroupe(gi,poser){
  if(AS.ro) return;
  const B=baremeById(AS.reg), g=B&&B.g[gi]; if(!g) return;
- const D=draftActif()?AS.draft:null;
+ const D=draftActif()?dCur():null;
  if(!D&&!AS.type&&choixActePossible()){ toast('Choisissez d’abord l’acte, puis cochez le groupe'); return }
  g.z.forEach(z=>{
    if(D){ const o=Object.prototype.hasOwnProperty.call(D.z,z.id);
@@ -15159,39 +15195,82 @@ function setRegion(r){
  renderOver(); toast('Région : '+(REGIONS.find(x=>x.id===r)||{}).n);
 }
 function majSoin(i,k,v){ const x=(AS.soins||[])[i]; if(!x) return; x[k]=v }
-/* ---- brouillon : ce qu'on compose avant d'appuyer sur « Ajouter un soin » ---- */
-const draftActif=()=>!!(AS&&AS.draft&&AS.draft.t);
-const draftZones=()=>Object.keys((AS.draft&&AS.draft.z)||{});
+/* ==========================================================================
+   Le composeur : une SÉLECTION d'actes, pas un acte
+   --------------------------------------------------------------------------
+   Une séance d'injection en porte souvent deux — acide hyaluronique et toxine
+   le même jour. Il fallait composer le premier, le confirmer, retrouver la
+   grille, composer le second : deux fois le même parcours pour un seul geste
+   clinique.
+
+   Le brouillon retient donc une LISTE d'actes, dans l'ordre où on les coche,
+   et chacun garde ses propres zones et son propre commentaire — sans quoi
+   cocher un second acte effacerait le travail fait sur le premier, ou le
+   cacherait, ce qui est pire. `t` désigne celui qu'on est en train de
+   composer : c'est lui que le schéma colore et que les zones cliquées
+   rejoignent. Un clic sur un acte déjà coché le ramène sous la main ; un clic
+   sur celui qu'on compose le décoche.
+
+   `＋ Confirmer` les fait entrer ENSEMBLE, dans l'ordre, chacun avec ce qu'on
+   lui a posé.
+   ========================================================================== */
+const DRAFT0=()=>({ts:[], t:null, par:{}});
+const draftTs=()=>((AS&&AS.draft&&AS.draft.ts)||[]);
+const draftActif=()=>draftTs().length>0;
+/* la fiche de brouillon d'un acte : ses zones, son commentaire */
+function dPar(t){ if(!AS||!AS.draft||!t) return null;
+ AS.draft.par=AS.draft.par||{};
+ return (AS.draft.par[t]=AS.draft.par[t]||{z:{},com:''}) }
+const dCur=()=>dPar((AS&&AS.draft&&AS.draft.t)||null);
+const draftZ=()=>{const f=dCur(); return f?f.z:{}};
+const draftZones=()=>Object.keys(draftZ());
+/* les zones de TOUS les actes cochés, avec leur porteur : c'est ce que le
+   schéma doit montrer pendant qu'on compose */
+function draftZonesTotal(){ const z={}, zt={};
+ draftTs().forEach(t=>{ const f=dPar(t); if(!f) return;
+   Object.entries(f.z).forEach(([k,q])=>{ z[k]=q; zt[k]=t }) });
+ return {z, zt};
+}
+/* remplacer toute la sélection par un seul acte — ou la vider */
 function setDraftActe(t){
- AS.draft=AS.draft||{t:null,z:{},com:''};
- if(!t){ AS.draft.t=null; AS.draft.z={}; renderOver(); return }
- if(AS.draft.t&&AS.draft.t!==t) AS.draft.z={};       /* les zones suivent l'acte */
- AS.draft.t=t;
+ if(!AS.draft||!AS.draft.par) AS.draft=DRAFT0();
+ if(!t){ AS.draft=DRAFT0(); renderOver(); return }
+ const garde=AS.draft.par[t];
+ AS.draft={ts:[t], t, par:garde?{[t]:garde}:{}};
  if(!regionsDe(t).includes(AS.reg)) AS.reg=regionDef(t);
  renderOver();
 }
-/* Cliquer l'acte déjà retenu le REPOSE — même geste qu'au devis, où la
-   pastille porte une croix pour le dire. */
-function picSoin(t){ const D=AS&&AS.draft; setDraftActe((D&&D.t===t)?'':t) }
-function draftCom(v){ AS.draft=AS.draft||{t:null,z:{},com:''}; AS.draft.com=v }
-/* poser, doser ou retirer une zone du brouillon */
-function draftZone(id,d){
- const D=AS.draft; if(!D||!D.t||!id) return;
- const pas=zonePas(id);
- const on=Object.prototype.hasOwnProperty.call(D.z,id), cur=+D.z[id]||0;
- if(d>0) D.z[id]=on?+(cur+pas).toFixed(2):1;
- else { const nv=+(cur-pas).toFixed(2); if(!on) return; if(nv<=0) delete D.z[id]; else D.z[id]=nv }
+/* Cocher, ramener sous la main, décocher — trois états sur une seule pastille :
+   un acte non coché se coche et passe sous la main ; un acte coché qu'on ne
+   compose pas revient sous la main ; celui qu'on compose se décoche. */
+function picSoin(t){
+ if(!AS.draft||!AS.draft.par) AS.draft=DRAFT0();
+ const D=AS.draft, L=(D.ts||[]).slice(), i=L.indexOf(t);
+ if(i<0){ L.push(t); D.ts=L; D.t=t }
+ else if(D.t!==t){ D.t=t }
+ else { L.splice(i,1); D.ts=L; delete D.par[t]; D.t=L.length?L[L.length-1]:null }
+ if(D.t&&!regionsDe(D.t).includes(AS.reg)) AS.reg=regionDef(D.t);
  renderOver();
 }
-function delDraftZone(id){ if(AS.draft&&AS.draft.z){ delete AS.draft.z[id]; renderOver() } }
-function setDraftZ(id,v){ if(!AS.draft) return;
+function draftCom(v){ const f=dCur(); if(f) f.com=v }
+/* poser, doser ou retirer une zone du brouillon */
+function draftZone(id,d){
+ const f=dCur(); if(!f||!id) return;
+ const pas=zonePas(id);
+ const on=Object.prototype.hasOwnProperty.call(f.z,id), cur=+f.z[id]||0;
+ if(d>0) f.z[id]=on?+(cur+pas).toFixed(2):1;
+ else { const nv=+(cur-pas).toFixed(2); if(!on) return; if(nv<=0) delete f.z[id]; else f.z[id]=nv }
+ renderOver();
+}
+function delDraftZone(id){ const f=dCur(); if(f){ delete f.z[id]; renderOver() } }
+function setDraftZ(id,v){ const f=dCur(); if(!f) return;
  const n=(v===''||+v<=0)?null:Math.round(+v*100)/100;
- if(n===null) delete AS.draft.z[id]; else AS.draft.z[id]=n; renderOver() }
+ if(n===null) delete f.z[id]; else f.z[id]=n; renderOver() }
 function ajouterZoneBrouillon(){
  const e=document.getElementById('draftZ'); if(!e) return;
  const id=zoneCle(e.value);
  if(!id){toast('Écrivez la zone traitée');return}
- if(Object.prototype.hasOwnProperty.call((AS.draft||{}).z||{},id)){toast('Cette zone figure déjà');e.value='';return}
+ if(Object.prototype.hasOwnProperty.call(draftZ(),id)){toast('Cette zone figure déjà');e.value='';return}
  e.value=''; draftZone(id,1);
 }
 /* ajouter une zone saisie librement à un soin déjà posé */
@@ -15207,27 +15286,34 @@ function ajouterZoneSoin(i){
    entrent ensemble dans la séance, et le composeur se vide. */
 function confirmerSoin(){
  const D=AS.draft||{};
- if(!D.t){toast('Choisissez d’abord un acte dans la liste');return false}
- const t=D.t, z={...D.z}, com=D.com||'';
- AS.draft={t:null,z:{},com:''};
- ajouterSoin(t);
- const nouv=(AS.soins||[])[AS.openSoin];
- if(nouv) nouv.com=com;
+ const L=(D.ts||[]).slice();
+ if(!L.length){toast('Choisissez d’abord un acte dans la liste');return false}
+ /* on fige ce qui a été composé AVANT de vider : chaque acte emporte ses
+    propres zones et son propre commentaire, dans l'ordre où il a été coché */
+ const fiches=L.map(t=>({t, z:{...((D.par&&D.par[t])||{}).z}, com:(((D.par&&D.par[t])||{}).com)||''}));
+ AS.draft=DRAFT0();
  AS.zs=AS.zs||{};
- Object.entries(z).forEach(([k,q])=>{ AS.zt[k]=t; if(nouv) AS.zs[k]=nouv.sid; AS.z[k]=q });
+ fiches.forEach(({t,z,com})=>{
+   ajouterSoin(t);
+   const nouv=(AS.soins||[])[AS.openSoin];
+   if(nouv) nouv.com=com;
+   Object.entries(z).forEach(([k,q])=>{ AS.zt[k]=t; if(nouv) AS.zs[k]=nouv.sid; AS.z[k]=q });
+ });
  /* Confirmer REPLIE — exactement ce que fait dvConfirmer sur un devis. Un
     soin validé n'a plus rien à demander : il devient une ligne, la liste se
     lit d'un coup d'œil, et la grille reste à portée pour le suivant. Un clic
     sur la ligne la rouvre si l'on veut l'ajuster. */
  AS.openSoin=TOUS_PLIES;
  AS.prix=null; renderOver();
- toast(acteDef(t).n+' ajouté à la séance');
+ toast(fiches.length>1
+   ? `${fiches.length} soins ajoutés à la séance — ${fiches.map(f=>acteDef(f.t).n).join(' + ')}`
+   : acteDef(fiches[0].t).n+' ajouté à la séance');
  return true;
 }
 /* ＋ Ajouter un soin : on valide ce qui est en cours, puis on rouvre la liste
    des actes pour composer le suivant. */
 function ajouterSoinCompose(){
- if((AS.draft||{}).t&&!confirmerSoin()) return;
+ if(draftActif()&&!confirmerSoin()) return;
  /* la grille ne se referme plus : il n'y a rien à rouvrir, seulement à
     remonter dessus si la liste des soins l'a poussée hors de vue */
  const e=document.getElementById('picSoins');
@@ -15240,11 +15326,11 @@ function soinsKey(e){
  const id=(e.target&&e.target.id)||'';
  if(id==='draftZ') return;
  e.preventDefault();
- if((AS.draft||{}).t) confirmerSoin();
+ if(draftActif()) confirmerSoin();
 }
 function ajouterLibreCompose(){
- const D=AS.draft||{}, com=D.com||'';
- AS.draft={t:null,z:{},com:''};
+ const f=dCur(), com=(f&&f.com)||'';
+ AS.draft=DRAFT0();
  AS.soins=AS.soins||[];
  AS.soins.push({libre:'', prix:null, q:1, com, remT:'%', sid:nouveauSid()}); AS.openSoin=AS.soins.length-1;
  AS.prix=null; renderOver();
@@ -16270,7 +16356,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='EV';
+const BUILD='EW';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
