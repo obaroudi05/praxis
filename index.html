@@ -1240,6 +1240,15 @@ tr.neuf>td{background:color-mix(in srgb,var(--accent) 9%,transparent)}
 .prot .pn{font-size:12.5px;font-weight:640}
 .prot-b{border-top:1px solid var(--line);background:var(--panel);padding:9px 10px 10px}
 .prot-b .zrow{margin-bottom:5px;padding:5px 8px}
+/* les actes que le protocole pose sans zone : un bloc à part, sous le schéma,
+   pour qu'on lise d'un coup ce qui est dessiné et ce qui ne l'est pas */
+.prot-sz{margin-top:10px;padding-top:9px;border-top:1px dashed var(--line)}
+.prot-sz-t{font-size:11.5px;font-weight:640;color:var(--ink-2);padding:0 2px 6px}
+.prot-z-t{padding-top:2px}
+.prot-sz-t .mu{font-weight:500}
+.prot-sz .addz{margin-top:6px}
+.inp.pqt{width:66px;text-align:right}
+.zrow .psq{font-size:11px;width:50px;flex:none}
 .addz{display:flex;gap:6px;align-items:center;margin-top:8px}
 .addz .inp{height:31px;font-size:12px;min-width:0}
 .addl select.inp{height:31px;font-size:12px;min-width:0}
@@ -2191,6 +2200,9 @@ body.en-connexion aside{display:none}
 /* la colonne du schéma est étroite : les raccourcis s'y logent sans la faire enfler */
 .preset{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px;flex:none}
 .preset .chip{padding:3px 8px;font-size:11px}
+/* la barre des protocoles sans zone vit sous la grille d'actes, pas sous le
+   schéma : un filet la rattache à la grille qu'elle prolonge */
+.preset.przs{margin:7px 0 0;padding-top:7px;border-top:1px dashed var(--line);width:100%}
 .schbar{row-gap:6px}
 .schbar .seg button{padding:4px 9px;font-size:11.5px}
 .schbar .chip{padding:3px 9px;font-size:11px}
@@ -2947,6 +2959,10 @@ let PROTOS=[
  {n:'Pommettes — volume + qualité de peau', z:{pomm_d:1, pomm_g:1},
   zt:{pomm_d:'AH', pomm_g:'AH'},
   zx:{pomm_d:[{t:'SKB', q:.5}], pomm_g:[{t:'SKB', q:.5}]}},
+ /* Un protocole SANS zone : deux actes qui vont ensemble, et rien à dessiner.
+    Le peeling prépare, le laser finit — on les vend groupés, au forfait. */
+ {n:'Peau neuve — peeling + photorajeunissement', z:{}, zt:{},
+  a:[{t:'PEEL', q:1}, {t:'LAS2', q:1}], prix:400},
 ];
 const protoActe=(P,z)=>(P.zt&&P.zt[z])||'AH';
 /* Actes associés à une zone — un acide hyaluronique ET un skinbooster sur la
@@ -2956,8 +2972,18 @@ const protoActe=(P,z)=>(P.zt&&P.zt[z])||'AH';
    mais tous restent attachés à la zone, qui se peint alors de leurs couleurs. */
 const protoSup=(P,z)=>((P&&P.zx&&P.zx[z])||[]);
 const protoTousSup=P=>Object.keys((P&&P.z)||{}).flatMap(z=>protoSup(P,z).map(x=>({...x, z})));
-const protoActes=P=>[...new Set(Object.keys(P.z).map(z=>protoActe(P,z))
+/* Actes sans zone — un protocole n'est pas forcément un tracé du visage.
+   « Radiesse + acide hyaluronique », « trois photorajeunissements » : ce sont
+   des associations d'actes, pas des cartes. On doit pouvoir les poser telles
+   quelles, sans désigner la moindre zone. Chacun garde sa quantité prévue et
+   rejoint la séance ou le devis comme n'importe quel autre acte. */
+const protoLibres=P=>(Array.isArray(P&&P.a)?P.a:[]);
+const protoQ=x=>Math.max(1,Math.round(+((x&&x.q)||1))||1);
+/* les actes que les zones amènent — séparés des autres parce qu'eux seuls
+   se chiffrent à l'unité : une zone de plus ne refacture pas l'acte */
+const protoActesZ=P=>[...new Set(Object.keys((P&&P.z)||{}).map(z=>protoActe(P,z))
   .concat(protoTousSup(P).map(x=>x.t)))];
+const protoActes=P=>[...new Set(protoActesZ(P).concat(protoLibres(P).map(x=>x.t)))];
 
 /* ---------- Référentiels ---------- */
 /* La liste des praticiens en exercice. Elle était figée ici, à côté des
@@ -11963,7 +11989,12 @@ V.stats=()=>{
 let protoSel=null;
 /* le tarif d'un protocole : la somme de ses actes — sauf si le cabinet en a fixé
    un, auquel cas c'est un forfait, et c'est lui qui s'impose. */
-const protoCalc=P=>prixSeance(protoActes(P),1);
+const protoCalc=P=>{
+ const zon=protoActesZ(P);
+ /* un acte déjà porté par une zone ne se compte pas une seconde fois */
+ return prixSeance(zon,1)+protoLibres(P).filter(x=>!zon.includes(x.t))
+   .reduce((s,x)=>s+(acteDef(x.t).prix||0)*protoQ(x),0);
+};
 const protoForfait=P=>!!P&&P.prix!=null&&P.prix!=='';
 const protoPrix=P=>protoForfait(P)?+P.prix:protoCalc(P);
 function setProtoPrix(i,v){ const P=PROTOS[i]; if(!P) return;
@@ -11976,13 +12007,27 @@ function setProtoPrix(i,v){ const P=PROTOS[i]; if(!P) return;
  const c=protoCalc(P);
  toast(`« ${P.n} » au forfait ${EUR(P.prix)}`+(P.prix!==c?` — au lieu de ${EUR(c)} en additionnant les actes`:''));
 }
+/* Deux barres, deux métiers.
+   Celle du schéma pose des ZONES : elle n'a rien à proposer d'un protocole
+   qui n'en porte aucune. Celle du choix d'actes pose des ACTES : c'est là que
+   « peeling + photorajeunissement » a sa place, et elle reste accessible même
+   sur le corps, sur un barème d'épilation ou sur un acte qui ne se dessine
+   pas. Chaque protocole apparaît dans une seule des deux — jamais les deux. */
+const protoAZones=x=>!!Object.keys((x&&x.z)||{}).length;
+const protoChips=(fn,zone)=>PROTOS.map((x,i)=>({x,i}))
+ .filter(o=>zone?protoAZones(o.x):(!protoAZones(o.x)&&!!protoActes(o.x).length))
+ .map(o=>`<button class="chip" onclick="${fn}(${o.i})" title="${esc(protoResume(o.x))}">${esc(o.x.n)}</button>`).join('');
 const protoResume=x=>{
- const E=Object.keys(x.z);
- if(!E.length) return 'aucune zone';
+ const E=Object.keys(x.z), LB=protoLibres(x);
+ if(!E.length&&!LB.length) return 'protocole vide — ajoutez une zone ou un acte';
  const sd=E.filter(z=>!(+x.z[z]>0)).length;
  const par=protoActes(x).map(t=>acteDef(t).n);
  const ns=protoTousSup(x).length;
- return `${E.length} zone${E.length>1?'s':''}${sd?` (dont ${sd} sans dose)`:''}${ns?` · ${ns} acte${ns>1?'s':''} associé${ns>1?'s':''}`:''} · ${par.join(' + ')} · ${EUR(protoPrix(x))}${protoForfait(x)?' forfait':''}`;
+ const tete=E.length
+  ? `${E.length} zone${E.length>1?'s':''}${sd?` (dont ${sd} sans dose)`:''}${ns?` · ${ns} acte${ns>1?'s':''} associé${ns>1?'s':''}`:''}${
+      LB.length?` · ${LB.length} acte${LB.length>1?'s':''} sans zone`:''}`
+  : `sans zone · ${LB.length} acte${LB.length>1?'s':''}`;
+ return `${tete} · ${par.join(' + ')} · ${EUR(protoPrix(x))}${protoForfait(x)?' forfait':''}`;
 };
 function zoneOptions(exclues){
  const dispo=ZONES.filter(z=>!exclues.includes(z.id));
@@ -12177,6 +12222,29 @@ function addProtoZone(i){
  PROTOS[i].zt=PROTOS[i].zt||{};
  PROTOS[i].zt[e.value]=PROTOS[i].zt[e.value]||(z.p==='tox'?'BTX':'AH');
  PROTOS[i].z[e.value]=z.d; paint(); toast(z.k+' ajoutée au protocole');
+}
+/* ---- actes sans zone ---- */
+/* Le protocole savait relier une zone à un acte. Il ne savait pas dire
+   « ces deux actes vont ensemble » sans passer par le schéma : un peeling
+   suivi d'un photorajeunissement n'a pas de zone à dessiner, et le protocole
+   refusait de se poser. Ces actes-là vivent ici. */
+function addProtoActe(i){
+ const P=PROTOS[i]; if(!P) return;
+ const e=document.getElementById('pa'+i); if(!e||!e.value){toast('Choisissez un acte');return}
+ const t=e.value; P.a=protoLibres(P).slice();
+ if(P.a.some(x=>x.t===t)){toast('Cet acte est déjà posé sans zone dans ce protocole');return}
+ P.a.push({t, q:1}); paint();
+ toast(`${acteDef(t).n} ajouté au protocole — sans zone`);
+}
+function setProtoActeQ(i,k,v){
+ const P=PROTOS[i], L=protoLibres(P); if(!L[k]) return;
+ const q=Math.round(+v||0);
+ L[k].q=q>0?q:1; paint();
+}
+function rmProtoActe(i,k){
+ const P=PROTOS[i], L=protoLibres(P); if(!L[k]) return;
+ const t=L[k].t; L.splice(k,1); P.a=L; paint();
+ toast(`${acteDef(t).n} retiré du protocole`);
 }
 function rmProto(i){
  if(PROTOS.length<2){toast('Gardez au moins un protocole');return}
@@ -12414,7 +12482,7 @@ V.params=()=>{
    <div class="grid g2 gcat" style="align-items:start">
     <div>
     <div class="card"><div class="h"><h2>Protocoles en 1 clic</h2><span class="s">${PROTOS.length}</span>
-      <div class="r"><button class="btn xs p" onclick="PROTOS.push({n:'Nouveau protocole',z:{},zt:{},zx:{},prix:null});protoSel=PROTOS.length-1;paint()">+ Protocole</button></div></div>
+      <div class="r"><button class="btn xs p" onclick="PROTOS.push({n:'Nouveau protocole',z:{},zt:{},zx:{},a:[],prix:null});protoSel=PROTOS.length-1;paint()">+ Protocole</button></div></div>
      <div class="b" style="padding:9px">
       <div class="mu" style="font-size:11.5px;margin-bottom:9px">Un protocole relie chaque zone à l'acte qu'on y pratique et à sa dose usuelle : un clic pose l'ensemble sur le schéma. Tout reste modifiable acte par acte.</div>
       ${PROTOS.map((x,i)=>`<div class="prot ${protoSel===i?'on':''}">
@@ -12439,6 +12507,7 @@ V.params=()=>{
             ? `Forfait : le protocole se pose à <b>${EUR(protoPrix(x))}</b>${protoPrix(x)!==protoCalc(x)
                 ?` au lieu de ${EUR(protoCalc(x))} en additionnant ses actes`:''}. Videz le champ pour revenir au calcul.`
             : `Tarif calculé : <b>${EUR(protoCalc(x))}</b>, somme des actes du protocole. Saisissez un montant pour en faire un forfait.`}</div>`:''}
+          <div class="prot-sz-t prot-z-t">Zones traitées</div>
           ${Object.entries(x.z).length?Object.entries(x.z).map(([z,q])=>{const Z=zoneDef(z); if(!Z) return '';
             const t=protoActe(x,z), C=acteDef(t);
             return `<div class="zrow"><span class="zd" style="background:${colActe(t)}"></span>
@@ -12466,13 +12535,29 @@ V.params=()=>{
                   ${optionsActes(null,CAN('prix'),c=>c.id!==protoActe(x,z)&&!protoSup(x,z).some(y=>y.t===c.id))}</select>
                 <button class="btn xs g" onclick="protoZS=null;paint()">Annuler</button>
                 <button class="btn xs p" onclick="addProtoSup(${i})">＋ Associer</button></div>`:''}`}).join('')
-            :'<div class="empty" style="padding:14px">Aucune zone dans ce protocole.</div>'}
+            :(protoLibres(x).length?'':'<div class="empty" style="padding:14px">Ce protocole est vide — ajoutez-lui une zone, ou un acte sans zone.</div>')}
           <div class="addz">
             <select class="inp" id="pz${i}" style="flex:1">${zoneOptions(Object.keys(x.z))}</select>
             <button class="btn xs p" onclick="addProtoZone(${i})">+ Ajouter</button>
           </div>
+          <div class="prot-sz">
+           <div class="prot-sz-t">Actes sans zone<span class="mu"> — sans passer par le schéma</span></div>
+           ${protoLibres(x).map((sp,k)=>{const SC=acteDef(sp.t);
+             return `<div class="zrow"><span class="zd" style="background:${colActe(sp.t)}"></span>
+              <div class="zn">${esc(SC.n)}</div>
+              <input class="inp pqt" type="number" min="1" step="1" value="${protoQ(sp)}"
+                title="Nombre de séances prévues pour cet acte"
+                onchange="setProtoActeQ(${i},${k},this.value)">
+              <span class="mu psq">séance${protoQ(sp)>1?'s':''}</span>
+              <button class="rm" title="Retirer cet acte du protocole" onclick="rmProtoActe(${i},${k})">✕</button></div>`}).join('')}
+           <div class="addz">
+             <select class="inp" id="pa${i}" style="flex:1">${optionsActes(null,CAN('prix'),c=>!protoLibres(x).some(y=>y.t===c.id))}</select>
+             <button class="btn xs p" onclick="addProtoActe(${i})">+ Ajouter</button>
+           </div>
+          </div>
           <div class="mu" style="font-size:11px;padding:6px 2px 0">Videz la dose pour poser la zone sans quantité — vous la doserez en séance. La croix retire la zone du protocole.
-            <b>＋</b> associe un second produit à la même zone — un acide hyaluronique et un skinbooster sur la pommette, par exemple. La zone se peint alors de leurs deux couleurs sur le schéma, et chaque produit garde sa dose, son lot et sa ligne de facture.</div>
+            <b>＋</b> associe un second produit à la même zone — un acide hyaluronique et un skinbooster sur la pommette, par exemple. La zone se peint alors de leurs deux couleurs sur le schéma, et chaque produit garde sa dose, son lot et sa ligne de facture.
+            Un protocole peut aussi n'avoir <b>aucune zone</b> : un peeling et un photorajeunissement vendus ensemble, par exemple. Il se pose alors partout, y compris sur une prestation d'épilation.</div>
           </div>`:''}
        </div>`).join('')}
      </div></div>
@@ -14210,7 +14295,7 @@ function renderOver(){
      </div>`}
     ${AS.ro||AS.reg!=='visage'?'':`<div class="preset">
       <span class="mu" style="font-size:11px;align-self:center;margin-right:2px">Protocole :</span>
-      ${PROTOS.map((x,i)=>`<button class="chip" onclick="applyProto(${i})" title="${esc(protoResume(x))}">${esc(x.n)}</button>`).join('')}
+      ${protoChips('applyProto',1)}
       <button class="chip" onclick="mirrorZ()">⇄ Symétriser</button></div>`}
     ${(()=>{const DT=draftZonesTotal(), dz=DT.z;
       const zAll={...AS.z,...dz};
@@ -14265,6 +14350,9 @@ function renderOver(){
           estBareme(AS.reg)?'':', ou cliquez une zone du schéma'}.</span></div>`}
        ${grilleActes({sel:TS, cur:D.t, prix:EUROS, pick:'picSoin',
          filtre:c=>dispo.some(d=>d.id===c.id)})}
+       ${(()=>{const CH=AS.ro?'':protoChips('applyProto',0); return CH?`<div class="preset przs">
+         <span class="mu" style="font-size:11px;align-self:center;margin-right:2px">Protocole sans zone :</span>
+         ${CH}</div>`:''})()}
        ${D.t?`
        <div class="dft">
         ${CD.zoned?`<div class="sc-lb">Zones traitées <span class="n">${DZ.length||'—'}</span>
@@ -15467,7 +15555,12 @@ function setZ(id,v){ AS.z[id]=(v===''||+v<=0)?null:Math.round(+v*100)/100; AS.pr
 const TOUS_PLIES=-1;
 function applyProto(i){
  const P=PROTOS[i];
- if(AS.reg!=='visage'){toast('Les protocoles sont définis sur le visage');return}
+ /* Un protocole sans zone n'a rien à dessiner : il se pose sur n'importe
+    quelle région, parce qu'il ne parle que d'actes. Seuls les protocoles qui
+    portent des zones exigent le visage, où leurs zones sont définies. */
+ const azones=Object.keys((P&&P.z)||{}).length;
+ if(azones&&AS.reg!=='visage'){toast('Les protocoles à zones sont définis sur le visage');return}
+ if(!protoActes(P).length){toast(`Le protocole « ${P.n} » est vide — ajoutez-lui une zone ou un acte`);return}
  Object.entries(P.z).forEach(([k,v])=>{
    const t=protoActe(P,k); AS.zs=AS.zs||{}; AS.zt[k]=t; AS.zs[k]=soinPour(t,1).sid;
    AS.z[k]=acteDef(t).unite?v:1;
@@ -15485,6 +15578,10 @@ function applyProto(i){
    if(AS.zx[o.z].some(e=>e.sid===x.sid)) return;
    AS.zx[o.z].push({sid:x.sid, q:acteDef(o.t).unite?(o.q||null):1});
  });
+ /* les actes sans zone rejoignent la séance tels quels, avec le nombre de
+    séances prévu. Ils ne sont pas « auto » : un soin auto sans zone se fait
+    ramasser au recalcul, et le protocole les perdrait en route. */
+ protoLibres(P).forEach(o=>{ const x=soinPour(o.t); x.auto=false; x.q=protoQ(o) });
  /* un protocole au forfait impose son montant ; sinon la séance additionne ses actes */
  AS.prix=protoForfait(P)?protoPrix(P):null;
  /* ------------------------------------------------------------------------
@@ -16367,7 +16464,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='EY';
+const BUILD='EZ';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -17520,13 +17617,22 @@ function dvBarGroupe(gi,poser){ dvPlie=false; const l=dvL(), B=baremeById(l&&l.r
    ligne en cours si elle est encore vide. */
 function dvProto(i){
  const P=PROTOS[i]; if(!P||!DV) return;
- const L=dvL();
- if(!L||L.reg!=='visage'||estBareme(L.reg)){toast('Les protocoles sont définis sur le visage');return}
+ const L=dvL(); if(!L) return;
+ /* Un protocole sans zone ne dessine rien : ce n'est qu'une association
+    d'actes, elle se pose sur n'importe quelle prestation — y compris une
+    épilation au barème, où un protocole à zones n'aurait aucun sens. */
+ const azones=Object.keys((P&&P.z)||{}).length;
+ if(azones&&(L.reg!=='visage'||estBareme(L.reg))){toast('Les protocoles à zones sont définis sur le visage');return}
  const T=protoActes(P);
- if(!T.length){toast(`Le protocole « ${P.n} » ne contient aucune zone`);return}
+ if(!T.length){toast(`Le protocole « ${P.n} » est vide — ajoutez-lui une zone ou un acte`);return}
+ /* les lignes d'un protocole à zones sont sur le visage ; celles d'un protocole
+    sans zone restent là où l'on travaille, sauf à tomber sur un barème qui ne
+    saurait pas afficher un acte d'esthétique */
+ const REG=(azones||estBareme(L.reg))?'visage':(L.reg||'visage');
  let cible=dvLigne;
- const SUP={};
+ const SUP={}, LIB={};
  protoTousSup(P).forEach(x=>{ (SUP[x.t]=SUP[x.t]||[]).push(zoneNom(x.z)) });
+ protoLibres(P).forEach(x=>{ LIB[x.t]=protoQ(x) });
  /* ==========================================================================
     Un forfait ne met pas zéro en face d'un acte
     --------------------------------------------------------------------------
@@ -17550,13 +17656,16 @@ function dvProto(i){
   const z={};
   Object.keys(P.z).forEach(zn=>{ if(protoActe(P,zn)===t) z[zn]=acteDef(t).unite?P.z[zn]:1 });
   /* un acte seulement associé n'a pas de zone à lui : on note où il était prévu */
-  const com=(!Object.keys(z).length&&SUP[t])?`associé à ${SUP[t].join(', ')}`:'';
+  const nue=!Object.keys(z).length;
+  const com=(nue&&SUP[t])?`associé à ${SUP[t].join(', ')}`:'';
+  /* un acte posé sans zone porte le nombre de séances prévu par le protocole */
+  const sc=(nue&&LIB[t])?LIB[t]:1;
   const cur=DV.lignes[cible];
   const vide=cur&&cur.type===null&&cur.libre==null;
-  if(k===0&&vide){ Object.assign(cur,{type:t, libre:null, reg:'visage', z, com, prix:null});
+  if(k===0&&vide){ Object.assign(cur,{type:t, libre:null, reg:REG, z, com, prix:null, seances:sc});
                    posees.push(cible) }
-  else { DV.lignes.push({type:t, libre:null, com, reg:'visage', z,
-          seances:1, prix:null, remise:0, remiseType:'%'});
+  else { DV.lignes.push({type:t, libre:null, com, reg:REG, z,
+          seances:sc, prix:null, remise:0, remiseType:'%'});
          cible=DV.lignes.length-1; posees.push(cible) }
  });
  /* --- le forfait se répartit --- */
@@ -17894,6 +18003,9 @@ function renderDevis(){
    ${LIB?`<div class="ap-libre"><span class="mu">Prestation libre — l’intitulé se saisit sur la fiche, en bas.</span>
       <button class="btn xs" onclick="dvReprendreActe(${dvLigne})">↩ Reprendre un acte du catalogue</button></div>`
     :grilleActes({sel:L.type, prix:CAN('prix'), pick:'dvSetActe'})}
+   ${(()=>{const CH=LIB?'':protoChips('dvProto',0); return CH?`<div class="preset przs">
+     <span class="mu" style="font-size:11px;align-self:center;margin-right:2px">Protocole sans zone :</span>
+     ${CH}</div>`:''})()}
   </div>
   ${C.zoned?`<div class="modebar">
     <div class="ap-t" style="width:100%;margin:0 0 2px">2 · Où ? <span class="mu" style="text-transform:none;letter-spacing:0;font-weight:500">— facultatif</span></div>
@@ -17902,7 +18014,7 @@ function renderDevis(){
     ${estBareme(L.reg)?'<span class="mu" style="font-size:11.5px">tarifs à la séance</span>':''}
     ${(estBareme(L.reg)||L.reg!=='visage')?'':`<div class="preset dvproto">
       <span class="mu" style="font-size:11px;align-self:center;margin-right:2px">Protocole :</span>
-      ${PROTOS.map((x,i)=>`<button class="chip" onclick="dvProto(${i})" title="${esc(protoResume(x))}">${esc(x.n)}</button>`).join('')}
+      ${protoChips('dvProto',1)}
       <button class="chip" onclick="dvMirror()">⇄ Symétriser</button></div>`}
     ${Object.keys(L.z).length?`<button class="chip" style="margin-left:auto" onclick="dvL().z={};renderDevis()">Effacer les zones</button>`:''}
    </div>`:''}
