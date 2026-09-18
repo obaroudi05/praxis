@@ -1419,7 +1419,15 @@ table.chrono.compact thead th{padding:7px 8px;white-space:nowrap}
 .forfc-r{flex:none;text-align:right;min-width:62px}
 .forfc-r b{display:block;font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums}
 .forfc-r small{font-size:10.5px;color:var(--ink-3)}
+/* L'argent du forfait, à côté de ses séances : même gabarit, même ligne de
+   base. Le rouge ne s'allume que sur ce qui est réellement dû — un forfait
+   soldé reste sourd, sans quoi la couleur ne voudrait plus rien dire. */
+.forfc-e{flex:none;text-align:right;min-width:78px}
+.forfc-e b{display:block;font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums}
+.forfc-e small{font-size:10.5px;color:var(--ink-3)}
+.forfc-e.du b{color:var(--crit-txt)}
 @media(max-width:900px){.forfc-j{display:none}}
+@media(max-width:700px){.forfc-e{min-width:64px}}
 /* Le détail d'un forfait : ses séances, avec leurs dates. Un compte doit se
    VÉRIFIER, pas se croire — surtout sur un soin déjà payé. */
 .forfd{margin:-3px 0 7px 11px;padding:7px 11px;border-left:2px solid var(--line-2)}
@@ -1732,6 +1740,22 @@ th.tri.on.desc::after{content:'▼'}
   background:var(--accent-wash);border:1px solid var(--accent);border-radius:11px;padding:8px;overflow:hidden}
 .cadd .inp{height:30px;background:var(--panel);min-width:0;max-width:100%}
 .cadd select.inp{text-overflow:ellipsis}
+/* Le compte du forfait, vu depuis une séance : trois lignes et un geste.
+   Il prend la place du formulaire de montant, qui est une grille à trois
+   colonnes — d'où la double classe : sans elle, le titre se retrouvait
+   comprimé dans une colonne de grille et se lisait à la verticale. */
+.cadd.forf-cadd{display:block}
+.fcf-t{font-size:12.5px;font-weight:660;margin-bottom:7px}
+.fcf-l{display:flex;align-items:baseline;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)}
+.fcf-l>span{width:92px;flex:none;font-size:11px;color:var(--ink-3)}
+.fcf-l>b{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;min-width:62px;flex:none}
+.fcf-l>small{font-size:11px;color:var(--ink-3);min-width:0;flex:1;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.fcf-l.du>b{color:var(--crit-txt)}
+.fcf-b{display:flex;flex-wrap:wrap;gap:6px;margin:9px 0 6px}
+.fcf-s{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:6px;
+  margin-top:8px;padding-top:9px;border-top:1px dashed var(--line)}
+.fcf-s .inp{height:30px;background:var(--panel);min-width:0;max-width:100%}
 /* catalogue produit rangé par famille et sous-famille */
 .cpick{background:var(--accent-wash);border:1px solid var(--accent);border-radius:11px;
   padding:7px;margin-bottom:7px;overflow:hidden}
@@ -3912,7 +3936,8 @@ function bdgSeance(a){
  const t=`Forfait « ${f.nom} » vendu le ${DF(f.date)} — ${f.n} séances`
    +(f.montant?` pour ${EUR(f.montant)}, soit ${EUR(f.pu)} la séance`:'')
    +`\n${f.faites} faite${f.faites>1?'s':''}, ${f.reste} à venir`
-   +`\nDevis ${f.devis}`;
+   +(CAN('prix')?`\n${forfArgentTxt(f)}`:'')
+   +(f.devis?`\nDevis ${f.devis}`:'\nOuvert au comptoir');
  return `<span class="sean" title="${esc(t)}">séance <b>${r.rang}/${r.n}</b></span>`;
 }
 /* Amorce : les séances déjà faites se rangent sous le forfait qui les a
@@ -3971,8 +3996,12 @@ const SD={brouillon:['Brouillon','b-neu'],envoye:['Envoyé','b-info'],relance1:[
    ce qu'il reste à facturer, et de quoi le convertir d'un geste. */
 const facturesDuDevis=d=>{ if(!d) return [];
  const a=d.realise?d.realise:null;
+ /* Un devis qui vend un forfait est soldé par la facture DU FORFAIT. Sans ce
+    lien, le devis réclamait éternellement ses 720 € « à facturer » alors que
+    la facture était émise, encaissée, et rangée sous le forfait. */
+ const FF=FORFAITS.filter(x=>x.devis===d.id).map(x=>x.id);
  return FACTURES.filter(f=>f.statut!=='annulee'
-   && (f.devis===d.id || (a!=null&&f.acte===a)));
+   && (f.devis===d.id || (a!=null&&f.acte===a) || (f.forfait&&FF.indexOf(f.forfait)>=0)));
 };
 const devFacture=d=>facturesDuDevis(d).reduce((s,f)=>s+fTTC(f),0);
 /* Ce qu'il reste à facturer sur un devis accepté. On ne compte QUE les devis
@@ -4158,6 +4187,107 @@ const factEvt=f=>!f?null
  :{t:f.regle||f.date, verbe:'Soldée'};
 const sousFacture=f=>{const x=factEvt(f); return x?ligneStatut(x.t,{verbe:x.verbe}):''};
 const fTTC=f=>f.statut==='annulee'?0:f.montant-f.avoir;
+/* ==========================================================================
+   L'argent d'un forfait
+   --------------------------------------------------------------------------
+   Un forfait se paie UNE FOIS, à la vente ; ses séances se déroulent ensuite,
+   au rythme du patient. Le logiciel faisait l'inverse : chaque séance
+   proposait son tarif et produisait sa facture. Un forfait de 720 € vendu,
+   deux séances faites, affichait donc 240 € encaissés en deux factures ET
+   720 € encore « à facturer » sur le devis : le même argent compté deux fois,
+   dans les deux sens à la fois. Au comptoir, c'est la dispute assurée.
+
+   Le forfait est donc l'unité de compte. Une facture s'y rattache par
+   f.forfait ; ce qui n'est pas encore facturé et ce qui est facturé sans être
+   réglé s'additionnent pour faire le montant restant à payer. Quelqu'un qui
+   n'a versé qu'un tiers de son forfait doit les deux autres tiers — et cela
+   se lit sur le forfait, pas sur la séance du jour, qui ne doit rien.
+   ========================================================================== */
+const facturesForf=id=>id?FACTURES.filter(f=>f.forfait===id&&f.statut!=='annulee'):[];
+function forfArgent(F){
+ const f=(typeof F==='string')?forfaitParClef(F):F;
+ if(!f) return {montant:0, fact:0, aFact:0, du:0, reste:0, factures:[], soldee:false, couvert:false};
+ const L=facturesForf(f.id);
+ const m=+f.montant||0;
+ if(!L.length&&f.devis){
+  /* Le forfait n'a pas de facture à lui, mais le devis qui l'a vendu est
+     intégralement facturé — c'est la même vente, et une facture globale de
+     devis couvre ce qu'elle contient. Continuer à réclamer le forfait ici
+     reviendrait à facturer deux fois. Ce qui reste à ENCAISSER sur cette
+     facture est une question de devis, et se lit sur la ligne du devis. */
+  const d=DEVIS.find(x=>x.id===f.devis);
+  const G=d?facturesDuDevis(d):[];
+  if(d&&d.statut==='accepte'&&G.length&&devAFacturer(d)<=0)
+    return {montant:m, fact:m, aFact:0, du:0, reste:0, factures:G, soldee:true, couvert:true};
+ }
+ const fact=L.reduce((s,x)=>s+fTTC(x),0);
+ const aFact=Math.max(0, Math.round(m-fact));
+ const du=L.reduce((s,x)=>s+rdu(x),0);
+ return {montant:m, fact, aFact, du, reste:aFact+du,
+   factures:L, soldee:!aFact&&!du&&L.length>0, couvert:false};
+}
+/* ce qu'on dit d'un forfait en une phrase, du point de vue de la caisse */
+function forfArgentTxt(f){
+ const F=(typeof f==='string')?forfaitParClef(f):f;
+ const M=forfArgent(F);
+ if(!M.montant) return 'Forfait sans montant';
+ if(M.couvert) return `Forfait de ${EUR(M.montant)} — couvert par la facture du devis ${(F&&F.devis)||''}`.trim();
+ if(M.soldee) return `Forfait de ${EUR(M.montant)} — facturé et soldé`;
+ if(!M.factures.length) return `Forfait de ${EUR(M.montant)} — pas encore facturé`;
+ if(M.aFact&&M.du) return `${EUR(M.fact)} facturés dont ${EUR(M.du)} non réglés · ${EUR(M.aFact)} restent à facturer`;
+ if(M.aFact) return `${EUR(M.fact)} facturés et réglés · ${EUR(M.aFact)} restent à facturer`;
+ return `Forfait de ${EUR(M.montant)} facturé — ${EUR(M.du)} restent à payer`;
+}
+/* les forfaits d'un patient qui doivent encore de l'argent — hors devis, dont
+   la créance est déjà comptée sur la ligne du devis */
+const forfaitsAFacturer=pid=>forfaitsDe(pid).filter(f=>!f.devis&&forfArgent(f).aFact>0);
+/* --------------------------------------------------------------------------
+   Reprise du jeu de démonstration : un forfait, une facture
+   --------------------------------------------------------------------------
+   Les factures de la démo ont été tirées séance par séance, avant que le
+   forfait existe. On les remplace par la pièce qui correspond à ce qui s'est
+   réellement passé au comptoir : une facture unique, à la vente, pour tout le
+   forfait — réglée d'un coup, échelonnée, ou pas encore émise.
+   Un jeu de démonstration qui se contredit fait douter du logiciel avant de
+   faire douter de lui-même.
+   -------------------------------------------------------------------------- */
+(function(){
+ const jPlus=(d,n)=>{const t=new Date(new Date(d).getTime()+n*864e5).toISOString().slice(0,10);
+   return t>TODAYS?TODAYS:t};
+ let k=0;
+ FORFAITS.slice().forEach(F=>{
+  const I=forfaitInfo(F); if(!I||!I.montant) return;
+  /* les factures émises séance par séance disparaissent : elles n'auraient
+     jamais dû exister, et elles comptaient l'argent une seconde fois */
+  I.seances.forEach(a=>{ for(let i=FACTURES.length-1;i>=0;i--)
+    if(FACTURES[i].acte===a.id) FACTURES.splice(i,1) });
+  if(!I.seances.length) return;          /* vendu, pas commencé : rien à reprendre */
+  const cas=(k++)%4;
+  if(cas===3) return;                    /* vendu, pas encore facturé : il reste à le faire */
+  const m=I.montant, date=jPlus(I.date,0);
+  const prat=(I.seances[0]&&I.seances[0].praticien)||PRATICIENS[0];
+  /* cas 1 : le règlement en trois fois, dont une seule échéance versée —
+     les deux tiers restants doivent se lire, et se lire en rouge */
+  const frac=cas===1?3:0;
+  const paye=cas===2?0:(frac?Math.round(m/frac):m);
+  FACTURES.push({id:'F-'+(2900+k), patient:I.patient, acte:null, forfait:I.id,
+    devis:I.devis||null, libelle:`${I.nom} — forfait ${I.n} séances`,
+    date, montant:m, paye, regle:paye>0?date:null, annule:null,
+    moyen:paye>0?MOYENS[k%4]:null, plan:frac?{n:frac,faites:1}:null,
+    praticien:prat, cat:'Forfait', type:I.t||null, statut:'ok', avoir:0});
+ });
+ /* Un forfait vendu au comptoir, sans devis : c'est le cas qui n'avait aucune
+    porte vers la caisse. La démo en porte un, non facturé. */
+ const CURE={LAS2:[3,780], RF:[4,800], PEEL:[3,420], MESO:[3,480]};
+ const cand=ACTES.filter(a=>!a.forfait&&CURE[a.type]&&!FACTURES.some(f=>f.acte===a.id))
+   .sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0];
+ if(cand){
+  const [n,montant]=CURE[cand.type];
+  const f=creerForfait({patient:cand.patient, t:cand.type, nom:acteDef(cand.type).n,
+    n, montant, date:cand.date, note:'vendu au comptoir'});
+  cand.forfait=f.id;
+ }
+})();
 const fHT =f=>Math.round(fTTC(f)/(1+tauxTVA(f.type)/100)*100)/100;
 const fTVA=f=>Math.round((fTTC(f)-fHT(f))*100)/100;
 const partPrat=f=>Math.round(fTTC(f)*tauxRetro(f.praticien,f.type)/100);
@@ -8343,7 +8473,7 @@ function ouvrirFactNew(pid,pre){
  if(!ROLES[role].prix){ toast('Les montants ne sont pas accessibles à ce rôle'); return }
  avoirNew=null;
  factNew={pid, acte:'', libelle:'', date:TODAYS, montant:'', type:'', prat:PRATICIENS[0], moyen:'', frac:1,
-   ...(pre||{})};
+   forfait:null, devis:null, ...(pre||{})};
  paint();
  /* préremplie, on n'a plus rien à saisir : le curseur va où la décision reste
     à prendre — le moyen de paiement. Sinon il s'assoit sur un montant juste. */
@@ -8365,14 +8495,53 @@ function devisEnFacture(id){
  const reste=devAFacturer(d);
  if(reste<=0){ toast(`${d.id} est déjà facturé — ${EUR(devFacture(d))}`); return }
  const a=d.realise?ACTES.find(x=>x.id===d.realise):null;
+ /* Quand le devis ne vend QUE ce forfait, sa facture est celle du forfait :
+    on la rattache, et les deux comptes disent dès lors la même chose. Sur un
+    devis qui mélange un forfait et d'autres prestations, on ne devine pas
+    quelle part couvre quoi — le forfait se lit alors « couvert par le devis ». */
+ const FU=FORFAITS.filter(x=>x.devis===d.id);
+ const fseul=(FU.length===1&&Math.round(+FU[0].montant||0)===Math.round(+d.montant||0))?FU[0].id:null;
  pView='liste'; pSel=d.patient; pTab='factu'; go('patients');
- ouvrirFactNew(d.patient, {acte:a?String(a.id):'', devis:d.id,
+ ouvrirFactNew(d.patient, {acte:a?String(a.id):'', devis:d.id, forfait:fseul,
    libelle:a?'':((d.lignes||[]).map(l=>l[1]).filter(Boolean).join(' · ')||nomDevis(d)),
    montant:String(reste),
    type:a?a.type:((d.prest&&d.prest[0]&&d.prest[0].type)||''),
    prat:d.praticien||(a?a.praticien:PRATICIENS[0])});
  toast(`Facture préparée d'après ${d.id} — ${EUR(reste)}`
    +(devFacture(d)?` (solde : ${EUR(devFacture(d))} déjà facturé)`:''));
+}
+/* ==========================================================================
+   Facturer un forfait — une fois, pour l'ensemble
+   --------------------------------------------------------------------------
+   C'est le geste qui manquait. Un forfait vendu au comptoir n'avait aucune
+   porte vers la caisse : il fallait facturer séance par séance, ce qui est
+   précisément ce qu'un forfait n'est pas. On émet donc UNE facture, du
+   montant du forfait, réglable en une fois ou en plusieurs échéances — et ce
+   qui n'est pas versé reste dû sur le forfait, pas sur la prochaine séance.
+   ========================================================================== */
+function forfaitEnFacture(id){
+ if(!ROLES[role].prix){ toast('Les montants ne sont pas accessibles à ce rôle'); return }
+ const f=forfaitParClef(id); if(!f){ toast('Forfait introuvable'); return }
+ const M=forfArgent(f);
+ if(M.aFact<=0){ toast(M.montant?`« ${f.nom} » est déjà facturé — ${EUR(M.fact)}`
+   :'Ce forfait ne porte aucun montant'); return }
+ const prat=(f.seances[0]&&f.seances[0].praticien)
+   ||(f.devis&&(DEVIS.find(x=>x.id===f.devis)||{}).praticien)||PRATICIENS[0];
+ pView='liste'; pSel=f.patient; pTab='factu'; go('patients');
+ ouvrirFactNew(f.patient, {acte:'', forfait:f.id, devis:f.devis||null,
+   libelle:`${f.nom} — forfait ${f.n} séances`,
+   montant:String(M.aFact), type:f.t||'', prat});
+ toast(`Facture préparée pour le forfait « ${f.nom} » — ${EUR(M.aFact)}`
+   +(M.fact?` (${EUR(M.fact)} déjà facturé)`:''));
+}
+/* le bouton, partout où un forfait se montre */
+function btnFacturerForfait(f,gros){
+ if(!CAN('prix')||!f) return '';
+ const M=forfArgent(f); if(M.aFact<=0) return '';
+ return `<button class="btn ${gros?'':'xs '}p" title="${esc(`Établir la facture du forfait — ${EUR(M.aFact)}`
+   +(M.fact?` (${EUR(M.fact)} déjà facturé)`:'')+'. Un forfait se règle en une fois, ou en plusieurs échéances.')}"
+   onclick="event.stopPropagation();forfaitEnFacture('${esc(f.id)}')"
+   >€ ${gros?'Facturer le forfait':(M.fact?'Facturer le reste':'Facturer')}</button>`;
 }
 const fermerFactNew=()=>{ factNew=null; paint() };
 function fnMaj(k,v){ if(!factNew) return; factNew[k]=v;
@@ -8393,8 +8562,9 @@ function creerFacture(){
  const id=numFact();
  FACTURES.unshift({id, patient:p.id, acte:a?a.id:null, libelle:a?'':lib,
    /* d'où elle vient : c'est ce lien qui permet de savoir qu'un devis est soldé,
-      même quand aucun acte n'a encore été saisi */
-   devis:factNew.devis||null,
+      même quand aucun acte n'a encore été saisi — et, pour un forfait, que ses
+      séances sont payées d'avance et n'ont plus rien à réclamer */
+   devis:factNew.devis||null, forfait:factNew.forfait||null,
    date:factNew.date, montant:m,
    paye:factNew.moyen?(frac?Math.round(m/frac):m):0, moyen:factNew.moyen||null,
    plan:frac?{n:frac,faites:1}:null,
@@ -8734,6 +8904,15 @@ function pDetail(p){
         <div class="forfc-j" title="${esc(f.faites+' séance'+(f.faites>1?'s':'')+' sur '+f.n)}"><div class="forfc-b" style="width:${Math.round(f.faites/f.n*100)}%"></div></div>
         <div class="forfc-r"><b>${f.faites}/${f.n}</b>
           <small>${f.reste} à venir</small></div>
+        ${CAN('prix')?(()=>{const M=forfArgent(f);
+          /* « Combien reste-t-il à payer ? » se pose au même comptoir et dans la
+             même phrase que « combien reste-t-il de séances ? » — les deux
+             comptes vivent donc côte à côte, et le rouge ne s'allume que sur de
+             l'argent réellement dû. */
+          return `<div class="forfc-e ${M.reste?'du':''}" title="${esc(forfArgentTxt(f))}">
+            <b>${M.reste?EUR(M.reste):(M.montant?EUR(M.montant):'—')}</b>
+            <small>${M.reste?(M.aFact&&!M.du?'à facturer':'reste à payer'):(M.factures.length?'soldé':'vendu')}</small></div>`})():''}
+        ${btnFacturerForfait(f)}
         ${f.devis?`<button class="btn xs" onclick="go('devis','${esc(f.devis)}')" title="Voir le devis qui l’a vendu">◫</button>`:''}
         <button class="btn xs" onclick="FORF_VU=(FORF_VU==='${esc(f.id)}'?null:'${esc(f.id)}');paint()"
           title="Voir les séances qui décomptent ce forfait">${FORF_VU===f.id?'▾':'›'}</button>
@@ -9297,12 +9476,21 @@ function pDetail(p){
      ${kpi('Total facturé',EUR(ca),`${F.filter(x=>x.statut==='ok').length} facture(s)`)}
      ${kpi('Reste dû',EUR(rd),rd?F.filter(f=>rdu(f)>0).length+' facture(s)':'tout est soldé',rd?'dn':'up')}
      ${(()=>{ const AF=devisAFacturer(p.id);
-        const m=AF.reduce((s2,d)=>s2+devCreance(d),0);
+        /* Un forfait vendu au comptoir n'a pas de devis derrière lui : personne
+           ne comptait son argent. Il entre ici — et seulement lui : un forfait
+           né d'un devis est déjà compté sur la ligne de ce devis, le compter
+           deux fois annoncerait au cabinet un argent qu'il n'a pas gagné. */
+        const FA=forfaitsAFacturer(p.id);
+        const m=AF.reduce((s2,d)=>s2+devCreance(d),0)
+               +FA.reduce((s2,f)=>s2+forfArgent(f).aFact,0);
+        const n=AF.length+FA.length;
         /* À facturer prend la place des devis en attente quand il y en a : un
            soin délivré et non facturé passe avant une proposition qui dort. */
-        return AF.length
+        return n
           ? kpi('À facturer',EUR(m),
-              `${AF.length} devis accepté${AF.length>1?'s':''} · soin ${AF.some(d=>d.realise)?'délivré':'à venir'}`,'dn')
+              FA.length&&!AF.length
+                ? `${FA.length} forfait${FA.length>1?'s':''} ouvert${FA.length>1?'s':''} au comptoir`
+                : `${AF.length} devis accepté${AF.length>1?'s':''}${FA.length?` · ${FA.length} forfait${FA.length>1?'s':''}`:''} · soin ${AF.some(d=>d.realise)?'délivré':'à venir'}`,'dn')
           : kpi('Devis en attente',EUR(enAttente.reduce((s2,d)=>s2+d.montant,0)),`${enAttente.length} devis`) })()}
      ${(()=>{const AV=AVOIRS.filter(a=>a.patient===p.id);
        return kpi('Avoirs',AV.length?EUR(AV.reduce((s2,a)=>s2+a.montant,0)):'—',
@@ -9340,6 +9528,36 @@ function pDetail(p){
         <button class="btn xs" onclick="event.stopPropagation();apercuDevis('${d.id}')">PDF</button></td></tr>`).join('')}
     </tbody></table>${D.length?'':'<div class="empty">Aucun devis.</div>'}</div>
 
+   ${(()=>{ const FL=forfaitsDe(p.id); if(!FL.length) return '';
+     /* « Combien reste-t-il à payer sur son forfait ? » doit se lire ici, dans
+        la même colonne et au même endroit que pour un devis ou une facture —
+        sans quoi un forfait vendu au comptoir n'apparaît nulle part dans les
+        comptes du patient, et personne ne réclame jamais les deux tiers. */
+     return `<div class="subh"><h3>Forfaits<span>${FL.length}</span></h3>
+       <div class="r"><button class="btn xs" onclick="ouvrirForfait(${p.id})">◉ Ouvrir un forfait</button></div></div>
+      ${(FRF&&FRF.pid===p.id)?formForfait(p):''}
+      <div class="tw"><table><thead><tr><th>Forfait</th><th style="width:106px">Vendu le</th>
+        <th style="width:96px">Séances</th><th class="num" style="width:96px">Montant</th>
+        <th class="num" style="width:96px">Facturé</th>
+        <th class="num ct-r" style="width:104px" title="Ce que le forfait laisse à encaisser — non facturé, ou facturé et non réglé">Reste dû</th>
+        <th style="width:150px"></th></tr></thead>
+       <tbody>${FL.map(f=>{const M=forfArgent(f);
+        return `<tr><td><b>${esc(f.nom)}</b><div class="mu" style="font-size:11.5px">${
+           f.devis?`devis ${esc(f.devis)}`:'vendu au comptoir'}${
+           M.factures.length?` · ${M.factures.map(x=>esc(x.id)).join(' · ')}`:''}</div></td>
+         <td class="mono nw">${DF(f.date)}</td>
+         <td><span class="sean">${f.faites}<b>/${f.n}</b></span></td>
+         <td class="num">${EUR(f.montant)}</td>
+         <td class="num">${M.fact?EUR(M.fact):'<span class="mu">—</span>'}</td>
+         <td class="num ct-r">${M.reste
+           ? `<span class="rst" title="${esc(forfArgentTxt(f))}"><b>${EUR(M.reste)}</b>${
+               M.aFact?'<i>à facturer</i>':''}</span>`
+           : '<span class="mu">—</span>'}</td>
+         <td class="num nw">${btnFacturerForfait(f)}${
+           f.devis?`<button class="btn xs" onclick="go('devis','${esc(f.devis)}')">Devis</button>`:''}</td></tr>`}).join('')}
+       </tbody></table></div>
+      <div class="mu" style="font-size:11.5px;margin-top:8px">Un forfait se facture une fois, pour l’ensemble ; ses séances se déroulent ensuite sans rien à encaisser. Ce qui n’a pas été versé reste dû ici, pas sur la prochaine séance.</div>` })()}
+
    <div class="subh"><h3>Factures<span>${F.length}</span></h3>
      <div class="r"><button class="btn xs ${avoirNew&&avoirNew.pid===p.id?'g':''}"
         onclick="${avoirNew&&avoirNew.pid===p.id?'fermerAvoirNew()':`ouvrirAvoirNew(${p.id})`}">↩ Établir un avoir</button>
@@ -9369,7 +9587,13 @@ function pDetail(p){
       const nAv=avoirsDe(f.id).length;
       return `<tr class="${an?'annul':''}">
       <td class="mono nw">${f.id}</td><td class="mono nw" title="${DF(f.date)}">${DFP(f.date)}</td>
-      <td class="el" style="max-width:150px" title="${esc(nom)}${act?'':' — facture sans acte'}${f.avoir?' · avoir '+EUR(f.avoir):''}">${esc(nom)}${act?'':'<div class="mu" style="font-size:10.5px">sans acte</div>'}${
+      <td class="el" style="max-width:150px" title="${esc(nom)}${(()=>{const FO=f.forfait?forfaitParClef(f.forfait):null;
+        return FO?` — forfait de ${FO.n} séances, ${FO.faites} faite${FO.faites>1?'s':''}`:(act?'':' — facture sans acte')})()}${f.avoir?' · avoir '+EUR(f.avoir):''}">${esc(nom)}${
+        (()=>{const FO=f.forfait?forfaitParClef(f.forfait):null;
+         /* « sans acte » dirait faux sur la facture d'un forfait : elle en couvre
+            plusieurs, c'est tout son objet. On dit lequel, et où il en est. */
+         return FO?`<div class="mu" style="font-size:10.5px">◉ forfait ${FO.faites}/${FO.n}</div>`
+           :(act?'':'<div class="mu" style="font-size:10.5px">sans acte</div>')})()}${
         f.avoir?`<div class="favoir" title="${nAv>1?nAv+' avoirs sur cette facture':'Avoir déduit du montant TTC'}">↩ avoir ${EUR(f.avoir)}${nAv>1?` · ${nAv}`:''}</div>`:''}</td>
       <td class="mu el" style="max-width:96px" title="${esc(f.praticien||'—')}">${esc(f.praticien||'—')}</td>
       <td class="num nw"><b>${EUR(fTTC(f))}</b></td>
@@ -15149,7 +15373,16 @@ const zonesDuSoin=x=>{ if(!x||!AS||!AS.z) return [];
    historique du jeu de démonstration. `null` = acte non facturé. */
 function montantActe(a){ if(!a) return null;
  const F=FACTURES.filter(f=>f.acte===a.id&&f.statut!=='annulee');
- if(F.length) return F.reduce((s2,f)=>s2+fTTC(f),0);
+ const propre=F.reduce((s2,f)=>s2+fTTC(f),0);
+ /* Une séance de forfait n'a pas de facture à elle : le forfait a été facturé
+    une fois, pour l'ensemble. Elle n'en vaut pas zéro pour autant — elle vaut
+    sa part, et c'est ce qui permet aux statistiques d'activité de continuer à
+    dire la vérité sur ce que produit une journée de laser. Ce qu'on lui a
+    facturé en supplément s'y ajoute : c'est de l'argent en plus, pas à la
+    place. */
+ const f=a.forfait?forfaitParClef(a.forfait):null;
+ if(f) return f.pu+propre;
+ if(F.length) return propre;
  return a.prix!=null?a.prix:null }
 const montantTxt=a=>{const m=montantActe(a); return m==null?'<span class="mu">—</span>':EUR(m)};
 /* --------------------------------------------------------------------------
@@ -15170,14 +15403,21 @@ const montantTxt=a=>{const m=montantActe(a); return m==null?'<span class="mu">�
    au patient de l'argent qu'on a décidé de ne pas lui demander.
    -------------------------------------------------------------------------- */
 function resteActe(a){
- if(!a) return {du:0, afact:0, total:0};
+ if(!a) return {du:0, afact:0, total:0, forf:null};
  const du=FACTURES.filter(f=>f.acte===a.id).reduce((s2,f)=>s2+rdu(f),0);
+ /* Une séance comprise dans un forfait ne doit rien à elle seule. Le forfait
+    a été vendu pour l'ensemble et c'est LUI qui porte ce qu'il reste à payer :
+    réclamer en plus à chaque séance, c'est réclamer deux fois. Une facture
+    émise directement sur la séance — un supplément hors forfait — continue,
+    elle, de compter : elle existe, elle a été remise au patient. */
+ const forf=a.forfait?forfaitParClef(a.forfait):null;
+ if(forf) return {du, afact:0, total:du, forf};
  /* le devis que cette séance a réalisé : ce qu'il reste à en facturer n'est
     compté qu'au sens de la créance — un accord ancien jamais réalisé n'est
     pas de l'argent dû (voir devCreance) */
  const d=DEVIS.find(x=>x.realise===a.id);
  const afact=d?devCreance(d):0;
- return {du, afact, total:du+afact};
+ return {du, afact, total:du+afact, forf:null};
 }
 const resteTitre=R=>R.du&&R.afact
    ? `${EUR(R.du)} facturés et non réglés · ${EUR(R.afact)} pas encore facturés`
@@ -15188,6 +15428,12 @@ const resteTitre=R=>R.du&&R.afact
    quand elle ne l'est pas. Elle ne s'allume donc que sur un montant réel. */
 function celluleReste(a){
  const R=resteActe(a);
+ /* Un tiret dirait « rien à encaisser » et laisserait croire à une gratuité.
+    Une séance de forfait, elle, est PAYÉE D'AVANCE — ou due sur le forfait.
+    Le mot le dit, l'infobulle donne le compte. */
+ if(R.forf&&!R.total){ const M=forfArgent(R.forf);
+   return `<span class="mu nw" title="${esc(`${(seanceTxt(a)||'Séance').replace(/^s/,'S')} du forfait « ${R.forf.nom} » — ${forfArgentTxt(R.forf)}`)}">${
+     M.reste?'◉ forfait':'forfait'}</span>` }
  if(!R.total) return '<span class="mu">—</span>';
  return `<span class="rst" title="${esc(resteTitre(R))}"><b>${EUR(R.total)}</b>${
    R.afact?'<i>à facturer</i>':''}</span>`;
@@ -16366,7 +16612,7 @@ function secFichiers(a){
 
 /* ---------------- Facturer l'acte ---------------- */
 let fcMoyen='', fcFrac=1, fcMontant=null;
-function toggleFact(){ factAdd=!factAdd; fcMoyen=''; fcFrac=1; fcMontant=null; renderOver() }
+function toggleFact(){ factAdd=!factAdd; fcMoyen=''; fcFrac=1; fcMontant=null; forfSupp=false; renderOver() }
 function facturerActe(aid){
  const a=ACTES.find(x=>x.id===aid); if(!a) return;
  const m=Math.max(0,+((document.getElementById('fcM')||{}).value)||0);
@@ -16383,10 +16629,12 @@ function facturerActe(aid){
    praticien:a.praticien,cat:a.cat,type:a.type,statut:'ok',avoir:0});
  const F=FACTURES[0];
  logDoc(id,`Facture émise — ${EUR(m)}${moyen?' · '+moyenTxt(F):''}`);
- factAdd=false; fcMoyen=''; fcFrac=1; fcMontant=null;
- toast(`Facture ${id} · ${EUR(m)}${moyen?(frac?` · 1ʳᵉ échéance de ${EUR(F.paye)} encaissée`:' encaissée'):' à encaisser'}`);
+ factAdd=false; fcMoyen=''; fcFrac=1; fcMontant=null; forfSupp=false;
+ toast(`Facture ${id} · ${EUR(m)}${a.forfait?' · supplément hors forfait':''}${
+   moyen?(frac?` · 1ʳᵉ échéance de ${EUR(F.paye)} encaissée`:' encaissée'):' à encaisser'}`);
  renderOver();
 }
+let forfSupp=false;   /* le formulaire de supplément hors forfait, quand il est ouvert */
 /* on retient ce qui est saisi : le formulaire se redessine à chaque choix pour
    chiffrer les échéances, il ne doit rien perdre au passage */
 function fcMaj(){
@@ -16409,7 +16657,42 @@ function secDocuments(a){
     ${CAN('prix')?`<button class="btn xs ${factAdd?'g':''}" onclick="toggleFact()">${factAdd?'✕':'€ Facturer'}</button>`:''}
     <button class="btn xs" onclick="toggleDocAdd()">${docAdd?'✕':'+ Doc.'}</button>
     ${nEnv?`<button class="btn xs p" onclick="sendAllDocs(${a.id})">✉ Tout envoyer · ${nEnv}</button>`:''}</div></div>
-  ${(factAdd&&CAN('prix'))?(()=>{const m=montantActe(a);
+  ${(factAdd&&CAN('prix'))?(()=>{
+    /* --------------------------------------------------------------------
+       Une séance de forfait ne se facture pas
+       --------------------------------------------------------------------
+       Proposer ici le tarif du catalogue, c'était inviter à encaisser une
+       deuxième fois un soin déjà vendu. On montre donc le compte du forfait,
+       et le seul geste qui ait un sens : facturer le forfait, une fois.
+       La porte reste ouverte pour un supplément hors forfait — une zone en
+       plus, un produit qui n'était pas dans la vente — mais il faut le
+       vouloir, et ça se dit. */
+    const FS=a.forfait?forfaitParClef(a.forfait):null;
+    if(FS){ const M=forfArgent(FS), r=rangSeance(a);
+     return `<div class="cadd forf-cadd">
+      <div class="fcf-t">◉ ${esc(r?`Séance ${r.rang}/${r.n}`:'Séance')} du forfait « ${esc(FS.nom)} »</div>
+      <div class="fcf-l"><span>Vendu</span><b>${EUR(M.montant)}</b><small>${DF(FS.date)}${
+        FS.devis?` · devis ${esc(FS.devis)}`:' · au comptoir'}</small></div>
+      <div class="fcf-l"><span>Facturé</span><b>${M.fact?EUR(M.fact):'—'}</b><small>${
+        M.factures.length?M.factures.map(x=>esc(x.id)).join(' · '):'aucune facture émise'}</small></div>
+      <div class="fcf-l ${M.reste?'du':''}"><span>Reste à payer</span><b>${M.reste?EUR(M.reste):'—'}</b><small>${
+        M.reste?esc(forfArgentTxt(FS)):'forfait soldé'}</small></div>
+      <div class="fcf-b">${btnFacturerForfait(FS,1)}
+        <button class="btn xs" onclick="forfSupp=!forfSupp;renderOver()">${
+          forfSupp?'✕ Annuler':'⊕ Supplément hors forfait'}</button></div>
+      <div class="mu" style="font-size:11px">Un forfait se facture une fois, pour l'ensemble ; ses séances se déroulent ensuite sans rien à encaisser. Ce qui n'a pas été versé reste dû sur le forfait.</div>
+      ${forfSupp?`<div class="fcf-s">
+        <input class="inp" id="fcM" type="number" min="0" step="10" placeholder="montant TTC du supplément"
+          value="${fcMontant!=null?fcMontant:''}" onchange="fcMaj()">
+        <select class="inp" id="fcP" onchange="fcMaj()"><option value="">à encaisser plus tard</option>${MOYENS.map(x=>`<option ${fcMoyen===x?'selected':''}>${x}</option>`).join('')}</select>
+        <button class="btn xs p" onclick="facturerActe(${a.id})">Émettre</button>
+        <select class="inp" id="fcN" style="grid-column:1/-1" onchange="fcMaj()" ${fcMoyen?'':'disabled'}>
+          <option value="1">Réglé en une fois</option>
+          ${FRACTIONS.map(n=>`<option value="${n}" ${fcFrac==n?'selected':''}>Paiement en ${n} fois</option>`).join('')}</select>
+        <div class="mu" style="font-size:11px;grid-column:1/-1">Une facture propre à cette séance, en plus du forfait : une zone traitée en supplément, un produit qui n'était pas dans la vente.</div>
+      </div>`:''}
+     </div>` }
+    const m=montantActe(a);
     /* un devis réalisé engage son prix : c'est lui qu'on propose en premier */
     const prop=(()=>{ if(m!=null) return m;
       const dv=DEVIS.find(x=>x.realise===a.id)||(a.devis?DEVIS.find(x=>x.id===a.devis):null);
@@ -16464,7 +16747,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='EZ';
+const BUILD='FA';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
