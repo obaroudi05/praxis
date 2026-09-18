@@ -378,10 +378,8 @@ select.inp{padding-right:26px;-webkit-appearance:none;appearance:none;
 .annul{opacity:.55}
 .annul td{text-decoration:line-through;text-decoration-color:var(--line-2)}
 .annul td:last-child{text-decoration:none}
-.tvag{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}
-.tvag label{font-size:11.5px;color:var(--ink-2);display:flex;align-items:center;justify-content:space-between;gap:8px;
-  border:1px solid var(--line);border-radius:9px;padding:5px 9px;background:var(--panel-2)}
-.tvag .inp{height:28px}
+.tvaf-r{display:flex;gap:11px;align-items:flex-start}
+.tvaf-t{font-size:11.5px;line-height:1.45;flex:1;min-width:0}
 .dvp{border:1px solid var(--accent);border-radius:var(--r-m);background:var(--accent-wash);padding:10px;
   display:flex;flex-direction:column;max-height:100%;min-height:0}
 .dvp-h{display:flex;align-items:center;gap:7px;font-size:12.5px;margin-bottom:7px;flex:none}
@@ -4095,10 +4093,43 @@ let FACTU={
     { praticien : { acte : % } }. Ce qui n'y figure pas suit le taux général. */
  retroActe:{'Dr O. Baroudi':{EPIL2:50, LAS1:50, LAS2:55, ELEC:50},
             'Dr A. Merlin':{EPIL2:45, LAS1:45, LAS2:50, ELEC:45}},
- tvaDefaut:20,
- tvaParActe:{AH:20,BTX:20,SKB:20,MESO:20,PEEL:20,LAS1:20,LAS2:20,RF:20,EPIL2:20,ELEC:20}
+ /* ------------------------------------------------------------------------
+    Un seul taux de TVA, pour tous les actes
+    ------------------------------------------------------------------------
+    Le logiciel savait fixer un taux par acte. C'était une complication sans
+    objet : les actes de médecine esthétique sont soumis à la TVA au taux
+    normal, et le cabinet n'a pas dix régimes à tenir.
+
+    Ce tableau de dix taux était surtout dix occasions d'en laisser un à 0 %
+    par inadvertance — dans un formulaire où rien ne le rappelait — et une
+    facture au mauvais taux ne se rattrape pas d'un clic : elle se rattrape
+    par un avoir, une facture rectificative, et une explication au patient.
+
+    Le taux reste réglable, une fois, parce qu'un taux de TVA est une donnée
+    légale qui peut changer — mais il n'y en a plus qu'un, et il s'applique
+    partout : factures, devis, avoirs, ventilation comptable.
+    ------------------------------------------------------------------------ */
+ tva:20
 };
-const tauxTVA=t=>FACTU.tvaParActe[t]!==undefined?FACTU.tvaParActe[t]:FACTU.tvaDefaut;
+const TVA_DEFAUT=20;
+/* la TVA contenue dans un montant TTC — deux écrans la recalculaient à la main
+   avec un 1,2 écrit en dur, qui aurait menti le jour où le taux change */
+const tvaSur=ttc=>Math.round((+ttc||0)-(+ttc||0)/(1+tauxTVA()/100));
+/* Un taux ABSENT n'est pas un taux à zéro. « +null » vaut 0 en JavaScript :
+   un réglage perdu aurait silencieusement émis des factures sans TVA, ce qui
+   ne se voit sur aucun écran et se découvre au contrôle. Zéro reste possible
+   — l'exonération existe — mais il faut l'avoir écrit. */
+const tauxTVA=()=>{ const v=FACTU.tva;
+ if(v===null||v===undefined||v==='') return TVA_DEFAUT;
+ const t=+v; return (isFinite(t)&&t>=0&&t<=100)?t:TVA_DEFAUT };
+function setTVA(v){
+ const t=String(v==null?'':v).trim().replace(',','.');
+ const n=+t;
+ if(t===''||!isFinite(n)||n<0||n>100){ toast('Le taux de TVA doit être un pourcentage entre 0 et 100'); paint(); return }
+ FACTU.tva=Math.round(n*100)/100; paint();
+ toast(`TVA à ${nb(FACTU.tva)} % sur tous les actes`
+   +(FACTU.tva===0?' — exonération à valider avec votre expert-comptable':''));
+}
 const RETRO_DEFAUT=70;
 /* Le taux de rétrocession se lit du plus précis au plus général : celui réglé
    pour cet acte et ce praticien, sinon le taux général du praticien, sinon
@@ -4288,7 +4319,7 @@ const forfaitsAFacturer=pid=>forfaitsDe(pid).filter(f=>!f.devis&&forfArgent(f).a
   cand.forfait=f.id;
  }
 })();
-const fHT =f=>Math.round(fTTC(f)/(1+tauxTVA(f.type)/100)*100)/100;
+const fHT =f=>Math.round(fTTC(f)/(1+tauxTVA()/100)*100)/100;
 const fTVA=f=>Math.round((fTTC(f)-fHT(f))*100)/100;
 const partPrat=f=>Math.round(fTTC(f)*tauxRetro(f.praticien,f.type)/100);
 const partCentre=f=>fTTC(f)-partPrat(f);
@@ -5951,7 +5982,7 @@ let CABINET={
  tva:'FR32812456789', ape:'8622C', adresse:'12 avenue Victor Hugo, 75116 Paris',
  tel:'01 45 00 12 34', mail:'contact@cabinet-baroudi.fr', site:'www.cabinet-baroudi.fr',
  entete:'{{raison}} — {{cabinet}}\n{{adresse}}\nTél. {{tel}} · {{mail}}',
- pied:'{{raison}} · SIRET {{siret}} · TVA {{tva}} · APE {{ape}}\n{{praticien}} — RPPS {{rpps}} · Assurance RCP {{rcp}}\nActes de médecine esthétique non pris en charge par l’Assurance Maladie, soumis à TVA au taux de 20 %.',
+ pied:'{{raison}} · SIRET {{siret}} · TVA {{tva}} · APE {{ape}}\n{{praticien}} — RPPS {{rpps}} · Assurance RCP {{rcp}}\nActes de médecine esthétique non pris en charge par l’Assurance Maladie, soumis à TVA au taux de {{tauxtva}}.',
  enteteOn:true, piedOn:true,
  /* le logo de la structure : une image collée dans le fichier, pas un lien —
     un document doit rester lisible quand il quitte le logiciel */
@@ -6037,7 +6068,7 @@ const VAR_GROUPES=[
  ['Qui signe',  [['praticien','Praticien'],['rpps','RPPS'],['rcp','Assurance RCP']]],
  ['La structure',[['cabinet','Nom du cabinet'],['raison','Raison sociale'],['adresse','Adresse'],
                   ['tel','Téléphone'],['mail','E-mail'],['site','Site'],
-                  ['siret','SIRET'],['tva','N° TVA'],['ape','Code APE']]],
+                  ['siret','SIRET'],['tva','N° TVA'],['tauxtva','Taux de TVA'],['ape','Code APE']]],
  ['La pièce',   [['acte','Acte'],['date','Date'],['montant','Montant'],
                  ['validite','Valable jusqu’au'],['remise','Remise'],['code','Code']]],
 ];
@@ -6284,7 +6315,7 @@ function pratsFiltre(){
  (typeof FACTURES!=='undefined'?FACTURES:[]).forEach(f=>{ if(f.praticien) vus.add(f.praticien) });
  return [...vus];
 }
-const VARS=['prenom','nom','cabinet','raison','praticien','rpps','siret','tva','ape','adresse','tel','mail','site','rcp','acte','remise','code','validite','date','montant'];
+const VARS=['prenom','nom','cabinet','raison','praticien','rpps','siret','tva','tauxtva','ape','adresse','tel','mail','site','rcp','acte','remise','code','validite','date','montant'];
 let MODELES=[
  {id:'anniv-sms', cat:'Anniversaire', canal:'SMS', nom:'Anniversaire — SMS', actif:true,
   texte:"Bonjour {{prenom}}, toute l'équipe du {{cabinet}} vous souhaite un très bel anniversaire ! Pour l'occasion, {{remise}} sur le soin de votre choix jusqu'au {{validite}}. Code : {{code}}. À très vite !"},
@@ -6310,7 +6341,8 @@ function tplCtx(p,extra){
  const pr=pratInfo(p?p.prat:'Dr O. Baroudi');
  return Object.assign({
   prenom:p?p.prenom:'Claire', nom:p?p.nom:'MARTIN', cabinet:CABINET.nom, raison:CABINET.raison,
-  siret:CABINET.siret, tva:CABINET.tva, ape:CABINET.ape, adresse:CABINET.adresse,
+  siret:CABINET.siret, tva:CABINET.tva, tauxtva:nb(tauxTVA())+' %',
+  ape:CABINET.ape, adresse:CABINET.adresse,
   tel:CABINET.tel, mail:CABINET.mail, site:CABINET.site, rpps:pr.rpps, rcp:`${pr.rcpCie} n° ${pr.rcpPolice}`,
   praticien:p?p.prat:'Dr O. Baroudi', acte:'acide hyaluronique',
   remise:ANNIV.remiseType==='%'?ANNIV.remise+' %':EUR(ANNIV.remise),
@@ -8579,7 +8611,7 @@ function factForm(p){
  const A=ACTES.filter(x=>x.patient===p.id).sort((a,b)=>b.date.localeCompare(a.date));
  const a=factNew.acte?ACTES.find(x=>String(x.id)===String(factNew.acte)):null;
  const m=+factNew.montant||0, n=Math.max(1,+factNew.frac||1);
- const t=a?tauxTVA(a.type):tauxTVA(factNew.type||null);
+ const t=tauxTVA();
  return `<div class="encf" style="margin-bottom:12px">
   <div class="encf-g">
    <label>Rattacher à un acte
@@ -8595,10 +8627,10 @@ function factForm(p){
    <label>Montant TTC
      <div class="pxin"><input class="inp" id="fnM" type="number" min="0" step="5"
        value="${factNew.montant}" oninput="factNew.montant=this.value" onchange="fnMaj('montant',this.value)"><span>€</span></div></label>
-   ${a?'':`<label>Nature — pour la TVA
+   ${a?'':`<label>Nature — pour la rétrocession
      <select class="inp" onchange="fnMaj('type',this.value)">
-       <option value="">Autre — TVA ${FACTU.tvaDefaut} %</option>
-       ${CATALOGUE.map(c=>`<option value="${c.id}" ${factNew.type===c.id?'selected':''}>${esc(c.n)} — TVA ${tauxTVA(c.id)} %</option>`).join('')}</select></label>
+       <option value="">Autre — taux général du praticien</option>
+       ${CATALOGUE.map(c=>`<option value="${c.id}" ${factNew.type===c.id?'selected':''}>${esc(c.n)}</option>`).join('')}</select></label>
    <label>Praticien
      <select class="inp" onchange="fnMaj('prat',this.value)">
        ${PRATICIENS.map(x=>`<option ${factNew.prat===x?'selected':''}>${esc(x)}</option>`).join('')}</select></label>`}
@@ -8612,7 +8644,7 @@ function factForm(p){
        ${FRACTIONS.map(k=>`<option value="${k}" ${n===k?'selected':''}>En ${k} fois${m?` — ${EUR(Math.round(m/k))} par échéance`:''}</option>`).join('')}</select></label>
   </div>
   <div class="encf-a">
-   <span class="mu" style="font-size:11px;flex:1">${m?`${EUR(m)} TTC · dont ${EUR(Math.round(m-m/(1+t/100)))} de TVA à ${t} %`:'Le montant se saisit TTC ; la TVA en est déduite au taux de la nature choisie.'}
+   <span class="mu" style="font-size:11px;flex:1">${m?`${EUR(m)} TTC · dont ${EUR(Math.round(m-m/(1+t/100)))} de TVA à ${t} %`:`Le montant se saisit TTC ; la TVA à ${nb(t)} % en est déduite.`}
      ${retroApercu(m, a?a.praticien:(factNew.prat||PRATICIENS[0]), a?a.type:(factNew.type||null))}</span>
    <button class="btn xs g" onclick="fermerFactNew()">Annuler</button>
    <button class="btn xs p" onclick="creerFacture()">Établir la facture</button>
@@ -8680,7 +8712,7 @@ function avoirForm(p){
 /* ---------------- l'avoir, en document ---------------- */
 function docAvoir(av){
  const p=pById(av.patient), f=FACTURES.find(x=>x.id===av.facture), prn=av.praticien;
- const t=f?tauxTVA(f.type):FACTU.tvaDefaut;
+ const t=tauxTVA();
  const ht=Math.round(av.montant/(1+t/100)*100)/100;
  return `<div class="a4">
   ${docEntete(p,prn)}
@@ -12812,7 +12844,7 @@ V.params=()=>{
     <div class="card" style="margin-top:13px;grid-column:1/-1"><div class="h"><h2>Catalogue des actes</h2><span class="s">${CATALOGUE.length} actes</span>
       <div class="r"><button class="btn xs p" onclick="nouvelActe()">+ Acte</button></div></div>
      <div class="tw"><table>
-      <thead><tr><th>Acte</th><th>Catégorie</th><th class="num">Tarif</th><th class="num">TVA</th><th>Unité</th><th>Consommable</th><th style="text-align:center">Schéma</th><th>Consent.</th><th class="num">Réalisés</th><th class="num">CA</th></tr></thead>
+      <thead><tr><th>Acte</th><th>Catégorie</th><th class="num">Tarif</th><th>Unité</th><th>Consommable</th><th style="text-align:center">Schéma</th><th>Consent.</th><th class="num">Réalisés</th><th class="num">CA</th></tr></thead>
       <tbody>${CATALOGUE.map((c,i)=>`<tr${acteNouv===c.id?' class="neuf"':''}>
         <td><input class="inp catl-n" data-a="${c.id}" style="width:100%;min-width:170px" value="${esc(c.n)}"
           onchange="CATALOGUE[${i}].n=this.value;acteNouv=null;paint()"></td>
@@ -12821,8 +12853,6 @@ V.params=()=>{
            <input class="inp ${c.prix?'':'sanstarif'}" style="width:76px;text-align:right" type="number" min="0" step="10"
              value="${c.prix||0}" title="${c.prix?'':'Cet acte se facturerait \u00e0 0\u202f\u20ac'}"
              onchange="CATALOGUE[${i}].prix=+this.value||0;paint()"><span class="mu">€</span></div></td>
-        <td class="num"><div style="display:flex;gap:3px;align-items:center;justify-content:flex-end">
-          <input class="inp" style="width:56px;text-align:right" type="number" min="0" max="20" value="${tauxTVA(c.id)}" onchange="FACTU.tvaParActe['${c.id}']=+this.value||0;paint()"><span class="mu">%</span></div></td>
         <td><select class="inp" title="Unité de dose : ce qui se saisit sur une zone"
           onchange="CATALOGUE[${i}].unite=this.value||null;paint()">
           ${[['','sans dose'],['ml','ml'],['U','U']].map(([v,l])=>`<option value="${v}" ${(c.unite||'')===v?'selected':''}>${l}</option>`).join('')}</select></td>
@@ -13253,12 +13283,16 @@ V.params=()=>{
         <button class="btn s" style="margin-top:12px" onclick="closeAll();go('encaiss');encView='retro';paint()">Voir et exporter les relevés de rétrocession →</button>`
         :'<div class="empty">Double facturation désactivée — une seule facture est émise, sans répartition.</div>'}
       <div style="margin-top:16px;padding-top:13px;border-top:1px solid var(--line)">
-       <div class="fld"><label>Taux de TVA par acte</label>
-        <div class="tvag">${CATALOGUE.map(c=>`<label>${esc(c.n)}
-          <div style="display:flex;gap:5px;align-items:center">
-           <input class="inp" style="width:64px;text-align:right" type="number" min="0" max="20" value="${tauxTVA(c.id)}"
-             onchange="FACTU.tvaParActe['${c.id}']=+this.value||0;paint()"><span class="mu">%</span></div></label>`).join('')}</div>
-        <div class="mu" style="font-size:11.5px;margin-top:6px">Les actes de médecine esthétique sont soumis à TVA à 20 %. Mettez 0 pour un acte à visée thérapeutique exonéré (art. 261-4-1° du CGI) — à valider avec votre expert-comptable.</div></div>
+       <div class="fld tvaf"><label>Taux de TVA</label>
+        <div class="tvaf-r">
+         <div class="pxin" style="width:96px"><input class="inp" type="number" min="0" max="100" step="0.1"
+           style="text-align:right" value="${nb(tauxTVA())}"
+           title="Le même taux pour tous les actes du catalogue"
+           onchange="setTVA(this.value)"><span>%</span></div>
+         <div class="mu tvaf-t">Le même pour <b>tous les actes</b> — factures, devis, avoirs et ventilation comptable.
+           Les actes de médecine esthétique sont soumis à la TVA au taux normal de 20 %.
+           Une exonération pour acte à visée thérapeutique (art. 261-4-1° du CGI) se décide dossier par dossier, avec votre expert-comptable — pas dans une grille de taux.</div>
+        </div></div>
       </div>
      </div></div>
    </div>
@@ -14822,7 +14856,7 @@ const dvpTotHTML=prix=>{const {brut,rem,net}=dvNetActe(prix);
   :`<div><span>Total des prestations</span><b>${EUR(brut)}</b></div>`}
   ${rem?`<div><span>Remise sur l’ensemble</span><b style="color:var(--good)">− ${EUR(rem)}</b></div>`:''}
   <div class="big"><span>Total TTC</span><b>${EUR(net)}</b></div>
-  <div class="mu" style="font-size:11px">dont TVA ${EUR(net-Math.round(net/1.2))} · valable jusqu'au ${DF(addD(TODAYS,AS.validite))}</div>`};
+  <div class="mu" style="font-size:11px">dont TVA ${EUR(tvaSur(net))} · valable jusqu'au ${DF(addD(TODAYS,AS.validite))}</div>`};
 /* Volet droit en mode consultation : ce qui se passe *pendant* la séance —
    la note, et les pièces à éditer. Les mêmes modèles qu'après l'enregistrement,
    pour qu'un acte repris d'un devis se documente sans quitter l'écran. */
@@ -14964,7 +14998,7 @@ function devisPane(sel,total,prix){
       <div class="dvi-l"><b>Rappel</b>un message de renouvellement sera programmé automatiquement.</div></div>
     <div class="dvi"><div class="dvi-t">⚖️ Mentions légales</div>
       <div class="dvi-l"><b>Réflexion</b>délai légal de 15 jours avant toute réalisation.</div>
-      <div class="dvi-l"><b>Prise en charge</b>acte non remboursé, soumis à TVA 20 %.</div></div>
+      <div class="dvi-l"><b>Prise en charge</b>acte non remboursé${tauxTVA()?`, soumis à TVA ${nb(tauxTVA())} %`:', exonéré de TVA'}.</div></div>
     <div class="fld" style="margin-top:8px"><label>Note personnalisée pour ce patient</label>
       <textarea class="note" style="min-height:56px" placeholder="ex. reprendre les photos avant la séance" oninput="AS.notePat=this.value">${esc(AS.notePat||'')}</textarea></div>
    </div>`:'<div class="mu" style="font-size:11.5px">La fiche d\'information ne sera pas jointe au devis.</div>'}
@@ -16747,7 +16781,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='FA';
+const BUILD='FB';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -16820,7 +16854,7 @@ function totauxDoc(d){
  const sous=brut-remL;
  const rem=d.remise||0;                             /* remise sur l'ensemble du devis */
  const net=Math.max(0,sous-rem);
- const tvaBase=L.reduce((s,x)=>{const t=tauxTVA(x.type)/100; return s+x.net-x.net/(1+t)},0);
+ const tvaBase=(()=>{const t=tauxTVA()/100; return L.reduce((s,x)=>s+x.net-x.net/(1+t),0)})();
  const tva=sous?tvaBase*net/sous:0;
  return {L, brut, remL, sous, rem, net, tva:Math.round(tva*100)/100, ht:Math.round((net-tva)*100)/100};
 }
@@ -16876,7 +16910,7 @@ function devisDoc(d){
  const val=d.validite||T.validiteJours||30, lim=addD(d.date,val);
  const su=[...new Set(L.filter(x=>x.type).map(x=>medleg(x.type).su))];
  const ar=Math.max(0,...L.filter(x=>x.type).map(x=>medleg(x.type).ar));
- const taux=[...new Set(L.map(x=>tauxTVA(x.type)))];
+ const taux=tauxTVA();
  const txt=t=>esc(fillTpl(t||'',tplCtx(p,{praticien:prn,rpps:pr.rpps,
    rcp:`${pr.rcpCie} n° ${pr.rcpPolice}`,montant:E2(net),validite:DF(lim)}))).replace(/\n/g,'<br>');
  const aZ=T.zones!==false&&L.some(x=>x.zones), aC=T.commentaire!==false&&L.some(x=>x.com);
@@ -16932,7 +16966,7 @@ function devisDoc(d){
    ${remL&&rem?`<div class="l"><span>Sous-total</span><span>${E2(sous)}</span></div>`:''}
    ${rem?`<div class="l"><span>Remise sur l’ensemble du devis</span><span>− ${E2(rem)}</span></div>`:''}
    <div class="l net"><span>Net à payer TTC</span><span>${E2(net)}</span></div>
-   ${T.tva?`<div class="l tva"><span>dont TVA ${taux.join(' et ')} %</span><span>${E2(tva)} · base HT ${E2(ht)}</span></div>`:''}</div>
+   ${T.tva?`<div class="l tva"><span>dont TVA ${nb(taux)} %</span><span>${E2(tva)} · base HT ${E2(ht)}</span></div>`:''}</div>
 
   ${T.suites?`<div class="dv-s" style="margin-top:2mm">${esc(T.suitesTitre||'Suites et soins')}</div>
   <div class="dv-p">${su.map(x=>esc(x)).join('<br>')}<br>
@@ -17086,7 +17120,7 @@ function corpsDoc(a,d){
 
  if(d.k==='facture'){
   const f=FACTURES.find(x=>x.id===d.id); if(!f) return '';
-  const t=tauxTVA(f.type), ht=fHT(f), tva=fTVA(f), ttc=fTTC(f);
+  const t=tauxTVA(), ht=fHT(f), tva=fTVA(f), ttc=fTTC(f);
   return `${bloc('Patient',`<b>${esc(fn(p))}</b> — dossier n° ${p.id}<br>${esc(p.adr||'')}`)}
   <div class="dv-s">Prestation</div>
   <table class="dv-tb"><thead><tr><th style="width:64%">Désignation</th><th class="n">Date</th><th class="n">Total TTC</th></tr></thead>
@@ -18410,7 +18444,7 @@ function renderDevis(){
        ${T.remL?`<div><span>Remises par prestation</span><b style="color:var(--good)">− ${EUR(T.remL)}</b></div>`:''}
        ${T.rem?`<div><span>Remise sur l’ensemble</span><b style="color:var(--good)">− ${EUR(T.rem)}</b></div>`:''}
        <div class="big"><span>Total TTC</span><b>${EUR(T.net)}</b></div>
-       <div class="mu" style="font-size:11px">dont TVA ${EUR(T.net-Math.round(T.net/1.2))} · valable jusqu'au ${DF(addD(DV.date,DV.validite))}</div>
+       <div class="mu" style="font-size:11px">dont TVA ${EUR(tvaSur(T.net))} · valable jusqu'au ${DF(addD(DV.date,DV.validite))}</div>
       </div>`:''}
      ${(()=>{ const prest=DV.lignes.filter(l=>l.type);
        const aPrep=consentsAPreparer(DV.pid, prest);
@@ -19837,7 +19871,18 @@ const CFG={
  factu:     {l:'Facturation',       lit:()=>FACTU,      ecrit:v=>{ fondObj(FACTU,v);
    /* une grille de taux se remplace, elle ne se fond pas : un taux qu'on a retiré
       doit le rester, sans que la valeur d'usine ne revienne par la fenêtre */
-   ['retro','retroActe','tvaParActe'].forEach(k=>{ if(v&&v[k]) FACTU[k]=v[k] }) }},
+   ['retro','retroActe'].forEach(k=>{ if(v&&v[k]) FACTU[k]=v[k] });
+   /* réglages d'une version antérieure : une grille de taux par acte se replie
+      sur le taux unique. On prend celui qui revient le plus souvent — c'est
+      celui que le cabinet appliquait vraiment — et on oublie la grille. */
+   if(v&&v.tvaParActe&&typeof v.tvaParActe==='object'){
+     const n={}; Object.values(v.tvaParActe).forEach(x=>{ const t=+x;
+       if(isFinite(t)) n[t]=(n[t]||0)+1 });
+     const K=Object.keys(n);
+     if(K.length) FACTU.tva=+K.sort((a,b)=>n[b]-n[a])[0];
+   }
+   if(v&&v.tvaDefaut!==undefined&&(v.tva===undefined)&&!(v.tvaParActe)) FACTU.tva=+v.tvaDefaut;
+   delete FACTU.tvaParActe; delete FACTU.tvaDefaut; }},
  cabinet:   {l:'Cabinet',           lit:()=>CABINET,    ecrit:v=>fondObj(CABINET,v)},
  expediteur:{l:'Expéditeur',        lit:()=>EXPEDITEUR, ecrit:v=>fondObj(EXPEDITEUR,v)},
  droits:    {l:'Droits',            lit:()=>droitsDiff(), ecrit:v=>appliqueDroits(v)},
