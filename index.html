@@ -14110,6 +14110,7 @@ function openActe(pid,aid,np){
  renderOver();
  document.getElementById('over').classList.add('on');
  document.getElementById('scrim').classList.add('on');
+ SAISIE_SUSP=null; navSuivre();
 }
 /* une séance rouverte ou dupliquée ne connaît que le type de chaque zone :
    on donne un identifiant à chaque soin, puis on relie chaque zone au premier
@@ -16954,7 +16955,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='FC';
+const BUILD='FD';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -17886,6 +17887,7 @@ function pdfView(titre,sous,html,actions){
    <button class="pv-b p" onclick="fermerPdf()">✕ Fermer</button></div>`;
  document.getElementById('pvsc').innerHTML=html;
  document.getElementById('pdfv').classList.add('on');
+ navSuivre();
 }
 function apercuDevis(id){
  const d=(typeof id==='object')?id:DEVIS.find(x=>x.id===id); if(!d) return;
@@ -17923,7 +17925,8 @@ function apercuBrouillon(){
    remise:dvNet().rem, validite:DV.validite, note:DV.note, statut:'brouillon', prest, lignes,
    montant:dvNet().net});
 }
-function fermerPdf(){document.getElementById('pdfv').classList.remove('on'); PV=null}
+function fermerPdf(){document.getElementById('pdfv').classList.remove('on'); PV=null;
+ if(navConsommer()) return; navSuivre()}
 
 /* ==========================================================================
    Devis autonome — sans passer par un acte
@@ -17952,6 +17955,7 @@ function openDevis(pid,fam,did){
  dvLigne=0; dvPlie=false; renderDevis();
  document.getElementById('over').classList.add('on');
  document.getElementById('scrim').classList.add('on');
+ SAISIE_SUSP=null; navSuivre();
 }
 const dvL=()=>DV.lignes[dvLigne]||DV.lignes[0];
 /* montant d'une prestation avant sa propre remise */
@@ -18664,12 +18668,43 @@ function renderDevis(){
    ========================================================================== */
 let palIdx=0, palItems=[];
 function openPal(){document.getElementById('pal').classList.add('on');document.getElementById('scrim').classList.add('on');
- const q=document.getElementById('palq');q.value='';q.focus();buildPal('')}
-function closeAll(){['pal','over','voix'].forEach(i=>document.getElementById(i).classList.remove('on'));
+ const q=document.getElementById('palq');q.value='';q.focus();buildPal(''); navSuivre()}
+function fermerEcrans(){['pal','over','voix'].forEach(i=>document.getElementById(i).classList.remove('on'));
  /* la fenêtre reprend sa taille normale pour le prochain qui l'ouvre */
  setTimeout(()=>{ const o=document.getElementById('over');
    if(!o.classList.contains('on')) o.classList.remove('mini') },260);
  document.getElementById('scrim').classList.remove('on')}
+/* --------------------------------------------------------------------------
+   Fermer une fenêtre, c'est revenir en arrière
+   --------------------------------------------------------------------------
+   Une fenêtre ouverte a déposé son entrée dans l'historique. La refermer par
+   la croix doit CONSOMMER cette entrée, pas en empiler une de plus — sinon
+   « précédent » ramène une fenêtre qu'on vient de fermer, ne la rouvre pas
+   (on ne reconstitue pas une saisie), et ne fait donc rien du tout : le
+   bouton semble cassé.
+
+   On demande donc au navigateur de reculer. Reste le cas où la fermeture
+   PRÉCÈDE un déplacement — « fermer, puis ouvrir la fiche de ce patient » :
+   le recul arrive après coup, alors que l'application est déjà ailleurs. On
+   note donc où l'on était ; si l'écran a bougé entre-temps, c'est le clic qui
+   commande, et le recul se contente de libérer l'entrée de la fenêtre. */
+function navConsommer(){
+ /* Un recul déjà demandé n'est pas encore traité : le navigateur le fait en
+    différé. En redemander un second avant qu'il n'arrive, c'est reculer deux
+    fois pour une seule fenêtre fermée — et, à la première fenêtre d'une
+    session, sortir carrément de l'application. */
+ if(navFermeture!=null) return true;
+ if(!navSig) return false;
+ let ov=0; try{ ov=+JSON.parse(navSig).ov||0 }catch(_){}
+ if(ov<=navCouches()) return false;      /* rien à rendre : on n'a pas fermé de couche */
+ if(navT){ clearTimeout(navT); navT=null }
+ navFermeture=JSON.stringify(navEtat());
+ /* on ne se croit plus sur une entrée de fenêtre dès maintenant, sans attendre
+    que le recul soit traité : c'est ce décalage qui faisait reculer deux fois */
+ navSig=navFermeture;
+ try{ history.back(); return true }catch(_){ navFermeture=null; return false }
+}
+function closeAll(){ fermerEcrans(); if(navConsommer()) return; navSuivre() }
 function buildPal(q){
  q=q.toLowerCase().trim(); const it=[];
  const ACT=[
@@ -19746,6 +19781,148 @@ function toggleTheme(){const r=document.documentElement;r.dataset.theme=r.datase
 function go(v,arg){ if(v==='devis') dSel=arg||null;
  if(v!=='patients') PE=null;    /* on ne garde pas une fiche ouverte en saisie hors de sa vue */
  view=v; document.getElementById('main').scrollTop=0; paint(); }
+
+/* ==========================================================================
+   Le bouton « page précédente » du navigateur
+   --------------------------------------------------------------------------
+   Le logiciel tient dans une seule page : changer d'écran ne changeait donc
+   rien pour le navigateur, et « précédent » faisait ce qu'il fait toujours
+   dans ce cas — il sortait du logiciel. Au milieu d'une journée de
+   consultations, c'est brutal : on voulait revenir à la liste des patients,
+   on se retrouve sur la page d'avant, et il faut tout rouvrir.
+
+   On tient donc un historique des ÉCRANS. Chaque fois que l'écran change
+   — une autre vue, un autre patient, un autre onglet de sa fiche, une autre
+   fenêtre ouverte — on dépose une entrée dans l'historique du navigateur, et
+   « précédent » la rejoue.
+
+   Ce qu'on ne fait PAS, volontairement :
+
+     · on n'écrit rien dans l'adresse. Une adresse qui bouge à chaque clic se
+       partage, se met en favori, se recharge — et exposerait un numéro de
+       dossier dans l'historique du navigateur, dans les journaux du serveur
+       et dans le presse-papier de qui copie l'URL. Un logiciel de santé n'a
+       pas à faire circuler ça pour le confort d'un bouton ;
+     · on ne rouvre pas une fenêtre de saisie en avançant dans l'historique :
+       une consultation à moitié composée ne se reconstitue pas à partir
+       d'une entrée d'historique, et prétendre le contraire serait pire que de
+       ne rien faire. Ce qui était en cours reste là, et un bandeau propose de
+       le reprendre.
+   ========================================================================== */
+let navSig=null, navT=null, navRetour=false, navFermeture=null;
+/* Les fenêtres s'empilent : un aperçu PDF s'ouvre PAR-DESSUS une consultation
+   en cours. On compte donc les couches plutôt que de répondre oui ou non —
+   sans quoi refermer l'aperçu emporterait la consultation avec lui. */
+const COUCHES=['over','pal','voix','pdfv'];
+const navCouches=()=>COUCHES.filter(i=>{
+  const e=document.getElementById(i); return !!e&&e.classList.contains('on') }).length;
+const navOuvert=()=>navCouches()>0;
+/* fermer la couche du dessus, et elle seule */
+function navFermerHaut(){
+ const pv=document.getElementById('pdfv');
+ if(pv&&pv.classList.contains('on')){ pv.classList.remove('on'); PV=null; return }
+ navSuspendre(); fermerEcrans();
+}
+/* l'écran, réduit à ce qui le définit : le reste (filtres, recherches, tris)
+   ne change pas d'écran et n'a rien à faire dans un historique de navigation */
+function navEtat(){
+ const P=(view==='patients');
+ return {v:view,
+   pv:P?pView:null,
+   ps:(P&&pView==='liste')?pSel:null,
+   pt:(P&&pView==='liste'&&pSel)?pTab:null,
+   ds:(view==='devis')?(dSel||null):null,
+   pa:(view==='params')?paramTab:null,
+   en:(view==='encaiss')?encView:null,
+   sk:(view==='stock')?stkTab:null,
+   ov:navCouches()};
+}
+/* Un clic change souvent plusieurs choses d'affilée — fermer une fenêtre,
+   choisir un patient, changer d'onglet. On attend que tout soit retombé avant
+   de déposer UNE entrée : sinon un seul geste en empilerait trois, et il
+   faudrait appuyer trois fois sur « précédent » pour défaire un clic. */
+function navSuivre(){
+ if(navRetour) return;
+ if(navT) clearTimeout(navT);
+ navT=setTimeout(()=>{ navT=null;
+   const e=navEtat(), sig=JSON.stringify(e);
+   if(sig===navSig) return;
+   navSig=sig;
+   try{ history.pushState({praxis:e}, '') }catch(_){}
+ },0);
+}
+function navAppliquer(e){
+ if(!e) return;
+ /* on redescend jusqu'au nombre de couches de l'écran visé : « précédent »
+    devant un aperçu ouvert sur une consultation referme l'aperçu, et rend la
+    consultation — il ne balaie pas tout */
+ let garde=0;
+ while(navCouches()>(+e.ov||0)&&garde++<COUCHES.length) navFermerHaut();
+ if(e.v==='patients'){ pView=e.pv||'liste';
+   if(pView==='liste'){ pSel=(e.ps!=null)?e.ps:null; pTab=e.pt||'resume' } }
+ if(e.v==='devis') dSel=e.ds||null;
+ if(e.v==='params'&&e.pa) paramTab=e.pa;
+ if(e.v==='encaiss'&&e.en) encView=e.en;
+ if(e.v==='stock'&&e.sk) stkTab=e.sk;
+ if(e.v&&ROLES[role].v.includes(e.v)) view=e.v;
+ const m=document.getElementById('main'); if(m) m.scrollTop=0;
+ paint();
+}
+addEventListener('popstate', ev=>{
+ if(jetonURL()) return;            /* le téléphone du QR n'a pas d'écrans à rejouer */
+ if(navFermeture!=null){
+   const attendu=navFermeture; navFermeture=null;
+   const ici=JSON.stringify(navEtat());
+   /* l'application a été menée ailleurs pendant que le recul s'exécutait :
+      on garde l'écran où le clic nous a menés, et on l'inscrit à la suite */
+   if(ici!==attendu){ navSig=attendu; navSuivre(); return }
+ }
+ navRetour=true;
+ try{ navAppliquer((ev.state&&ev.state.praxis)||null) }
+ finally{
+   navRetour=false;
+   if(navT){ clearTimeout(navT); navT=null }
+   /* on se recale sur ce que l'écran EST devenu, pas sur ce qu'on visait :
+      un rôle qui n'a pas accès à une vue la refuse, et l'entrée suivante
+      doit partir de là où l'on est vraiment */
+   navSig=JSON.stringify(navEtat());
+ }
+});
+/* ---- ce qui était en cours de saisie n'est pas perdu ---- */
+let SAISIE_SUSP=null;
+function navSuspendre(){
+ const o=document.getElementById('over');
+ if(!o||!o.classList.contains('on')) return;
+ /* une fenêtre en lecture seule n'a rien à reprendre */
+ if(typeof AS!=='undefined'&&AS&&!AS.ro&&(AS.soins||[]).length)
+   SAISIE_SUSP={k:'acte', quoi:(AS.soins||[]).map(x=>x.t?acteDef(x.t).n:(x.libre||'ligne libre'))
+     .filter(Boolean).join(' + ')||'Séance', pid:AS.pid};
+ else if(typeof DV!=='undefined'&&DV&&(DV.lignes||[]).some(l=>l.type||l.libre))
+   SAISIE_SUSP={k:'devis', quoi:(DV.lignes||[]).filter(l=>l.type||l.libre)
+     .map(l=>l.type?acteDef(l.type).n:l.libre).join(' · '), pid:DV.pid};
+}
+function reprendreSaisie(){
+ if(!SAISIE_SUSP) return;
+ const k=SAISIE_SUSP.k; SAISIE_SUSP=null;
+ /* le bandeau disparaît AVANT que la fenêtre ne le recouvre : sans ça il
+    attend derrière et ressort à la fermeture, en proposant de reprendre une
+    saisie qu'on est en train de faire */
+ paint();
+ document.getElementById('over').classList.add('on');
+ document.getElementById('scrim').classList.add('on');
+ if(k==='acte') renderOver(); else renderDevis();
+ navSuivre();
+}
+function oublierSaisie(){ SAISIE_SUSP=null; paint() }
+function bandeauSaisie(){
+ if(!SAISIE_SUSP) return '';
+ const p=pById(SAISIE_SUSP.pid);
+ return `<div class="bandeau"><span>↩</span><div style="flex:1;min-width:0">
+   <b>${SAISIE_SUSP.k==='acte'?'Consultation':'Devis'} en cours — ${esc(SAISIE_SUSP.quoi)}</b>${
+   p?` · ${esc(fn(p))}`:''}. Rien n’est perdu : la fenêtre s’est fermée, la saisie est toujours là.
+   <button class="btn xs p" style="margin-left:6px" onclick="reprendreSaisie()">Reprendre</button>
+   <button class="btn xs" style="margin-left:4px" onclick="oublierSaisie()">Abandonner</button></div></div>`;
+}
 /* ==========================================================================
    Le téléphone qui a scanné le code
    --------------------------------------------------------------------------
@@ -19836,12 +20013,13 @@ function paint(){
  const bs=document.getElementById('btn-sortir'); if(bs) bs.style.display=CONNECTE()?'':'none';
  document.getElementById('avat').textContent=ROLES[role].i;
  document.getElementById('who').innerHTML=`${ROLES[role].u}<small>${ROLES[role].l}</small>`;
- document.getElementById('main').innerHTML=bandeauHTML()+(V[view]||V.dash)();
+ document.getElementById('main').innerHTML=bandeauHTML()+bandeauSaisie()+(V[view]||V.dash)();
  bindBA(); bindGZ(); calerCumul();
  if(typeof cfgPlanifier==='function') cfgPlanifier();
  /* En mode connecté, le classeur local ne doit PAS enregistrer : il écraserait
     au rechargement suivant ce que le serveur fait autorité à dire. */
  if(typeof clPlanifier==='function' && !CONNECTE()) clPlanifier();
+ navSuivre();
 }
 
 /* --------------------------------------------------------------------------
@@ -20860,6 +21038,11 @@ function srvAppliquerDroits(d, moi){
  }
  clActif=true;
  paint();
+ /* l'écran de départ existe dans l'historique, sinon le premier « précédent »
+    n'aurait rien à rejouer et sortirait du logiciel */
+ try{ history.replaceState({praxis:navEtat()}, '') }catch(_){}
+ if(navT){ clearTimeout(navT); navT=null }
+ navSig=JSON.stringify(navEtat());
  initVersion();
 })();
 
