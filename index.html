@@ -1007,6 +1007,25 @@ table.rgr td{vertical-align:middle}
 @media(max-width:960px){.retrod{max-width:520px}}
 .catr{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
 tr.neuf>td{background:color-mix(in srgb,var(--accent) 9%,transparent)}
+/* la ligne qu'on vient de suivre depuis un devis : on la retrouve d'un regard */
+tr.vu>td{background:color-mix(in srgb,var(--accent) 13%,transparent)}
+tr.vu>td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+/* Le fil entre un devis et ses factures. Discret par défaut — c'est un
+   renvoi, pas une alerte — mais sousligné au survol : il se clique. */
+.lienf{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:3px;
+  font-size:10.5px;color:var(--ink-3);line-height:1.3}
+.lienf-i{display:inline-grid;place-items:center;width:13px;height:13px;flex:none;
+  border-radius:4px;background:var(--panel-3);color:var(--ink-2);font-size:9px;font-weight:700}
+.lienf a{color:var(--accent-ink);font-weight:640;cursor:pointer;
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.lienf a:hover{text-decoration:underline}
+.lienf-p{color:var(--ink-3)}
+.lienf-m{font-variant-numeric:tabular-nums;white-space:nowrap}
+/* « 490 € sur 970 € » dit un AVANCEMENT, pas une dette : le rouge est
+   réservé à l'argent dû, et la ligne du devis en porte déjà deux. */
+.lienf.part .lienf-m{color:var(--ink-2);font-weight:620}
+.subt{font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;
+  color:var(--ink-3);margin-bottom:7px}
 .catr:last-child{border-bottom:none}
 .catr-o{display:flex;flex-direction:column;gap:1px;flex:none;width:18px}
 .catr-o button{border:none;background:transparent;color:var(--ink-3);font-size:8px;line-height:1;cursor:pointer;padding:1px}
@@ -4056,6 +4075,77 @@ const celluleDevReste=d=>{ const r=devReste(d);
    :c?'Devis accepté — la facture reste à établir':'Facture émise, non soldée')}"><b>${EUR(r)}</b>${
    c?'<i>à facturer</i>':''}</span>` };
 
+/* ==========================================================================
+   Le fil entre un devis et ses factures
+   --------------------------------------------------------------------------
+   Un devis de 1 400 € facturé pour moitié affichait « reste dû 700 € — à
+   facturer », et rien d'autre. Rien ne disait que 700 € l'avaient DÉJÀ été,
+   sous quel numéro, ni quand. Pour retrouver la pièce il fallait descendre
+   dans la liste des factures et reconnaître le montant à l'œil — c'est-à-dire
+   se tromper, un jour, sur le dossier d'à côté.
+
+   Le lien existait dans les données (f.devis, et le forfait pour les ventes en
+   séances) ; il ne se voyait nulle part. Il se pose donc des deux côtés, et
+   il se suit d'un clic : sous la ligne du devis, les factures qu'il a
+   produites ; sous la ligne d'une facture, le devis dont elle vient.
+
+   Le cas partiel est celui qui compte : c'est là qu'un devis porte à la fois
+   une facture émise et un reste à facturer, et qu'on a besoin de lire les
+   deux chiffres ensemble sans les confondre.
+   ========================================================================== */
+const parDate=(a,b)=>String(a.date).localeCompare(String(b.date))||String(a.id).localeCompare(String(b.id));
+const factDuDevis=d=>facturesDuDevis(d).slice().sort(parDate);
+/* le même fil, annulations comprises : c'est ce qu'il faut à un registre */
+const factDuDevisTout=d=>{ if(!d) return [];
+ const FF=FORFAITS.filter(x=>x.devis===d.id).map(x=>x.id);
+ return FACTURES.filter(f=>f.devis===d.id
+   ||(d.realise!=null&&f.acte===d.realise)
+   ||(f.forfait&&FF.indexOf(f.forfait)>=0)).sort(parDate);
+};
+let factVu=null;       /* la facture qu'on vient de suivre depuis un devis */
+function voirFacture(id){
+ const f=FACTURES.find(x=>x.id===id); if(!f){ toast('Facture introuvable'); return }
+ factVu=id; closeAll();
+ pView='liste'; pSel=f.patient; pTab='factu'; go('patients');
+ /* la ligne se met en évidence ET vient sous les yeux : une surbrillance hors
+    de l'écran ne sert à personne */
+ setTimeout(()=>{ const e=document.querySelector('tr.vu');
+   if(e&&e.scrollIntoView) e.scrollIntoView({block:'center'}) },40);
+}
+function voirDevis(id){ factVu=null; closeAll(); go('devis',id) }
+/* Ce qu'un devis a produit comme factures, en une ligne qui se clique.
+   `compact` pour les tableaux, où la place manque. */
+function lienFacturesDevis(d,compact){
+ if(!CAN('prix')||!d) return '';
+ const L=factDuDevis(d); if(!L.length) return '';
+ const fait=L.reduce((s,f)=>s+fTTC(f),0);
+ const reste=devAFacturer(d);
+ const du=L.reduce((s,f)=>s+rdu(f),0);
+ const part=reste>0;
+ const t=`${L.length>1?L.length+' factures':'Facture '+L[0].id} · ${EUR(fait)} facturé${fait>1?'s':''} sur ${EUR(d.montant)}`
+   +(part?` — ${EUR(reste)} restent à facturer`:'')
+   +(du?` · ${EUR(du)} non encaissé${du>1?'s':''}`:'');
+ /* Dans un tableau, la place se paie : la colonne du statut s'élargissait de
+    27 px pour « sur 970 € », un chiffre que la colonne Montant donne déjà deux
+    cases plus loin. On garde ce que la ligne ne dit nulle part ailleurs — le
+    numéro de la pièce et ce qu'elle porte — et le reste va dans l'infobulle. */
+ return `<div class="lienf${part?' part':''}" title="${esc(t)}">
+   <span class="lienf-i">€</span>${L.map(f=>`<a onclick="event.stopPropagation();voirFacture('${esc(f.id)}')"
+     >${esc(f.id)}</a>`).join('<span class="lienf-p">+</span>')}
+   <span class="lienf-m">${compact?EUR(fait):(part?`${EUR(fait)} sur ${EUR(d.montant)}`:EUR(fait))}</span></div>`;
+}
+/* et le lien inverse : d'où vient cette facture */
+function lienDevisFacture(f){
+ if(!f) return '';
+ const id=f.devis||((f.forfait&&(forfaitById(f.forfait)||{}).devis)||null);
+ if(!id) return '';
+ const d=DEVIS.find(x=>x.id===id); if(!d) return '';
+ const part=devAFacturer(d)>0;
+ return `<div class="lienf" title="${esc(`Établie d’après le devis ${d.id} du ${DF(d.date)} — ${EUR(d.montant)}`
+   +(part?` · ${EUR(devAFacturer(d))} restent à facturer dessus`:' · intégralement facturé'))}">
+   <span class="lienf-i">◫</span><a onclick="event.stopPropagation();voirDevis('${esc(d.id)}')">${esc(d.id)}</a>${
+   part?'<span class="lienf-m">partiel</span>':''}</div>`;
+}
 /* Un devis se rencontre à quatre endroits : l'onglet Facturation d'une fiche,
    son onglet Documents, la liste « Devis et conversions » et la fiche du devis
    lui-même. Le geste doit être le MÊME partout — quatre copies auraient divergé
@@ -4217,6 +4307,15 @@ const factEvt=f=>!f?null
  :rdu(f)>0?{t:f.regle||f.date, verbe:'Dernier encaissement'}
  :{t:f.regle||f.date, verbe:'Soldée'};
 const sousFacture=f=>{const x=factEvt(f); return x?ligneStatut(x.t,{verbe:x.verbe}):''};
+/* L'état d'une facture se disait ligne par ligne, chacune à sa façon. Une
+   seule écriture, pour que « Partielle » veuille dire la même chose partout. */
+const bdgFact=f=>!f?''
+ :f.statut==='annulee'?bdg('b-crit','⊘ Annulée')
+ :f.avoir?bdg('b-warn','Avoir')
+ :rdu(f)>0?bdg('b-warn','Partielle')
+ :bdg('b-good','Soldée');
+/* les forfaits qu'un devis a réellement ouverts — sans en créer au passage */
+const forfaitsDuDevisVendus=d=>!d?[]:FORFAITS.filter(x=>x.devis===d.id).map(forfaitInfo).filter(Boolean);
 const fTTC=f=>f.statut==='annulee'?0:f.montant-f.avoir;
 /* ==========================================================================
    L'argent d'un forfait
@@ -4307,6 +4406,33 @@ const forfaitsAFacturer=pid=>forfaitsDe(pid).filter(f=>!f.devis&&forfArgent(f).a
     moyen:paye>0?MOYENS[k%4]:null, plan:frac?{n:frac,faites:1}:null,
     praticien:prat, cat:'Forfait', type:I.t||null, statut:'ok', avoir:0});
  });
+ /* --------------------------------------------------------------------------
+    Un devis facturé EN PARTIE
+    --------------------------------------------------------------------------
+    C'est le cas où le lien entre un devis et sa facture manque le plus : le
+    devis porte à la fois une pièce émise et un reste à facturer, et les deux
+    chiffres se lisent ensemble ou pas du tout. La démonstration en porte donc
+    un : la moitié facturée et encaissée, l'autre moitié encore à établir.
+    -------------------------------------------------------------------------- */
+ (function(){
+  const d=DEVIS.find(x=>x.statut==='accepte'&&+x.montant>=600&&devCreance(x)>0
+    &&!FACTURES.some(f=>f.devis===x.id));
+  if(!d) return;
+  const moitie=Math.round((+d.montant||0)/2/10)*10;
+  const a=d.acte?ACTES.find(x=>x.id===d.acte):null;
+  const dt=jPlus(d.decide||d.date, 2);
+  /* et cette moitié facturée n'est elle-même réglée qu'en partie : le devis
+     porte alors les DEUX dettes à la fois — ce qui est facturé et non encaissé,
+     ce qui n'est pas encore facturé — et c'est la ligne la plus difficile à
+     lire de tout le logiciel si rien ne la relie à sa pièce. */
+  const verse=Math.round(moitie*0.4/10)*10;
+  FACTURES.push({id:'F-2950', patient:d.patient, acte:a?a.id:null, forfait:null,
+    devis:d.id, libelle:a?'':nomDevis(d),
+    date:dt, montant:moitie, paye:verse, regle:verse>0?dt:null, annule:null,
+    moyen:verse>0?'CB':null, plan:null,
+    praticien:d.praticien||(a&&a.praticien)||PRATICIENS[0],
+    cat:(a&&a.cat)||'Facturation libre', type:(a&&a.type)||null, statut:'ok', avoir:0});
+ })();
  /* Un forfait vendu au comptoir, sans devis : c'est le cas qui n'avait aucune
     porte vers la caisse. La démo en porte un, non facturé. */
  const CURE={LAS2:[3,780], RF:[4,800], PEEL:[3,420], MESO:[3,480]};
@@ -7990,7 +8116,22 @@ function chronoDevis(d){
    :d.statut==='refuse'?['✕','Devis refusé']
    :d.statut==='expire'?['⏱','Expiré (30 j sans réponse)']:null;
  if(fin) H.push({t:d.derniere||d.date, heure:false, ic:fin[0], lib:fin[1]});
- return H.sort((a,b)=>a.t.localeCompare(b.t));
+ /* Les factures appartiennent à l'histoire de ce devis : sans elles, la
+    chronologie s'arrêtait à « accepté » et ne disait jamais ce que l'accord
+    était devenu en caisse — alors que c'est la suite de l'histoire. */
+ /* Y COMPRIS les factures annulées : elles ne comptent plus dans l'argent,
+    mais elles ont existé, elles ont été remises au patient, et un registre qui
+    les efface ne sert plus de registre. */
+ if(CAN('prix')) factDuDevisTout(d).forEach(f=>{
+   H.push({t:f.date, heure:false, ic:'€',
+     lib:`Facture ${f.id} émise — ${EUR(fTTC(f))}`});
+   if(f.statut==='annulee') H.push({t:f.annule||f.date, heure:false, ic:'✕',
+     lib:`Facture ${f.id} annulée`});
+   else if(f.paye>0) H.push({t:f.regle||f.date, heure:false, ic:rdu(f)?'€':'✓',
+     lib:rdu(f)?`Facture ${f.id} — ${EUR(f.paye)} encaissés, ${EUR(rdu(f))} restent dus`
+              :`Facture ${f.id} soldée — ${EUR(f.paye)}`});
+ });
+ return H.sort((a,b)=>String(a.t).localeCompare(String(b.t)));
 }
 /* « par qui » se lit sur la même ligne que « quand » : c'est la même question
    posée à un registre, et la superviser demande de les voir ensemble. */
@@ -9536,7 +9677,7 @@ function pDetail(p){
     <tbody>${D.map(d=>`<tr class="c" onclick="go('devis','${d.id}')">
       <td class="mono">${d.id}</td><td class="mono" title="${(()=>{const e=devisEtabliTxt(d);
         return esc('Devis établi le '+e.cree+(e.maj?' · modifié le '+e.maj:''))})()}">${DF(d.date)}</td>
-      <td>${d.lignes.map(l=>esc(l[1])).join(' · ')}</td>
+      <td>${d.lignes.map(l=>esc(l[1])).join(' · ')}${lienFacturesDevis(d,1)}</td>
       <td class="num">${EUR(d.montant)}</td>
       <td class="num ct-r">${celluleDevReste(d)}</td>
       <td>${bdgDevis(d)}${sousStatut(d)}${bdgAFacturer(d)}</td>
@@ -9617,7 +9758,7 @@ function pDetail(p){
     <tbody>${F.map(f=>{const act=ACTES.find(x=>x.id===f.acte), an=f.statut==='annulee';
       const nom=act?act.nom:(f.libelle||'—');
       const nAv=avoirsDe(f.id).length;
-      return `<tr class="${an?'annul':''}">
+      return `<tr class="${an?'annul':''}${factVu===f.id?' vu':''}">
       <td class="mono nw">${f.id}</td><td class="mono nw" title="${DF(f.date)}">${DFP(f.date)}</td>
       <td class="el" style="max-width:150px" title="${esc(nom)}${(()=>{const FO=f.forfait?forfaitParClef(f.forfait):null;
         return FO?` — forfait de ${FO.n} séances, ${FO.faites} faite${FO.faites>1?'s':''}`:(act?'':' — facture sans acte')})()}${f.avoir?' · avoir '+EUR(f.avoir):''}">${esc(nom)}${
@@ -9625,7 +9766,7 @@ function pDetail(p){
          /* « sans acte » dirait faux sur la facture d'un forfait : elle en couvre
             plusieurs, c'est tout son objet. On dit lequel, et où il en est. */
          return FO?`<div class="mu" style="font-size:10.5px">◉ forfait ${FO.faites}/${FO.n}</div>`
-           :(act?'':'<div class="mu" style="font-size:10.5px">sans acte</div>')})()}${
+           :(act?'':'<div class="mu" style="font-size:10.5px">sans acte</div>')})()}${lienDevisFacture(f)}${
         f.avoir?`<div class="favoir" title="${nAv>1?nAv+' avoirs sur cette facture':'Avoir déduit du montant TTC'}">↩ avoir ${EUR(f.avoir)}${nAv>1?` · ${nAv}`:''}</div>`:''}</td>
       <td class="mu el" style="max-width:96px" title="${esc(f.praticien||'—')}">${esc(f.praticien||'—')}</td>
       <td class="num nw"><b>${EUR(fTTC(f))}</b></td>
@@ -9634,7 +9775,7 @@ function pDetail(p){
       <td class="num">${rdu(f)>0?`<span style="color:var(--crit-txt);font-weight:650">${EUR(rdu(f))}</span>`
         :trop(f)?`<span style="color:var(--warn);font-weight:650" title="Encaissé au-delà du dû après avoir">↩ ${EUR(trop(f))}</span>`
         :'<span class="mu">—</span>'}</td>
-      <td>${an?bdg('b-crit','⊘ Annulée'):f.avoir?bdg('b-warn','Avoir'):rdu(f)>0?bdg('b-warn','Partielle'):bdg('b-good','Soldée')}${sousFacture(f)}</td>
+      <td>${bdgFact(f)}${sousFacture(f)}</td>
       <td class="num" style="white-space:nowrap">
         ${(an||!voitRetro())?'':`<button class="btn xs ${retroSel===f.id?'g':''}"
           title="Part centre et part praticien rétrocédée"
@@ -9767,6 +9908,38 @@ V.devis=()=>{
     <thead><tr><th>Prestation</th><th class="num">Qté</th><th class="num">P.U.</th><th class="num">Total</th></tr></thead><tbody>
     ${d.lignes.map(l=>`<tr><td>${esc(l[1])}</td><td class="num">${l[2]}</td><td class="num">${EUR(l[3])}</td><td class="num">${EUR(l[2]*l[3])}</td></tr>`).join('')}
     <tr><td colspan="3" class="num"><b>Total TTC</b></td><td class="num"><b>${EUR(d.montant)}</b></td></tr></tbody></table></div>
+    ${CAN('prix')?(()=>{ const L=factDuDevis(d), reste=devAFacturer(d), F=forfaitsDuDevisVendus(d);
+      if(!L.length&&!reste&&!F.length) return '';
+      const fait=L.reduce((s,f)=>s+fTTC(f),0);
+      /* « Ce devis, où en est-il côté caisse ? » se demande sur le devis, pas
+         dans une liste de factures où il faut reconnaître un montant à l'œil. */
+      return `<div class="b" style="border-top:1px solid var(--line);padding-top:10px">
+        <div class="subt">Facturation</div>
+        ${L.length?`<div class="tw"><table class="tcomp"><thead><tr><th>Facture</th><th>Date</th>
+           <th class="num">TTC</th><th class="num">Encaissé</th><th class="num ct-r">Reste dû</th><th>État</th><th></th></tr></thead>
+          <tbody>${L.map(f=>`<tr class="c" onclick="voirFacture('${esc(f.id)}')">
+            <td class="mono nw">${esc(f.id)}</td><td class="mono nw">${DF(f.date)}</td>
+            <td class="num nw"><b>${EUR(fTTC(f))}</b></td>
+            <td class="num nw">${f.paye?EUR(f.paye):'<span class="mu">—</span>'}</td>
+            <td class="num ct-r">${rdu(f)?`<span class="rst"><b>${EUR(rdu(f))}</b></span>`:'<span class="mu">—</span>'}</td>
+            <td>${bdgFact(f)}${sousFacture(f)}</td>
+            <td class="num nw"><button class="btn xs" onclick="event.stopPropagation();voirFacture('${esc(f.id)}')">Voir</button></td>
+           </tr>`).join('')}
+           <tr><td colspan="2"><b>${L.length>1?`${L.length} factures`:'1 facture'}</b></td>
+             <td class="num"><b>${EUR(fait)}</b></td>
+             <td class="num">${EUR(L.reduce((s,f)=>s+f.paye,0))}</td>
+             <td class="num ct-r">${(()=>{const t=L.reduce((s,f)=>s+rdu(f),0);
+               return t?`<span class="rst"><b>${EUR(t)}</b></span>`:'<span class="mu">—</span>'})()}</td>
+             <td colspan="2"></td></tr></tbody></table></div>`
+          :'<div class="mu" style="font-size:11.5px">Aucune facture n’a encore été établie d’après ce devis.</div>'}
+        ${reste>0?`<div class="tip" style="margin-top:10px"><span class="e">€</span>
+          <div style="flex:1;min-width:0"><b>${EUR(reste)} restent à facturer</b> sur les ${EUR(d.montant)} de ce devis${
+            L.length?` — ${EUR(fait)} l’ont déjà été`:''}.</div>
+          ${btnFacturerDevis(d)}</div>`:''}
+        ${F.length?`<div class="mu" style="font-size:11.5px;margin-top:8px">Ce devis a ouvert ${
+          F.length>1?`${F.length} forfaits`:'un forfait'} : ${F.map(f=>`<a onclick="openPatient(${d.patient});pTab='factu';paint()"
+            >${esc(f.nom)} · ${f.faites}/${f.n}</a>`).join(', ')}. Un forfait se facture une fois, pour l’ensemble.</div>`:''}
+      </div>`})():''}
     <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">Devis valable ${d.validite||30} jours. Devis détaillé obligatoire au-delà de ${SEUIL_DEVIS} € (arrêté du 17 octobre 1996) — ou à la demande du patient. Le délai de réflexion de 15 jours ne s'impose qu'en chirurgie esthétique.</div></div></div>
    <div class="card"><div class="h"><h2>Historique &amp; relances</h2><div class="r">
      ${bdg(nRel?'b-info':'b-neu', nRel?nRel+' relance'+(nRel>1?'s':'')+' envoyée'+(nRel>1?'s':''):'aucune relance')}
@@ -9850,7 +10023,7 @@ V.devis=()=>{
       <div class="mu" style="font-size:11.5px">${(()=>{const T=devTypes(d);
         if(!T.length) return '<i>prestation libre</i>';
         const v=T.slice(0,3).map(t=>esc(acteDef(t).n)).join(' · ');
-        return v+(T.length>3?` <span class="mu">+${T.length-3}</span>`:'')})()}</div></td>
+        return v+(T.length>3?` <span class="mu">+${T.length-3}</span>`:'')})()}</div>${lienFacturesDevis(d,1)}</td>
     <td class="mono" title="${(()=>{const e=devisEtabliTxt(d);
       return esc('Devis établi le '+e.cree+(e.maj?' · modifié le '+e.maj:''))})()}">${DF(d.date)}</td>
     <td class="num">${EUR(d.montant)}</td>
@@ -10094,10 +10267,10 @@ function eDetail(){
    <th class="num">Encaissé</th><th>Mode</th><th class="num">Reste dû</th><th>Statut</th></tr></thead>
   <tbody>${L.map(f=>{const p=pById(f.patient), a=ACTES.find(x=>x.id===f.acte), an=f.statut==='annulee';
    const acte=a?a.nom:(f.libelle||'—'), md=moyenCourt(f);
-   return `<tr class="c ${an?'annul':''}" onclick="openPatient(${f.patient})">
+   return `<tr class="c ${an?'annul':''}${factVu===f.id?' vu':''}" onclick="openPatient(${f.patient})">
     <td class="mono nw">${f.id}</td><td class="mono nw" title="${DF(f.date)}">${DFP(f.date)}</td>
     <td class="el" style="max-width:106px" title="${esc(fn(p))} — dossier n° ${p.id}"><span class="nm">${esc(fn(p))}</span></td>
-    <td class="el" style="max-width:138px" title="${esc(acte)}${f.cat?' · '+esc(f.cat):''}${f.avoir?' · avoir '+EUR(f.avoir):''}">${esc(acte)}${f.avoir?`<div class="mu" style="font-size:10.5px">avoir ${EUR(f.avoir)}</div>`:''}</td>
+    <td class="el" style="max-width:138px" title="${esc(acte)}${f.cat?' · '+esc(f.cat):''}${f.avoir?' · avoir '+EUR(f.avoir):''}">${esc(acte)}${lienDevisFacture(f)}${f.avoir?`<div class="mu" style="font-size:10.5px">avoir ${EUR(f.avoir)}</div>`:''}</td>
     <td class="mu el" style="max-width:88px" title="${esc(f.praticien)}">${esc(f.praticien)}</td>
     ${cpt?`<td class="num nw">${EUR(fHT(f))}</td><td class="num mu nw">${EUR(fTVA(f))}</td>`:''}
     <td class="num nw"><b>${EUR(fTTC(f))}</b></td>
@@ -16781,7 +16954,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='FB';
+const BUILD='FC';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -17133,6 +17306,14 @@ function corpsDoc(a,d){
    ${f.paye?`<div class="l"><span>Encaissé${moyenTxt(f)?' — '+esc(moyenTxt(f)):''}</span><span>${E2(f.paye)}</span></div>`:''}
    ${(f.plan&&f.plan.n>1&&rdu(f)>0)?`<div class="l"><span>Reste à échoir · ${f.plan.n-(f.plan.faites||0)} échéance${f.plan.n-(f.plan.faites||0)>1?'s':''} de ${E2(echeance(f))}</span><span>${E2(rdu(f))}</span></div>`:''}
    ${rdu(f)?`<div class="l"><span>Reste dû</span><span>${E2(rdu(f))}</span></div>`:''}</div>
+  ${(()=>{ const id=f.devis||((f.forfait&&(forfaitById(f.forfait)||{}).devis)||null);
+    const dv=id?DEVIS.find(x=>x.id===id):null; if(!dv) return '';
+    /* La pièce que le patient garde doit dire de quel accord elle vient —
+       surtout quand elle n'en couvre qu'une partie : sans cela il compare un
+       devis à 1 400 € et une facture à 700 €, et il appelle. */
+    const reste=devAFacturer(dv);
+    return `<div class="dv-men">Établie d’après le devis <b>${esc(dv.id)}</b> du ${DF(dv.date)}, d’un montant de ${E2(dv.montant)}${
+      reste>0?` — facturation partielle : ${E2(reste)} restent à facturer sur ce devis`:''}.</div>`})()}
   <div class="dv-men">Facture acquittée le ${DF(f.date)}${f.moyen?` par ${esc(moyenTxt(f))}`:''}.
    Actes à visée esthétique non pris en charge par l’Assurance Maladie, soumis à TVA au taux de ${t} %.</div>`;
  }
