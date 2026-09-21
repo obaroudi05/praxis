@@ -17273,7 +17273,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='FF';
+const BUILD='FG';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -18076,8 +18076,10 @@ function ouvrirParapheur(refs,o){
  document.getElementById('parv').classList.add('on');
  parRender();
  padInit('parC','parOk',PAR);
+ navSuivre();                 /* une couche de plus : « précédent » la refermera */
 }
-function fermerParapheur(){ document.getElementById('parv').classList.remove('on'); PAR=null }
+function fermerParapheur(){ document.getElementById('parv').classList.remove('on'); PAR=null;
+ if(navConsommer()) return; navSuivre() }
 function parRender(){
  if(!PAR) return;
  const aS=parASigner();
@@ -18578,7 +18580,16 @@ function dvQn(i,v){ const l=DV.lignes[i]; if(!l) return;
 function dvCom(i,v){ DV.lignes[i].com=v }
 function dvPrixSet(i,v){ DV.lignes[i].prix=(v===''||v==null)?null:+v; renderDevis() }
 
-function dvEnregistrer(envoyer){
+/* Trois gestes, et non deux positions d'un même bouton.
+   « Enregistrer » garde le devis au cabinet. « Faire signer » le met sous les
+   yeux de quelqu'un qui va s'engager, ici, maintenant. « Envoyer » le fait
+   sortir. Ce sont trois conséquences différentes pour le patient, et on ne
+   doit pas découvrir après coup laquelle on a déclenchée — d'où trois
+   boutons nommés par leur effet, plutôt qu'un bouton et une case à cocher. */
+const DV_MODES=['enregistrer','signer','envoyer'];
+const dvMode=m=>m===true?'envoyer':(DV_MODES.includes(m)?m:'enregistrer');
+function dvEnregistrer(mode){
+ const M=dvMode(mode), envoyer=(M==='envoyer');
  const {net,rem}=dvNet();
  /* aucune ligne à 0 € sur un document remis au patient */
  const vide=DV.lignes.findIndex(l=>l.type===null&&!String(l.libre||'').trim());
@@ -18606,6 +18617,7 @@ function dvEnregistrer(envoyer){
    d.statut='envoye'; d.envoye=TODAYS; d.relances=0; d.derniere=null;
    logDoc(d.id,(renv?'Devis corrigé et renvoyé par ':'Devis envoyé par ')+canalPat(pById(d.patient))) }
   closeAll(); go('devis',d.id);
+  if(M==='signer'){ dvFaireSigner(d.id, nc.length); return }
   toast('Devis '+d.id+' mis à jour'+(envoyer?' et envoyé':'')
     +(nc.length?` · ${nc.length} consentement${nc.length>1?'s préparés':' préparé'}`:''));
   return;
@@ -18621,8 +18633,20 @@ function dvEnregistrer(envoyer){
  if(envoyer) logDoc(num,'Devis envoyé par '+ca);
  const nc=DV.consOn?preparerConsentements(DEVIS[0],prest):[];
  closeAll(); dF='tous'; dCat=''; dActe=''; go('devis',num);
+ if(M==='signer'){ dvFaireSigner(num, nc.length); return }
  toast((envoyer?`Devis ${num} envoyé par ${ca} à ${fn(p)} · ${EUR(net)}`:`Devis ${num} enregistré en brouillon · ${EUR(net)}`)
    +(nc.length?` · ${nc.length} consentement${nc.length>1?'s préparés':' préparé'}`:''));
+}
+/* Enregistré, puis présenté. Le devis part au parapheur avec les
+   consentements qu'il vient de préparer : le patient lit tout, et signe une
+   seule fois. Tant qu'il n'a pas signé, rien n'a changé pour lui — le devis
+   reste ce qu'il était, et le parapheur se referme sans rien laisser. */
+function dvFaireSigner(id, nc){
+ const d=DEVIS.find(x=>x.id===id);
+ if(!d){ toast('Devis introuvable'); return }
+ toast(`Devis ${id} enregistré · à faire signer`
+   +(nc?` · ${nc} consentement${nc>1?'s joints':' joint'}`:''));
+ parapheurDevis(id);
 }
 
 /* ==========================================================================
@@ -18977,8 +19001,11 @@ function renderDevis(){
   <div style="margin-left:auto;display:flex;gap:8px">
    <button class="btn" onclick="closeAll()">Annuler</button>
    <button class="btn" onclick="apercuBrouillon()">◫ Aperçu PDF</button>
-   <button class="btn" onclick="dvEnregistrer(false)">Enregistrer en brouillon</button>
-   <button class="btn p" onclick="dvEnregistrer(true)">✉ ${DV.id&&(DEVIS.find(x=>x.id===DV.id)||{}).statut!=='brouillon'?'Corriger et renvoyer':'Enregistrer et envoyer'}${CAN('prix')?' · '+EUR(T.net):''}</button></div>`;
+   <button class="btn" onclick="dvEnregistrer('enregistrer')"
+     title="Le devis est enregistré et reste au cabinet : rien ne part, personne ne signe">Enregistrer</button>
+   <button class="btn" onclick="dvEnregistrer('signer')"
+     title="Le patient est là : on enregistre, puis on lui présente le devis à l’écran">✎ Faire signer</button>
+   <button class="btn p" onclick="dvEnregistrer('envoyer')">✉ ${DV.id&&(DEVIS.find(x=>x.id===DV.id)||{}).statut!=='brouillon'?'Corriger et renvoyer':'Envoyer'}${CAN('prix')?' · '+EUR(T.net):''}</button></div>`;
  histoPlace();
 }
 /* ==========================================================================
@@ -20131,12 +20158,16 @@ let navSig=null, navT=null, navRetour=false, navFermeture=null;
 /* Les fenêtres s'empilent : un aperçu PDF s'ouvre PAR-DESSUS une consultation
    en cours. On compte donc les couches plutôt que de répondre oui ou non —
    sans quoi refermer l'aperçu emporterait la consultation avec lui. */
-const COUCHES=['over','pal','voix','pdfv'];
+const COUCHES=['over','pal','voix','pdfv','parv'];
 const navCouches=()=>COUCHES.filter(i=>{
   const e=document.getElementById(i); return !!e&&e.classList.contains('on') }).length;
 const navOuvert=()=>navCouches()>0;
 /* fermer la couche du dessus, et elle seule */
 function navFermerHaut(){
+ /* le parapheur est toujours la couche la plus haute quand il est ouvert :
+    « précédent » le referme lui, et lui seul — sans rien signer */
+ const pa=document.getElementById('parv');
+ if(pa&&pa.classList.contains('on')){ fermerParapheur(); return }
  const pv=document.getElementById('pdfv');
  if(pv&&pv.classList.contains('on')){ pv.classList.remove('on'); PV=null; return }
  navSuspendre(); fermerEcrans();
