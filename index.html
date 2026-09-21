@@ -7790,7 +7790,7 @@ function simulerEnvoi(id){
 }
 
 /* ---- composition : on choisit le canal, l'objet et la forme, puis on envoie ---- */
-function composerEnvoi(aid,id,dvId){
+function composerEnvoi(aid,id,dvId,opt){
  let p, d, docId, docNom, docK;
  const lb=(!dvId&&id)?libById(id):null;
  if(dvId){ const dv=DEVIS.find(x=>x.id===dvId); if(!dv) return;
@@ -7804,9 +7804,11 @@ function composerEnvoi(aid,id,dvId){
  const modeE=EXPEDITEUR.mode;
  const sg=docSignable(docK)&&modeE==='lien'&&!signOf(docId);
  ENV={aid, docId, docNom, docK, pid:p.id, canal, mode:modeE, sign:sg,
+   renv:!!(opt&&opt.renv), depuis:(opt&&opt.depuis)||null,
    objet:objetPour(p,docK,modeE==='lien',sg)};
  document.getElementById('envv').classList.add('on');
  renderEnvoi();
+ navSuivre();                 /* une couche de plus : « précédent » la refermera */
 }
 /* ==========================================================================
    Relancer, c'est envoyer — pas déclencher
@@ -7838,7 +7840,8 @@ function composerRelance(id){
  document.getElementById('envv').classList.add('on');
  renderEnvoi();
 }
-function fermerEnvoi(){ ENV=null; document.getElementById('envv').classList.remove('on') }
+function fermerEnvoi(){ ENV=null; document.getElementById('envv').classList.remove('on');
+ if(navConsommer()) return; navSuivre() }
 /* Un objet neutre : ni le soin, ni le motif. Une adresse mal saisie ne doit rien
    révéler de médical. */
 const objetNeutre=k=>msgDe(k).objet||'Un document de votre dossier';
@@ -7893,7 +7896,7 @@ function renderEnvoi(){
 }
 function envoyerDepuisComposeur(){
  if(!ENV) return;
- const o={canal:ENV.canal, objet:ENV.objet, mode:ENV.mode, sign:!!ENV.sign};
+ const o={canal:ENV.canal, objet:ENV.objet, mode:ENV.mode, sign:!!ENV.sign, renv:!!ENV.renv};
  const aid=ENV.aid, id=ENV.docId, k=ENV.docK, pid=ENV.pid, rel=ENV.relance;
  fermerEnvoi();
  if(rel) sendRel(id,o);
@@ -7923,6 +7926,9 @@ function envoyerDevis(id,o){
  const dv=DEVIS.find(x=>x.id===id); if(!dv) return;
  const p=pById(dv.patient);
  if(dv.statut==='brouillon'){ dv.statut='envoye'; dv.envoye=TODAYS }
+ /* un devis corrigé puis renvoyé repart de zéro : le patient vient d'être
+    contacté, la relance de demain n'aurait aucun sens */
+ else if(o&&o.renv){ dv.envoye=TODAYS; dv.relances=0; dv.derniere=null }
  const e=poserEnvoi(p,dv.id,nomDevis(dv),'devis',dv.acte||null,o);
  paint(); toast(`Devis ${id} envoyé par ${e.canal} à ${fn(p)} · ${e.ref}`);
 }
@@ -16547,7 +16553,10 @@ const canalPat=p=>p&&p.mail&&p.mail!=='—'?'e-mail':'SMS';
 function sendDoc(aid,id,o){
  const a=ACTES.find(x=>x.id===aid), p=pById(a.patient);
  const d=docsActe(a).find(x=>x.id===id); if(!d) return;
- if(d.k==='devis'){ const dv=DEVIS.find(x=>x.id===id); if(dv&&dv.statut==='brouillon'){dv.statut='envoye';dv.envoye=TODAYS} }
+ if(d.k==='devis'){ const dv=DEVIS.find(x=>x.id===id);
+   if(dv&&dv.statut==='brouillon'){dv.statut='envoye';dv.envoye=TODAYS}
+   /* même règle que par l'autre porte : un devis renvoyé repart de zéro */
+   else if(dv&&o&&o.renv){ dv.envoye=TODAYS; dv.relances=0; dv.derniere=null } }
  if(d.k!=='consentement'&&d.k!=='devis'){ const ad=DOCADD.find(x=>x.id===id); if(ad) ad.envoye=nowStamp() }
  const e=poserEnvoi(p,id,d.nom,d.k,aid,o);
  toast(d.k==='consentement'
@@ -17273,7 +17282,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='FG';
+const BUILD='FH';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -18589,7 +18598,7 @@ function dvPrixSet(i,v){ DV.lignes[i].prix=(v===''||v==null)?null:+v; renderDevi
 const DV_MODES=['enregistrer','signer','envoyer'];
 const dvMode=m=>m===true?'envoyer':(DV_MODES.includes(m)?m:'enregistrer');
 function dvEnregistrer(mode){
- const M=dvMode(mode), envoyer=(M==='envoyer');
+ const M=dvMode(mode);
  const {net,rem}=dvNet();
  /* aucune ligne à 0 € sur un document remis au patient */
  const vide=DV.lignes.findIndex(l=>l.type===null&&!String(l.libre||'').trim());
@@ -18613,29 +18622,42 @@ function dvEnregistrer(mode){
   logDoc(d.id,'Devis modifié');
   /* un devis corrigé peut avoir gagné un soin : on complète, on ne double pas */
   const nc=DV.consOn?preparerConsentements(d,prest):[];
-  if(envoyer){ const renv=d.statut!=='brouillon';
-   d.statut='envoye'; d.envoye=TODAYS; d.relances=0; d.derniere=null;
-   logDoc(d.id,(renv?'Devis corrigé et renvoyé par ':'Devis envoyé par ')+canalPat(pById(d.patient))) }
+  const renv=d.statut!=='brouillon';
   closeAll(); go('devis',d.id);
   if(M==='signer'){ dvFaireSigner(d.id, nc.length); return }
-  toast('Devis '+d.id+' mis à jour'+(envoyer?' et envoyé':'')
+  if(M==='envoyer'){ dvEnvoyer(d.id, nc.length, renv); return }
+  toast('Devis '+d.id+' mis à jour'
     +(nc.length?` · ${nc.length} consentement${nc.length>1?'s préparés':' préparé'}`:''));
   return;
  }
  const num='D-'+TODAYS.slice(2,4)+TODAYS.slice(5,7)+'-'+String(DEVIS.length+22).padStart(3,'0');
- const p=pById(DV.pid), ca=canalPat(p);
+ const p=pById(DV.pid);
+ /* un devis naît toujours brouillon : ce qui le fait sortir, c'est la fenêtre
+    d'envoi — et elle peut encore être annulée */
  DEVIS.unshift({id:num,patient:DV.pid,date:DV.date,cree:HORO(),montant:net,fam:DV.fam,
-   statut:envoyer?'envoye':'brouillon',acte:null,praticien:DV.prat,
-   envoye:envoyer?TODAYS:null,relances:0,derniere:null,lignes,prest,
+   statut:'brouillon',acte:null,praticien:DV.prat,
+   envoye:null,relances:0,derniere:null,lignes,prest,
    zones:{...prest[0].z},seances:prest[0].seances,remise:rem,validite:DV.validite,
    infos:DV.infosOn?infosPatient(prest[0].z):null,note:DV.note||''});
  logDoc(num,'Devis établi');
- if(envoyer) logDoc(num,'Devis envoyé par '+ca);
  const nc=DV.consOn?preparerConsentements(DEVIS[0],prest):[];
  closeAll(); dF='tous'; dCat=''; dActe=''; go('devis',num);
  if(M==='signer'){ dvFaireSigner(num, nc.length); return }
- toast((envoyer?`Devis ${num} envoyé par ${ca} à ${fn(p)} · ${EUR(net)}`:`Devis ${num} enregistré en brouillon · ${EUR(net)}`)
+ if(M==='envoyer'){ dvEnvoyer(num, nc.length, false); return }
+ toast(`Devis ${num} enregistré en brouillon · ${EUR(net)}`
    +(nc.length?` · ${nc.length} consentement${nc.length>1?'s préparés':' préparé'}`:''));
+}
+/* Enregistré, puis composé. « Envoyer » n'expédie rien tout seul : il ouvre
+   la fenêtre d'envoi, où l'on choisit le canal et la forme, où l'on relit
+   l'objet et le corps du message, et où l'on peut encore annuler. Tant qu'on
+   n'a pas cliqué « Envoyer » dans cette fenêtre, le devis reste un brouillon
+   et rien n'est parti. Un devis quitte le cabinet sur un geste conscient,
+   jamais sur un clic qui voulait dire « enregistrer ». */
+function dvEnvoyer(id, nc, renv){
+ const d=DEVIS.find(x=>x.id===id);
+ if(!d){ toast('Devis introuvable'); return }
+ if(nc) toast(`${nc} consentement${nc>1?'s préparés':' préparé'} avec le devis`);
+ composerEnvoi(null, null, id, {renv:!!renv, depuis:'devis'});
 }
 /* Enregistré, puis présenté. Le devis part au parapheur avec les
    consentements qu'il vient de préparer : le patient lit tout, et signe une
@@ -19104,6 +19126,7 @@ document.addEventListener('keydown',e=>{
    else voixFermer();
    return}
  if(e.key==='Escape'){ if(HFEN){histoFermerFen();return}
+   if(ENV){fermerEnvoi();return}
    if(PAR){fermerParapheur();return}
    if(VX){voixFermer();return}
    if(GAL&&GAL.lb){galFermerLb();return}
@@ -20158,7 +20181,7 @@ let navSig=null, navT=null, navRetour=false, navFermeture=null;
 /* Les fenêtres s'empilent : un aperçu PDF s'ouvre PAR-DESSUS une consultation
    en cours. On compte donc les couches plutôt que de répondre oui ou non —
    sans quoi refermer l'aperçu emporterait la consultation avec lui. */
-const COUCHES=['over','pal','voix','pdfv','parv'];
+const COUCHES=['over','pal','voix','pdfv','parv','envv'];
 const navCouches=()=>COUCHES.filter(i=>{
   const e=document.getElementById(i); return !!e&&e.classList.contains('on') }).length;
 const navOuvert=()=>navCouches()>0;
@@ -20166,6 +20189,8 @@ const navOuvert=()=>navCouches()>0;
 function navFermerHaut(){
  /* le parapheur est toujours la couche la plus haute quand il est ouvert :
     « précédent » le referme lui, et lui seul — sans rien signer */
+ const en=document.getElementById('envv');
+ if(en&&en.classList.contains('on')){ fermerEnvoi(); return }
  const pa=document.getElementById('parv');
  if(pa&&pa.classList.contains('on')){ fermerParapheur(); return }
  const pv=document.getElementById('pdfv');
