@@ -1185,6 +1185,10 @@ tr.vu>td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .psg-t{font-size:14.5px;font-weight:620;margin-bottom:6px}
 .psg-b p{font-size:12.5px;color:var(--ink-2);line-height:1.55;margin:0 0 7px}
 .psg-m{font-size:11px !important;color:var(--ink-3) !important}
+.psg-mdp{border:1px solid var(--line-2);border-radius:10px;padding:13px 14px 4px;margin:12px 0 4px;
+  background:var(--panel-2)}
+.psg-mdp-t{font-size:13px;font-weight:620;margin-bottom:10px}
+.psg-mdp .inp{width:100%}
 .psg-l{font-family:var(--mono,monospace);font-size:11.5px !important;word-break:break-all;
  background:var(--panel-3);border:1px solid var(--line);border-radius:7px;padding:7px 9px;color:var(--accent) !important}
 .sc-mat.vide a,.encf .tip a{color:var(--accent);cursor:pointer}
@@ -1908,6 +1912,17 @@ body.en-connexion aside{display:none}
   font-size:12.5px;line-height:1.45}
 .cnx-pied{font-size:11px;color:var(--mu);margin-top:18px;line-height:1.5;
   border-top:1px solid var(--bd);padding-top:13px}
+.cnx-pied a{color:var(--accent);cursor:pointer;font-weight:550}
+.cnx-oubli{margin-top:16px;border-top:1px solid var(--bd);padding-top:14px}
+.cnx-oubli .inp{width:100%;font-size:13.5px;padding:9px 11px}
+.cnx-demo{margin-top:16px;border-top:1px dashed var(--line-2);padding-top:14px}
+.cnx-demo-t{font-size:11px;font-weight:650;letter-spacing:.055em;text-transform:uppercase;
+  color:var(--ink-3);margin-bottom:5px}
+.cnx-demo-g{display:flex;flex-direction:column;gap:5px}
+.cnx-demo-g .btn{justify-content:flex-start;width:100%;font-weight:400;padding:7px 10px}
+.cnx-demo-g .btn b{font-weight:600;margin-right:6px}
+.cnx-demo-c{font-size:11.5px;color:var(--ink-2);background:var(--panel-3);
+  border:1px solid var(--line);border-radius:8px;padding:7px 9px;margin-top:9px}
 /* Le bandeau qui dit d'où viennent les données. Il vit DANS le panneau
    principal — .app est une grille à deux colonnes, un frère de .main y
    prendrait une cellule et déplacerait tout l'écran. */
@@ -7791,6 +7806,7 @@ function simulerEnvoi(id){
 
 /* ---- composition : on choisit le canal, l'objet et la forme, puis on envoie ---- */
 function composerEnvoi(aid,id,dvId,opt){
+ if(porteFermee()) return;
  let p, d, docId, docNom, docK;
  const lb=(!dvId&&id)?libById(id):null;
  if(dvId){ const dv=DEVIS.find(x=>x.id===dvId); if(!dv) return;
@@ -14152,6 +14168,9 @@ const accesDe=(uid,k)=>{ let r=null;
   return r };
 const accesVivant=a=>!!a&&!a.annule&&!a.utilise&&a.exp>=TODAYS;
 const accesUrl=a=>`https://${domaineCabinet()}/acces/${a.jeton.replace(/-/g,'').toLowerCase()}`;
+/* le chemin inverse : ce que l'adresse porte → le jeton tel qu'il est rangé */
+const dejetonner=x=>{ const n=String(x||'').replace(/-/g,'').toUpperCase();
+ return (ACCES.find(a=>a.jeton.replace(/-/g,'')===n)||{}).jeton || String(x||'') };
 function creerAcces(u,k){
  /* deux liens valables en même temps, c'est un de trop : le précédent tombe */
  ACCES.filter(a=>a.uid===u.id&&accesVivant(a)).forEach(a=>{ a.annule=nowStamp();
@@ -14265,24 +14284,54 @@ function pageAcces(j){
        <p>Ce que votre rôle permet : ${esc(droits.slice(0,6).join(' · '))}${droits.length>6?` · +${droits.length-6}`:''}.</p>
        ${u.a2f?'<p><b>La double authentification est demandée</b> : vous la réglerez juste après, avec votre téléphone.</p>':''}
        <p class="psg-l">${esc(accesUrl(a))}</p>
+       ${accesVivant(a)?`<div class="psg-mdp">
+         <div class="psg-mdp-t">Choisissez votre mot de passe</div>
+         <label class="cnx-l">Mot de passe
+           <input class="inp" id="acc-a" type="password" autocomplete="new-password"></label>
+         <label class="cnx-l">Répétez-le
+           <input class="inp" id="acc-b" type="password" autocomplete="new-password"></label>
+         <div class="mu" style="font-size:11.5px">Au moins <b>${AUTH.mdpMin} caractères</b>. Une phrase dont vous vous souvenez protège mieux qu'un mot court semé de symboles.
+           Il ne part par aucun message, et le cabinet ne le connaîtra pas : si vous l'oubliez, on vous rouvrira la porte, on ne vous le rendra pas.</div>
+       </div>`:''}
        <p class="psg-m">Lien à usage unique · valable jusqu’au ${DF(a.exp)}${
          a.k==='reprise'?` (${ACCES_J.reprise*24} h)`:''} · référence ${esc(a.jeton)}</p>`}
    </div></div>`;
- pdfView(`${ACCES_LIB[a.k]} — ${u.nom}`,
+ pdfViewAcces(`${ACCES_LIB[a.k]} — ${u.nom}`,
    `${u.mail} · ${(ACCES_ST[et]||['','—'])[1]} · simulation du parcours`,
    corps,
    accesVivant(a)
     ? `<button class="pv-b p" onclick="activerAcces('${a.jeton}')">✓ ${a.k==='invitation'?'J’active mon accès':'Je reprends mon accès'}</button>`
     : '');
 }
+/* la page d'accès passe la porte, et elle seule */
+const pdfViewAcces=(t,s2,h,a2)=>pdfView(t,s2,h,a2,true);
 function activerAcces(j){
  const a=accesParJeton(j); if(!accesVivant(a)){ toast('Ce lien ne permet plus d’ouvrir l’accès'); return }
  const u=utilById(a.uid); if(!u) return;
+ /* Le mot de passe se pose ICI, sur la page que la personne a ouverte avec son
+    lien, et nulle part ailleurs. C'est ce qui fait qu'il n'a jamais transité
+    par un message et que le cabinet ne le connaît pas. */
+ const g=id=>{ const e=document.getElementById(id); return e?e.value:'' };
+ const m1=g('acc-a'), m2=g('acc-b');
+ if(document.getElementById('acc-a')){
+   if(m1!==m2){ toast('Les deux saisies diffèrent'); return }
+   const r=poserMotDePasse(u.id, m1);
+   if(!r.ok){ toast(r.erreur); return }
+ }
  a.utilise=nowStamp();
  a.evts.push({t:a.utilise, ev:a.k==='invitation'?'Accès activé par le destinataire':'Accès repris par le destinataire'});
  u.etat='actif'; u.derniere=TODAYS;
- fermerPdf(); paint();
- toast(`${u.nom} — accès ${a.k==='invitation'?'activé':'repris'} le ${DTS(a.utilise)}`);
+ fermerPdf();
+ /* La personne vient de poser son mot de passe : on la met devant la porte,
+    identifiant déjà écrit. Elle n'a plus qu'à entrer — c'est le seul moment
+    où l'on sait à coup sûr qui elle est. */
+ if(!SRV.base && !SESSION){
+   CNX={identifiant:u.mail, motdepasse:'', code:'', totp:false, erreur:'', occupe:false};
+   peindreConnexion();
+   setTimeout(()=>{ const e=document.getElementById('cnx-mdp'); if(e) e.focus() },60);
+ } else paint();
+ toast(`${u.nom} — accès ${a.k==='invitation'?'activé':'repris'} le ${DTS(a.utilise)}`
+   + (aUnMotDePasse(u.id)?' · mot de passe enregistré':''));
 }
 /* l'état d'une personne, en une pastille : c'est la colonne qu'on lit en
    diagonale quand on se demande qui peut entrer */
@@ -14344,6 +14393,40 @@ function formInvit(){
    <button class="btn xs p" ${pret?'':'disabled'} onclick="envoyerInvit()">✉ Envoyer l’invitation</button>
   </div></div>`;
 }
+/* --------------------------------------------------------------------------
+   Le journal des tentatives de connexion
+   --------------------------------------------------------------------------
+   C'est la seule pièce qui distingue « quelqu'un s'est trompé » de « quelqu'un
+   essaie ». La première est banale et arrive à tout le monde ; la seconde ne
+   l'est pas, et elle ne se voit que là — l'écran de connexion, lui, dit la
+   même chose dans tous les cas de refus, exprès.
+
+   Il ne montre que ce qu'il faut pour juger : quand, quel identifiant a été
+   présenté, et ce qui s'est réellement passé. Aucun mot de passe, pas même
+   tronqué, pas même « le début » : un journal qui en garderait un fragment
+   serait devenu un endroit où l'on peut voler un mot de passe.
+   -------------------------------------------------------------------------- */
+function journalConnexions(){
+ if(!EST_ADMIN()) return '';
+ const L=CONNEX.slice(0,14);
+ const rate=CONNEX.filter(x=>x.issue!=='succes'&&x.issue!=='totp_requis'
+   && Date.now()-cnxQuand(x) < AUTH.freinage).length;
+ return `<div class="card" style="margin-bottom:13px"><div class="h"><h2>Connexions</h2>
+   <span class="s">${L.length?`${CONNEX.filter(x=>x.issue==='succes').length} réussie${CONNEX.filter(x=>x.issue==='succes').length>1?'s':''} · ${CONNEX.length-CONNEX.filter(x=>x.issue==='succes').length} refus`:'aucune tentative depuis l’ouverture'}</span></div>
+  ${rate>=AUTH.echecsMax?`<div class="tip" style="margin:0 13px 11px"><span class="e">⛔</span><div>
+    <b>${rate} refus dans les ${Math.round(AUTH.freinage/60000)} dernières minutes.</b>
+    Le freinage est actif : au-delà de ${AUTH.echecsMax} échecs sur un même identifiant, les tentatives sont refusées d’office pendant ${Math.round(AUTH.freinage/60000)} minutes, quel que soit le mot de passe présenté.</div></div>`:''}
+  ${L.length?`<div class="tw"><table>
+   <thead><tr><th>Quand</th><th>Identifiant présenté</th><th>Poste</th><th>Issue</th></tr></thead>
+   <tbody>${L.map(x=>{const b=CNX_ISSUE[x.issue]||['b-neu',x.issue];
+    return `<tr><td class="mono mu nw">${esc(String(x.t).slice(11,19))}</td>
+     <td class="el" style="max-width:230px" title="${esc(x.identifiant||'—')}">${esc(x.identifiant||'—')}</td>
+     <td class="mu nw">${esc(x.poste)}</td>
+     <td>${bdg(b[0],b[1])}</td></tr>`}).join('')}</tbody></table></div>`
+   :'<div class="empty">Personne ne s’est encore présenté à la porte depuis l’ouverture de cette session.</div>'}
+  <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">L’écran de connexion répond la même chose dans tous les cas de refus — identifiant inconnu, mot de passe faux, compte suspendu — pour ne pas livrer la liste des comptes du cabinet à qui essaie.
+    <b>C’est ici, et seulement ici, qu’on lit le vrai motif.</b> Aucun mot de passe n’y figure, pas même en partie.</div></div></div>`;
+}
 V.equipe=()=>{
  const U=UTILS;
  const enAttente=U.filter(u=>u.etat==='invite').length;
@@ -14382,6 +14465,7 @@ V.equipe=()=>{
    <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">Une invitation est un lien à usage unique, valable ${ACCES_J.invitation} jours, envoyé à l’adresse indiquée et inscrit au
      <a onclick="closeAll();go('envois')">registre des envois</a>. Un lien de <b>reprise d’accès</b> ne vit que ${ACCES_J.reprise*24} heures — on ne perd pas ses identifiants à l’avance.
      Aucun mot de passe n’est créé ici, ni transporté par message : il se choisit sur la page d’activation, et le cabinet ne le connaît pas.</div></div></div>
+  ${journalConnexions()}
   <div class="card"><div class="h"><h2>Matrice des droits</h2><span class="s">${EST_ADMIN()
      ?'cliquez pour autoriser ou retirer':'lecture seule — réservée au titulaire'}</span></div><div class="tw"><table>
    <thead><tr><th>Action</th>${RK.map(r=>`<th style="text-align:center">${ROLES[r].l}</th>`).join('')}</tr></thead>
@@ -14407,6 +14491,7 @@ function allerActe(id){ const a=ACTES.find(x=>x.id===id); if(a) openActe(a.patie
 function acteVoisin(d){ const L=actesPatient(AS.pid), i=L.findIndex(x=>x.id===AS.aid);
  const j=i+d; if(j<0||j>=L.length) return; allerActe(L[j].id) }
 function openActe(pid,aid,np){
+ if(porteFermee()) return;
  const a=aid?ACTES.find(x=>x.id===aid):null;
  const t0=a?a.type:null;
  AS={pid:pid||(a?a.patient:(np?null:PATIENTS[0].id)), aid:aid||null, ro:!!a, mode:acteMode, prix:a?a.prix:null, note:a?(a.note||''):'',
@@ -17282,7 +17367,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='FH';
+const BUILD='FJ';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -18071,6 +18156,7 @@ const parASigner=()=>PAR?PAR.docs.filter(x=>!x.deja):[];
 const parReste=()=>parASigner().filter(x=>!x.lu);
 
 function ouvrirParapheur(refs,o){
+ if(porteFermee()) return;
  const L=(refs||[]).map(parPiece).filter(Boolean);
  if(!L.length){ toast('Aucune pièce à faire signer'); return }
  const pid=(o&&o.pid)||L[0].pid, p=pById(pid);
@@ -18206,7 +18292,10 @@ function parapheurPatient(pid){
 }
 
 let PV=null;
-function pdfView(titre,sous,html,actions){
+function pdfView(titre,sous,html,actions,horsPorte){
+ /* une seule pièce s'affiche porte close : celle qu'on ouvre AVEC son lien
+    d'accès, pour y poser son mot de passe. Elle ne contient aucun dossier. */
+ if(porteFermee() && !horsPorte) return;
  PV=titre;
  document.getElementById('pvbar').innerHTML=`
   <span class="tt">${esc(titre)}</span><span class="ss">${esc(sous)}</span>
@@ -18270,6 +18359,7 @@ let dvPlie=false;
    propose tous les actes, et la trame du document se déduit d'eux. */
 const dvChoix=pid=>openDevis(pid);
 function openDevis(pid,fam,did){
+ if(porteFermee()) return;
  const d=did?DEVIS.find(x=>x.id===did):null;
  const f=fam||(d?d.fam:'esth')||'esth';
  /* aucune prestation prédéfinie : c'est au praticien de choisir l'acte */
@@ -20361,6 +20451,11 @@ function paint(){
        if(e!==m && e.id!=='toast' && e.tagName!=='SCRIPT') e.remove() });
      m.innerHTML=prisePage(); }
    return }
+ /* La porte. Tant que personne n'est entré, aucun écran de dossiers ne se
+    peint — et ce n'est pas un masquage : paint() rend la main, il n'y a rien
+    à retrouver dans la page. En mode serveur, c'est SRV.moi qui fait foi. */
+ if(!SRV.base && !SESSION && !SRV.moi){ peindreConnexion(); return }
+ if(veillerSession()) return;
  const al=ROLES[role].v; if(!al.includes(view))view='dash';
  document.querySelectorAll('#nav a[data-v]').forEach(a=>{a.classList.toggle('on',a.dataset.v===view);
   a.style.display=al.includes(a.dataset.v)?'':'none'});
@@ -20384,7 +20479,11 @@ function paint(){
     démarrage — sinon entrer par le formulaire de connexion le laisserait en
     place, ce qui est exactement ce qui est arrivé. */
  const br=document.getElementById('btn-role');   if(br) br.style.display=CONNECTE()?'none':'';
- const bs=document.getElementById('btn-sortir'); if(bs) bs.style.display=CONNECTE()?'':'none';
+ /* la porte se referme aussi sans serveur : dès qu'une session est ouverte
+    ici, le bouton de sortie existe — une porte qui ne s'ouvre que dans un sens
+    n'est pas une porte */
+ const bs=document.getElementById('btn-sortir');
+ if(bs) bs.style.display=(CONNECTE()||!!SESSION)?'':'none';
  document.getElementById('avat').textContent=ROLES[role].i;
  document.getElementById('who').innerHTML=`${ROLES[role].u}<small>${ROLES[role].l}</small>`;
  document.getElementById('main').innerHTML=bandeauHTML()+bandeauSaisie()+(V[view]||V.dash)();
@@ -21200,6 +21299,286 @@ async function srvMoi(){
      · Le champ du second facteur n'apparaît QUE si le serveur l'a demandé.
        Le montrer d'emblée dirait à qui essaie quels comptes en sont pourvus.
    ========================================================================== */
+/* ==========================================================================
+   LA PORTE — l'authentification du poste, sans serveur
+   --------------------------------------------------------------------------
+   Le lot 02 a construit une authentification complète côté serveur : Argon2id,
+   second facteur, freinage, journal. L'écran qui l'appelle existe aussi — mais
+   il ne s'affichait QUE lorsqu'un serveur répondait. Sur le poste du cabinet,
+   sans serveur, le logiciel s'ouvrait sur les dossiers : la porte était un
+   dessin de porte.
+
+   Ce bloc lui donne un pêne. Les règles ne sont pas réinventées : ce sont
+   exactement celles du serveur, recopiées ici parce qu'un écran qui apprendrait
+   d'autres habitudes que le serveur serait un écran qui ment.
+
+     · UN SEUL MESSAGE DE REFUS. Identifiant inconnu, mot de passe faux, compte
+       suspendu : « Identifiant ou mot de passe incorrect. » Distinguer les cas
+       offrirait à qui essaie la liste des comptes du cabinet. Le journal, lui,
+       note le vrai motif — c'est là qu'il sert, et lui n'est pas public.
+
+     · ON VÉRIFIE MÊME QUAND LE COMPTE N'EXISTE PAS. Sinon la réponse revient
+       tout de suite pour un compte inconnu et après un calcul pour un compte
+       réel, et la liste des comptes se lit au chronomètre.
+
+     · LE SECOND FACTEUR NE S'ANNONCE QU'APRÈS le mot de passe. Le montrer
+       d'emblée dirait quels comptes en sont pourvus.
+
+     · LE MOT DE PASSE N'EST JAMAIS CONSERVÉ. Ni ici, ni dans le classeur local,
+       ni dans une sauvegarde : seulement une empreinte salée et étirée. Le
+       cabinet ne peut pas retrouver le mot de passe de quelqu'un — il ne peut
+       que lui rouvrir la porte, ce que fait déjà la procédure de connexion.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   SHA-256, en clair dans la page
+   --------------------------------------------------------------------------
+   Le navigateur en propose un (crypto.subtle), mais seulement en contexte
+   sécurisé : ouvert depuis un fichier local, il n'existe pas. Un logiciel qui
+   refuserait de s'ouvrir selon la façon dont on l'a lancé serait insupportable
+   à déboguer, et la tentation serait alors de garder le mot de passe en clair
+   « juste pour ce cas-là ». Trente lignes valent mieux que cette tentation.
+   -------------------------------------------------------------------------- */
+const SHA256=(()=>{
+ const K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+ 0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+ 0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+ 0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+ 0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+ 0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+ 0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+ 0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+ const rr=(x,n)=>(x>>>n)|(x<<(32-n));
+ return function(txt){
+  const o=unescape(encodeURIComponent(txt));
+  const L=o.length, N=(((L+8)>>6)+1)<<4, m=new Uint32Array(N);
+  for(let i=0;i<L;i++) m[i>>2]|=o.charCodeAt(i)<<((3-(i&3))<<3);
+  m[L>>2]|=0x80<<((3-(L&3))<<3); m[N-1]=L<<3;
+  let H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const w=new Uint32Array(64);
+  for(let i=0;i<N;i+=16){
+   for(let j=0;j<16;j++) w[j]=m[i+j];
+   for(let j=16;j<64;j++){
+    const a=w[j-15], b=w[j-2];
+    const s0=rr(a,7)^rr(a,18)^(a>>>3), s1=rr(b,17)^rr(b,19)^(b>>>10);
+    w[j]=(w[j-16]+s0+w[j-7]+s1)>>>0;
+   }
+   let [a,b,c,d,e,f,g,h]=H;
+   for(let j=0;j<64;j++){
+    const S1=rr(e,6)^rr(e,11)^rr(e,25), ch=(e&f)^(~e&g);
+    const t1=(h+S1+ch+K[j]+w[j])>>>0;
+    const S0=rr(a,2)^rr(a,13)^rr(a,22), mj=(a&b)^(a&c)^(b&c);
+    const t2=(S0+mj)>>>0;
+    h=g; g=f; f=e; e=(d+t1)>>>0; d=c; c=b; b=a; a=(t1+t2)>>>0;
+   }
+   H=[H[0]+a,H[1]+b,H[2]+c,H[3]+d,H[4]+e,H[5]+f,H[6]+g,H[7]+h].map(x=>x>>>0);
+  }
+  return H.map(x=>x.toString(16).padStart(8,'0')).join('');
+ };
+})();
+
+/* Les réglages de sécurité en un seul endroit, comme dans auth.mjs, pour qu'on
+   puisse les relire d'un coup d'œil plutôt que d'aller les chercher. */
+const AUTH = {
+  mdpMin: 12,          /* l'ANSSI privilégie la longueur aux règles de composition */
+  tours: 8000,         /* étirement. Le serveur, lui, utilise Argon2id */
+  echecsMax: 8,        /* échecs sur UN compte avant freinage */
+  freinage: 15*60*1000,
+  inactivite: 30*60*1000,
+};
+const REFUS_CNX = 'Identifiant ou mot de passe incorrect.';
+
+/* La porte, vue de l'intérieur du logiciel.
+   -------------------------------------------------------------------------
+   paint() la tient pour les écrans. Mais une fenêtre — une saisie d'acte, un
+   devis, un aperçu de document — ne passe pas par paint() : elle se peint
+   elle-même par-dessus. Sans cette garde, un appel resté en l'air (une
+   minuterie, un raccourci clavier, une reprise de saisie) ouvrirait un dossier
+   par-dessus l'écran de connexion. On ferme donc au même endroit que le
+   verrou : à chaque porte, et pas seulement à la principale. */
+const porteFermee=()=>!SRV.base && !SESSION && !SRV.moi;
+
+let MDP = {};        /* uid → {sel, e} — jamais le mot de passe */
+let CONNEX = [];     /* le journal des tentatives, succès compris */
+let SESSION = null;  /* {uid, depuis, derniere} */
+/* Le nom et les initiales d'usine de chaque rôle : on les rend à la
+   déconnexion, sinon le rôle garderait le nom du dernier connecté. */
+const ROLES_USAGE = Object.fromEntries(RK.map(r=>[r,{u:ROLES[r].u,i:ROLES[r].i}]));
+
+const empreinteMdp=(mdp,sel,tours)=>{
+ let h=SHA256(sel+'\u0000'+String(mdp));
+ const n=tours||AUTH.tours;
+ for(let i=0;i<n;i++) h=SHA256(h+sel);
+ return h;
+};
+/* Une comparaison qui ne dit pas, par le temps qu'elle met, jusqu'où elle a
+   trouvé juste. Deux empreintes font la même longueur : on les parcourt en
+   entier, toujours. */
+const memeEmpreinte=(a,b)=>{
+ const x=String(a||''), y=String(b||'');
+ if(x.length!==y.length) return false;
+ let d=0; for(let i=0;i<x.length;i++) d|=x.charCodeAt(i)^y.charCodeAt(i);
+ return d===0;
+};
+/* L'empreinte de comparaison des comptes qui n'existent pas. Elle ne
+   correspond à aucun mot de passe : elle ne sert qu'à prendre le même temps. */
+const SEL_FANTOME='fantome';
+const MDP_FANTOME=empreinteMdp('\u0000aucun compte\u0000', SEL_FANTOME, 1);
+
+function poserMotDePasse(uid, mdp){
+ const m=String(mdp||'');
+ if(m.length < AUTH.mdpMin)
+   return {ok:false, erreur:`Au moins ${AUTH.mdpMin} caractères — une phrase dont vous vous souvenez protège mieux qu’un mot court avec des symboles.`};
+ const sel=jetonNeuf();
+ MDP[uid]={sel, e:empreinteMdp(m, sel)};
+ return {ok:true};
+}
+const aUnMotDePasse=uid=>!!MDP[uid];
+
+/* --------------------------------------------------------------------------
+   Le journal des tentatives
+   --------------------------------------------------------------------------
+   Il note le VRAI motif, celui que l'écran ne dit pas. C'est la seule pièce
+   qui permette de distinguer « quelqu'un s'est trompé » de « quelqu'un
+   essaie » — et la première est banale, la seconde ne l'est pas.
+   -------------------------------------------------------------------------- */
+const CNX_ISSUE={succes:['b-good','✓ Connecté'], inconnu:['b-neu','Identifiant inconnu'],
+  secret_faux:['b-crit','Mot de passe faux'], desactive:['b-crit','Compte suspendu'],
+  sans_secret:['b-warn','Accès jamais activé'], totp_requis:['b-info','Code demandé'],
+  totp_faux:['b-crit','Code faux'], bloque:['b-crit','⛔ Freiné'], vide:['b-neu','Champs vides']};
+
+function tracerCnx(issue, identifiant, uid){
+ CONNEX.unshift({t:nowStampS(), issue, identifiant:String(identifiant||''), uid:uid||null,
+   poste:POSTE_NOM});
+ if(CONNEX.length>400) CONNEX.length=400;
+ return issue;
+}
+/* Le poste, pas l'adresse IP : sur le réseau du cabinet, toutes les adresses
+   se ressemblent, et ce qu'on veut savoir c'est « depuis quel ordinateur ». */
+const POSTE_NOM='ce poste';
+const nowStampS=()=>{ const n=new Date();
+ return `${TODAYS}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}:${String(n.getSeconds()).padStart(2,'0')}` };
+const cnxQuand=x=>new Date(String(x.t).replace(' ','T')).getTime();
+
+function freineCnx(identifiant){
+ const id=String(identifiant||'').toLowerCase();
+ const depuis=Date.now()-AUTH.freinage;
+ const n=CONNEX.filter(x=>x.issue!=='succes' && x.issue!=='totp_requis'
+   && x.identifiant.toLowerCase()===id && cnxQuand(x)>depuis).length;
+ return n>=AUTH.echecsMax;
+}
+
+/* --------------------------------------------------------------------------
+   Se connecter
+   -------------------------------------------------------------------------- */
+function connecterLocal(d){
+ const identifiant=String(d.identifiant||'').trim().toLowerCase();
+ const mdp=String(d.motdepasse||'');
+ if(!identifiant || !mdp){
+   tracerCnx('vide', identifiant, null);
+   return {ok:false, erreur:'Identifiant et mot de passe sont requis.'};
+ }
+ if(freineCnx(identifiant)){
+   tracerCnx('bloque', identifiant, null);
+   return {ok:false, erreur:`Trop de tentatives. Réessayez dans ${Math.round(AUTH.freinage/60000)} minutes.`};
+ }
+ const u=UTILS.find(x=>String(x.mail||'').toLowerCase()===identifiant) || null;
+ const s=u?MDP[u.id]:null;
+
+ /* Même quand le compte n'existe pas, on calcule une empreinte : sans cela la
+    réponse revient en un clin d'œil pour un compte inconnu et après un temps
+    pour un compte réel, ce qui livre la liste des comptes au chronomètre. */
+ if(!u || !s){
+   empreinteMdp(mdp, SEL_FANTOME, 1);
+   tracerCnx(u?'sans_secret':'inconnu', identifiant, u?u.id:null);
+   return {ok:false, erreur:REFUS_CNX};
+ }
+ if(u.etat==='suspendu'){
+   empreinteMdp(mdp, SEL_FANTOME, 1);
+   tracerCnx('desactive', identifiant, u.id);
+   return {ok:false, erreur:REFUS_CNX};
+ }
+ if(!memeEmpreinte(empreinteMdp(mdp, s.sel), s.e)){
+   tracerCnx('secret_faux', identifiant, u.id);
+   return {ok:false, erreur:REFUS_CNX};
+ }
+ /* Le second facteur, si le compte l'a activé. */
+ if(u.a2f){
+   if(!d.code){
+     tracerCnx('totp_requis', identifiant, u.id);
+     return {ok:false, totp:true, erreur:'Code de votre application d’authentification.'};
+   }
+   if(!codeA2fValide(u, d.code)){
+     tracerCnx('totp_faux', identifiant, u.id);
+     return {ok:false, totp:true, erreur:'Code incorrect ou expiré.'};
+   }
+ }
+ tracerCnx('succes', identifiant, u.id);
+ ouvrirSessionLocale(u);
+ return {ok:true, utilisateur:u};
+}
+
+/* En démonstration, le second facteur n'a pas d'application derrière lui : on
+   accepte le code que la fiche de l'utilisateur annonce, et on le montre à
+   l'écran. Le vrai logiciel vérifie un TOTP ; ce que cet écran éprouve, c'est
+   l'enchaînement — mot de passe, PUIS code — pas la cryptographie du code. */
+const codeA2fDemo=u=>String(1000 + (String(u.id).split('').reduce((s,c)=>s+c.charCodeAt(0),0)*7)%9000).slice(0,4)+'12';
+const codeA2fValide=(u,code)=>String(code||'').trim()===codeA2fDemo(u);
+
+function ouvrirSessionLocale(u){
+ SESSION={uid:u.id, depuis:Date.now(), derniere:Date.now()};
+ role=u.role;
+ /* le logiciel attribue ce qui se fait à ROLES[role].u : on y met le nom de
+    qui est entré, sinon tout serait signé du nom d'usine du rôle */
+ ROLES[role].u=u.nom; ROLES[role].i=u.i;
+ u.derniere=TODAYS;
+ document.body.classList.remove('en-connexion');
+ const b=document.getElementById('btn-sortir'); if(b) b.style.display='';
+}
+
+function deconnecter(motif){
+ SESSION=null;
+ RK.forEach(r=>{ ROLES[r].u=ROLES_USAGE[r].u; ROLES[r].i=ROLES_USAGE[r].i });
+ CNX={identifiant:'', motdepasse:'', code:'', totp:false, erreur:'', occupe:false};
+ if(motif) CNX.erreur=motif;
+ fermerEcrans();
+ const b=document.getElementById('btn-sortir'); if(b) b.style.display='none';
+ peindreConnexion();
+}
+
+/* Trente minutes sans rien faire, et la porte se referme. Un poste de
+   consultation reste rarement seul dans une pièce fermée à clé. */
+function veillerSession(){
+ if(!SESSION) return;
+ if(Date.now()-SESSION.derniere > AUTH.inactivite){
+   deconnecter('Session fermée après ' + Math.round(AUTH.inactivite/60000)
+     + ' minutes sans activité.');
+   return true;
+ }
+ SESSION.derniere=Date.now();
+ return false;
+}
+
+/* --------------------------------------------------------------------------
+   Mot de passe oublié
+   --------------------------------------------------------------------------
+   Le cabinet ne peut pas rendre un mot de passe : il n'en connaît aucun. Il
+   peut rouvrir la porte, et c'est la procédure de connexion déjà en place.
+   La réponse est la MÊME que l'adresse existe ou non — sinon ce formulaire
+   devient un moyen commode de savoir qui travaille ici.
+   -------------------------------------------------------------------------- */
+function demanderReprise(adresse){
+ const a=String(adresse||'').trim().toLowerCase();
+ const u=UTILS.find(x=>String(x.mail||'').toLowerCase()===a);
+ if(u && u.etat!=='suspendu' && MAIL_OK(u.mail)){
+   const garde=role; role='admin';        /* l'envoi est un acte du cabinet */
+   try{ envoyerAcces(u,'reprise', `Reprise d’accès à ${CABINET.nom||'PRAXIS'}`) }
+   finally{ role=garde }
+ }
+ return `Si un compte correspond à ${a || 'cette adresse'}, un lien de reprise vient d’y être envoyé. `
+   + `Il vaut ${ACCES_J.reprise*24} heures.`;
+}
+
 let CNX = {identifiant:'', motdepasse:'', code:'', totp:false, erreur:'', occupe:false};
 
 function ecranConnexion(){
@@ -21207,6 +21586,7 @@ function ecranConnexion(){
    <div class="cnx-tete">
      <div class="cnx-logo">${esc(CABINET.nom||'PRAXIS')}</div>
      <div class="cnx-sous">${CNX.totp?'Code de votre application d’authentification':'Identifiez-vous pour ouvrir les dossiers'}</div>
+     ${(CNX.totp&&!SRV.base)?`<div class="cnx-demo-c">Démonstration : le code est <b class="mono">${esc(codeA2fAttendu())}</b></div>`:''}
    </div>
    ${CNX.erreur?`<div class="cnx-err"><span class="e">⚠</span><div>${esc(CNX.erreur)}</div></div>`:''}
    <form onsubmit="cnxEnvoyer(event)" autocomplete="on">
@@ -21228,9 +21608,68 @@ function ecranConnexion(){
        ${CNX.occupe?'Un instant…':(CNX.totp?'Valider le code':'Se connecter')}</button>
    </form>
    ${CNX.totp?`<button class="btn g cnx-retour" onclick="CNX={identifiant:'',motdepasse:'',code:'',totp:false,erreur:'',occupe:false};peindreConnexion()">Recommencer</button>`:''}
-   <div class="cnx-pied">Mot de passe oublié : demandez un lien à l’administrateur du cabinet.
-     Personne ne peut choisir votre mot de passe à votre place.</div>
+   ${cnxOubli()}
+   ${cnxDemo()}
  </div></div>`;
+}
+
+/* --------------------------------------------------------------------------
+   « J'ai oublié mon mot de passe »
+   --------------------------------------------------------------------------
+   Personne ne peut le rendre : le cabinet n'en connaît aucun. Ce qu'on peut
+   faire, c'est rouvrir la porte pour vingt-quatre heures — la procédure de
+   connexion déjà en place. Et la réponse est la même que l'adresse existe ou
+   non : un formulaire qui répondrait « compte inconnu » deviendrait un moyen
+   commode de savoir qui travaille ici.
+   -------------------------------------------------------------------------- */
+/* le code que l'écran attend pour la personne en train de s'identifier */
+const codeA2fAttendu=()=>{
+ const u=UTILS.find(x=>String(x.mail||'').toLowerCase()===String(CNX.identifiant||'').trim().toLowerCase());
+ return u?codeA2fDemo(u):'——————';
+};
+function cnxOubli(){
+ if(CNX.totp) return '';
+ if(CNX.oubliFait) return `<div class="cnx-pied"><b>✓ Demande enregistrée.</b><br>${esc(CNX.oubliFait)}</div>`;
+ if(!CNX.oubli) return `<div class="cnx-pied">
+   <a onclick="CNX.oubli=true;CNX.erreur='';peindreConnexion();setTimeout(()=>{const e=document.getElementById('cnx-oubli');if(e)e.focus()},40)">Mot de passe oublié ?</a>
+   — personne ne peut choisir votre mot de passe à votre place, pas même le cabinet.</div>`;
+ return `<div class="cnx-oubli">
+   <div class="cnx-l" style="font-weight:600">Rouvrir mon accès</div>
+   <div class="mu" style="font-size:11.5px;margin:2px 0 7px">Un lien de reprise part à votre adresse. Il vaut ${ACCES_J.reprise*24} heures et ne sert qu'une fois.</div>
+   <input class="inp" id="cnx-oubli" type="email" placeholder="votre adresse au cabinet"
+          value="${esc(CNX.identifiant)}">
+   <div class="r" style="display:flex;gap:7px;margin-top:8px">
+     <button class="btn g" onclick="CNX.oubli=false;peindreConnexion()">Annuler</button>
+     <button class="btn p" onclick="cnxDemanderReprise()">Envoyer le lien</button>
+   </div></div>`;
+}
+function cnxDemanderReprise(){
+ const e=document.getElementById('cnx-oubli');
+ const a=e?e.value:CNX.identifiant;
+ CNX.oubliFait=demanderReprise(a);
+ CNX.oubli=false;
+ peindreConnexion();
+}
+
+/* En démonstration — aucun dossier réel — on entre d'un clic, et l'écran le
+   dit franchement. Cacher la porte derrière un mot de passe que personne n'a
+   ne protégerait rien : il n'y a rien à protéger dans ce jeu de données. */
+function cnxDemo(){
+ if(SRV.base || CNX.totp || CNX.oubli) return '';
+ const L=UTILS.filter(u=>u.etat==='actif');
+ return `<div class="cnx-demo">
+   <div class="cnx-demo-t">Démonstration — aucun dossier réel</div>
+   <div class="mu" style="font-size:11.5px;margin-bottom:8px">Les dossiers de cette version sont inventés. Entrez tel ou tel membre de l'équipe pour voir ce que chacun a le droit de voir.</div>
+   <div class="cnx-demo-g">${L.map(u=>`<button class="btn xs" onclick="entrerDemo('${u.id}')">
+     <b>${esc(u.nom)}</b> <span class="mu">${esc((ROLES[u.role]||{}).l||u.role)}</span></button>`).join('')}</div>
+ </div>`;
+}
+function entrerDemo(uid){
+ const u=utilById(uid); if(!u) return;
+ tracerCnx('succes', u.mail, u.id);
+ ouvrirSessionLocale(u);
+ CNX={identifiant:'',motdepasse:'',code:'',totp:false,erreur:'',occupe:false};
+ paint(); toast(`Bonjour ${u.nom} — démonstration`);
 }
 
 async function cnxEnvoyer(ev){
@@ -21243,7 +21682,29 @@ async function cnxEnvoyer(ev){
                 CNX.motdepasse =g('cnx-mdp')||CNX.motdepasse }
  else CNX.code=g('cnx-code')||CNX.code;
 
- CNX.occupe=true; CNX.erreur=''; peindreConnexion();
+ CNX.occupe=true; CNX.erreur='';
+
+ /* Sans serveur, c'est le poste qui tient la porte — mêmes règles, mêmes
+    mots. On ne repeint pas avant : le calcul de l'empreinte est synchrone et
+    l'écran « Un instant… » n'aurait le temps de rien montrer. */
+ if(!SRV.base){
+   const rl=connecterLocal({identifiant:CNX.identifiant, motdepasse:CNX.motdepasse,
+                            ...(CNX.totp?{code:CNX.code}:{})});
+   CNX.occupe=false;
+   if(rl.ok){
+     const nom=rl.utilisateur.nom;
+     CNX={identifiant:'',motdepasse:'',code:'',totp:false,erreur:'',occupe:false};
+     paint(); toast(`Bonjour ${nom}`);
+     return;
+   }
+   if(rl.totp && !CNX.totp){ CNX.totp=true; CNX.erreur=''; CNX.code=''; peindreConnexion();
+     setTimeout(()=>{const e=document.getElementById('cnx-code'); if(e) e.focus()},50); return }
+   CNX.erreur=rl.erreur; if(CNX.totp) CNX.code='';
+   CNX.motdepasse='';
+   peindreConnexion(); return;
+ }
+
+ peindreConnexion();
  let r;
  try{
    r = await srvAppel('POST','/api/connexion',
@@ -21273,6 +21734,19 @@ async function cnxEnvoyer(ev){
 
 function peindreConnexion(){
  document.body.classList.add('en-connexion');
+ /* et l'on vide ce qui aurait pu rester ouvert : masquer une fenêtre laisse
+    son contenu dans la page, où il se retrouve au copier-coller ou à la
+    lecture d'écran. On retire, on ne cache pas. */
+ ['over','pal','pdfv','parv','envv','voix'].forEach(i=>{
+   const e=document.getElementById(i); if(e) e.classList.remove('on');
+ });
+ /* On vide le CONTENU, pas les conteneurs : leur squelette (en-tête, corps,
+    pied) est écrit dans la page et c'est lui que les écrans viennent remplir.
+    Le supprimer reviendrait à casser la fenêtre pour la fermer. */
+ ['overh','overb','overf','pvbar','pvsc','palist','parNav','parDoc','parA','envB','envF']
+   .forEach(i=>{ const e=document.getElementById(i); if(e) e.innerHTML='' });
+ const vx=document.getElementById('voix'); if(vx) vx.innerHTML='';
+ const sc=document.getElementById('scrim'); if(sc) sc.classList.remove('on');
  document.getElementById('main').innerHTML = ecranConnexion();
  const p=document.getElementById('cnx-mdp'); if(p) p.value=CNX.motdepasse;
 }
@@ -21332,6 +21806,10 @@ function peindreEnrolement(){
 }
 
 async function srvDeconnecter(){
+ /* Sans serveur, il n'y a rien à fermer côté distant : on referme la porte
+    ici, et on ne recharge pas — recharger perdrait la saisie en cours et
+    remettrait le classeur local à plat pour rien. */
+ if(!SRV.base){ deconnecter(); toast('Vous êtes déconnecté'); return }
  try{ await srvAppel('POST','/api/deconnexion') }catch(e){}
  location.reload();
 }
@@ -21419,6 +21897,12 @@ function srvAppliquerDroits(d, moi){
    try{ if(navigator.storage&&navigator.storage.persist) await navigator.storage.persist() }catch(e){}
  }
  clActif=true;
+ /* Un lien de reprise ou d'invitation dans l'adresse : la personne vient
+    poser son mot de passe, elle n'a pas encore de quoi se connecter. */
+ try{
+   const m=/[?&#]acces=([A-Za-z0-9-]+)/.exec(location.search+location.hash);
+   if(m){ const a=accesParJeton(dejetonner(m[1])); if(a){ pageAcces(a.jeton); initVersion(); return } }
+ }catch(_){}
  paint();
  /* l'écran de départ existe dans l'historique, sinon le premier « précédent »
     n'aurait rien à rejouer et sortirait du logiciel */
