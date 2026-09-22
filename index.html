@@ -2652,6 +2652,8 @@ body.mode-prise #main{padding:0;max-width:none}
       <a data-v="relances"><span class="i">↻</span>Relances auto<span class="n" id="n-rel">0</span></a>
       <div class="sgroup">Logistique</div>
       <a data-v="stock"><span class="i">▧</span>Stock &amp; lots<span class="n" id="n-stock">0</span></a>
+      <div class="sgroup">Traçabilité</div>
+      <a data-v="acces"><span class="i">◷</span>Journal des accès</a>
       <div class="sgroup">Admin</div>
       <a data-v="equipe"><span class="i">◎</span>Équipe &amp; droits</a>
       <a data-v="params"><span class="i">⚙</span>Paramètres</a>
@@ -5028,10 +5030,10 @@ let RULES=[
    consommé du stock. Le médecin soigne et pilote son activité, sans accès aux
    volumes ni à la traçabilité destructive. */
 const ROLES={
- admin:{l:'Administrateur',u:'Dr O. Baroudi',i:'OB',v:['dash','stats','envois','patients','actes','devis','encaiss','relances','stock','equipe','params'],med:true,prix:true,compta:true,volumes:true,suppTrace:true,encaisse:true,caCabinet:true,retro:true},
- praticien:{l:'Médecin',u:'Dr A. Merlin',i:'AM',v:['dash','stats','envois','patients','actes','devis','encaiss','relances','stock','equipe','params'],med:true,prix:true,compta:true,encaisse:true,caCabinet:false},
- assistante:{l:'Assistante',u:'L. Roche',i:'LR',v:['dash','stats','envois','patients','actes','devis','relances','stock'],med:true,prix:true,compta:false,encaisse:true,caCabinet:false},
- secretariat:{l:'Secrétariat',u:'N. Faure',i:'NF',v:['dash','envois','patients','devis','relances','stock'],med:false,prix:true,compta:false,encaisse:true,caCabinet:false},
+ admin:{l:'Administrateur',u:'Dr O. Baroudi',i:'OB',v:['dash','stats','envois','patients','actes','devis','encaiss','relances','stock','acces','equipe','params'],med:true,prix:true,compta:true,volumes:true,suppTrace:true,encaisse:true,caCabinet:true,retro:true},
+ praticien:{l:'Médecin',u:'Dr A. Merlin',i:'AM',v:['dash','stats','envois','patients','actes','devis','encaiss','relances','stock','acces','equipe','params'],med:true,prix:true,compta:true,encaisse:true,caCabinet:false},
+ assistante:{l:'Assistante',u:'L. Roche',i:'LR',v:['dash','stats','envois','patients','actes','devis','relances','stock','acces'],med:true,prix:true,compta:false,encaisse:true,caCabinet:false},
+ secretariat:{l:'Secrétariat',u:'N. Faure',i:'NF',v:['dash','envois','patients','devis','relances','stock','acces'],med:false,prix:true,compta:false,encaisse:true,caCabinet:false},
 };
 /* prix     = voir les montants d'un acte, d'un devis, d'une facture (métier : facturer, encaisser)
    encaisse = saisir et corriger un règlement, depuis la fiche du patient
@@ -7213,6 +7215,7 @@ function majFiche(){
  apA.filter(a=>!avA.includes(a)).forEach(a=>ch.push({l:'Antécédent ajouté', av:'', ap:a}));
  avA.filter(a=>!apA.includes(a)).forEach(a=>ch.push({l:'Antécédent retiré', av:a, ap:''}));
  if(!ch.length){ PE=null; paint(); toast('Aucune modification à enregistrer'); return }
+ tracerEcrit(x.id, 'fiche · identité');
  Object.assign(x, nouv);
  (PMAJ[x.id]=PMAJ[x.id]||[]).push({t:nowStamp(), par:ROLES[role].u, ch});
  PE=null; paint();
@@ -7819,6 +7822,9 @@ function composerEnvoi(aid,id,dvId,opt){
  /* un devis ou un consentement part pour être signé : c'est le cas courant */
  const modeE=EXPEDITEUR.mode;
  const sg=docSignable(docK)&&modeE==='lien'&&!signOf(docId);
+ /* composer un envoi, c'est ouvrir une pièce du dossier et la préparer pour
+    qu'elle en sorte : à inscrire au même titre qu'une consultation */
+ tracerVu(p.id,'dossier','envoi · '+docNom);
  ENV={aid, docId, docNom, docK, pid:p.id, canal, mode:modeE, sign:sg,
    renv:!!(opt&&opt.renv), depuis:(opt&&opt.depuis)||null,
    objet:objetPour(p,docK,modeE==='lien',sg)};
@@ -8369,6 +8375,8 @@ function pFiche(){
      ${nav(-1,'‹')}${nav(1,'›')}
      <button class="btn s" onclick="toast('SMS ouvert')" title="Envoyer un SMS">💬</button>
      <button class="btn s" onclick="toast('E-mail ouvert')" title="Envoyer un e-mail">✉</button>
+     ${EST_ADMIN()?`<button class="btn s" title="Qui a ouvert ce dossier, et quand"
+       onclick="accVoirDossier(${p.id})">◷</button>`:''}
      <button class="btn" onclick="dvChoix(${p.id})">📄 Devis</button>
      <button class="btn p" onclick="openActe(${p.id})">✚ Nouvel acte</button>
      ${CAN('suppTrace')?(()=>{const B=bilanPatient(p.id);
@@ -14477,7 +14485,7 @@ V.equipe=()=>{
          :'non modifiable')}"`:`onclick="toggleDroit('${r}',${i})"`}>${on?'✓':'—'}</button></td>`}).join('')}
     </tr>`).join('')}</tbody></table></div>
    <div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">${EST_ADMIN()?''
-     :'<b>Cette matrice est en lecture seule.</b> Seul le titulaire du cabinet accorde ou retire un droit — une matrice que chacun peut réécrire ne protège personne.<br>'}La colonne <b>Administrateur</b> n'est pas modifiable : le titulaire du cabinet répond de la traçabilité, il garde donc l'accès aux volumes de produit et le droit d'effacer un acte déjà tracé.<br>Le <b>suivi comptable</b> est la ligne qui sépare « facturer » de « piloter » : sans ce droit, un utilisateur émet les factures, encaisse et relance les impayés, mais ne voit ni le chiffre d'affaires cumulé, ni la TVA, ni la rétrocession.<br>Chaque accès à une donnée de santé est journalisé (utilisateur, patient, horodatage). Obligation de l'agrément HDS et de l'article 9 du RGPD.</div></div></div>
+     :'<b>Cette matrice est en lecture seule.</b> Seul le titulaire du cabinet accorde ou retire un droit — une matrice que chacun peut réécrire ne protège personne.<br>'}La colonne <b>Administrateur</b> n'est pas modifiable : le titulaire du cabinet répond de la traçabilité, il garde donc l'accès aux volumes de produit et le droit d'effacer un acte déjà tracé.<br>Le <b>suivi comptable</b> est la ligne qui sépare « facturer » de « piloter » : sans ce droit, un utilisateur émet les factures, encaisse et relance les impayés, mais ne voit ni le chiffre d'affaires cumulé, ni la TVA, ni la rétrocession.<br>Chaque accès à une donnée de santé est journalisé : qui, quel <b>numéro</b> de dossier, quand — et jamais le nom du patient, sinon le journal deviendrait une seconde copie des dossiers. La ligne est écrite <b>avant</b> l'affichage, pas après. Voyez-le vous-même : <a onclick="closeAll();go('acces')">journal des accès</a>. Obligation de l'agrément HDS et de l'article 9 du RGPD.</div></div></div>
  </div>`;
 };
 
@@ -14493,6 +14501,9 @@ function acteVoisin(d){ const L=actesPatient(AS.pid), i=L.findIndex(x=>x.id===AS
 function openActe(pid,aid,np){
  if(porteFermee()) return;
  const a=aid?ACTES.find(x=>x.id===aid):null;
+ /* la fenêtre s'ouvre SUR un dossier : elle l'inscrit, comme l'écran du
+    dessous — et avant de montrer quoi que ce soit */
+ { const d=pid||(a?a.patient:null); if(d!=null) tracerVu(d,'dossier','séance'); }
  const t0=a?a.type:null;
  AS={pid:pid||(a?a.patient:(np?null:PATIENTS[0].id)), aid:aid||null, ro:!!a, mode:acteMode, prix:a?a.prix:null, note:a?(a.note||''):'',
      fam:a?(acteDef(t0).fam||'esth'):'esth', reg:a&&a.reg?a.reg:'visage',
@@ -15659,6 +15670,7 @@ function saveDevis(){
    envoye:null,relances:0,derniere:null,lignes,prest,
    zones:{...AS.z},seances:seancesMax(),remise:rem,validite:AS.validite,
    infos:AS.infosOn?infosPatient(AS.z):null,note:AS.notePat||''});
+ tracerEcrit(AS.pid, 'devis établi');
  closeAll(); pSel=AS.pid; pTab='docs'; docF='devis'; docQ=''; pView='liste'; go('patients');
  toast('Devis '+num+' créé · '+EUR(net)+(AS.infosOn?' · fiche d\'information jointe':''));
 }
@@ -16534,6 +16546,7 @@ function saveActe(){
     ts:nowStamp(), par:ROLES[role].u, qui:AS.prat});
   sortirLot(st, l.lot, l.q, AS.prat, {acte:ACTES[0].id, patient:AS.pid,
     note:`${acteDef(T[0]||'').n||'Séance'} — ${fn(pById(AS.pid))}`}) });
+ tracerEcrit(AS.pid, 'séance enregistrée');
  closeAll(); pSel=AS.pid; pTab='resume'; go('patients');
  const nCs=(AS.conso||[]).length;
  toast(`${T.map(t=>acteDef(t).n).join(' + ')||'Séance'} enregistré${nCs?` · ${nCs} consommable${nCs>1?'s':''} tracé${nCs>1?'s':''}`:''}${nDoc?` · ${nDoc} document${nDoc>1?'s':''} édité${nDoc>1?'s':''}`:''} · consentement ${AS.consent?'signé':'à faire signer'}`);
@@ -17367,7 +17380,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='FJ';
+const BUILD='FK';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -18160,6 +18173,7 @@ function ouvrirParapheur(refs,o){
  const L=(refs||[]).map(parPiece).filter(Boolean);
  if(!L.length){ toast('Aucune pièce à faire signer'); return }
  const pid=(o&&o.pid)||L[0].pid, p=pById(pid);
+ if(pid!=null) tracerVu(pid,'dossier','parapheur');
  L.forEach(x=>{ x.lu=false; x.vue=false });
  PAR={pid, par:(o&&o.par)||fn(p), docs:L, i:0, trace:false,
       titre:(o&&o.titre)||`Lecture et signature — ${fn(p)}`,
@@ -18361,6 +18375,7 @@ const dvChoix=pid=>openDevis(pid);
 function openDevis(pid,fam,did){
  if(porteFermee()) return;
  const d=did?DEVIS.find(x=>x.id===did):null;
+ { const q=pid||(d?d.patient:null); if(q!=null) tracerVu(q,'dossier','devis'); }
  const f=fam||(d?d.fam:'esth')||'esth';
  /* aucune prestation prédéfinie : c'est au praticien de choisir l'acte */
  DV={ id:d?d.id:null, pid:pid||(d?d.patient:PATIENTS[0].id), fam:f,
@@ -18696,6 +18711,10 @@ function dvEnregistrer(mode){
    if(l.libre==null) l.libre='';
    dvLigne=vide; dvPlie=false; renderDevis(); dvFocusTitre(vide);
    toast(`Prestation ${vide+1} : donnez-lui un intitulé, ou choisissez un acte du catalogue`); return }
+
+ /* l'issue choisie — enregistrer, faire signer, envoyer — fait partie de ce
+    qu'on inscrit : ce n'est pas le même geste sur le dossier */
+ tracerEcrit(DV.pid, 'devis · '+M);
 
 
  const prest=DV.lignes.map(l=>({...l, z:{...l.z}, brut:dvPrix(l), montant:dvNetL(l),
@@ -20436,6 +20455,274 @@ function priseEnvoyer(){
 }
 function peindrePrise(){ document.getElementById('main').innerHTML=prisePage() }
 
+/* ==========================================================================
+   LE JOURNAL DES ACCÈS AUX DONNÉES DE SANTÉ
+   --------------------------------------------------------------------------
+   Au bas de la matrice des droits, une ligne promettait depuis des mois que
+   chaque consultation d'un dossier était enregistrée. Elle ne l'était pas.
+   Voici ce qui la tient, du côté de l'écran ; le serveur tient la même
+   promesse de son côté, avec les mêmes règles — c'est fait exprès.
+
+   CE QU'ON INSCRIT : qui a ouvert quel dossier, quand, par quelle porte.
+   LE NUMÉRO DU DOSSIER, JAMAIS LE NOM. Ce n'est pas de la pudeur : c'est la
+   faute qu'on commet en voulant bien faire. On ajoute le nom « pour que ce
+   soit lisible », et le journal devient une seconde copie des dossiers — plus
+   facile à emporter que la première, puisqu'elle tient dans une table et
+   qu'on la consulte sans motif.
+
+   CE QU'ON N'INSCRIT PAS : le stock, les statistiques, les réglages, les
+   comptes de l'équipe. Un journal qui inscrit tout n'apprend rien, et devient
+   à son tour un fichier de surveillance de l'équipe.
+
+   ET L'ORDRE : la ligne est écrite AVANT que l'écran ne soit peint, comme le
+   serveur l'écrit avant de lire la base. C'est toute la différence entre un
+   journal et un compte rendu.
+   ========================================================================== */
+const JAC={garde:400, jours:365, nuitDe:22, nuitA:6, volMini:20, volFois:3};
+let ACC=[], accSig=null, accQui='', accDos='', accDossiersSeuls=false;
+
+/* Ce que chaque écran fait au journal. Une entrée par écran, et le logiciel
+   REFUSE DE S'AFFICHER si l'une manque — c'est le même garde-fou que côté
+   serveur, et pour la même raison : un écran qui montre des dossiers sans
+   rien inscrire ne se signale par rien. Il marche, il affiche les bonnes
+   données, et le jour où l'on cherche qui a ouvert ce dossier-là, il manque
+   une ligne qu'on ne saura même pas chercher. */
+const ECRANS_TRACE={
+ dash:    {t:'aucun', sans:'des totaux du cabinet ; aucun dossier n’y est désigné'},
+ stats:   {t:'aucun', sans:'des agrégats : des sommes, des moyennes, des comptages'},
+ stock:   {t:'aucun', sans:'des produits, des lots et des péremptions'},
+ equipe:  {t:'aucun', sans:'les comptes de l’équipe et leurs droits'},
+ params:  {t:'aucun', sans:'les réglages du cabinet'},
+ patients:{t:'dossier'},
+ actes:   {t:'liste'},
+ devis:   {t:'liste'},
+ encaiss: {t:'liste'},
+ relances:{t:'liste'},
+ envois:  {t:'liste'},
+ /* Lire le journal n'est pas lire un dossier — on y voit des numéros, des
+    noms de collaborateurs et des heures. On l'inscrit quand même : sans cela
+    ce serait le seul endroit où l'on passe sans laisser de trace. */
+ acces:   {t:'liste'},
+};
+const ECRANS_LIB={dash:'tableau de bord', stats:'statistiques', stock:'stock',
+ equipe:'équipe et droits', params:'paramètres', patients:'liste des patients',
+ actes:'suivi des actes', devis:'devis et conversions', encaiss:'facturation et caisse',
+ relances:'relances', envois:'envois et remises', acces:'journal des accès'};
+const ECRANS_OK=['dossier','liste','aucun'];
+/* Le journal se lit par quelqu'un, pas par une machine : on y écrit le nom de
+   l'onglet tel qu'il s'appelle à l'écran, et non sa clé interne. */
+const PTAB_LIB={resume:'Résumé', actes:'Actes', schema:'Schéma cumulé', photos:'Photos',
+ factu:'Facturation', docs:'Documents', envois:'Envois'};
+
+function ecransSansTrace(){
+ const vus=[...new Set(RK.flatMap(r=>(ROLES[r]||{v:[]}).v))];
+ return vus.filter(v=>{ const d=ECRANS_TRACE[v];
+   return !d || !ECRANS_OK.includes(d.t) || (d.t==='aucun' && !d.sans) });
+}
+
+/* Qui est devant l'écran. En démonstration, le sélecteur de rôle sert
+   d'identité : le journal le dit plutôt que d'inventer un compte. */
+function accQui2(){
+ const u=SESSION?UTILS.find(x=>x.id===SESSION.uid):null;
+ return {uid:u?u.id:null, ident:u?u.mail:null,
+         nom:(u&&u.nom)||ROLES[role].u, role};
+}
+
+function tracerVu(pid, quoi, ou, act){
+ const sig=(pid==null?'-':pid)+'|'+quoi+'|'+ou+'|'+(act||'consultation');
+ if(sig===accSig) return;
+ accSig=sig;
+ const q=accQui2();
+ ACC.unshift({t:Date.now(), uid:q.uid, ident:q.ident, nom:q.nom, role:q.role,
+              pid:(pid==null?null:pid), quoi, ou, act:act||'consultation'});
+ if(ACC.length>JAC.garde) ACC.length=JAC.garde;
+}
+/* Une écriture s'inscrit toujours, même sur le dossier déjà ouvert : c'est un
+   geste, pas un affichage. On repart donc de zéro pour la ligne suivante. */
+function tracerEcrit(pid, ou){ accSig=null; tracerVu(pid,'dossier',ou,'modification'); accSig=null }
+
+/* Appelée en tête de paint(), AVANT le rendu. */
+function accesEcran(){
+ const d=ECRANS_TRACE[view];
+ if(!d || d.t==='aucun'){ accSig=null; return }
+ if(view==='patients'){
+   if(pView==='liste' && pSel!=null)
+     return tracerVu(pSel,'dossier','fiche · '+(PTAB_LIB[pTab]||pTab));
+   /* pas de remise à zéro ici : la signature suffit à distinguer la liste
+      d'un dossier, et l'effacer ferait compter les repeints — un tri, un
+      filtre, un dépliement — comme autant de consultations. */
+   return tracerVu(null,'liste','liste des patients');
+ }
+ tracerVu(null,'liste', ECRANS_LIB[view]||view);
+}
+
+const accH=t=>{const d=new Date(t);
+ const z=n=>String(n).padStart(2,'0');
+ return z(d.getDate())+'/'+z(d.getMonth()+1)+' '+z(d.getHours())+':'+z(d.getMinutes())+':'+z(d.getSeconds())};
+const accRole=r=>(ROLES[r]||{}).l||r;
+
+function accVoirDossier(id){ accDos=String(id); accQui=''; accDossiersSeuls=false;
+ closeAll(); go('acces') }
+function accFiltre(k,v){ if(k==='qui') accQui=v; if(k==='dos') accDos=v.trim();
+ if(k==='dsl') accDossiersSeuls=!accDossiersSeuls; paint() }
+
+/* Ce que chacun a le droit de lire. L'administrateur voit tout le journal ;
+   les autres ne voient que leurs propres allées et venues — savoir ce qu'on a
+   soi-même consulté n'est pas un privilège, et c'est la meilleure façon de
+   s'apercevoir que quelqu'un d'autre s'est servi de son compte. */
+function accLisible(){
+ const q=accQui2();
+ return EST_ADMIN()?ACC:ACC.filter(x=>x.uid!=null?x.uid===q.uid:x.role===q.role);
+}
+
+/* --------------------------------------------------------------------------
+   Ce qui sort de l'ordinaire
+   --------------------------------------------------------------------------
+   La CNIL ne demande pas seulement de tracer : elle demande d'aller y voir, et
+   recommande un examen automatique. Trois signaux, et pas trente — un tableau
+   de bord qui clignote tous les matins finit par ne plus être lu.
+
+   Aucun des trois n'accuse personne. Une consultation de nuit est souvent une
+   garde ; une semaine chargée est souvent une semaine chargée. Ce sont des
+   questions qu'on peut poser, et c'est déjà beaucoup.
+   -------------------------------------------------------------------------- */
+function accSignaux(){
+ const D=ACC.filter(x=>x.quoi==='dossier'&&x.pid!=null);
+ const out=[];
+ const par=new Map();
+ D.forEach(x=>{const k=x.nom; if(!par.has(k)) par.set(k,new Set()); par.get(k).add(x.pid)});
+ const n=[...par.values()].map(s=>s.size).sort((a,b)=>a-b);
+ const med=n.length?n[Math.floor(n.length/2)]:0;
+ if(par.size>1) par.forEach((s,k)=>{ if(s.size>=JAC.volMini && s.size>JAC.volFois*med)
+   out.push([k+' a ouvert '+s.size+' dossiers distincts',
+             'la médiane du cabinet est de '+med]) });
+ const nuit=D.filter(x=>{const h=new Date(x.t).getHours(); return h>=JAC.nuitDe||h<JAC.nuitA});
+ if(nuit.length) out.push([nuit.length+' consultation'+(nuit.length>1?'s':'')+' entre '+JAC.nuitDe+' h et '+JAC.nuitA+' h',
+   'la dernière à '+accH(nuit[0].t)]);
+ const eteints=ACC.filter(x=>{const u=x.uid!=null?UTILS.find(y=>y.id===x.uid):null;
+   return u&&u.etat==='suspendu'});
+ if(eteints.length) out.push([eteints.length+' accès faits par un compte aujourd’hui suspendu',
+   'le dernier par '+eteints[0].nom]);
+ return {out, med, dossiers:new Set(D.map(x=>x.pid)).size};
+}
+
+/* --------------------------------------------------------------------------
+   L'écran
+   -------------------------------------------------------------------------- */
+function accLignes(L){
+ const admin=EST_ADMIN();
+ return L.map(x=>{
+  const dos=x.pid!=null
+   ? '<a class="mono" onclick="openPatient('+x.pid+')" title="Ouvrir ce dossier — et laisser une ligne de plus, la vôtre">'+x.pid+'</a>'
+   : '<span class="mu">—</span>';
+  const b=x.act==='modification'?bdg('b-warn','✎ modification'):bdg('b-neu','consultation');
+  return '<tr><td class="mono mu nw">'+accH(x.t)+'</td>'
+   +(admin?'<td><b>'+esc(x.nom)+'</b><div class="mu" style="font-size:11px">'+esc(accRole(x.role))+'</div></td>':'')
+   +'<td class="num">'+dos+'</td>'
+   +'<td class="mu">'+esc(x.ou)+'</td>'
+   +'<td>'+b+'</td></tr>' }).join('');
+}
+
+V.acces=()=>{
+ const admin=EST_ADMIN();
+ const moi=accQui2();
+ let L=accLisible();
+ if(accQui) L=L.filter(x=>x.nom===accQui);
+ if(accDos) L=L.filter(x=>String(x.pid||'')===accDos);
+ if(accDossiersSeuls) L=L.filter(x=>x.quoi==='dossier');
+ const nDos=new Set(L.filter(x=>x.pid!=null).map(x=>x.pid)).size;
+ const gens=[...new Set(ACC.map(x=>x.nom))];
+ const S=admin?accSignaux():null;
+
+ const filtres=admin?'<div class="r" style="gap:7px">'
+  +'<select class="btn s" onchange="accFiltre(\'qui\',this.value)">'
+  +'<option value="">Tout le monde</option>'
+  +gens.map(g=>'<option value="'+esc(g)+'"'+(accQui===g?' selected':'')+'>'+esc(g)+'</option>').join('')
+  +'</select>'
+  +'<input class="btn s" style="width:120px" placeholder="n° de dossier" value="'+esc(accDos)+'"'
+  +' oninput="accDos=this.value.trim()" onchange="paint()">'
+  +'<button class="btn s '+(accDossiersSeuls?'p':'')+'" onclick="accFiltre(\'dsl\')"'
+  +' title="Masquer les ouvertures de listes et ne garder que les dossiers">Dossiers seulement</button>'
+  +((accQui||accDos||accDossiersSeuls)?'<button class="btn s g" onclick="accQui=\'\';accDos=\'\';accDossiersSeuls=false;paint()">Tout voir</button>':'')
+  +'</div>':'';
+
+ const entete='<div class="head"><div><h1>Journal des accès</h1>'
+  +'<p>'+(admin
+    ?L.length+' ligne'+(L.length>1?'s':'')+' · '+nDos+' dossier'+(nDos>1?'s':'')+' concerné'+(nDos>1?'s':'')
+     +' · '+gens.length+' compte'+(gens.length>1?'s':'')
+    :'ce que <b>vous</b> avez consulté depuis l’ouverture de cette session')
+  +'</p></div>'+filtres+'</div>';
+
+ const mot=admin
+  ? '<div class="tip"><span class="e">◷</span><div><b>Qui a ouvert quel dossier, et quand.</b> '
+    +'Le journal porte le <b>numéro</b> du dossier, jamais le nom — sinon il deviendrait une seconde copie '
+    +'des dossiers, plus facile à emporter que la première. Ce qui ne touche à aucun dossier — le stock, '
+    +'les statistiques, les réglages, les comptes de l’équipe — n’y figure pas : un journal qui inscrit '
+    +'tout n’apprend rien.</div></div>'
+  : '<div class="tip"><span class="e">◷</span><div><b>Vous voyez vos propres allées et venues, et elles seules.</b> '
+    +'Le journal complet est réservé au titulaire du cabinet. Savoir ce qu’on a soi-même consulté n’est pas '
+    +'un privilège : c’est la meilleure façon de s’apercevoir que quelqu’un d’autre s’est servi de votre compte. '
+    +'Si vous lisez ici une consultation que vous n’avez pas faite, dites-le tout de suite.</div></div>';
+
+ const signaux=admin?'<div class="card" style="margin-bottom:13px"><div class="h"><h2>Ce qui sort de l’ordinaire</h2>'
+  +'<span class="s">'+(S.out.length?S.out.length+' à regarder':'rien à signaler')+'</span></div>'
+  +(S.out.length
+    ?'<div class="b">'+S.out.map(o=>'<div class="rowline" style="margin-bottom:6px"><span class="e">•</span>'
+        +'<div><b>'+esc(o[0])+'</b><div class="mu" style="font-size:11.5px">'+esc(o[1])+'</div></div></div>').join('')+'</div>'
+    :'<div class="empty">Rien qui sorte de l’ordinaire dans ce qui a été consulté depuis l’ouverture.</div>')
+  +'<div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">'
+  +'Trois signaux, et pas trente : <b>le volume</b> (plus de '+JAC.volMini+' dossiers et plus de '
+  +JAC.volFois+' fois la médiane du cabinet, aujourd’hui '+S.med+'), <b>la nuit</b> (entre '+JAC.nuitDe+' h et '
+  +JAC.nuitA+' h), <b>les comptes suspendus</b>. Aucun des trois n’accuse personne : une consultation de nuit '
+  +'est souvent une garde, une semaine chargée est souvent une semaine chargée. Ce sont des questions qu’on '
+  +'peut poser — et le journal ne sert qu’à rendre la question possible.</div></div></div>':'';
+
+ const table=L.length
+  ? '<div class="tw"><table><thead><tr><th>Quand</th>'
+    +(admin?'<th>Qui</th>':'')
+    +'<th class="num">Dossier</th><th>Ce qui a été ouvert</th><th></th></tr></thead>'
+    +'<tbody>'+accLignes(L.slice(0,200))+'</tbody></table></div>'
+    +(L.length>200?'<div class="b"><div class="mu" style="font-size:11.5px">'+(L.length-200)
+      +' ligne(s) plus anciennes ne sont pas affichées.</div></div>':'')
+  : '<div class="empty">Aucun accès inscrit'+(accQui||accDos||accDossiersSeuls?' avec ces filtres':' pour l’instant')
+    +'. Ouvrez un dossier patient : la ligne s’écrira avant que la fiche ne s’affiche.</div>';
+
+ const pied='<div class="b" style="border-top:1px solid var(--line)"><div class="mu" style="font-size:11.5px">'
+  +'<b>La ligne est écrite avant l’affichage, pas après.</b> C’est toute la différence entre un journal et un '
+  +'compte rendu : écrite après coup, elle manque précisément le jour où le journal ne fonctionne pas — et ce '
+  +'jour-là le dossier a quand même été lu. Au cabinet, le serveur refuse d’ouvrir un dossier qu’il ne sait pas '
+  +'inscrire.<br>Ces lignes disent où une personne est passée et quand : les garder indéfiniment serait à son '
+  +'tour une faute. Le serveur les conserve <b>'+JAC.jours+' jours</b> puis les efface — la CNIL retient six mois '
+  +'à un an pour la journalisation courante. Cette démonstration, elle, ne les garde que le temps de l’onglet, '
+  +'et au plus '+JAC.garde+'.</div></div>';
+
+ return entete+mot+signaux+'<div class="card">'
+  +'<div class="h"><h2>'+(admin?'Tous les accès':'Mes accès')+'</h2>'
+  +'<span class="s">'+esc(moi.nom)+' · '+esc(accRole(moi.role))+'</span></div>'
+  +table+pied+'</div>';
+};
+
+/* --------------------------------------------------------------------------
+   Le refus d'afficher
+   --------------------------------------------------------------------------
+   Si un écran ne dit pas ce qu'il fait au journal, on n'affiche rien du tout.
+   C'est brutal, et c'est voulu : la panne visible vaut mieux que le dossier
+   consulté sans trace, qui ne se voit jamais.
+   -------------------------------------------------------------------------- */
+function peindreRefusTrace(nus){
+ COUCHES.forEach(i=>{const e=document.getElementById(i); if(e) e.classList.remove('on')});
+ const m=document.getElementById('main'); if(!m) return;
+ m.innerHTML='<div class="head"><div><h1>Refus d’afficher</h1>'
+  +'<p>'+nus.length+' écran'+(nus.length>1?'s ne disent':' ne dit')+' pas ce qu’'
+  +(nus.length>1?'ils font':'il fait')+' au journal des accès.</p></div></div>'
+  +'<div class="tip ko"><span class="e">⛔</span><div><b>'+nus.map(esc).join(' · ')+'</b><br>'
+  +'Chaque écran déclare, dans <span class="mono">ECRANS_TRACE</span>, ce qu’il inscrit au journal : '
+  +'<span class="mono">dossier</span>, <span class="mono">liste</span>, ou <span class="mono">aucun</span> '
+  +'avec la raison écrite. Un écran qui montre des dossiers sans rien inscrire ne se signale par rien : '
+  +'il marche, il affiche les bonnes données, et le jour où l’on cherche qui a ouvert ce dossier-là, il '
+  +'manque une ligne qu’on ne saura même pas chercher. On préfère cette panne-ci.</div></div>';
+}
+
 function paint(){
  /* Un téléphone venu par le QR ne voit pas l'application : il voit l'appareil
     photo. On RETIRE le reste du document plutôt que de le masquer — masquer
@@ -20451,6 +20738,11 @@ function paint(){
        if(e!==m && e.id!=='toast' && e.tagName!=='SCRIPT') e.remove() });
      m.innerHTML=prisePage(); }
    return }
+ /* Le logiciel ne s'affiche pas s'il ne sait pas ce qu'il inscrit. Même
+    principe que le serveur qui refuse de démarrer : la panne visible vaut
+    mieux que le dossier consulté sans trace, qui ne se voit jamais. */
+ { const nus=ecransSansTrace();
+   if(nus.length){ peindreRefusTrace(nus); return } }
  /* La porte. Tant que personne n'est entré, aucun écran de dossiers ne se
     peint — et ce n'est pas un masquage : paint() rend la main, il n'y a rien
     à retrouver dans la page. En mode serveur, c'est SRV.moi qui fait foi. */
@@ -20486,6 +20778,10 @@ function paint(){
  if(bs) bs.style.display=(CONNECTE()||!!SESSION)?'':'none';
  document.getElementById('avat').textContent=ROLES[role].i;
  document.getElementById('who').innerHTML=`${ROLES[role].u}<small>${ROLES[role].l}</small>`;
+ /* Le journal AVANT le rendu, comme le serveur l'écrit avant de lire la
+    base : une ligne posée après coup manque précisément le jour où elle
+    compte. */
+ accesEcran();
  document.getElementById('main').innerHTML=bandeauHTML()+bandeauSaisie()+(V[view]||V.dash)();
  bindBA(); bindGZ(); calerCumul();
  if(typeof cfgPlanifier==='function') cfgPlanifier();
