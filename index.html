@@ -15648,7 +15648,7 @@ function creerPatientNP(){
  AS.pid=id; AS.np=null; AS.npKO=[];
  return true;
 }
-function saveDevis(){
+async function saveDevis(){
  if(!creerPatientNP()) return;
  const S=(AS.soins||[]).filter(x=>x.t||(x.libre||'').trim()||+x.prix>0);
  if(!S.length){toast('Ajoutez au moins un soin avant de générer le devis');return}
@@ -15686,12 +15686,19 @@ function saveDevis(){
  const net=Math.max(0,brut-rem);
  const num='D-'+String(TODAYS.slice(2,4))+String(TODAYS.slice(5,7))+'-'+String(DEVIS.length+22).padStart(3,'0');
  const acteJour=ACTES.find(x=>x.patient===AS.pid&&x.date===TODAYS);
- DEVIS.unshift({id:num,patient:AS.pid,date:TODAYS,cree:HORO(),montant:net,statut:'brouillon',acte:acteJour?acteJour.id:null,
+ const neuf={id:num,patient:AS.pid,date:TODAYS,cree:HORO(),montant:net,statut:'brouillon',acte:acteJour?acteJour.id:null,
    fam:(T.length?acteDef(T[0]).fam:'esth')||'esth',praticien:AS.prat,
    envoye:null,relances:0,derniere:null,lignes,prest,
    zones:{...AS.z},seances:seancesMax(),remise:rem,validite:AS.validite,
-   infos:AS.infosOn?infosPatient(AS.z):null,note:AS.notePat||''});
+   infos:AS.infosOn?infosPatient(AS.z):null,note:AS.notePat||''};
  tracerEcrit(AS.pid, 'devis établi');
+ const rn=await ecrire({
+   methode:'POST', chemin:'/api/devis', corps:DEVIS_VERS(neuf),
+   quoi:`le devis ${num}`,
+   local:()=>{ DEVIS.unshift(neuf) },
+   appliquer:row=>{ poseDevis(row, neuf.praticien) },
+ });
+ if(!rn.ok){ renderOver(); return }
  closeAll(); pSel=AS.pid; pTab='docs'; docF='devis'; docQ=''; pView='liste'; go('patients');
  toast('Devis '+num+' créé · '+EUR(net)+(AS.infosOn?' · fiche d\'information jointe':''));
 }
@@ -17401,7 +17408,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='FL';
+const BUILD='FM';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -18723,7 +18730,7 @@ function dvPrixSet(i,v){ DV.lignes[i].prix=(v===''||v==null)?null:+v; renderDevi
    boutons nommés par leur effet, plutôt qu'un bouton et une case à cocher. */
 const DV_MODES=['enregistrer','signer','envoyer'];
 const dvMode=m=>m===true?'envoyer':(DV_MODES.includes(m)?m:'enregistrer');
-function dvEnregistrer(mode){
+async function dvEnregistrer(mode){
  const M=dvMode(mode);
  const {net,rem}=dvNet();
  /* aucune ligne à 0 € sur un document remis au patient */
@@ -18747,8 +18754,16 @@ function dvEnregistrer(mode){
   const d=DEVIS.find(x=>x.id===DV.id);
   if(d.statut==='accepte'){toast('Devis accepté par le patient — il n’est plus modifiable');return}
   /* maj, jamais cree : l'établissement est un fait, il ne se réécrit pas. */
-  Object.assign(d,{montant:net,remise:rem,validite:DV.validite,note:DV.note,prest,lignes,fam:DV.fam,
-    cree:d.cree||HORO(), maj:HORO()});
+  const nouv={...d, montant:net, remise:rem, validite:DV.validite, note:DV.note,
+    prest, lignes, fam:DV.fam, cree:d.cree||HORO(), maj:HORO()};
+  const r=await ecrire({
+    methode:'PATCH', chemin:`/api/devis/${encodeURIComponent(d.id)}`,
+    corps:{...DEVIS_VERS(nouv), revision:d.rev},
+    quoi:`le devis ${d.id}`,
+    local:()=>{ Object.assign(d, nouv) },
+    appliquer:row=>{ poseDevis(row, nouv.praticien) },
+  });
+  if(!r.ok){ paint(); return }
   logDoc(d.id,'Devis modifié');
   /* un devis corrigé peut avoir gagné un soin : on complète, on ne double pas */
   const nc=DV.consOn?preparerConsentements(d,prest):[];
@@ -18764,13 +18779,20 @@ function dvEnregistrer(mode){
  const p=pById(DV.pid);
  /* un devis naît toujours brouillon : ce qui le fait sortir, c'est la fenêtre
     d'envoi — et elle peut encore être annulée */
- DEVIS.unshift({id:num,patient:DV.pid,date:DV.date,cree:HORO(),montant:net,fam:DV.fam,
+ const neuf={id:num,patient:DV.pid,date:DV.date,cree:HORO(),montant:net,fam:DV.fam,
    statut:'brouillon',acte:null,praticien:DV.prat,
    envoye:null,relances:0,derniere:null,lignes,prest,
    zones:{...prest[0].z},seances:prest[0].seances,remise:rem,validite:DV.validite,
-   infos:DV.infosOn?infosPatient(prest[0].z):null,note:DV.note||''});
+   infos:DV.infosOn?infosPatient(prest[0].z):null,note:DV.note||''};
+ const rn=await ecrire({
+   methode:'POST', chemin:'/api/devis', corps:DEVIS_VERS(neuf),
+   quoi:`le devis ${num}`,
+   local:()=>{ DEVIS.unshift(neuf) },
+   appliquer:row=>{ poseDevis(row, neuf.praticien) },
+ });
+ if(!rn.ok){ paint(); return }
  logDoc(num,'Devis établi');
- const nc=DV.consOn?preparerConsentements(DEVIS[0],prest):[];
+ const nc=DV.consOn?preparerConsentements(DEVIS.find(x=>x.id===num),prest):[];
  closeAll(); dF='tous'; dCat=''; dActe=''; go('devis',num);
  if(M==='signer'){ dvFaireSigner(num, nc.length); return }
  if(M==='envoyer'){ dvEnvoyer(num, nc.length, false); return }
@@ -20609,6 +20631,58 @@ function posePatient(row, prat){
  return x;
 }
 
+/* Les devis. Même chemin que la fiche patient, même vocabulaire écrit des deux
+   côtés et tenu par une épreuve d'aller-retour.
+
+   Une particularité : le devis est une PIÈCE. Ce que le patient signe, ce sont
+   ses lignes, ses zones, ses prestations — et la base ne les range pas en
+   colonnes, elle les garde tels quels dans « document ». Les colonnes ne
+   servent qu'à répondre vite aux questions qu'on pose souvent (combien de
+   devis en attente, pour quel montant). Le document reste la pièce. */
+const DEVIS_DOC = ['prest','lignes','zones','zs','cs','seances','infos'];
+
+const DEVIS_VERS = d => {
+ const doc = {};
+ DEVIS_DOC.forEach(k => { if(d[k] !== undefined) doc[k] = d[k] });
+ return {
+   id: d.id,
+   patient_id: d.patient, date: jourTxt(d.date), praticien: d.praticien || null,
+   montant: +d.montant || 0, statut: d.statut, famille: d.fam || null,
+   envoye_le: jourTxt(d.envoye), relances: d.relances || 0,
+   derniere_relance: jourTxt(d.derniere),
+   note: d.note == null ? null : String(d.note),
+   validite: d.validite == null ? null : +d.validite,
+   remise: +d.remise || 0,
+   acte_id: d.acte == null ? null : d.acte,
+   realise_acte_id: d.realise == null ? null : d.realise,
+   document: doc,
+ };
+};
+/* L'inverse, à partir de la ligne que le serveur rend. Le praticien n'est pas
+   en base sous son nom : on garde celui qu'on vient d'envoyer. */
+const DEVIS_DEPUIS = (r, prat) => {
+ const doc = (r.document && typeof r.document === 'object') ? r.document : {};
+ return { id:r.id, rev:Number(r.revision), patient:Number(r.patient_id),
+   date:jourTxt(r.date), montant:Number(r.montant), statut:r.statut,
+   envoye:jourTxt(r.envoye_le), relances:r.relances||0,
+   derniere:jourTxt(r.derniere_relance), fam:r.famille,
+   praticien: prat !== undefined ? prat : null,
+   note: r.note==null?'':r.note,
+   validite: r.validite==null?null:Number(r.validite),
+   remise: Number(r.remise)||0,
+   acte: r.acte_id==null?null:Number(r.acte_id),
+   realise: r.realise_acte_id==null?null:Number(r.realise_acte_id),
+   ...doc };
+};
+function poseDevis(row, prat){
+ const n = DEVIS_DEPUIS(row, prat);
+ const i = DEVIS.findIndex(x => x.id === n.id);
+ if(i < 0){ DEVIS.unshift(n); return DEVIS[0] }
+ /* on garde ce que le serveur ne connaît pas encore (marques d'écran) */
+ Object.keys(n).forEach(k => { DEVIS[i][k] = n[k] });
+ return DEVIS[i];
+}
+
 /* --------------------------------------------------------------------------
    Le conflit, à l'écran
    -------------------------------------------------------------------------- */
@@ -21008,9 +21082,9 @@ function bandeauHTML(){
  return `<div class="bandeau srv"><span>●</span><div><b>${esc(SRV.moi.nom)}</b> · ${esc(ROLES[role]?ROLES[role].l:role)}
    — dossiers du cabinet, sur le serveur.`
    + (SRV.voulu==='connecte' ? ' <b>(mode forcé)</b>' : '')
-   + (SRV.lecture ? ` <b>Écriture partielle</b> : les <b>fiches patient</b> sont enregistrées
-      au serveur — corriger une identité, retirer un dossier. Les séances, devis, factures et
-      mouvements de stock restent pour l’instant dans ce navigateur et ne sont pas renvoyés.
+   + (SRV.lecture ? ` <b>Écriture partielle</b> : les <b>fiches patient</b> et les <b>devis</b>
+      sont enregistrés au serveur. Les séances, les factures et les mouvements de stock restent
+      pour l’instant dans ce navigateur et ne sont pas renvoyés.
       N’y saisissez pas de dossier réel tant que l’écriture n’est pas posée partout.` : '')
    + `</div></div>`;
 }
