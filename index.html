@@ -15637,19 +15637,31 @@ function validerNP(){
  AS.npKO=ko;
  return ko.length?ko.map(k=>NP_L[k]).join(', '):null;
 }
-function creerPatientNP(){
+async function creerPatientNP(){
  if(!AS.np) return true;
  const err=validerNP();
  if(err){ renderOver(); toast(`Dossier incomplet — il manque ${err}`); return false }
  const n=AS.np, id=Math.max(...PATIENTS.map(p=>p.id))+1;
- PATIENTS.push({id, nom:n.nom.trim().toUpperCase(), prenom:n.prenom.trim(), ddn:n.ddn,
+ const neuf={id, nom:n.nom.trim().toUpperCase(), prenom:n.prenom.trim(), ddn:n.ddn,
    tel:n.tel.trim(), mail:n.mail.trim(), adr:(n.adr||'').trim(), origine:n.origine||'',
-   prat:AS.prat, depuis:TODAYS, notes:'', ant:[]});
- AS.pid=id; AS.np=null; AS.npKO=[];
+   prat:AS.prat, depuis:TODAYS, notes:'', ant:[]};
+ /* Le dossier naît AVANT la séance, et par le serveur : une séance sur un
+    patient que lui ne connaît pas serait refusée, et c'est très bien ainsi —
+    mais autant s'en apercevoir ici, quand la fenêtre est encore ouverte. */
+ const r=await ecrire({
+   methode:'POST', chemin:'/api/patients',
+   corps:{...PATIENT_VERS(neuf), id, depuis:TODAYS},
+   quoi:`le dossier de ${neuf.prenom} ${neuf.nom}`,
+   local:()=>{ PATIENTS.push(neuf) },
+   appliquer:row=>{ const p=posePatient(row, neuf.prat); AS.pid=Number(p.id) },
+ });
+ if(!r.ok){ renderOver(); return false }
+ if(r.local) AS.pid=id;
+ AS.np=null; AS.npKO=[];
  return true;
 }
 async function saveDevis(){
- if(!creerPatientNP()) return;
+ if(!(await creerPatientNP())) return;
  const S=(AS.soins||[]).filter(x=>x.t||(x.libre||'').trim()||+x.prix>0);
  if(!S.length){toast('Ajoutez au moins un soin avant de générer le devis');return}
  /* une prestation par soin : chacune garde ses zones, sa quantité et son tarif */
@@ -16520,9 +16532,9 @@ function mirrorZ(){
  });
  renderOver(); toast('Zones symétrisées');
 }
-function saveActe(){
+async function saveActe(){
  const C=acteCourant()||CNUL;
- if(!creerPatientNP()) return;
+ if(!(await creerPatientNP())) return;
  const prix=(AS.prix!=null&&AS.prix!=='')?+AS.prix:prixSaisi();
  /* le montant peut être nul — geste offert, retouche, consultation non facturée */
  if(!actesSaisis().length && !lignesLibres().some(x=>(x.libre||'').trim()) && !Object.keys(AS.z).length){
@@ -16546,7 +16558,7 @@ function saveActe(){
    return Object.keys(o).length?o:null })();
  const LB=soins.filter(x=>!x.t);
  const C0=T.length?acteDef(T[0]):CNUL;
- ACTES.unshift({id:Date.now(),patient:AS.pid,type:C0.id,zt,zs,zx,soins,
+ const neufActe={id:Date.now(),patient:AS.pid,type:C0.id,zt,zs,zx,soins,
   nom:[...T.map(t=>acteDef(t).n),...LB.map(x=>x.libre)].join(' + ')||'Séance',
   cat:[...new Set(T.map(t=>acteDef(t).cat))].join(' + ')||'Divers',
   reg:AS.reg,fam:C0.fam||'esth',
@@ -16557,24 +16569,41 @@ function saveActe(){
   /* la séance se range sous le forfait qui l'a vendue — ou sous rien du tout */
   forfait:(()=>{ const f=forfaitSeance(); return f?f.id:null })(),
   zonesNote:(AS.soins||[]).map(x=>(x.com||'').trim()).filter(Boolean).join(' · ')||AS.zonesNote||'',
-  prix:null});                       /* l'acte ne porte pas de montant : il se facture après */
- DEVIS.filter(d=>!d.acte&&d.patient===AS.pid&&d.date===AS.date).forEach(d=>{d.acte=ACTES[0].id});
- const nDoc=(AS.docs||[]).filter(m=>addDocActe(ACTES[0].id,m,true)).length;
- if(AS.devis){ const dv=DEVIS.find(x=>x.id===AS.devis);
-  if(dv){ dv.realise=ACTES[0].id; dv.acte=dv.acte||ACTES[0].id;
-   if(dv.statut!=='accepte') accepterDevis(dv);
-   logDoc(dv.id,`Devis réalisé — consultation du ${DF(AS.date)}`) } }
+  prix:null};                       /* l'acte ne porte pas de montant : il se facture après */
  /* les consommables préparés deviennent les lignes tracées de l'acte,
     et ce sont eux — et rien d'autre — qui décomptent le stock */
  syncConsoAuto();
- (AS.conso||[]).forEach(l=>{ const st=STOCK.find(x=>x.ref===l.ref); if(!st) return;
-  /* le produit sort du stock de celui qui a fait l'acte, pas d'un pot anonyme */
-  CONSO.push({id:'CS-'+(CONSO.length+1+9000), acte:ACTES[0].id, patient:AS.pid, ref:st.ref,
-    nom:nomProduit(st), lot:(l.lot||st.lot||'—'), per:(l.per||st.per), q:l.q, u:st.u,
-    ts:nowStamp(), par:ROLES[role].u, qui:AS.prat});
-  sortirLot(st, l.lot, l.q, AS.prat, {acte:ACTES[0].id, patient:AS.pid,
-    note:`${acteDef(T[0]||'').n||'Séance'} — ${fn(pById(AS.pid))}`}) });
  tracerEcrit(AS.pid, 'séance enregistrée');
+
+ const rA=await ecrire({
+   methode:'POST', chemin:'/api/actes',
+   corps:{...ACTE_VERS(neufActe),
+          conso:(AS.conso||[]).map(consoVers).filter(Boolean)},
+   quoi:`la séance de ${fn(pById(AS.pid))}`,
+   local:()=>{
+     ACTES.unshift(neufActe);
+     (AS.conso||[]).forEach(l=>{ const st=STOCK.find(x=>x.ref===l.ref); if(!st) return;
+       /* le produit sort du stock de celui qui a fait l'acte, pas d'un pot anonyme */
+       CONSO.push({id:'CS-'+(CONSO.length+1+9000), acte:neufActe.id, patient:AS.pid, ref:st.ref,
+         nom:nomProduit(st), lot:(l.lot||st.lot||'—'), per:(l.per||st.per), q:l.q, u:st.u,
+         ts:nowStamp(), par:ROLES[role].u, qui:AS.prat});
+       sortirLot(st, l.lot, l.q, AS.prat, {acte:neufActe.id, patient:AS.pid,
+         note:`${acteDef(T[0]||'').n||'Séance'} — ${fn(pById(AS.pid))}`}) });
+   },
+   appliquer:row=>{
+     poseActe(row, neufActe);
+     if(row.aBouge) poseStock(row.aBouge.stock);
+   },
+ });
+ if(!rA.ok){ renderOver(); return }
+
+ const acteNeuf=ACTES.find(x=>x.id===neufActe.id)||ACTES[0];
+ DEVIS.filter(d=>!d.acte&&d.patient===AS.pid&&d.date===AS.date).forEach(d=>{d.acte=acteNeuf.id});
+ const nDoc=(AS.docs||[]).filter(m=>addDocActe(acteNeuf.id,m,true)).length;
+ if(AS.devis){ const dv=DEVIS.find(x=>x.id===AS.devis);
+  if(dv){ dv.realise=acteNeuf.id; dv.acte=dv.acte||acteNeuf.id;
+   if(dv.statut!=='accepte') accepterDevis(dv);
+   logDoc(dv.id,`Devis réalisé — consultation du ${DF(AS.date)}`) } }
  closeAll(); pSel=AS.pid; pTab='resume'; go('patients');
  const nCs=(AS.conso||[]).length;
  toast(`${T.map(t=>acteDef(t).n).join(' + ')||'Séance'} enregistré${nCs?` · ${nCs} consommable${nCs>1?'s':''} tracé${nCs>1?'s':''}`:''}${nDoc?` · ${nDoc} document${nDoc>1?'s':''} édité${nDoc>1?'s':''}`:''} · consentement ${AS.consent?'signé':'à faire signer'}`);
@@ -17408,7 +17437,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='FM';
+const BUILD='FN';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -20683,6 +20712,87 @@ function poseDevis(row, prat){
  return DEVIS[i];
 }
 
+/* La séance. La plus chargée des écritures : des zones, des soins, des
+   réglages d'appareil, un consentement, des documents — et les produits qui
+   sortent du stock.
+
+   UN SEUL APPEL, et c'est le point qui compte. Le serveur écrit la séance, ses
+   zones et ses consommables dans la MÊME transaction : ou tout est là, ou rien
+   ne l'est. Envoyer la séance puis les produits en deux fois laisserait, au
+   premier réseau qui hoquette, un lot descendu d'une dose que plus aucune
+   séance n'explique — et l'on chercherait des mois plus tard pourquoi le stock
+   ne tombe pas juste. */
+const ACTE_DOC = ['zx','seances','devis','forfait','zonesNote'];
+
+const ACTE_VERS = a => {
+ const doc = {};
+ ACTE_DOC.forEach(k => { if(a[k] !== undefined && a[k] !== null) doc[k] = a[k] });
+ return {
+   id: a.id, patient_id: a.patient, date: jourTxt(a.date),
+   praticien: a.praticien || null, operateur: a.operateur || null,
+   type_id: a.type || null, nom: a.nom, categorie: a.cat || null,
+   famille: a.fam || null, region: a.reg || null,
+   lot: a.lot || null, conso_ref: a.conso || null,
+   consentement: !!a.consent, effets: a.effets || null,
+   note: a.note || null, prix: a.prix == null ? null : +a.prix,
+   materiel_id: a.mat || null,
+   params: a.par || null, soins: a.soins || [],
+   zones: a.zones || {}, zt: a.zt || {}, zs: a.zs || {},
+   document: doc,
+ };
+};
+const ACTE_DEPUIS = (r, prat, oper) => {
+ const doc = (r.document && typeof r.document === 'object') ? r.document : {};
+ return { id:Number(r.id), rev:Number(r.revision), patient:Number(r.patient_id),
+   type:r.type_id, nom:r.nom, cat:r.categorie, date:jourTxt(r.date),
+   praticien: prat !== undefined ? prat : null,
+   operateur: oper !== undefined ? oper : null,
+   lot:r.lot, conso:r.conso_ref, fam:r.famille, reg:r.region,
+   note:r.note==null?'':r.note, mat:r.materiel_id,
+   soins:Array.isArray(r.soins)?r.soins:[],
+   par:r.params==null?undefined:r.params,
+   consent:!!r.consentement, effets:r.effets==null?'':r.effets,
+   prix:r.prix==null?null:Number(r.prix),
+   ...doc };
+};
+function poseActe(row, a){
+ const n = ACTE_DEPUIS(row, a.praticien, a.operateur);
+ /* Les zones sont rangées à part, en lignes : le serveur les relit après les
+    avoir écrites et les rend telles qu'elles sont — avec le type comblé par
+    celui de la séance quand la zone n'en portait pas. On les prend de lui
+    plutôt que de refaire ce calcul ici : la même règle écrite à deux endroits
+    finit toujours par valoir deux choses. */
+ if(row.zones){ n.zones = row.zones;
+   n.zt = (row.zt && Object.keys(row.zt).length) ? row.zt : undefined;
+   n.zs = (row.zs && Object.keys(row.zs).length) ? row.zs : undefined;
+ } else { n.zones = a.zones; if(a.zt) n.zt = a.zt; if(a.zs) n.zs = a.zs }
+ const i = ACTES.findIndex(x => x.id === n.id);
+ if(i < 0){ ACTES.unshift(n); return ACTES[0] }
+ Object.keys(n).forEach(k => { ACTES[i][k] = n[k] });
+ return ACTES[i];
+}
+
+/* Ce que la séance a déplacé dans le stock. On ne recalcule rien ici : le
+   serveur a fait l'arithmétique des parts, des emprunts et des lots épuisés,
+   et la refaire à l'écran reviendrait à tenir deux comptabilités du même
+   stock — elles finiraient par différer sur un lot, un jour. */
+function poseStock(etat){
+ if(!Array.isArray(etat)) return;
+ remplTab(STOCK, etat);
+ STOCK.forEach(x=>{ recalcStock(x); lotsDe(x).forEach(majEpuise) });
+}
+
+/* Le consommable, tel que le serveur l'attend : un lot désigné par son
+   identité en base, et le praticien pour qui la dose sort. */
+function consoVers(l){
+ const st = STOCK.find(x => x.ref === l.ref); if(!st) return null;
+ const lo = (st.lots||[]).find(x => x.lot === l.lot) || (st.lots||[])[0];
+ if(!lo || lo.lid == null) return null;
+ return { lot_id: lo.lid, quantite: l.q, pour: AS.prat || null,
+          note: `${(typeof acteDef==='function' && AS.soins && AS.soins[0] && AS.soins[0].t
+                    ? acteDef(AS.soins[0].t).n : 'Séance')} — ${fn(pById(AS.pid))}` };
+}
+
 /* --------------------------------------------------------------------------
    Le conflit, à l'écran
    -------------------------------------------------------------------------- */
@@ -21082,9 +21192,10 @@ function bandeauHTML(){
  return `<div class="bandeau srv"><span>●</span><div><b>${esc(SRV.moi.nom)}</b> · ${esc(ROLES[role]?ROLES[role].l:role)}
    — dossiers du cabinet, sur le serveur.`
    + (SRV.voulu==='connecte' ? ' <b>(mode forcé)</b>' : '')
-   + (SRV.lecture ? ` <b>Écriture partielle</b> : les <b>fiches patient</b> et les <b>devis</b>
-      sont enregistrés au serveur. Les séances, les factures et les mouvements de stock restent
-      pour l’instant dans ce navigateur et ne sont pas renvoyés.
+   + (SRV.lecture ? ` <b>Écriture partielle</b> : les <b>fiches patient</b>, les <b>devis</b> et les
+      <b>séances</b> — avec les produits qu’elles consomment — sont enregistrés au serveur.
+      Les factures, les encaissements et les mouvements de stock saisis depuis l’écran Stock
+      restent pour l’instant dans ce navigateur.
       N’y saisissez pas de dossier réel tant que l’écriture n’est pas posée partout.` : '')
    + `</div></div>`;
 }
