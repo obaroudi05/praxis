@@ -7189,7 +7189,7 @@ function peRetirerAnt(i){ if(!PE) return;
 
 const PCHAMPS=[['nom','Nom'],['prenom','Prénom'],['ddn','Date de naissance'],['tel','Téléphone'],
  ['mail','E-mail'],['adr','Adresse'],['prat','Praticien référent'],['origine','Origine'],['notes','Notes']];
-function majFiche(){
+async function majFiche(){
  if(!PE) return;
  const x=pById(PE.id); if(!x) return;
  const nom=PE.nom.trim(), prenom=PE.prenom.trim(), mail=PE.mail.trim(), tel=PE.tel.trim();
@@ -7216,7 +7216,19 @@ function majFiche(){
  avA.filter(a=>!apA.includes(a)).forEach(a=>ch.push({l:'Antécédent retiré', av:a, ap:''}));
  if(!ch.length){ PE=null; paint(); toast('Aucune modification à enregistrer'); return }
  tracerEcrit(x.id, 'fiche · identité');
- Object.assign(x, nouv);
+
+ /* Lot 04 bis : en mode connecté, c'est le serveur qui enregistre, et c'est sa
+    réponse qu'on applique. On lui renvoie la révision qu'on avait en ouvrant
+    la fiche : s'il a bougé depuis, il refuse en disant qui est passé avant. */
+ const r = await ecrire({
+   methode:'PATCH', chemin:`/api/patients/${x.id}`,
+   corps:{...PATIENT_VERS(nouv), revision:x.rev},
+   quoi:`la fiche de ${fn(x)}`,
+   local:()=>{ Object.assign(x, nouv) },
+   appliquer:row=>{ posePatient(row, nouv.prat) },
+ });
+ if(!r.ok){ paint(); return }              /* la saisie reste à l'écran */
+
  (PMAJ[x.id]=PMAJ[x.id]||[]).push({t:nowStamp(), par:ROLES[role].u, ch});
  PE=null; paint();
  toast(`Fiche mise à jour — ${ch.length} modification${ch.length>1?'s':''}`);
@@ -8289,12 +8301,21 @@ function bilanPatient(id){
 let patRetrait=null;     /* la fiche dont on confirme le retrait */
 
 /* La fiche n'a jamais rien porté : on l'efface pour de bon. */
-function effacerPatient(id){
+async function effacerPatient(id){
  const i=PATIENTS.findIndex(p=>p.id===id);
  if(i<0) return;
  if(!bilanPatient(id).vierge){ toast('Ce dossier porte des données : il s’archive, il ne s’efface pas'); return }
  const nom=fn(PATIENTS[i]);
- PATIENTS.splice(i,1);
+ /* Le serveur ne supprime pas non plus : il marque. La fiche disparaît des
+    écrans, la ligne reste en base avec qui l'a retirée et quand — c'est ce que
+    la conservation impose, et c'est ce que le prototype montrait déjà. */
+ const r = await ecrire({
+   methode:'DELETE', chemin:`/api/patients/${id}`, corps:{},
+   quoi:`la fiche de ${nom}`,
+   local:()=>{ PATIENTS.splice(i,1) },
+   appliquer:()=>{ const j=PATIENTS.findIndex(p=>p.id===id); if(j>=0) PATIENTS.splice(j,1) },
+ });
+ if(!r.ok){ paint(); return }
  if(pSel===id) pSel=null;
  patRetrait=null; paint();
  toast(`Fiche de ${nom} supprimée`);
@@ -17380,7 +17401,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='FK';
+const BUILD='FL';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -20456,6 +20477,162 @@ function priseEnvoyer(){
 function peindrePrise(){ document.getElementById('main').innerHTML=prisePage() }
 
 /* ==========================================================================
+   L'ÉCRITURE TRAVERSANTE — lot 04 bis
+   --------------------------------------------------------------------------
+   Depuis le lot 04, l'interface LIT le serveur. Elle n'y écrivait pas : ce
+   qu'on enregistrait allait dans un tableau du navigateur, et le bandeau le
+   disait à l'écran. Sur un poste, cela se voit à peine. À deux, le dernier
+   qui enregistre écrase son confrère sans que personne ne s'en aperçoive.
+
+   Et tant que l'interface n'écrivait pas, rien de ce qui a été bâti aux lots
+   03 et 05 ne servait vraiment : les droits appliqués côté serveur, le journal
+   des accès, le compte qui ne possède rien protégeaient une base que l'usage
+   ne touchait pas.
+
+   UNE SEULE PORTE. Toute écriture passe par ecrire(). Elle a quatre devoirs,
+   et c'est parce qu'ils sont réunis en un seul endroit qu'on peut les tenir :
+
+     1. LE SERVEUR FAIT FOI. On n'applique pas ce qu'on voulait écrire : on
+        applique ce que le serveur a rendu. C'est ce qui fait que deux postes
+        finissent par voir la même chose plutôt que chacun la sienne.
+
+     2. UN REFUS NE TOUCHE À RIEN. Droit manquant, dossier introuvable,
+        contrainte violée : l'écran ne bouge pas, et le motif s'affiche tel que
+        le serveur l'a écrit. Une interface qui applique d'abord et se rétracte
+        ensuite montre pendant une seconde quelque chose de faux — et c'est
+        cette seconde-là qu'on retient.
+
+     3. UNE PANNE DE RÉSEAU N'ÉCRIT PAS EN LOCAL. La tentation est forte : « au
+        moins on ne perd pas la saisie ». Mais on aurait alors deux vérités et
+        personne pour le dire, jusqu'au jour où l'écart se découvre sur un
+        dossier. On refuse, on laisse la saisie à l'écran, et on le dit.
+
+     4. ON ATTEND, ET ÇA SE VOIT. Un aller-retour prend un instant. Pendant ce
+        temps la même écriture ne peut pas repartir : sinon un double clic
+        enregistre deux fois, et c'est la sorte de bogue qu'on ne reproduit
+        jamais.
+
+   ET LE CONFLIT. Le serveur tient une révision par dossier. On la lui renvoie ;
+   s'il a bougé entre-temps, il refuse en disant QUI l'a modifié, et rend la
+   version courante. On n'écrase pas, on ne fusionne pas en silence : on montre,
+   et on laisse choisir.
+
+   EN MODE AUTONOME, rien de tout cela ne s'applique : la démonstration écrit
+   dans ses tableaux comme avant. La porte le sait et rend la main tout de
+   suite — sans quoi il faudrait deux chemins dans chaque écran, et l'un des
+   deux finirait par ne plus être éprouvé.
+   ========================================================================== */
+const ENVOL=new Set();              /* les écritures en cours, par destination */
+let CONFLIT=null;                   /* ce que le serveur a refusé, et pourquoi */
+const ecritEnCours=()=>ENVOL.size>0;
+
+/* Ce que l'écran affiche quand le serveur refuse ou ne répond pas. On garde le
+   texte du serveur : il a été écrit pour être lu par quelqu'un du cabinet, et
+   le réécrire ici ferait deux messages pour une seule cause. */
+function refusEcriture(r){
+ if(r && r.corps && r.corps.erreur) return r.corps.erreur;
+ if(r && r.code===0) return 'Le serveur n’a pas répondu. Rien n’a été enregistré : '
+   + 'ce qui est à l’écran est toujours là, vous pouvez réessayer.';
+ return 'Le serveur a refusé cette écriture.';
+}
+
+async function ecrire(o){
+ /* o = {methode, chemin, corps, local, appliquer, quoi} */
+ if(!CONNECTE()){ const v=o.local?o.local():undefined; return {ok:true, local:true, valeur:v} }
+ /* Le double clic. Un aller-retour prend un instant, et pendant cet instant le
+    bouton est toujours là. Sans ce verrou, la seconde frappe part pour de bon :
+    deux séances identiques, deux règlements, et personne pour comprendre d'où
+    vient le doublon. On verrouille la DESTINATION, pas l'application — deux
+    écrans peuvent enregistrer deux choses différentes en même temps. */
+ const porte=o.methode+' '+o.chemin;
+ if(ENVOL.has(porte)){ toast('Enregistrement déjà en cours…'); return {ok:false, envol:true} }
+ ENVOL.add(porte);
+ try{
+   let r;
+   try{ r=await srvAppel(o.methode, o.chemin, o.corps) }
+   catch(e){ r={code:0, corps:null} }
+   if(r.code===409 && r.corps && r.corps.detail && r.corps.detail.courant){
+     CONFLIT={quoi:o.quoi||'ce dossier', message:r.corps.erreur, courant:r.corps.detail.courant,
+              revision:r.corps.detail.revision, appliquer:o.appliquer||null};
+     return {ok:false, conflit:true, message:r.corps.erreur};
+   }
+   if(r.code!==200){ const m=refusEcriture(r); toast(m); return {ok:false, code:r.code, message:m} }
+   /* Le serveur fait foi : on applique ce qu'il rend, pas ce qu'on a envoyé. */
+   if(o.appliquer) o.appliquer(r.corps);
+   return {ok:true, valeur:r.corps};
+ } finally { ENVOL.delete(porte) }
+}
+
+/* --------------------------------------------------------------------------
+   Le vocabulaire
+   --------------------------------------------------------------------------
+   Le serveur parle la langue du prototype en LECTURE : c'est lui qui traduit
+   ses colonnes en « ddn », « adr », « ant ». En ÉCRITURE, il rend la ligne
+   telle qu'elle est en base — et c'est voulu : une épreuve du socle vérifie
+   par là qu'un client ne peut pas écrire les colonnes qu'il veut.
+
+   Les deux traductions vivent donc ici, l'une en face de l'autre, et une
+   épreuve fait l'aller-retour complet : on enregistre une fiche, on relit le
+   modèle du serveur, et l'objet doit revenir identique. C'est cette épreuve
+   qui tient les deux moitiés ensemble — pas la bonne volonté de qui les
+   relira.
+   -------------------------------------------------------------------------- */
+const jourTxt = v => { if(!v) return null;
+ const s=String(v); const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m?m[0]:s };
+
+const PATIENT_VERS = p => ({
+ nom:(p.nom||'').trim(), prenom:(p.prenom||'').trim(),
+ naissance:jourTxt(p.ddn)||null,
+ tel:(p.tel||'').trim()||null, mail:(p.mail||'').trim()||null,
+ adresse:(p.adr||'').trim()||null, origine:p.origine||null,
+ notes:(p.notes==null?null:String(p.notes)),
+ antecedents:Array.isArray(p.ant)?p.ant.slice():[],
+ praticien:p.prat||null,
+});
+const PATIENT_DEPUIS = r => ({
+ id:Number(r.id), rev:Number(r.revision),
+ nom:r.nom, prenom:r.prenom, ddn:jourTxt(r.naissance),
+ tel:r.tel, mail:r.mail, prat:null,          /* rempli par l'appelant : le nom
+                                                du praticien n'est pas en base */
+ depuis:jourTxt(r.depuis), notes:r.notes==null?'':r.notes,
+ ant:Array.isArray(r.antecedents)?r.antecedents:[],
+ adr:r.adresse==null?'':r.adresse, origine:r.origine||'',
+});
+
+/* Poser dans le modèle local ce que le serveur vient de rendre, sans perdre ce
+   que le serveur ne connaît pas encore (photos, documents, marques d'écran). */
+function posePatient(row, prat){
+ const n=PATIENT_DEPUIS(row); if(prat!==undefined) n.prat=prat;
+ const x=pById(n.id);
+ if(!x){ PATIENTS.push(n); return n }
+ Object.keys(n).forEach(k=>{ if(k==='prat'&&n.prat==null) return; x[k]=n[k] });
+ return x;
+}
+
+/* --------------------------------------------------------------------------
+   Le conflit, à l'écran
+   -------------------------------------------------------------------------- */
+function fermerConflit(){ CONFLIT=null; paint() }
+function reprendreConflit(){
+ const c=CONFLIT; CONFLIT=null;
+ if(c && c.courant && c.appliquer) c.appliquer(c.courant);
+ paint();
+ toast('Version du serveur reprise');
+}
+function blocConflit(){
+ if(!CONFLIT) return '';
+ return `<div class="tip ko" style="margin-bottom:12px"><span class="e">⚠</span><div>
+   <b>${esc(CONFLIT.message)}</b><br>
+   Rien n’a été enregistré : votre saisie est toujours à l’écran, et la version
+   du serveur est intacte. Recopiez ce qui doit l’être, ou reprenez la version
+   du serveur et recommencez — le logiciel ne choisira pas à votre place.
+   <div class="r" style="gap:7px;margin-top:8px">
+     <button class="btn xs" onclick="fermerConflit()">Garder ma saisie</button>
+     <button class="btn xs p" onclick="reprendreConflit()">Reprendre la version du serveur</button>
+   </div></div></div>`;
+}
+
+/* ==========================================================================
    LE JOURNAL DES ACCÈS AUX DONNÉES DE SANTÉ
    --------------------------------------------------------------------------
    Au bas de la matrice des droits, une ligne promettait depuis des mois que
@@ -20782,7 +20959,7 @@ function paint(){
     base : une ligne posée après coup manque précisément le jour où elle
     compte. */
  accesEcran();
- document.getElementById('main').innerHTML=bandeauHTML()+bandeauSaisie()+(V[view]||V.dash)();
+ document.getElementById('main').innerHTML=bandeauHTML()+blocConflit()+bandeauSaisie()+(V[view]||V.dash)();
  bindBA(); bindGZ(); calerCumul();
  if(typeof cfgPlanifier==='function') cfgPlanifier();
  /* En mode connecté, le classeur local ne doit PAS enregistrer : il écraserait
@@ -20831,8 +21008,10 @@ function bandeauHTML(){
  return `<div class="bandeau srv"><span>●</span><div><b>${esc(SRV.moi.nom)}</b> · ${esc(ROLES[role]?ROLES[role].l:role)}
    — dossiers du cabinet, sur le serveur.`
    + (SRV.voulu==='connecte' ? ' <b>(mode forcé)</b>' : '')
-   + (SRV.lecture ? ` <b>Lecture seule</b> : ce que vous modifiez ici n’est pas encore renvoyé
-      au serveur. N’y saisissez pas de dossier réel tant que l’écriture n’est pas posée.` : '')
+   + (SRV.lecture ? ` <b>Écriture partielle</b> : les <b>fiches patient</b> sont enregistrées
+      au serveur — corriger une identité, retirer un dossier. Les séances, devis, factures et
+      mouvements de stock restent pour l’instant dans ce navigateur et ne sont pas renvoyés.
+      N’y saisissez pas de dossier réel tant que l’écriture n’est pas posée partout.` : '')
    + `</div></div>`;
 }
 /* Le schéma cumulé prend la hauteur qui reste réellement sous lui : l'en-tête
