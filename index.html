@@ -7521,31 +7521,56 @@ function calculerImport(){
 }
 
 /* ---- application ---- */
-function appliquerImport(){
+async function appliquerImport(){
  if(!IMP||!IMP.res) return;
  if(IMP.map.nom==null||IMP.map.prenom==null){ toast('Indiquez au moins les colonnes du nom et du prénom'); return }
- let neufs=0, majs=0;
- IMP.res.forEach(r=>{
+ let neufs=0, majs=0, refus=0;
+ /* Un import porte des centaines de lignes : elles partent une par une, et
+    chacune peut être refusée pour elle-même. On ne s'arrête pas à la première
+    — un fichier d'export contient toujours une ligne aberrante, et refuser
+    l'import entier pour elle obligerait à nettoyer le fichier à la main. On
+    compte ce qui est passé, et on dit ce qui ne l'est pas. */
+ for(const r of IMP.res){
   if(r.etat==='neuf'){
    const id=Math.max(...PATIENTS.map(p=>p.id))+1;
-   PATIENTS.push({id, nom:r.x.nom, prenom:r.x.prenom, ddn:r.x.ddn||null,
+   const neuf={id, nom:r.x.nom, prenom:r.x.prenom, ddn:r.x.ddn||null,
      tel:r.x.tel||'—', mail:r.x.mail||'—', adr:r.x.adr||'', origine:'',
-     prat:PRATICIENS[0], depuis:TODAYS, notes:'', ant:[]});
+     prat:PRATICIENS[0], depuis:TODAYS, notes:'', ant:[]};
+   const rr=await ecrire({
+     methode:'POST', chemin:'/api/patients',
+     corps:{...PATIENT_VERS(neuf), id, depuis:TODAYS},
+     quoi:`le dossier de ${neuf.prenom} ${neuf.nom}`,
+     local:()=>{ PATIENTS.push(neuf) },
+     appliquer:row=>{ posePatient(row, neuf.prat) },
+   });
+   if(!rr.ok){ refus++; continue }
    (PMAJ[id]=PMAJ[id]||[]).push({t:nowStamp(), par:'Import Doctolib',
      ch:[{l:'Dossier créé', av:'', ap:'reprise de l’export Doctolib'}]});
    neufs++;
   } else if(r.etat==='maj'){
-   const p=pById(r.pid); if(!p) return;
-   r.diff.forEach(d=>{ p[d.k]=d.ap });
+   const p=pById(r.pid); if(!p) continue;
+   const nouv={...p}; r.diff.forEach(d=>{ nouv[d.k]=d.ap });
+   const rr=await ecrire({
+     methode:'PATCH', chemin:`/api/patients/${p.id}`,
+     corps:{...PATIENT_VERS(nouv), revision:p.rev},
+     quoi:`la fiche de ${fn(p)}`,
+     local:()=>{ r.diff.forEach(d=>{ p[d.k]=d.ap }) },
+     appliquer:row=>{ posePatient(row, nouv.prat) },
+   });
+   if(!rr.ok){ refus++; CONFLIT=null; continue }
    (PMAJ[p.id]=PMAJ[p.id]||[]).push({t:nowStamp(), par:'Import Doctolib',
      ch:r.diff.map(d=>({l:d.l, av:d.av, ap:d.ap}))});
    majs++;
   }
- });
+ }
  IMP_JOURNAL.push({t:nowStamp(), par:ROLES[role].u, fichier:IMP.nom,
-   neufs, majs, idem:IMP.cpt.idem, rejets:IMP.cpt.rejet});
+   neufs, majs, idem:IMP.cpt.idem, rejets:IMP.cpt.rejet, refus});
  fermerImport(); paint();
- toast(`Reprise Doctolib — ${neufs} dossier${neufs>1?'s':''} créé${neufs>1?'s':''}, ${majs} mis à jour`);
+ /* Un seul message, qui dit tout : un avertissement affiché avant le bilan
+    serait recouvert par lui, et la personne repartirait en croyant que tout
+    est passé. */
+ toast(`Reprise Doctolib — ${neufs} dossier${neufs>1?'s':''} créé${neufs>1?'s':''}, ${majs} mis à jour`
+   + (refus?` · ${refus} ligne${refus>1?'s':''} refusée${refus>1?'s':''} par le serveur`:''));
 }
 
 /* ---- une fiche reprise peut être incomplète : on le dit, sans bloquer ---- */
@@ -8790,7 +8815,7 @@ const fermerFactNew=()=>{ factNew=null; paint() };
 function fnMaj(k,v){ if(!factNew) return; factNew[k]=v;
  if(k==='moyen'&&!v) factNew.frac=1;
  paint() }
-function creerFacture(){
+async function creerFacture(){
  if(!factNew) return;
  const p=pById(factNew.pid); if(!p) return;
  const m=Math.round((+factNew.montant||0)*100)/100;
@@ -8803,17 +8828,26 @@ function creerFacture(){
  const n=Math.max(1,+factNew.frac||1);
  const frac=(factNew.moyen&&n>1)?n:0;
  const id=numFact();
- FACTURES.unshift({id, patient:p.id, acte:a?a.id:null, libelle:a?'':lib,
+ const paye=factNew.moyen?(frac?Math.round(m/frac):m):0;
+ const neuve={id, patient:p.id, acte:a?a.id:null, libelle:a?'':lib,
    /* d'où elle vient : c'est ce lien qui permet de savoir qu'un devis est soldé,
       même quand aucun acte n'a encore été saisi — et, pour un forfait, que ses
       séances sont payées d'avance et n'ont plus rien à réclamer */
    devis:factNew.devis||null, forfait:factNew.forfait||null,
    date:factNew.date, montant:m,
-   paye:factNew.moyen?(frac?Math.round(m/frac):m):0, moyen:factNew.moyen||null,
+   paye, moyen:factNew.moyen||null,
+   regle:paye>0?factNew.date:null,
    plan:frac?{n:frac,faites:1}:null,
    praticien:a?a.praticien:factNew.prat, cat:a?a.cat:'Facturation libre',
-   type, statut:'ok', avoir:0});
- const F=FACTURES[0];
+   type, statut:'ok', avoir:0};
+ const rF=await ecrire({
+   methode:'POST', chemin:'/api/factures', corps:FACT_VERS(neuve),
+   quoi:`la facture ${id}`,
+   local:()=>{ FACTURES.unshift(neuve) },
+   appliquer:row=>{ poseFacture(row, neuve.praticien) },
+ });
+ if(!rF.ok){ paint(); return }
+ const F=FACTURES.find(x=>x.id===id)||FACTURES[0];
  logDoc(id, `Facture émise — ${EUR(m)}${factNew.moyen?' · '+moyenTxt(F):''}`);
  factNew=null; paint();
  toast(`Facture ${id} · ${EUR(m)}${F.moyen?(frac?` · 1ʳᵉ échéance de ${EUR(F.paye)} encaissée`:' encaissée'):' à encaisser'}`);
@@ -17303,7 +17337,7 @@ function secFichiers(a){
 /* ---------------- Facturer l'acte ---------------- */
 let fcMoyen='', fcFrac=1, fcMontant=null;
 function toggleFact(){ factAdd=!factAdd; fcMoyen=''; fcFrac=1; fcMontant=null; forfSupp=false; renderOver() }
-function facturerActe(aid){
+async function facturerActe(aid){
  const a=ACTES.find(x=>x.id===aid); if(!a) return;
  const m=Math.max(0,+((document.getElementById('fcM')||{}).value)||0);
  if(!m){toast('Indiquez un montant');return}
@@ -17313,11 +17347,19 @@ function facturerActe(aid){
     reste dû, et se solde échéance par échéance depuis la caisse */
  const frac=(moyen&&n>1)?n:0;
  const id='F-'+(2600+FACTURES.length);
- FACTURES.unshift({id,patient:a.patient,acte:a.id,date:TODAYS,montant:m,
-   paye:moyen?(frac?Math.round(m/frac):m):0, moyen:moyen||null,
+ const paye=moyen?(frac?Math.round(m/frac):m):0;
+ const neuve={id,patient:a.patient,acte:a.id,date:TODAYS,montant:m,
+   paye, moyen:moyen||null, regle:paye>0?TODAYS:null,
    plan:frac?{n:frac,faites:1}:null,
-   praticien:a.praticien,cat:a.cat,type:a.type,statut:'ok',avoir:0});
- const F=FACTURES[0];
+   praticien:a.praticien,cat:a.cat,type:a.type,statut:'ok',avoir:0};
+ const rF=await ecrire({
+   methode:'POST', chemin:'/api/factures', corps:FACT_VERS(neuve),
+   quoi:`la facture ${id}`,
+   local:()=>{ FACTURES.unshift(neuve) },
+   appliquer:row=>{ poseFacture(row, neuve.praticien) },
+ });
+ if(!rF.ok){ renderOver(); return }
+ const F=FACTURES.find(x=>x.id===id)||FACTURES[0];
  logDoc(id,`Facture émise — ${EUR(m)}${moyen?' · '+moyenTxt(F):''}`);
  factAdd=false; fcMoyen=''; fcFrac=1; fcMontant=null; forfSupp=false;
  toast(`Facture ${id} · ${EUR(m)}${a.forfait?' · supplément hors forfait':''}${
@@ -17437,7 +17479,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='FN';
+const BUILD='FP';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -17930,7 +17972,7 @@ function encMaj(id){
    F.value='1' }
  if(M) M.value=n>1?Math.round(fTTC(f)/n):fTTC(f);
 }
-function majEnc(id){
+async function majEnc(id){
  const f=FACTURES.find(x=>x.id===id); if(!f) return;
  if(!peutEncaisser()){toast('Encaissement réservé aux rôles qui tiennent la caisse');return}
  const av={paye:f.paye, moyen:f.moyen, plan:f.plan?{...f.plan}:null};
@@ -17940,13 +17982,20 @@ function majEnc(id){
  const faites=Math.min(n,Math.max(1,+((document.getElementById('enF')||{}).value)||1));
  if(m>fTTC(f)){toast(`Un encaissement ne peut pas dépasser le montant dû (${EUR(fTTC(f))})`);return}
  if(m>0&&!moyen){toast('Indiquez par quel moyen le patient a réglé');return}
- f.paye=moyen?m:0;
- f.moyen=moyen||null;
- f.plan=(moyen&&n>1)?{n,faites}:null;
+ const nouv={...f, paye:moyen?m:0, moyen:moyen||null,
+   plan:(moyen&&n>1)?{n,faites}:null};
  /* la date du règlement suit le règlement : remettre une facture à zéro la
     remet à « émise », et elle ne doit pas garder la date d'un encaissement
     qui n'existe plus */
- f.regle=f.paye>0?TODAYS:null;
+ nouv.regle=nouv.paye>0?TODAYS:null;
+ const rF=await ecrire({
+   methode:'PATCH', chemin:`/api/factures/${encodeURIComponent(f.id)}`,
+   corps:{...FACT_VERS(nouv), revision:f.rev},
+   quoi:`le règlement de ${f.id}`,
+   local:()=>{ Object.assign(f, nouv) },
+   appliquer:row=>{ poseFacture(row, nouv.praticien) },
+ });
+ if(!rF.ok){ paint(); return }
  /* on garde trace de l'avant et de l'après : c'est une pièce comptable */
  const dit=x=>`${EUR(x.paye)}${x.moyen?' · '+x.moyen:' · non encaissé'}${(x.plan&&x.plan.n>1)?` · ${x.plan.n} fois (${x.plan.faites}/${x.plan.n})`:''}`;
  const apres={paye:f.paye, moyen:f.moyen, plan:f.plan};
@@ -20793,6 +20842,47 @@ function consoVers(l){
                     ? acteDef(AS.soins[0].t).n : 'Séance')} — ${fn(pById(AS.pid))}` };
 }
 
+/* Les factures. Une pièce comptable : elle ne se réécrit pas à la légère, et
+   c'est la raison pour laquelle la correction d'un règlement passe par la
+   révision — on ne rectifie pas un encaissement qu'un confrère vient de
+   saisir. */
+const FACT_DOC = ['libelle','devis','forfait','annule'];
+
+const FACT_VERS = f => {
+ const doc = {};
+ FACT_DOC.forEach(k => { if(f[k] !== undefined && f[k] !== null) doc[k] = f[k] });
+ return {
+   id: f.id, patient_id: f.patient, acte_id: f.acte == null ? null : f.acte,
+   date: jourTxt(f.date), montant: +f.montant || 0, paye: +f.paye || 0,
+   avoir: +f.avoir || 0, moyen: f.moyen || null,
+   plan: f.plan || null, praticien: f.praticien || null,
+   categorie: f.cat || null, type: f.type || null, statut: f.statut || 'ok',
+   regle: jourTxt(f.regle), document: doc,
+ };
+};
+const FACT_DEPUIS = (r, prat) => {
+ const doc = (r.document && typeof r.document === 'object') ? r.document : {};
+ return { id:r.id, rev:Number(r.revision), patient:Number(r.patient_id),
+   acte: r.acte_id==null?null:Number(r.acte_id),
+   date:jourTxt(r.date), montant:Number(r.montant), paye:Number(r.paye),
+   avoir:Number(r.avoir), moyen:r.moyen, plan:r.plan||null,
+   praticien: prat !== undefined ? prat : null,
+   cat:r.categorie, type:r.type, statut:r.statut, regle:jourTxt(r.regle),
+   ...doc };
+};
+function poseFacture(row, prat){
+ const n = FACT_DEPUIS(row, prat);
+ const i = FACTURES.findIndex(x => x.id === n.id);
+ if(i < 0){ FACTURES.unshift(n); return FACTURES[0] }
+ Object.keys(n).forEach(k => { FACTURES[i][k] = n[k] });
+ return FACTURES[i];
+}
+
+/* Le prélèvement depuis l'écran Stock. Le même que celui d'une séance, à ceci
+   près qu'il ne désigne pas de dossier : c'est du produit qui sort pour la
+   réserve de quelqu'un, et non pour un patient. */
+function poseStockSeul(etat){ poseStock(etat) }
+
 /* --------------------------------------------------------------------------
    Le conflit, à l'écran
    -------------------------------------------------------------------------- */
@@ -21192,10 +21282,10 @@ function bandeauHTML(){
  return `<div class="bandeau srv"><span>●</span><div><b>${esc(SRV.moi.nom)}</b> · ${esc(ROLES[role]?ROLES[role].l:role)}
    — dossiers du cabinet, sur le serveur.`
    + (SRV.voulu==='connecte' ? ' <b>(mode forcé)</b>' : '')
-   + (SRV.lecture ? ` <b>Écriture partielle</b> : les <b>fiches patient</b>, les <b>devis</b> et les
-      <b>séances</b> — avec les produits qu’elles consomment — sont enregistrés au serveur.
-      Les factures, les encaissements et les mouvements de stock saisis depuis l’écran Stock
-      restent pour l’instant dans ce navigateur.
+   + (SRV.lecture ? ` <b>Écriture partielle</b> : les <b>fiches patient</b>, les <b>devis</b>, les
+      <b>séances</b> — avec les produits qu’elles consomment — et les <b>factures</b> sont
+      enregistrés au serveur. Seuls les mouvements de stock saisis depuis l’écran Stock
+      (réception, ajustement) restent pour l’instant dans ce navigateur.
       N’y saisissez pas de dossier réel tant que l’écriture n’est pas posée partout.` : '')
    + `</div></div>`;
 }
