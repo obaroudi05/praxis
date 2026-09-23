@@ -4938,6 +4938,48 @@ function rendreLot(x,n,q,per,qui,info){
    acte:(info&&info.acte)||null, patient:(info&&info.patient)||null});
  majEpuise(l); recalcStock(x);
 }
+
+/* --------------------------------------------------------------------------
+   Les deux gestes du stock qui touchent un dossier
+   --------------------------------------------------------------------------
+   Sortir un produit sur une séance déjà écrite, et le rendre. Ils passent par
+   le serveur quand il est là : un stock tenu à deux endroits finit par
+   différer d'une dose, et la dose qui manque est toujours celle qu'un rappel
+   produit vient chercher. Les corps locaux ci-dessus restent pour le
+   navigateur qui travaille seul.
+   -------------------------------------------------------------------------- */
+async function sortirPourActe(st, nLot, q, qui, a, note){
+ const l=lotDe(st,nLot)||lotFEFO(st);
+ let id=null, pris=q, manque=0;
+ tracerEcrit(a.patient, 'produit tracé sur une séance');
+ const r=await ecrire({
+  methode:'POST', chemin:'/api/stock/sortie',
+  corps:{lot_id:l&&l.lid, quantite:q, pour:(qui===PART_COMMUN||!qui)?null:qui,
+         acte_id:a.id, patient_id:a.patient, note, accepter_manque:true},
+  quoi:`le produit tracé sur ${fn(pById(a.patient))}`,
+  appliquer:row=>{ id=row.consommation||null; pris=row.preleve; manque=row.manque||0;
+                   if(row.aBouge){ poseStock(row.aBouge.stock); poseJournal(row.aBouge.journal) } },
+  local:()=>{ pris=sortirLot(st, nLot, q, qui, {acte:a.id, patient:a.patient, note}) },
+ });
+ return {ok:r.ok, id, pris, manque, lot:l};
+}
+
+/* Rendre UNE ligne. On la désigne par son identifiant, jamais par « ce lot,
+   cette quantité » : deux lignes identiques existent, et rendre la mauvaise
+   ferait pointer la traçabilité sur le mauvais patient. */
+async function rendreConso(c, note){
+ const st=STOCK.find(x=>x.ref===c.ref);
+ if(c.patient!=null) tracerEcrit(c.patient, 'produit rendu au stock');
+ const r=await ecrire({
+  methode:'POST', chemin:'/api/stock/retour',
+  corps:{consommation:c.id, note},
+  quoi:`le retour de ${c.nom||c.ref}`,
+  appliquer:row=>{ if(row.aBouge){ poseStock(row.aBouge.stock); poseJournal(row.aBouge.journal) } },
+  local:()=>{ if(st) rendreLot(st,c.lot,c.q,c.per,c.qui,{note}) },
+ });
+ return r.ok;
+}
+
 /* Étiquette d'un lot dans un menu : numéro, péremption, ce qu'il en reste.
    Forme courte pour les menus étroits — c'est le numéro qui identifie, il vient
    donc en tête et ne se fait jamais tronquer. */
@@ -10984,7 +11026,7 @@ function rcSet(k,v){ if(!RC) return; RC[k]=v;
  if(k==='cat'){ const L=sfamsDe(v); if(!L.includes(RC.sfam)) RC.sfam=L[0]||v }
  renderRC() }
 function rcPart(k,v){ if(!RC) return; RC.parts[k]=Math.max(0,+v||0); renderRC() }
-function validerReception(){
+async function validerReception(){
  if(!RC) return;
  const q=rcTotal();
  if(!RC.ref&&!String(RC.marque||'').trim()) { toast('Indiquez le nom commercial du produit'); return }
@@ -10993,6 +11035,50 @@ function validerReception(){
  const V=verdictReception(RC.per);
  if(!V.ok){ toast(V.msg); RC.refus=V; renderRC(); return }
  RC.refus=null;
+ const dejaLa=STOCK.find(y=>y.ref===RC.ref);
+ const refFin=dejaLa?dejaLa.ref:(RC.ref||('REF-'+(STOCK.length+1))).toUpperCase().replace(/\s+/g,'-');
+ const nLotF=(RC.lot||'').trim()||null;
+ /* La livraison telle que le serveur l'attend : les parts d'un coup, et la
+    fiche du produit avec elles. C'est un seul fait — la boîte est dans la
+    main, le nom, le code-barres et le prix payé sont sous les yeux ; les
+    séparer, ce serait garantir que le second geste ne se fait pas. */
+ const parts=PARTS_CIBLE().filter(k=>+RC.parts[k]>0)
+   .map(k=>({pour: k===PART_COMMUN?null:k, quantite:Math.max(0,+RC.parts[k]||0)}));
+ const fiche={};
+ if(!dejaLa){
+  fiche.nom=(RC.marque||'').trim()||refFin;
+  fiche.categorie=RC.cat||'Injectable';
+  fiche.sous_famille=RC.sfam||RC.cat||'Divers';
+  fiche.unite=RC.u||'unité';
+ }
+ { const m=(RC.marque||'').trim(); if(m) fiche.marque=m; if(!dejaLa&&m) fiche.nom=m }
+ if(RC.seuil!=='') fiche.seuil=Math.max(0,+RC.seuil||0);
+ if(RC.pu!=='') fiche.prix_achat=Math.max(0,+RC.pu||0);
+ if(RC.f) fiche.fournisseur=RC.f;
+ if(RC.sp!=='') fiche.sous_produit=+RC.sp;
+ if(RC.gtinVu&&(!dejaLa||!dejaLa.gtin)) fiche.gtin=RC.gtinVu;
+
+ const rR=await ecrire({
+  methode:'POST', chemin:'/api/stock/reception',
+  corps:{reference:refFin, lot:nLotF, peremption:RC.per||null, parts, fiche,
+         note:RC.note||(dejaLa&&lotDe(dejaLa,nLotF)?'Réapprovisionnement':'Nouveau lot')},
+  quoi:`la réception de ${(RC.marque||'').trim()||refFin}`,
+  appliquer:row=>{ if(row.aBouge){ poseStock(row.aBouge.stock); poseJournal(row.aBouge.journal) } },
+  local:()=>receptionLocale(),
+ });
+ if(!rR.ok){ renderRC(); return }
+ cfgPlanifier();
+ const xf=STOCK.find(y=>y.ref===refFin);
+ const det=PARTS_CIBLE().filter(k=>+RC.parts[k]>0)
+   .map(k=>`${k===PART_COMMUN?'commun':k.replace('Dr ','')} +${+RC.parts[k]}`).join(' · ');
+ toast(`${xf?nomProduit(xf):refFin} · lot ${nLotF||'sans n°'} — ${det}`);
+ RC=null; scanCible=null; closeAll(); go('stock');
+}
+
+/* La même réception, quand le serveur n'est pas là. Ce corps était celui de
+   validerReception() : il n'a pas bougé, il a seulement été mis de côté pour
+   que la version qui écrit au serveur ne le recopie pas. */
+function receptionLocale(){
  let x=STOCK.find(y=>y.ref===RC.ref);
  if(!x){
   const ref=(RC.ref||('REF-'+(STOCK.length+1))).toUpperCase().replace(/\s+/g,'-');
@@ -11024,11 +11110,7 @@ function validerReception(){
   crediterPart(l,v,k);
   logMvt({t:'reception', ref:x.ref, nom:nomProduit(x), lot:l.lot, per:l.per, q:v, qui:k,
     note:RC.note||(neuf?'Nouveau lot':'Réapprovisionnement')}) });
- majEpuise(l); recalcStock(x); cfgPlanifier();
- const det=PARTS_CIBLE().filter(k=>+RC.parts[k]>0)
-   .map(k=>`${k===PART_COMMUN?'commun':k.replace('Dr ','')} +${+RC.parts[k]}`).join(' · ');
- toast(`${nomProduit(x)} · lot ${nLot||'sans n°'} — ${det}`);
- RC=null; scanCible=null; closeAll(); go('stock');
+ majEpuise(l); recalcStock(x);
 }
 
 /* ==========================================================================
@@ -11071,7 +11153,7 @@ function utSeances(){
  return L.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,60);
 }
 const utActe=()=>UT&&UT.acte?ACTES.find(a=>a.id===UT.acte):null;
-function validerUtilisation(){
+async function validerUtilisation(){
  if(!UT) return;
  const x=STOCK.find(y=>y.ref===UT.ref); if(!x){ toast('Choisissez un produit'); return }
  const a=utActe(); if(!a){ toast('Rattachez cette utilisation à une séance'); return }
@@ -11080,28 +11162,44 @@ function validerUtilisation(){
  const ret=UT.mode==='retouche';
  const d=ret?(UT.date||TODAYS):a.date;
  if(ret&&d<a.date){ toast('Une retouche ne peut pas précéder la séance'); return }
- const r=retirerPart(l,q,UT.qui);
  const n=new Date();
- const csId='CS-'+(CONSO.length+1+9000);
- CONSO.push({id:csId, acte:a.id, patient:a.patient, ref:x.ref,
-   nom:nomProduit(x), lot:l.lot||'—', per:l.per, q:r.pris, u:x.u,
-   ts:`${d}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`,
-   par:ROLES[role].u, qui:UT.qui, retouche:ret, note:(UT.note||'').trim()||null});
+ const ts=`${d}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+ const note=`${ret?'Retouche':a.nom} — ${fn(pById(a.patient))}${UT.note?' · '+UT.note.trim():''}`;
+ let pris=q, manque=0, csId=null;
+ tracerEcrit(a.patient, 'produit tracé sur une séance');
+ const rU=await ecrire({
+  methode:'POST', chemin:'/api/stock/sortie',
+  corps:{lot_id:l.lid, quantite:q, pour:UT.qui===PART_COMMUN?null:UT.qui,
+         acte_id:a.id, patient_id:a.patient, note, accepter_manque:true},
+  quoi:`le produit tracé sur ${fn(pById(a.patient))}`,
+  appliquer:row=>{ pris=row.preleve; manque=row.manque||0;
+   /* L'identifiant de la ligne vient du serveur : c'est lui qu'on rendra
+      si elle doit être défaite. En inventer un ici, c'est perdre le moyen
+      de désigner CETTE ligne-là. */
+   csId=row.consommation||null;
+   if(row.aBouge){ poseStock(row.aBouge.stock); poseJournal(row.aBouge.journal) }
+   CONSO.push({id:csId||('CS-'+(CONSO.length+1+9000)), acte:a.id, patient:a.patient, ref:x.ref,
+     nom:nomProduit(x), lot:l.lot||'—', per:l.per, q:pris, u:x.u, ts,
+     par:ROLES[role].u, qui:UT.qui, retouche:ret, note:(UT.note||'').trim()||null}) },
+  local:()=>{ const r=retirerPart(l,q,UT.qui); pris=r.pris; manque=r.manque;
+   csId='CS-'+(CONSO.length+1+9000);
+   CONSO.push({id:csId, acte:a.id, patient:a.patient, ref:x.ref,
+     nom:nomProduit(x), lot:l.lot||'—', per:l.per, q:r.pris, u:x.u, ts,
+     par:ROLES[role].u, qui:UT.qui, retouche:ret, note:(UT.note||'').trim()||null});
+   logMvt({t:'sortie', ref:x.ref, nom:nomProduit(x), lot:l.lot, per:l.per, q:r.pris, qui:UT.qui,
+     detail:r.detail, emprunts:r.emprunts, manque:r.manque, acte:a.id, patient:a.patient, ts, note});
+   majEpuise(l); recalcStock(x) },
+ });
+ if(!rU.ok){ renderUT(); return }
  /* une retouche saisie ici est la même chose qu'une retouche saisie dans la
     fiche : elle s'enregistre au même endroit, et s'y relit */
  if(ret) RETOUCHES.push({id:'RT-'+(RETOUCHES.length+1+9000), acte:a.id, patient:a.patient,
-   date:d, prat:UT.qui, note:(UT.note||'').trim(), conso:csId,
-   ts:`${d}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`,
-   par:ROLES[role].u});
- logMvt({t:'sortie', ref:x.ref, nom:nomProduit(x), lot:l.lot, per:l.per, q:r.pris, qui:UT.qui,
-   detail:r.detail, emprunts:r.emprunts, manque:r.manque, acte:a.id, patient:a.patient,
-   ts:`${d}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`,
-   note:`${ret?'Retouche':a.nom} — ${fn(pById(a.patient))}${UT.note?' · '+UT.note.trim():''}`});
- majEpuise(l); recalcStock(x); cfgPlanifier();
+   date:d, prat:UT.qui, note:(UT.note||'').trim(), conso:csId, ts, par:ROLES[role].u});
+ cfgPlanifier();
  const pat=fn(pById(a.patient));
- toast(r.manque
-   ? `${nomProduit(x)} · ${r.pris} pour ${pat} — il en manquait ${r.manque}`
-   : `${nomProduit(x)} × ${r.pris} · lot ${l.lot||'sans n°'} tracé sur ${pat}${ret?' (retouche)':''}`);
+ toast(manque
+   ? `${nomProduit(x)} · ${pris} pour ${pat} — il en manquait ${manque}`
+   : `${nomProduit(x)} × ${pris} · lot ${l.lot||'sans n°'} tracé sur ${pat}${ret?' (retouche)':''}`);
  UT=null; scanCible=null; closeAll(); go('stock');
 }
 
@@ -11223,19 +11321,34 @@ function soScan(L){ if(!SO||!L||!L.lot) return;
 function soSet(k,v){ if(!SO) return; SO[k]=v;
  if(k==='ref'){ const x=STOCK.find(y=>y.ref===v), l=x?lotFEFO(x):null; SO.lot=(l&&l.lot)||'' }
  renderSO() }
-function validerSortie(){
+async function validerSortie(){
  if(!SO) return;
  const x=STOCK.find(y=>y.ref===SO.ref); if(!x){ toast('Choisissez un produit'); return }
  const q=Math.max(1,+SO.q||1);
  const l=lotDe(x,SO.lot)||lotFEFO(x); if(!l){ toast('Aucun lot à sortir'); return }
- const dispo=lotDispo(l,SO.qui);
- const r=retirerPart(l,q,SO.qui);
- logMvt({t:(SO.motif==='Écart d’inventaire'?'ajust':'sortie'), ref:x.ref, nom:nomProduit(x), lot:l.lot,
-   per:l.per, q:r.pris, qui:SO.qui, detail:r.detail, emprunts:r.emprunts, manque:r.manque,
-   note:SO.motif+(SO.note?' — '+SO.note:'')});
- majEpuise(l); recalcStock(x); cfgPlanifier();
- toast(r.manque?`${nomProduit(x)} · ${r.pris} sorti${r.pris>1?'s':''} — il en manquait ${r.manque}`
-              :`${nomProduit(x)} · ${r.pris} sorti${r.pris>1?'s':''} du lot ${l.lot||'sans n°'}`);
+ /* Le motif change le mouvement écrit : un flacon cassé et un inventaire
+    corrigé retirent la même quantité, ce ne sont pas les mêmes faits, et le
+    journal qui les confondrait ne dirait plus si le stock a servi ou s'il
+    s'est perdu. */
+ const type=(SO.motif==='Écart d’inventaire'?'ajust':'sortie');
+ const note=SO.motif+(SO.note?' — '+SO.note:'');
+ let pris=q, manque=0;
+ const rS=await ecrire({
+  methode:'POST', chemin:'/api/stock/sortie',
+  corps:{lot_id:l.lid, quantite:q, pour:SO.qui===PART_COMMUN?null:SO.qui,
+         type, note, accepter_manque:true},
+  quoi:`la sortie de ${nomProduit(x)}`,
+  appliquer:row=>{ pris=row.preleve; manque=row.manque||0;
+                   if(row.aBouge){ poseStock(row.aBouge.stock); poseJournal(row.aBouge.journal) } },
+  local:()=>{ const r=retirerPart(l,q,SO.qui); pris=r.pris; manque=r.manque;
+   logMvt({t:type, ref:x.ref, nom:nomProduit(x), lot:l.lot, per:l.per,
+     q:r.pris, qui:SO.qui, detail:r.detail, emprunts:r.emprunts, manque:r.manque, note});
+   majEpuise(l); recalcStock(x) },
+ });
+ if(!rS.ok){ renderSO(); return }
+ cfgPlanifier();
+ toast(manque?`${nomProduit(x)} · ${pris} sorti${pris>1?'s':''} — il en manquait ${manque}`
+             :`${nomProduit(x)} · ${pris} sorti${pris>1?'s':''} du lot ${l.lot||'sans n°'}`);
  SO=null; scanCible=null; closeAll(); go('stock');
 }
 
@@ -16626,7 +16739,7 @@ async function saveActe(){
    },
    appliquer:row=>{
      poseActe(row, neufActe);
-     if(row.aBouge) poseStock(row.aBouge.stock);
+     if(row.aBouge){ poseStock(row.aBouge.stock); poseConso(neufActe.id, row.aBouge.conso) }
    },
  });
  if(!rA.ok){ renderOver(); return }
@@ -17098,7 +17211,7 @@ function secPhotos(a){
 /* ---------------- Consommables ---------------- */
 let csRefSel=STOCK[0].ref;
 function toggleConso(){ consoAdd=!consoAdd; renderOver() }
-function addConso(aid){
+async function addConso(aid){
  const a=ACTES.find(x=>x.id===aid); if(!a) return;
  const ref=(document.getElementById('csRef')||{}).value;
  const q=Math.max(1,+((document.getElementById('csQ')||{}).value)||1);
@@ -17106,12 +17219,17 @@ function addConso(aid){
  /* le lot vient du menu quand la référence en tient plusieurs, sinon du FEFO */
  const nLot=(document.getElementById('csLot')||{}).value;
  const lot=lotDe(st,nLot)||lotFEFO(st);
- CONSO.push({id:'CS-'+(CONSO.length+1+9000), acte:a.id, patient:a.patient, ref:st.ref, nom:nomProduit(st),
-   lot:(lot&&lot.lot)||'—', per:lot?lot.per:st.per, q, u:st.u, ts:nowStamp(), par:ROLES[role].u,
-   qui:a.praticien});
- sortirLot(st, lot&&lot.lot, q, a.praticien, {acte:a.id, patient:a.patient,
-   note:`${a.nom} — ${fn(pById(a.patient))}`});
- consoAdd=false; toast(`${nomProduit(st)} × ${q} · lot ${(lot&&lot.lot)||'—'} — stock à ${st.q}`); rafraichirConso();
+ const r=await sortirPourActe(st, lot&&lot.lot, q, a.praticien, a,
+   `${a.nom} — ${fn(pById(a.patient))}`);
+ if(!r.ok){ rafraichirConso(); return }
+ CONSO.push({id:r.id||('CS-'+(CONSO.length+1+9000)), acte:a.id, patient:a.patient,
+   ref:st.ref, nom:nomProduit(st), lot:(lot&&lot.lot)||'—', per:lot?lot.per:st.per,
+   q:r.pris, u:st.u, ts:nowStamp(), par:ROLES[role].u, qui:a.praticien});
+ consoAdd=false;
+ toast(r.manque
+   ? `${nomProduit(st)} × ${r.pris} — il en manquait ${r.manque}`
+   : `${nomProduit(st)} × ${r.pris} · lot ${(lot&&lot.lot)||'—'} — stock à ${st.q}`);
+ rafraichirConso();
 }
 /* Depuis que le stock sait tracer une utilisation, une ligne de consommable
    n'appartient plus à la seule fenêtre de saisie d'acte : on redessine ce qui
@@ -17121,10 +17239,10 @@ function rafraichirConso(){
  if(over&&over.classList.contains('on')&&!over.classList.contains('mini')&&AS) renderOver();
  else paint();
 }
-function delConso(id){ const i=CONSO.findIndex(x=>x.id===id); if(i<0) return;
- const c=CONSO[i], st=STOCK.find(x=>x.ref===c.ref);
- if(st) rendreLot(st,c.lot,c.q,c.per,c.qui,{note:'Consommable retiré de l’acte'});
- CONSO.splice(i,1);
+async function delConso(id){ const i=CONSO.findIndex(x=>x.id===id); if(i<0) return;
+ const c=CONSO[i];
+ if(!await rendreConso(c,'Consommable retiré de l’acte')){ rafraichirConso(); return }
+ const j=CONSO.findIndex(x=>x.id===id); if(j>=0) CONSO.splice(j,1);
  /* la retouche qui portait ce produit devient une retouche sans produit :
     le geste a bien eu lieu, on ne l'efface pas avec la seringue */
  const r=RETOUCHES.find(z=>z.conso===id); if(r) r.conso=null;
@@ -17174,7 +17292,7 @@ function rtSet(k,v){ if(!RT) return; RT[k]=v;
  renderOver() }
 /* Enregistrer une retouche. Le produit est facultatif : sans lui, on trace le
    geste et rien d'autre — ce qui est le cas le plus fréquent. */
-function addRetouche(aid){
+async function addRetouche(aid){
  const a=ACTES.find(x=>x.id===aid); if(!a||!RT) return;
  const d=RT.date||TODAYS;
  if(d<a.date){ toast('Une retouche ne peut pas précéder la séance'); return }
@@ -17188,15 +17306,14 @@ function addRetouche(aid){
   const l=lotDe(x,RT.lot)||lotFEFO(x);
   if(!l){ toast('Aucun lot disponible sur cette référence'); return }
   const q=Math.max(1,+RT.q||1);
-  const r=retirerPart(l,q,RT.qui);
-  csId='CS-'+(CONSO.length+1+9000);
+  const r=await sortirPourActe(x, l.lot, q, RT.qui, a,
+    `Retouche — ${fn(pById(a.patient))}${RT.note?' · '+RT.note.trim():''}`);
+  if(!r.ok){ renderOver(); return }
+  csId=r.id||('CS-'+(CONSO.length+1+9000));
   CONSO.push({id:csId, acte:a.id, patient:a.patient, ref:x.ref, nom:nomProduit(x),
     lot:l.lot||'—', per:l.per, q:r.pris, u:x.u, ts, par:ROLES[role].u,
     qui:RT.qui, retouche:true, note:(RT.note||'').trim()||null});
-  logMvt({t:'sortie', ref:x.ref, nom:nomProduit(x), lot:l.lot, per:l.per, q:r.pris, qui:RT.qui,
-    detail:r.detail, emprunts:r.emprunts, manque:r.manque, acte:a.id, patient:a.patient, ts,
-    note:`Retouche — ${fn(pById(a.patient))}${RT.note?' · '+RT.note.trim():''}`});
-  majEpuise(l); recalcStock(x); cfgPlanifier();
+  cfgPlanifier();
   resume=` · ${nomProduit(x)} × ${r.pris}${l.lot?' (lot '+l.lot+')':''}`;
  }
  RETOUCHES.push({id:'RT-'+(RETOUCHES.length+1+9000), acte:a.id, patient:a.patient,
@@ -17207,13 +17324,13 @@ function addRetouche(aid){
 }
 /* Supprimer une retouche rend le produit à qui il appartenait — sinon le stock
    mentirait sur ce qui reste. */
-function delRetouche(id){
+async function delRetouche(id){
  const i=RETOUCHES.findIndex(r=>r.id===id); if(i<0) return;
  const r=RETOUCHES[i], c=consoDeRetouche(r);
- if(c){ const st=STOCK.find(x=>x.ref===c.ref);
-   if(st) rendreLot(st,c.lot,c.q,c.per,c.qui,{note:'Retouche supprimée — produit rendu'});
+ if(c){
+   if(!await rendreConso(c,'Retouche supprimée — produit rendu')){ renderOver(); return }
    const j=CONSO.findIndex(x=>x.id===c.id); if(j>=0) CONSO.splice(j,1); }
- RETOUCHES.splice(i,1);
+ const k=RETOUCHES.findIndex(z=>z.id===id); if(k>=0) RETOUCHES.splice(k,1);
  toast(c?'Retouche supprimée · stock recrédité':'Retouche supprimée');
  renderOver();
 }
@@ -17479,7 +17596,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='FP';
+const BUILD='FQ';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -20831,6 +20948,32 @@ function poseStock(etat){
  STOCK.forEach(x=>{ recalcStock(x); lotsDe(x).forEach(majEpuise) });
 }
 
+/* Les lignes de consommation d'une séance, telles que le serveur les tient.
+   On remplace celles de la séance plutôt que d'ajouter : réenregistrer une
+   séance ne doit pas doubler ses produits. Et surtout, les identifiants
+   viennent de lui — sans eux, l'écran ne saurait pas désigner une ligne pour
+   la rendre, et n'aurait d'autre choix que de bouger le stock dans son coin. */
+/* Les lignes de journal que le serveur vient d'écrire. L'écran des
+   mouvements les montre à l'instant, sans avoir à recharger — et surtout
+   sans tenir un journal à lui, qui porterait des lignes que la base ne
+   connaît pas. Le jour d'un rappel produit, les deux journaux doivent dire
+   la même chose. */
+function poseJournal(lignes){
+ if(!Array.isArray(lignes)) return;
+ lignes.forEach(m=>{ if(!MVT.some(x=>x.id===m.id)) MVT.unshift(m) });
+}
+
+function poseConso(acte, lignes){
+ if(!Array.isArray(lignes)) return;
+ /* La séance vient de naître : elle n'a pas encore de ligne à l'écran. On
+    pose, on ne fusionne pas. Il y avait ici un garde-fou qui effaçait
+    d'abord les lignes de la séance ; aucune épreuve ne pouvait le
+    distinguer de son absence, parce qu'aucun chemin n'y mène. Le jour où
+    cette fonction servira à rafraîchir une séance qui a déjà ses lignes,
+    ce sera un autre geste, avec son épreuve. */
+ lignes.forEach(l=>CONSO.push({...l, par:l.par||ROLES[role].u}));
+}
+
 /* Le consommable, tel que le serveur l'attend : un lot désigné par son
    identité en base, et le praticien pour qui la dose sort. */
 function consoVers(l){
@@ -21283,9 +21426,10 @@ function bandeauHTML(){
    — dossiers du cabinet, sur le serveur.`
    + (SRV.voulu==='connecte' ? ' <b>(mode forcé)</b>' : '')
    + (SRV.lecture ? ` <b>Écriture partielle</b> : les <b>fiches patient</b>, les <b>devis</b>, les
-      <b>séances</b> — avec les produits qu’elles consomment — et les <b>factures</b> sont
-      enregistrés au serveur. Seuls les mouvements de stock saisis depuis l’écran Stock
-      (réception, ajustement) restent pour l’instant dans ce navigateur.
+      <b>séances</b>, les <b>factures</b> et les <b>mouvements de stock</b> — réceptions,
+      sorties, produits tracés sur un patient et produits rendus — sont enregistrés au
+      serveur. Restent dans ce navigateur : la <b>fiche d’un produit</b> modifiée depuis
+      l’écran Stock, et la <b>suppression d’une séance</b>.
       N’y saisissez pas de dossier réel tant que l’écriture n’est pas posée partout.` : '')
    + `</div></div>`;
 }
