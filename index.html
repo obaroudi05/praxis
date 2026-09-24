@@ -10265,8 +10265,8 @@ function choixRetro(){
    <button class="btn" onclick="releveRetro(retroQui())">⭳ Exporter le relevé</button></span>`;
 }
 const ENCV=[['detail','Facturations détaillées'],['jours','Totaux journaliers'],
-            ['caisse','Encaissement & caisse'],['retro','Rétrocession']];
-const encVues=()=>ENCV.filter(([k])=>k!=='retro'||(FACTU.double&&CAN('compta')));
+            ['caisse','Encaissement & caisse'],['clotures','Clôtures'],['retro','Rétrocession']];
+const encVues=()=>ENCV.filter(([k])=>(k!=='retro'||(FACTU.double&&CAN('compta')))&&(k!=='clotures'||CAN('compta')));
 
 /* ==========================================================================
    Exports — un fichier qu'on ouvre dans un tableur, pas un message d'attente
@@ -10419,7 +10419,8 @@ V.encaiss=()=>{
  const sub=`<div class="fbar" style="margin-bottom:14px"><div class="seg">${encVues().map(([k,l])=>
    `<button class="${encView===k?'on':''}" onclick="encView='${k}';paint()">${l}</button>`).join('')}</div>
    ${CAN('compta')?`<div style="margin-left:auto"><button class="btn s g" onclick="go('params');paramTab='facturation';paint()">⚙ Double facturation &amp; rétrocession</button></div>`:''}</div>`;
- return sub+(CAN('compta')?'':bandeauCompta())+({detail:eDetail, jours:eJours, caisse:eCaisse, retro:eRetro}[encView]||eDetail)();
+ return sub+(CAN('compta')?'':bandeauCompta())+({detail:eDetail, jours:eJours, caisse:eCaisse, retro:eRetro,
+   clotures:CAN('compta')?eClotures:eDetail}[encView]||eDetail)();
 };
 
 /* ---------- Facturations détaillées ---------- */
@@ -10757,7 +10758,7 @@ function eCaisse(){
  return `<div class="head" style="margin-bottom:12px">
   <div><h1>Encaissement &amp; caisse</h1><p>${FP.length} facture${FP.length>1?'s':''} · ${EUR(enc)} encaissés${fPrat?' · '+esc(fPrat):''}</p></div>
   <div class="r">${pratsArgent().length>1?selPrat():''}
-   <button class="btn" onclick="toast('Clôture de caisse enregistrée')">Clôture du jour</button>
+   ${CAN('compta')?`<button class="btn" onclick="encView='clotures';paint()">Clôtures</button>`:''}
    <button class="btn p" onclick="toast('Encaissement saisi')">+ Encaissement</button></div></div>
  ${periodBar(perE,'setPerE',`${FP.length} facture${FP.length>1?'s':''}`,presetsFactu(),1)}
  <div class="grid g4" style="margin-bottom:14px">
@@ -10778,6 +10779,165 @@ function eCaisse(){
    <td class="num" style="color:var(--crit);font-weight:660">${EUR(rdu(f))}</td><td class="mono">${days(f.date,TODAY)} j</td>
    <td class="num"><button class="btn xs" onclick="toast('Relance envoyée')">Relancer</button></td></tr>`).join('')}</tbody></table>
    ${im.length?'':'<div class="empty">Aucun impayé sur cette période 🎉</div>'}</div></div>`;
+}
+
+/* ==========================================================================
+   Les clôtures de caisse (lot 06, pas 2)
+   --------------------------------------------------------------------------
+   Cet écran avait un bouton « Clôture du jour » qui affichait « Clôture de
+   caisse enregistrée » et n'enregistrait rien. Une clôture qu'on croit faite
+   et qui ne l'est pas est pire que pas de bouton du tout.
+
+   Les clôtures sont désormais faites par le serveur, toutes seules, chaque
+   jour d'activité achevé, chaque mois, chaque exercice : la base relit le
+   journal, fait les totaux et les cumuls, et scelle. Un prestataire
+   d'horodatage qualifié date chacune. L'écran ne calcule rien : il montre ce
+   que le serveur a clos, ce qui est horodaté et ce qui attend, et ce que la
+   dernière vérification a trouvé.
+   ========================================================================== */
+let CLOT={etat:'vide', liste:[], evts:[], verif:null, erreur:null, occupe:false, jet:false};
+async function chargerClotures(){
+ if(!CONNECTE()) return;
+ CLOT.etat='charge';
+ try{
+   const [a,b]=await Promise.all([srvAppel('GET','/api/caisse/clotures'), srvAppel('GET','/api/caisse/evenements')]);
+   if(a.code!==200) throw new Error((a.corps&&a.corps.erreur)||('le serveur a répondu '+a.code));
+   CLOT.liste=Array.isArray(a.corps)?a.corps:[];
+   CLOT.evts=(b.code===200&&Array.isArray(b.corps))?b.corps:[];
+   CLOT.etat='pret'; CLOT.erreur=null;
+ }catch(e){ CLOT.etat='erreur'; CLOT.erreur=e.message }
+ if(view==='encaiss'&&encView==='clotures') paint();
+}
+async function cloreMaintenant(){
+ if(CLOT.occupe) return;
+ CLOT.occupe=true; paint();
+ try{
+   const r=await srvAppel('POST','/api/caisse/clotures');
+   if(r.code!==200){ toast(refusEcriture(r)); return }
+   const n=r.corps.clotures.length, h=r.corps.horodatages, e=r.corps.echecs||[];
+   toast((n?`${n} clôture${n>1?'s':''} faite${n>1?'s':''}`:'Rien à clore : tout ce qui est achevé l’est déjà')
+     +(h?` · ${h} horodatée${h>1?'s':''}`:'')+(e.length?` · horodatage en échec : ${e[0]}`:''));
+ }catch(e){ toast('Le serveur n’a pas répondu. Rien n’a été clos.') }
+ finally{ CLOT.occupe=false; await chargerClotures() }
+}
+async function verifierCaisse(){
+ if(CLOT.occupe) return;
+ CLOT.occupe=true; paint();
+ try{
+   const r=await srvAppel('GET','/api/caisse/verification');
+   if(r.code!==200){ toast(refusEcriture(r)); return }
+   CLOT.verif={...r.corps, le:nowStamp()};
+   toast(r.corps.intacte?'Vérification : tout est intact':'Vérification : une anomalie a été trouvée');
+ }catch(e){ toast('Le serveur n’a pas répondu.') }
+ finally{ CLOT.occupe=false; paint() }
+}
+async function telechargerJeton(id){
+ try{
+   const r=await srvAppel('GET',`/api/caisse/clotures/${encodeURIComponent(id)}/jeton`);
+   if(r.code!==200){ toast(refusEcriture(r)); return }
+   const o=atob(r.corps.jeton), b=new Uint8Array(o.length);
+   for(let i=0;i<o.length;i++) b[i]=o.charCodeAt(i);
+   const a=document.createElement('a');
+   a.href=URL.createObjectURL(new Blob([b],{type:'application/timestamp-reply'}));
+   a.download=r.corps.nom; document.body.appendChild(a); a.click(); a.remove();
+   toast(`Jeton ${r.corps.nom} téléchargé`);
+ }catch(e){ toast('Le serveur n’a pas répondu.') }
+}
+const LIB_NAT_CLOT={jour:'Jour', mois:'Mois', annee:'Exercice'};
+const LIB_EVT={demarrage:'Démarrage', arret:'Arrêt', version:'Changement de version', parametre:'Changement de paramètre',
+  cloture:'Clôture', horodatage:'Horodatage obtenu', horodatage_echec:'Horodatage manqué',
+  verification:'Vérification', anomalie:'Anomalie', erreur:'Erreur'};
+function periodeClot(c){
+ if(c.nature==='jour') return DF(c.debut);
+ if(c.nature==='mois') return new Date(c.debut+'T12:00').toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+ return `${DF(c.debut)} – ${DF(c.fin)}`;
+}
+function resumeEvt(v){
+ const d=v.detail||{};
+ switch(v.code){
+  case 'cloture': return `${(LIB_NAT_CLOT[d.nature]||d.nature||'').toLowerCase()} ${d.debut||''}${d.fin&&d.fin!==d.debut?' → '+d.fin:''} · ${d.ecritures||0} écriture${d.ecritures>1?'s':''}`;
+  case 'horodatage': return `clôture n° ${d.cloture} · ${d.prestataire||''}`;
+  case 'horodatage_echec': return `clôture n° ${d.cloture} · tentative ${d.tentative} · ${d.erreur||''}`;
+  case 'demarrage': return `${d.version||''} · périmètre ${String(d.perimetre||'').slice(0,8)} · ${d.horodateur?'horodateur '+d.horodateur:'aucun horodateur configuré'}`;
+  case 'version': return `${(d.avant||{}).version||'?'} (${String((d.avant||{}).perimetre||'').slice(0,8)}) → ${(d.apres||{}).version||'?'} (${String((d.apres||{}).perimetre||'').slice(0,8)})`;
+  case 'parametre': return Object.keys({...(d.avant||{}),...(d.apres||{})})
+    .filter(k=>JSON.stringify((d.avant||{})[k])!==JSON.stringify((d.apres||{})[k]))
+    .map(k=>`${k} : ${JSON.stringify((d.avant||{})[k]??null)} → ${JSON.stringify((d.apres||{})[k]??null)}`).join(' · ');
+  case 'verification': case 'anomalie':
+   return `${d.intacte?'intacte':'ANOMALIE'} · ${d.ecritures||0} écritures · ${d.clotures||0} clôtures, ${d.horodatees||0} horodatées`;
+  case 'erreur': return `${d.ou||''} : ${d.message||''}`;
+  case 'arret': return d.signal||'';
+  default: return '';
+ }
+}
+function eClotures(){
+ const tete=`<div class="head" style="margin-bottom:12px">
+   <div><h1>Clôtures de caisse</h1><p>Journalières, mensuelles, annuelles — calculées et scellées par le serveur, datées par un tiers</p></div>
+   ${CONNECTE()?`<div class="r">
+     <button class="btn" ${CLOT.occupe?'disabled':''} onclick="verifierCaisse()">Vérifier la caisse</button>
+     <button class="btn p" ${CLOT.occupe?'disabled':''} onclick="cloreMaintenant()">Clore ce qui est achevé</button></div>`:''}</div>`;
+ if(!CONNECTE()) return tete+`<div class="tip"><span class="e">🔏</span><div><b>La caisse fiscale n’existe que sur le serveur.</b>
+   La démonstration rejoue les règlements, mais ne scelle rien : il n’y a donc rien à clore ici.
+   Connecté, cet écran montre chaque clôture — ses totaux par taux de TVA et par moyen de paiement, le grand total
+   de l’exercice, le total perpétuel — et le jeton du prestataire d’horodatage qui la date.</div></div>`;
+ if(CLOT.etat==='vide') chargerClotures();
+ if(CLOT.etat==='vide'||CLOT.etat==='charge') return tete+'<div class="empty">Lecture des clôtures…</div>';
+ if(CLOT.etat==='erreur') return tete+`<div class="tip ko"><span class="e">⚠</span><div>Les clôtures ne se lisent pas : ${esc(CLOT.erreur||'')}
+   <div style="margin-top:8px"><button class="btn xs" onclick="CLOT.etat='vide';paint()">Réessayer</button></div></div></div>`;
+ const L=CLOT.liste, J=L.filter(c=>c.nature==='jour');
+ const sans=L.filter(c=>!(c.horodatages&&c.horodatages.length));
+ const dem=CLOT.evts.find(v=>v.code==='demarrage'), dv=(dem&&dem.detail)||{};
+ const plusieurs=new Set(L.map(c=>c.assujetti+(c.ecole?' (école)':''))).size>1;
+ const vf=CLOT.verif;
+ const tuile=(k,v,d,c)=>kpi(k,v,d,c);
+ const moyens=t=>Object.entries(((t||{}).encaissements||{}).par_moyen||{})
+   .map(([m,v])=>`${m} ${EUR(+v)}`).join(' · ');
+ const ligne=c=>{
+   const t=c.totaux||{}, ca=t.chiffre_affaires||{}, en=t.encaissements||{}, h=(c.horodatages||[])[0];
+   return `<tr${c.nature!=='jour'?' style="background:var(--panel-2)"':''}>
+    <td class="mono">${c.numero}</td>
+    ${plusieurs?`<td class="mu">${esc(c.assujetti)}</td>`:''}
+    <td>${c.nature==='jour'?'':'<b>'}${LIB_NAT_CLOT[c.nature]||esc(c.nature)}${c.nature==='jour'?'':'</b>'}</td>
+    <td class="nw">${esc(periodeClot(c))}</td>
+    <td class="num mu" title="Écritures n° ${c.premier_numero??'—'} à ${c.dernier_numero??'—'}">${c.ecritures}</td>
+    <td class="num">${EUR(+ca.ttc||0)}<div class="mu" style="font-size:10.5px">HT ${EUR(+ca.ht||0)} · TVA ${EUR(+ca.tva||0)}</div></td>
+    <td class="num" title="${esc(moyens(t))}">${EUR(+en.total||0)}</td>
+    <td class="num">${EUR(+c.grand_total)}</td>
+    <td class="num">${EUR(+c.total_perpetuel)}</td>
+    <td>${h?`<span class="bdg b-good" title="${esc(h.prestataire)} · jeton n° ${esc(String(h.serie))}">✓ ${esc(DTS(minuteLocale(h.heure)))}</span>`
+            :'<span class="bdg b-warn" title="Le prestataire d’horodatage n’a pas encore répondu : le serveur réessaie tout seul">en attente</span>'}</td>
+    <td class="num">${h?`<button class="btn xs" onclick="telechargerJeton(${c.id})" title="Le jeton tel que le prestataire l’a rendu : il se vérifie avec OpenSSL, sans PRAXIS">Jeton</button>`:''}</td></tr>`;
+ };
+ return tete+`<div class="grid g4" style="margin-bottom:14px">
+   ${tuile('Dernière journée close', J.length?DF(J[0].fin):'—', J.length?`${J.length} jour${J.length>1?'s':''} clos`:'aucune activité close', J.length?'up':'')}
+   ${tuile('Horodatage', `${L.length-sans.length} / ${L.length}`, sans.length?`${sans.length} en attente du prestataire`:(L.length?'toutes datées par le tiers':'—'), sans.length?'dn':'up')}
+   ${tuile('Vérification', vf?(vf.intacte?'Intacte':'Anomalie'):'—',
+      vf?`le ${DTS(vf.le)} · ${vf.horodatages.horodatees} jeton${vf.horodatages.horodatees>1?'s':''} vérifié${vf.horodatages.horodatees>1?'s':''}`:'à lancer', vf?(vf.intacte?'up':'dn'):'')}
+   ${(()=>{ const v=String(dv.version||''), m=/^(.*\S)\s+(\S+)$/.exec(v);
+      return tuile('Version fiscale', esc(m?m[2]:(v||'—')),
+        `${esc(m?m[1]:'')}${dv.perimetre?` · périmètre ${esc(String(dv.perimetre).slice(0,8))}`:''}`, '') })()}</div>
+  ${vf&&!vf.intacte?`<div class="tip ko" style="margin-bottom:13px"><span class="e">⚠</span><div><b>La vérification a trouvé une anomalie.</b>
+    ${[...(vf.chaines||[]),...(vf.clotures||[])].filter(c=>!c.intacte).map(c=>`<div>${esc(c.chaine)} : ${esc(((c.rupture||{}).raisons||[]).join(' ; '))}</div>`).join('')}
+    ${(vf.horodatages.invalides||[]).slice(0,3).map(i=>`<div>clôture n° ${i.cloture} : ${esc(i.raisons.join(' ; '))}</div>`).join('')}
+    ${vf.evenements&&!vf.evenements.intacte?`<div>journal technique : ${esc(vf.evenements.rupture.raisons.join(' ; '))}</div>`:''}</div></div>`:''}
+  ${!dv.horodateur&&CLOT.evts.length?`<div class="tip" style="margin-bottom:13px"><span class="e">⏳</span><div><b>Aucun prestataire d’horodatage n’est configuré sur le serveur.</b>
+    Les clôtures sont faites et scellées, mais aucun tiers ne les date encore : c’est ce qui empêche qui possède la base de les refaire.
+    Voir PRAXIS_HORODATAGE_URL dans le document du lot 06.</div></div>`:''}
+  <div class="card" style="margin-bottom:13px"><div class="h"><h2>Clôtures</h2><span class="s">${L.length} · de la plus récente à la plus ancienne</span></div>
+   <div class="tw"><table><thead><tr><th>N°</th>${plusieurs?'<th>Caisse</th>':''}<th>Nature</th><th>Période</th>
+     <th class="num" title="Écritures du journal couvertes">Écr.</th><th class="num">Chiffre d’affaires TTC</th><th class="num">Encaissé</th>
+     <th class="num" title="Chiffre d’affaires depuis l’ouverture de l’exercice">Grand total</th>
+     <th class="num" title="Chiffre d’affaires depuis la première utilisation — jamais remis à zéro">Total perpétuel</th>
+     <th>Horodatage</th><th></th></tr></thead>
+    <tbody>${L.map(ligne).join('')}</tbody></table>
+    ${L.length?'':'<div class="empty">Aucune période achevée à clore pour l’instant : la première clôture se fait au lendemain du premier jour d’activité.</div>'}</div></div>
+  <div class="card"><div class="h"><h2>Journal technique</h2><span class="s">${CLOT.evts.length} événement${CLOT.evts.length>1?'s':''}</span>
+    <div class="r"><button class="btn xs" onclick="CLOT.jet=!CLOT.jet;paint()">${CLOT.jet?'Replier':'Déplier'}</button></div></div>
+   ${CLOT.jet?`<div class="tw"><table><thead><tr><th>N°</th><th>Quand</th><th>Événement</th><th>Détail</th></tr></thead>
+    <tbody>${CLOT.evts.slice(0,100).map(v=>`<tr><td class="mono">${v.numero}</td><td class="mono nw">${esc(DTS(minuteLocale(v.horodatage)))}</td>
+      <td>${['anomalie','erreur','horodatage_echec'].includes(v.code)?`<span class="bdg b-crit">${LIB_EVT[v.code]}</span>`:esc(LIB_EVT[v.code]||v.code)}</td>
+      <td class="mu" style="font-size:11.5px">${esc(resumeEvt(v))}</td></tr>`).join('')}</tbody></table></div>`
+    :`<div class="b"><div class="mu" style="font-size:11.5px">Ce qui arrive au logiciel lui-même : démarrages, arrêts, changements de version, clôtures, horodatages obtenus ou manqués, vérifications. En ajout seul et chaîné, comme le journal de caisse.</div></div>`}</div>`;
 }
 
 /* ---------------- Relances ---------------- */
@@ -17634,7 +17794,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='FR';
+const BUILD='FS';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
