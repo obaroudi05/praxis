@@ -664,6 +664,14 @@ td .lvide{color:var(--ink-3);text-decoration:line-through}
 .encf .inp{height:31px;background:var(--panel);font-size:12.5px;text-transform:none;letter-spacing:0}
 .encf .pxin .inp{text-align:right}
 .encf-a{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+/* le journal d'une pièce : une ligne par écriture, les annulées barrées */
+.encj{display:flex;flex-direction:column;gap:3px;background:var(--panel);border:1px solid var(--line);
+  border-radius:9px;padding:6px 8px}
+.encr{display:grid;grid-template-columns:78px minmax(0,1fr) auto auto;gap:8px;align-items:center;
+  font-size:12px;min-height:26px}
+.encr .num{font-variant-numeric:tabular-nums;font-weight:620;text-align:right}
+.encr-x>span:not(.bdg){text-decoration:line-through;text-decoration-color:var(--ink-3);color:var(--ink-3)}
+.encr-t{font-size:10.5px;font-weight:640;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em}
 .sig-f{display:flex;gap:8px;align-items:center}
 .sig-f .btn.p{margin-left:auto}
 /* la signature recueillie, telle qu'elle s'imprime sur la pièce */
@@ -4276,20 +4284,28 @@ function setRetroGen(pr,v){
    instrument sans perdre l'information du fractionnement. */
 const MOYENS=['CB','Espèces','Chèque','Virement','Lien de paiement'];
 const FRACTIONS=[2,3,4];
+/* Les écritures de caisse d'une facture — ce que le journal en dit. Un
+   règlement annulé reste une écriture : il a eu lieu, il ne compte plus. */
+const regsDe=f=>Array.isArray(f&&f.regs)?f.regs:[];
+const reglementsVivants=f=>regsDe(f).filter(e=>e.nature==='reglement'&&!e.annulee);
+const emissionDe=f=>regsDe(f).find(e=>e.nature==='emission')||null;
+/* Les échéances réglées se COMPTENT : ce sont les règlements qui tiennent.
+   Les déclarer à la main, c'était pouvoir écrire « 3/3 » sur un seul chèque. */
+const faitesDe=f=>{const n=reglementsVivants(f).length; return n||((f&&f.plan&&f.plan.faites)||0)};
 /* libellé lisible d'un règlement, plan compris */
 function moyenTxt(f){
  if(!f||f.statut==='annulee') return '';
  if(!f.moyen) return '';
  const P=f.plan;
  if(!P||!(P.n>1)) return f.moyen;
- return `${f.moyen} — ${P.n} fois (${Math.min(P.faites||0,P.n)}/${P.n})`;
+ return `${f.moyen} — ${P.n} fois (${Math.min(faitesDe(f),P.n)}/${P.n})`;
 }
 /* le même règlement, en plus court : « Virement 1/2 » plutôt que
    « Virement — 2 fois (1/2) ». Le libellé complet reste en infobulle. */
 function moyenCourt(f){
  if(!f||f.statut==='annulee'||!f.moyen) return '';
  const P=f.plan;
- return (!P||!(P.n>1))?f.moyen:`${f.moyen} ${Math.min(P.faites||0,P.n)}/${P.n}`;
+ return (!P||!(P.n>1))?f.moyen:`${f.moyen} ${Math.min(faitesDe(f),P.n)}/${P.n}`;
 }
 /* montant d'une échéance */
 const echeance=f=>(f&&f.plan&&f.plan.n>1)?Math.round(fTTC(f)/f.plan.n):0;
@@ -5078,7 +5094,8 @@ const ROLES={
  secretariat:{l:'Secrétariat',u:'N. Faure',i:'NF',v:['dash','envois','patients','devis','relances','stock','acces'],med:false,prix:true,compta:false,encaisse:true,caCabinet:false},
 };
 /* prix     = voir les montants d'un acte, d'un devis, d'une facture (métier : facturer, encaisser)
-   encaisse = saisir et corriger un règlement, depuis la fiche du patient
+   encaisse = tenir la caisse d'une facture, depuis la fiche du patient :
+              enregistrer un règlement, l'annuler avec son motif, rembourser
    compta   = suivi comptable : ventilation HT/TVA, rétrocession, les MONTANTS
               des statistiques, périodes au-delà de la journée, et les écrans
               financiers globaux. L'écran des statistiques, lui, s'ouvre par la
@@ -8760,7 +8777,11 @@ let factNew=null;    /* saisie d'une facture */
 let avoirNew=null;   /* saisie d'un avoir */
 
 const numFact=()=>'F-'+(Math.max(2599,...FACTURES.map(f=>+String(f.id).replace(/\D/g,'')||0))+1);
-const numAvoir=()=>'AV-'+String(Math.max(0,...AVOIRS.map(a=>+String(a.id).replace(/\D/g,'')||0))+1).padStart(4,'0');
+/* Le numéro qu'on PROPOSE : la suite de la série « AV-nnnn ». Au serveur, c'est
+   lui qui l'arrête — un confrère a pu prendre celui-ci à l'instant — et
+   l'écran imprime celui qu'il a retenu. Les avoirs repris d'un ancien
+   logiciel n'ont pas de numéro de cette série : ils ne la font pas avancer. */
+const numAvoir=()=>'AV-'+String(Math.max(0,...AVOIRS.map(a=>{const m=/^AV-(\d+)$/.exec(String(a.id)); return m?+m[1]:0}))+1).padStart(4,'0');
 /* encaissé au-delà de ce qui reste dû : il y a un remboursement à faire */
 const trop=f=>f.statut==='annulee'?0:Math.round(Math.max(0,f.paye-(f.montant-f.avoir))*100)/100;
 const avoirsDe=fid=>AVOIRS.filter(a=>a.facture===fid);
@@ -8882,10 +8903,12 @@ async function creerFacture(){
    plan:frac?{n:frac,faites:1}:null,
    praticien:a?a.praticien:factNew.prat, cat:a?a.cat:'Facturation libre',
    type, statut:'ok', avoir:0};
+ /* Le taux part avec la pièce : c'est celui qu'elle imprime, et c'est celui
+    que le journal de caisse doit sceller — pas celui du jour où on la relira. */
  const rF=await ecrire({
-   methode:'POST', chemin:'/api/factures', corps:FACT_VERS(neuve),
+   methode:'POST', chemin:'/api/factures', corps:{...FACT_VERS(neuve), tva:tauxTVA()},
    quoi:`la facture ${id}`,
-   local:()=>{ FACTURES.unshift(neuve) },
+   local:()=>{ naitreLocal(neuve) },
    appliquer:row=>{ poseFacture(row, neuve.praticien) },
  });
  if(!rF.ok){ paint(); return }
@@ -8950,7 +8973,7 @@ function ouvrirAvoirNew(pid){
 }
 const fermerAvoirNew=()=>{ avoirNew=null; paint() };
 function avMaj(k,v){ if(!avoirNew) return; avoirNew[k]=v; paint() }
-function creerAvoir(){
+async function creerAvoir(){
  if(!avoirNew) return;
  const f=FACTURES.find(x=>x.id===avoirNew.fid); if(!f){ toast('Facture introuvable'); return }
  const max=creditable(f);
@@ -8960,14 +8983,28 @@ function creerAvoir(){
  if(!avoirNew.motif.trim()){ toast('Un avoir doit porter son motif'); return }
  if(avoirNew.date>TODAYS){ toast('Un avoir ne s’établit pas dans le futur'); return }
  const id=numAvoir();
- AVOIRS.unshift({id, facture:f.id, patient:f.patient, date:avoirNew.date, montant:m,
-   motif:avoirNew.motif.trim(), praticien:f.praticien, par:ROLES[role].u, ts:nowStamp()});
- f.avoir=Math.round((f.avoir+m)*100)/100;
- logDoc(f.id, `Avoir ${id} établi — ${EUR(m)} · ${avoirNew.motif.trim()}`);
- logDoc(id, `Avoir sur la facture ${f.id} — ${EUR(m)}`);
+ const motif=avoirNew.motif.trim(), date=avoirNew.date;
+ /* L'avoir est une écriture de caisse de sens contraire, qui porte le numéro
+    de sa pièce : il crédite ce qui a été vendu, au taux où cela l'a été. */
+ const rA=await ecrire({
+   methode:'POST', chemin:`/api/factures/${encodeURIComponent(f.id)}/avoir`,
+   corps:{montant:m, motif, piece:id, tva:tauxTVA()}, quoi:`l’avoir ${id}`,
+   local:()=>{ inscrireLocal(f,{nature:'avoir', montant:-m, motif, piece:id}) },
+   appliquer:row=>{ poseFacture(row, f.praticien) },
+ });
+ if(!rA.ok){ paint(); return }
+ /* Le numéro retenu est celui du serveur : si un confrère venait d'établir un
+    avoir sous ce numéro, il a donné le suivant — et c'est celui-là que la
+    pièce doit porter. */
+ const eAv=rA.local?null:regsDe(f).filter(x=>x.nature==='avoir').pop();
+ const num=(eAv&&eAv.piece)||id;
+ AVOIRS.unshift({id:num, facture:f.id, patient:f.patient, date, montant:m,
+   motif, praticien:f.praticien, par:ROLES[role].u, ts:nowStamp()});
+ logDoc(f.id, `Avoir ${num} établi — ${EUR(m)} · ${motif}`);
+ logDoc(num, `Avoir sur la facture ${f.id} — ${EUR(m)}`);
  const reste=trop(f);
  avoirNew=null; paint();
- toast(`Avoir ${id} · ${EUR(m)} sur ${f.id}${reste?` · ${EUR(reste)} à rembourser`:''}`);
+ toast(`Avoir ${num} · ${EUR(m)} sur ${f.id}${reste?` · ${EUR(reste)} à rembourser`:''}`);
 }
 function avoirForm(p){
  const L=FACTURES.filter(f=>f.patient===p.id&&f.statut!=='annulee'&&creditable(f)>0);
@@ -9789,7 +9826,7 @@ function pDetail(p){
    if(!ROLES[role].prix) return '<div class="empty">🔒 Non accessible au rôle « '+ROLES[role].l+' ».</div>';
    const enAttente=D.filter(d=>['envoye','relance1','relance2'].includes(d.statut));
    const avoirs=F.filter(f=>f.avoir>0);
-   const modes={}; F.forEach(f=>{if(f.moyen) modes[f.moyen]=(modes[f.moyen]||0)+f.paye});
+   const modes={}; F.forEach(f=>ajouterModes(modes, f));
    const cpt=CAN('compta');
    return `<div class="grid g4" style="margin-bottom:14px">
      ${kpi('Total facturé',EUR(ca),`${F.filter(x=>x.statut==='ok').length} facture(s)`)}
@@ -9926,7 +9963,7 @@ function pDetail(p){
         ${(an||!voitRetro())?'':`<button class="btn xs ${retroSel===f.id?'g':''}"
           title="Part centre et part praticien rétrocédée"
           onclick="event.stopPropagation();ouvrirRetro('${f.id}')">${retroSel===f.id?'✕':'⇄ Rétroc.'}</button>`}
-        ${(an||!peutEncaisser())?'':`<button class="btn xs ${encSel===f.id?'g':''}" title="Corriger l’encaissement, même sur une facture soldée"
+        ${(an||!peutEncaisser())?'':`<button class="btn xs ${encSel===f.id?'g':''}" title="Les règlements de cette facture : en enregistrer un, en annuler un, rembourser un trop-perçu"
           onclick="event.stopPropagation();ouvrirEnc('${f.id}')">${encSel===f.id?'✕':'€ Encaisser'}</button>`}
         <button class="btn xs" onclick="toast('PDF Factur-X de ${f.id}')">PDF</button></td></tr>
       ${encSel===f.id?`<tr class="supp"><td colspan="10">${encForm(f)}</td></tr>`:''}
@@ -9938,13 +9975,13 @@ function pDetail(p){
      <div class="tw"><table><thead><tr><th>N°</th><th>Date</th><th>Facture</th><th>Motif</th>
        <th class="num">Montant</th><th>Établi par</th><th></th></tr></thead>
       <tbody>${AV.map(a=>`<tr>
-        <td class="mono" style="white-space:nowrap">${esc(a.id)}</td>
+        <td class="mono" style="white-space:nowrap">${a.reprise?'<span class="mu" title="Avoir transmis en cumul par l’ancien logiciel : sa pièce est dans ses archives">repris</span>':esc(a.id)}</td>
         <td class="mono" style="white-space:nowrap">${DF(a.date)}</td>
         <td class="mono">${esc(a.facture)}</td>
         <td>${esc(a.motif)}</td>
         <td class="num" style="color:var(--warn);font-weight:650">− ${EUR(a.montant)}</td>
         <td class="mu" style="white-space:nowrap">${esc(a.par||a.praticien)}</td>
-        <td class="num"><button class="btn xs" onclick="apercuAvoir('${a.id}')">◫ PDF</button></td></tr>`).join('')}
+        <td class="num">${a.reprise?'':`<button class="btn xs" onclick="apercuAvoir('${esc(a.id)}')">◫ PDF</button>`}</td></tr>`).join('')}
       </tbody></table></div>`:''})()}
    ${Object.keys(modes).length?`<div class="subh"><h3>Encaissements par moyen de paiement</h3></div>
     <div style="display:flex;gap:7px;flex-wrap:wrap">${Object.entries(modes).map(([m,v])=>
@@ -10681,7 +10718,7 @@ function eJours(){
    <th class="num">TTC</th>${dbl?'<th class="num" title="Part revenant au centre">Centre</th><th class="num" title="Part rétrocédée au praticien">Rétroc.</th>':''}
    <th class="num">Encaissé</th><th>Moyens de paiement</th><th class="num">Restant dû</th></tr></thead>
   <tbody>${jours.map(d=>{const F=j[d], ok=F.filter(f=>f.statut==='ok');
-   const modes={}; ok.forEach(f=>{if(f.moyen) modes[f.moyen]=(modes[f.moyen]||0)+f.paye});
+   const modes={}; ok.forEach(f=>ajouterModes(modes, f));
    return `<tr class="c" onclick="encView='detail';setPerE({k:'perso',from:'${d}',to:'${d}'})">
     <td class="mono"><b>${DF(d)}</b><div class="mu" style="font-size:11px">${new Date(d).toLocaleDateString('fr-FR',{weekday:'long'})}</div></td>
     <td class="num">${ok.length}${F.length!==ok.length?`<div class="mu" style="font-size:11px">${F.length-ok.length} annulée(s)</div>`:''}</td>
@@ -14050,7 +14087,8 @@ function apercuGlobal(){
  ACTES.forEach(a=>{ if(pages.length>=6) return;
   docsActe(a).forEach(x=>{ if(vus.has(x.k)||pages.length>=6) return;
    vus.add(x.k); pages.push(docDoc({...a, praticien:P}, x)) }) });
- if(AVOIRS[0]&&pages.length<6) pages.push(docAvoir({...AVOIRS[0], praticien:P}));
+ { const av=AVOIRS.find(a=>!a.reprise);
+   if(av&&pages.length<6) pages.push(docAvoir({...av, praticien:P})) }
  if(!pages.length){ toast('Aucune pièce à montrer'); return }
  pdfView(`Aperçu global — ${P}`,
    `${pages.length} pièce${pages.length>1?'s':''} · en-tête ${enteteVisible(P)?'affiché':'masqué'}`
@@ -17470,9 +17508,9 @@ async function facturerActe(aid){
    plan:frac?{n:frac,faites:1}:null,
    praticien:a.praticien,cat:a.cat,type:a.type,statut:'ok',avoir:0};
  const rF=await ecrire({
-   methode:'POST', chemin:'/api/factures', corps:FACT_VERS(neuve),
+   methode:'POST', chemin:'/api/factures', corps:{...FACT_VERS(neuve), tva:tauxTVA()},
    quoi:`la facture ${id}`,
-   local:()=>{ FACTURES.unshift(neuve) },
+   local:()=>{ naitreLocal(neuve) },
    appliquer:row=>{ poseFacture(row, neuve.praticien) },
  });
  if(!rF.ok){ renderOver(); return }
@@ -17596,7 +17634,7 @@ function secDocuments(a){
 /* ==========================================================================
    Version et détection de mise à jour
    ========================================================================== */
-const BUILD='FQ';
+const BUILD='FR';
 function rechargerDur(){
  const u=new URL(location.href); u.searchParams.set('maj',Date.now()); location.replace(u.toString());
 }
@@ -18053,73 +18091,179 @@ function retroApercu(m,prat,t){
  return `<span class="rtap">⇄ ${esc(prat)} <b>${EUR(pp)}</b> (${tx} %) · ${esc(FACTU.centre.nom)} <b>${EUR(m-pp)}</b></span>`;
 }
 const peutEncaisser=()=>CAN('encaisse');
-function ouvrirEnc(id){ encSel=(encSel===id)?null:id; paint&&paint(); if(AS) renderOver() }
-function fermerEnc(){ encSel=null; paint&&paint(); if(AS) renderOver() }
-/* le formulaire, réutilisé dans la fiche patient comme dans un acte */
+function ouvrirEnc(id){ encSel=(encSel===id)?null:id; encAnn=null; paint&&paint(); if(AS) renderOver() }
+function fermerEnc(){ encSel=null; encAnn=null; paint&&paint(); if(AS) renderOver() }
+const redessinerCaisse=()=>{ paint&&paint(); if(AS) renderOver() };
+
+/* ==========================================================================
+   La caisse d'une pièce
+   --------------------------------------------------------------------------
+   Ce panneau corrigeait l'encaissement : on y réécrivait le montant reçu, le
+   moyen, les échéances « faites » — jusqu'à remettre une facture réglée à
+   « non encaissé ». C'est exactement ce que l'article 286 I 3° bis du CGI
+   interdit à un logiciel qui mémorise les règlements de patients : une donnée
+   enregistrée ne se modifie pas, elle se corrige par une opération de sens
+   contraire, qui reste visible (BOFiP, BOI-TVA-DECLA-30-10-30, § 90).
+
+   Il ENREGISTRE donc désormais. Un règlement s'ajoute, avec SON moyen ; s'il
+   était faux, il s'annule, avec son motif, et reste à l'écran barré. Le trop-
+   perçu se rembourse. La facture s'annule quand plus rien n'y est encaissé.
+   ========================================================================== */
+const LIB_ECR={emission:'Émission', reglement:'Règlement', avoir:'Avoir', remboursement:'Remboursement',
+  annulation_reglement:'Annulation d’un règlement', annulation_emission:'Annulation de la facture'};
+let encAnn=null;     /* {fid, eid} : l'annulation qu'on est en train de motiver */
+
 function encForm(f){
- const n=(f.plan&&f.plan.n)||1;
+ if(!f) return '';
+ const n=(f.plan&&f.plan.n)||1, du=rdu(f), tp=trop(f), an=f.statut==='annulee';
+ const R=regsDe(f).filter(e=>e.nature!=='emission');
+ const em=emissionDe(f);
+ const propose=du>0?Math.min(du, n>1?Math.max(1,Math.round(fTTC(f)/n)):du):0;
+ const jour=e=>{const d=e.date?String(e.date).slice(0,10):jourLocal(e.horodatage); return d?DF(d):'—'};
+ const ligne=e=>`<div class="encr${e.annulee?' encr-x':''}" data-ecr="${esc(String(e.id))}">
+    <span class="mono">${jour(e)}</span>
+    <span>${LIB_ECR[e.nature]||esc(e.nature)}${e.moyen?' · '+esc(e.moyen):''}${e.motif?` <span class="mu">— ${esc(e.motif)}</span>`:''}${e.annulee?' <span class="bdg b-crit">annulé</span>':''}</span>
+    <span class="num">${e.montant<0?'− ':''}${EUR(Math.abs(e.montant))}</span>
+    ${(!e.annulee&&e.nature==='reglement'&&peutEncaisser()&&!(encAnn&&String(encAnn.eid)===String(e.id)))
+      ?`<button class="btn xs g" onclick="demanderAnnulation('${f.id}','${esc(String(e.id))}')">Annuler…</button>`:'<span></span>'}
+  </div>`;
+ const motifAnn=(encAnn&&encAnn.fid===f.id)?(()=>{
+   const c=regsDe(f).find(e=>String(e.id)===String(encAnn.eid));
+   const quoi=c&&c.nature==='emission'?'l’annulation de la facture':`l’annulation du règlement de ${EUR(c?c.montant:0)}`;
+   return `<div class="encf-a" style="background:var(--warn-w);border-radius:8px;padding:6px 8px">
+     <label style="flex:1;min-width:220px">Motif de ${quoi}
+       <input class="inp" id="enA" placeholder="Erreur de saisie, chèque impayé, erreur de patient…"></label>
+     <button class="btn xs g" onclick="lacherAnnulation()">Garder</button>
+     <button class="btn xs crit" onclick="confirmerAnnulation()">Confirmer l’annulation</button></div>`})():'';
  return `<div class="encf" onclick="event.stopPropagation()">
-  <div class="encf-g">
-   <label>Encaissé
-     <div class="pxin"><input class="inp" id="enM" type="number" min="0" step="5" value="${f.paye}"><span>€</span></div></label>
+  <div class="encr-t">Facture ${esc(f.id)} · ${EUR(f.montant)} TTC${f.avoir?` · avoir ${EUR(f.avoir)}`:''} · encaissé ${EUR(f.paye)}${an?' · annulée':du>0?` · reste ${EUR(du)}`:' · soldée'}</div>
+  ${R.length?`<div class="encj">${R.map(ligne).join('')}</div>`:''}
+  ${motifAnn}
+  ${(!an&&du>0.005)?`<div class="encf-g">
+   <label>Montant reçu
+     <div class="pxin"><input class="inp" id="enM" type="number" min="0" step="5" value="${propose}"><span>€</span></div></label>
    <label>Moyen de paiement
-     <select class="inp" id="enP"><option value="">non encaissé</option>
-       ${MOYENS.map(m=>`<option ${f.moyen===m?'selected':''}>${m}</option>`).join('')}</select></label>
-   <label>Étalement
-     <select class="inp" id="enN" onchange="encMaj('${f.id}')">
+     <select class="inp" id="enP"><option value="">— choisir —</option>
+       ${MOYENS.map(m=>`<option>${m}</option>`).join('')}</select></label>
+   <label>Échéancier
+     <select class="inp" id="enN" onchange="planFacture('${f.id}',+this.value)">
        <option value="1" ${n===1?'selected':''}>Réglé en une fois</option>
        ${FRACTIONS.map(k=>`<option value="${k}" ${n===k?'selected':''}>En ${k} fois — ${EUR(Math.round(fTTC(f)/k))} par échéance</option>`).join('')}</select></label>
-   <label>Échéances réglées
-     <select class="inp" id="enF" ${n>1?'':'disabled'}>
-       ${Array.from({length:Math.max(n,1)},(_,k)=>`<option value="${k+1}" ${((f.plan&&f.plan.faites)||1)===k+1?'selected':''}>${k+1} sur ${n}</option>`).join('')}</select></label>
-  </div>
+  </div>`:''}
+  ${tp>0.005?`<div class="encf-g">
+   <label>Trop-perçu à rembourser
+     <div class="pxin"><input class="inp" id="enRM" type="number" min="0" step="1" value="${tp}"><span>€</span></div></label>
+   <label>Remboursé par
+     <select class="inp" id="enRP"><option value="">— choisir —</option>
+       ${MOYENS.map(m=>`<option>${m}</option>`).join('')}</select></label>
+   <label>Motif
+     <input class="inp" id="enRX" value="Trop-perçu après avoir"></label>
+  </div>`:''}
   <div class="encf-a">
-   <span class="mu" style="font-size:11px;flex:1">Facture ${esc(f.id)} · ${EUR(fTTC(f))} TTC${f.avoir?` · avoir ${EUR(f.avoir)}`:''}. Toute correction est horodatée dans le journal de la pièce.</span>
-   <button class="btn xs g" onclick="fermerEnc()">Annuler</button>
-   <button class="btn xs p" onclick="majEnc('${f.id}')">Enregistrer</button>
+   <span class="mu" style="font-size:11px;flex:1">Chaque règlement est une écriture de caisse : il ne se modifie pas, il s’annule — avec son motif — et l’annulation reste visible.${n>1?` Échéances réglées : ${Math.min(faitesDe(f),n)} sur ${n}.`:''}</span>
+   ${(em&&!an&&!em.annulee&&f.paye<=0.005&&peutEncaisser()&&!(encAnn&&encAnn.fid===f.id))
+     ?`<button class="btn xs g" onclick="demanderAnnulation('${f.id}','${esc(String(em.id))}')">Annuler la facture…</button>`:''}
+   <button class="btn xs g" onclick="fermerEnc()">Fermer</button>
+   ${tp>0.005?`<button class="btn xs" onclick="rembourserFacture('${f.id}')">Rembourser</button>`:''}
+   ${(!an&&du>0.005)?`<button class="btn xs p" onclick="encaisserFacture('${f.id}')">Encaisser</button>`:''}
   </div></div>`;
 }
-/* changer l'étalement recalcule l'encaissement proposé */
-function encMaj(id){
- const f=FACTURES.find(x=>x.id===id); if(!f) return;
- const n=+((document.getElementById('enN')||{}).value)||1;
- const F=document.getElementById('enF'), M=document.getElementById('enM');
- if(F){ F.disabled=n<2;
-   F.innerHTML=Array.from({length:Math.max(n,1)},(_,k)=>`<option value="${k+1}">${k+1} sur ${n}</option>`).join('');
-   F.value='1' }
- if(M) M.value=n>1?Math.round(fTTC(f)/n):fTTC(f);
-}
-async function majEnc(id){
+
+/* Encaisser : un règlement DE PLUS, avec son moyen. Il ne remplace rien. */
+async function encaisserFacture(id){
  const f=FACTURES.find(x=>x.id===id); if(!f) return;
  if(!peutEncaisser()){toast('Encaissement réservé aux rôles qui tiennent la caisse');return}
- const av={paye:f.paye, moyen:f.moyen, plan:f.plan?{...f.plan}:null};
- const m=Math.max(0,+((document.getElementById('enM')||{}).value)||0);
- const moyen=(document.getElementById('enP')||{}).value||null;
- const n=Math.max(1,+((document.getElementById('enN')||{}).value)||1);
- const faites=Math.min(n,Math.max(1,+((document.getElementById('enF')||{}).value)||1));
- if(m>fTTC(f)){toast(`Un encaissement ne peut pas dépasser le montant dû (${EUR(fTTC(f))})`);return}
- if(m>0&&!moyen){toast('Indiquez par quel moyen le patient a réglé');return}
- const nouv={...f, paye:moyen?m:0, moyen:moyen||null,
-   plan:(moyen&&n>1)?{n,faites}:null};
- /* la date du règlement suit le règlement : remettre une facture à zéro la
-    remet à « émise », et elle ne doit pas garder la date d'un encaissement
-    qui n'existe plus */
- nouv.regle=nouv.paye>0?TODAYS:null;
- const rF=await ecrire({
-   methode:'PATCH', chemin:`/api/factures/${encodeURIComponent(f.id)}`,
-   corps:{...FACT_VERS(nouv), revision:f.rev},
-   quoi:`le règlement de ${f.id}`,
-   local:()=>{ Object.assign(f, nouv) },
-   appliquer:row=>{ poseFacture(row, nouv.praticien) },
+ const m=Math.round((+((document.getElementById('enM')||{}).value)||0)*100)/100;
+ const moyen=(document.getElementById('enP')||{}).value||'';
+ if(!(m>0)){toast('Indiquez le montant reçu');return}
+ if(!moyen){toast('Indiquez par quel moyen le patient a réglé');return}
+ if(m>rdu(f)+0.005){toast(`Il ne reste que ${EUR(rdu(f))} à encaisser sur cette facture`);return}
+ const r=await ecrire({
+   methode:'POST', chemin:`/api/factures/${encodeURIComponent(f.id)}/encaissement`,
+   corps:{montant:m, moyen}, quoi:`le règlement de ${f.id}`,
+   local:()=>{ inscrireLocal(f,{nature:'reglement', montant:m, moyen, date:TODAYS}) },
+   appliquer:row=>{ poseFacture(row, f.praticien) },
  });
- if(!rF.ok){ paint(); return }
- /* on garde trace de l'avant et de l'après : c'est une pièce comptable */
- const dit=x=>`${EUR(x.paye)}${x.moyen?' · '+x.moyen:' · non encaissé'}${(x.plan&&x.plan.n>1)?` · ${x.plan.n} fois (${x.plan.faites}/${x.plan.n})`:''}`;
- const apres={paye:f.paye, moyen:f.moyen, plan:f.plan};
- if(dit(av)!==dit(apres)) logDoc(f.id,`Encaissement corrigé : ${dit(av)} → ${dit(apres)}`);
- encSel=null;
- toast(`${f.id} · ${rdu(f)>0?`${EUR(rdu(f))} restent dus`:'soldée'}`);
- paint&&paint(); if(AS) renderOver();
+ if(!r.ok){ redessinerCaisse(); return }
+ logDoc(f.id,`Règlement enregistré — ${EUR(m)} · ${moyen}`);
+ toast(`${f.id} · ${EUR(m)} encaissés${rdu(f)>0?` · ${EUR(rdu(f))} restent dus`:' · soldée'}`);
+ redessinerCaisse();
+}
+
+/* Annuler UNE écriture : un règlement, ou la facture par son émission. On la
+   désigne par son identifiant — jamais par « ce montant » : deux règlements
+   identiques existent, et annuler le mauvais laisserait la caisse dire le
+   faux avec un air parfaitement juste. */
+function demanderAnnulation(fid, eid){
+ encAnn={fid, eid}; redessinerCaisse();
+ const e=document.getElementById('enA'); if(e) e.focus();
+}
+function lacherAnnulation(){ encAnn=null; redessinerCaisse() }
+async function confirmerAnnulation(){
+ if(!encAnn) return;
+ const f=FACTURES.find(x=>x.id===encAnn.fid); if(!f){ encAnn=null; return }
+ const motif=String((document.getElementById('enA')||{}).value||'').trim();
+ if(!motif){toast('Une annulation dit pourquoi');return}
+ const c=regsDe(f).find(e=>String(e.id)===String(encAnn.eid));
+ if(!c){toast('Écriture introuvable');return}
+ if(c.annulee){toast('Cette écriture est déjà annulée');return}
+ const facture=c.nature==='emission';
+ if(facture&&f.paye>0.005){
+   toast(`Cette facture porte encore ${EUR(f.paye)} encaissés : annulez les règlements ou remboursez d’abord`); return }
+ const r=await ecrire({
+   methode:'POST', chemin:`/api/caisse/${encodeURIComponent(String(c.id))}/annulation`,
+   corps:{motif}, quoi:`l’annulation sur ${f.id}`,
+   local:()=>{ inscrireLocal(f,{nature:facture?'annulation_emission':'annulation_reglement',
+     montant:facture?-(Math.round((f.montant-f.avoir)*100)/100):-c.montant,
+     moyen:c.moyen||null, reference:c.id, motif}) },
+   appliquer:row=>{ poseFacture(row, f.praticien) },
+ });
+ if(!r.ok){ redessinerCaisse(); return }
+ logDoc(f.id, facture?`Facture annulée — ${motif}`
+   :`Règlement de ${EUR(c.montant)}${c.moyen?' ('+c.moyen+')':''} annulé — ${motif}`);
+ encAnn=null;
+ toast(facture?`${f.id} annulée`:`Règlement annulé${rdu(f)>0?` · ${EUR(rdu(f))} restent dus`:''}`);
+ redessinerCaisse();
+}
+
+/* Le trop-perçu repart chez le patient : c'est une sortie de caisse, avec son
+   moyen — pas un règlement qu'on efface. */
+async function rembourserFacture(id){
+ const f=FACTURES.find(x=>x.id===id); if(!f) return;
+ if(!peutEncaisser()){toast('Remboursement réservé aux rôles qui tiennent la caisse');return}
+ const m=Math.round((+((document.getElementById('enRM')||{}).value)||0)*100)/100;
+ const moyen=(document.getElementById('enRP')||{}).value||'';
+ const motif=String((document.getElementById('enRX')||{}).value||'').trim();
+ if(!(m>0)){toast('Indiquez le montant remboursé');return}
+ if(m>trop(f)+0.005){toast(`Le remboursement ne peut pas dépasser ${EUR(trop(f))}`);return}
+ if(!moyen){toast('Indiquez par quel moyen le patient est remboursé');return}
+ if(!motif){toast('Un remboursement dit pourquoi');return}
+ const r=await ecrire({
+   methode:'POST', chemin:`/api/factures/${encodeURIComponent(f.id)}/remboursement`,
+   corps:{montant:m, moyen, motif}, quoi:`le remboursement sur ${f.id}`,
+   local:()=>{ inscrireLocal(f,{nature:'remboursement', montant:-m, moyen, motif, date:TODAYS}) },
+   appliquer:row=>{ poseFacture(row, f.praticien) },
+ });
+ if(!r.ok){ redessinerCaisse(); return }
+ logDoc(f.id,`Remboursement — ${EUR(m)} · ${moyen} · ${motif}`);
+ toast(`${EUR(m)} remboursés sur ${f.id}`);
+ redessinerCaisse();
+}
+
+/* L'échéancier est un engagement du patient, pas un fait de caisse : il se
+   corrige. Les échéances « faites », elles, se comptent dans les règlements. */
+async function planFacture(id, n){
+ const f=FACTURES.find(x=>x.id===id); if(!f) return;
+ const plan=n>1?{n, faites:faitesDe(f)}:null;
+ const r=await ecrire({
+   methode:'PATCH', chemin:`/api/factures/${encodeURIComponent(f.id)}`,
+   corps:{...FACT_VERS({...f, plan}), revision:f.rev}, quoi:`l’échéancier de ${f.id}`,
+   local:()=>{ f.plan=plan },
+   appliquer:row=>{ poseFacture(row, f.praticien) },
+ });
+ if(!r.ok){ redessinerCaisse(); return }
+ logDoc(f.id, plan?`Échéancier : ${n} fois`:'Échéancier retiré — réglé en une fois');
+ redessinerCaisse();
 }
 
 /* ==========================================================================
@@ -20794,6 +20938,16 @@ async function ecrire(o){
    qui tient les deux moitiés ensemble — pas la bonne volonté de qui les
    relira.
    -------------------------------------------------------------------------- */
+/* Un INSTANT rendu par le serveur (« 2026-09-23T22:30:00.000Z ») se lit au
+   jour d'ici — c'est le 24 à Paris ; le couper à dix caractères donnait le 23.
+   Une date sans heure, ou un horodatage local de la démonstration, se garde
+   tel quel. */
+const instantUTC = s => /T\d\d:\d\d(:\d\d(\.\d+)?)?(Z|[+-]\d\d:?\d\d)$/.test(s);
+const z2 = n => String(n).padStart(2,'0');
+const jourLocal = v => { const s=String(v||''); if(!instantUTC(s)) return s.slice(0,10)||null;
+  const d=new Date(s); return isNaN(d)?s.slice(0,10):`${d.getFullYear()}-${z2(d.getMonth()+1)}-${z2(d.getDate())}` };
+const minuteLocale = v => { const s=String(v||''); if(!instantUTC(s)) return s.slice(0,16)||null;
+  const d=new Date(s); return isNaN(d)?s.slice(0,16):`${jourLocal(s)}T${z2(d.getHours())}:${z2(d.getMinutes())}` };
 const jourTxt = v => { if(!v) return null;
  const s=String(v); const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m?m[0]:s };
 
@@ -20989,7 +21143,11 @@ function consoVers(l){
    c'est la raison pour laquelle la correction d'un règlement passe par la
    révision — on ne rectifie pas un encaissement qu'un confrère vient de
    saisir. */
-const FACT_DOC = ['libelle','devis','forfait','annule'];
+/* « annule » n'est plus un champ de la pièce : une annulation est une
+   écriture du journal de caisse, avec son motif et son heure. On la relit
+   dans les écritures ; la renvoyer comme un drapeau serait tenter de réécrire
+   une pièce émise, et le serveur le refuserait. */
+const FACT_DOC = ['libelle','devis','forfait'];
 
 const FACT_VERS = f => {
  const doc = {};
@@ -21005,20 +21163,98 @@ const FACT_VERS = f => {
 };
 const FACT_DEPUIS = (r, prat) => {
  const doc = (r.document && typeof r.document === 'object') ? r.document : {};
+ const regs = Array.isArray(r.ecritures) ? r.ecritures : [];
+ const an = regs.find(e => e.nature === 'annulation_emission');
  return { id:r.id, rev:Number(r.revision), patient:Number(r.patient_id),
    acte: r.acte_id==null?null:Number(r.acte_id),
    date:jourTxt(r.date), montant:Number(r.montant), paye:Number(r.paye),
    avoir:Number(r.avoir), moyen:r.moyen, plan:r.plan||null,
    praticien: prat !== undefined ? prat : null,
    cat:r.categorie, type:r.type, statut:r.statut, regle:jourTxt(r.regle),
-   ...doc };
+   ...doc,
+   regs, annule: an ? jourLocal(an.horodatage) : (doc.annule || null),
+   repriseMoyen: r.reprise && r.reprise.moyen || null };
 };
+/* Ce que l'écran déduit du journal d'une facture, par quelque chemin qu'elle
+   arrive : la réponse d'une écriture (FACT_DEPUIS), ou le modèle entier au
+   chargement. Deux chemins qui déduiraient différemment feraient changer
+   l'écran au premier rechargement — une facture annulée dirait soudain
+   l'avoir été le jour de son émission. */
+function deriverFacture(f){
+ const an=regsDe(f).find(e=>e.nature==='annulation_emission');
+ if(an) f.annule=jourLocal(an.horodatage);
+ return f;
+}
 function poseFacture(row, prat){
  const n = FACT_DEPUIS(row, prat);
  const i = FACTURES.findIndex(x => x.id === n.id);
  if(i < 0){ FACTURES.unshift(n); return FACTURES[0] }
  Object.keys(n).forEach(k => { FACTURES[i][k] = n[k] });
  return FACTURES[i];
+}
+
+/* --------------------------------------------------------------------------
+   La caisse sans serveur
+   --------------------------------------------------------------------------
+   La démonstration rejoue les mêmes gestes que le journal de caisse — un
+   règlement s'ajoute, une erreur s'annule avec son motif — pour qu'on voie la
+   même chose des deux côtés. Mais sans sceau : la caisse fiscale n'existe
+   que sur le serveur, où la base numérote, date et chaîne chaque écriture.
+   -------------------------------------------------------------------------- */
+function refletLocal(f){
+ /* Ce que la facture portait avant sa première écriture — la démonstration
+    arrive avec des factures déjà réglées, comme une reprise. */
+ if(!f._base) f._base={paye:+f.paye||0, avoir:+f.avoir||0, moyen:f.moyen||null,
+                       regle:f.regle||null, statut:f.statut};
+ const R=regsDe(f);
+ const somme=L=>R.filter(e=>L.includes(e.nature)).reduce((t,e)=>t+e.montant,0);
+ f.paye=Math.round((f._base.paye+somme(['reglement','annulation_reglement','remboursement']))*100)/100;
+ f.avoir=Math.round((f._base.avoir-somme(['avoir']))*100)/100;
+ /* les moyens de ce qui reste encaissé : les règlements vivants, et ce que la
+    facture portait avant eux — comme au serveur (caisse.solde) */
+ const V=reglementsVivants(f);
+ const moyens=[...new Set([...(f._base.paye>0&&f._base.moyen?[f._base.moyen]:[]), ...V.map(e=>e.moyen)])];
+ f.moyen=moyens.length>1?'plusieurs':moyens.length===1?moyens[0]:f._base.moyen;
+ f.regle=V.length?(V[V.length-1].date||jourLocal(V[V.length-1].horodatage)):f._base.regle;
+ const an=R.find(e=>e.nature==='annulation_emission');
+ /* Le statut dit la vie de la pièce — émise ou annulée — comme au serveur.
+    Où en est son règlement se lit dans « payé » : tous les totaux de l'écran
+    comptent les pièces « ok », une facture réglée doit y rester. */
+ f.statut=(f._base.statut==='annulee'||!!an)?'annulee':'ok';
+ if(an) f.annule=jourLocal(an.horodatage);
+}
+let regN=0;
+function inscrireLocal(f, e){
+ const v={id:'L'+(++regN), numero:null, horodatage:nowStamp(), annulee:false, moyen:null,
+          date:null, motif:null, reference:null, ...e};
+ (f.regs=f.regs||[]).push(v);
+ if(v.reference!=null&&/^annulation_/.test(v.nature)){
+   const c=f.regs.find(x=>String(x.id)===String(v.reference)); if(c) c.annulee=true }
+ refletLocal(f);
+ return v;
+}
+
+/* Une facture qui naît sans serveur : son émission, puis — si le patient a
+   réglé au comptoir — son premier règlement. Deux écritures, comme au
+   journal, et non un « payé » posé dans la pièce. */
+function naitreLocal(f){
+ const p0=+f.paye||0, m0=f.moyen, d0=f.regle||f.date;
+ Object.assign(f,{paye:0, moyen:null, regle:null});
+ FACTURES.unshift(f);
+ inscrireLocal(f,{nature:'emission', montant:+f.montant||0});
+ if(p0>0) inscrireLocal(f,{nature:'reglement', montant:p0, moyen:m0, date:d0});
+}
+
+/* L'encaissé par moyen de paiement, lu règlement par règlement : « f.moyen »
+   ne sait plus dire que « plusieurs » quand un chèque a suivi une carte. */
+function ajouterModes(modes, f){
+ const V=reglementsVivants(f), R=regsDe(f).filter(e=>e.nature==='remboursement');
+ const j=V.reduce((t,e)=>t+e.montant,0)+R.reduce((t,e)=>t+e.montant,0);
+ const base=Math.round(((+f.paye||0)-j)*100)/100;
+ const mB=(f._base&&f._base.moyen)||f.repriseMoyen||(V.length||R.length?null:f.moyen);
+ if(base>0.005&&mB) modes[mB]=(modes[mB]||0)+base;
+ V.forEach(e=>{ modes[e.moyen]=(modes[e.moyen]||0)+e.montant });
+ R.forEach(e=>{ modes[e.moyen]=(modes[e.moyen]||0)+e.montant });
 }
 
 /* Le prélèvement depuis l'écran Stock. Le même que celui d'une séance, à ceci
@@ -21428,7 +21664,8 @@ function bandeauHTML(){
    + (SRV.lecture ? ` <b>Écriture partielle</b> : les <b>fiches patient</b>, les <b>devis</b>, les
       <b>séances</b>, les <b>factures</b> et les <b>mouvements de stock</b> — réceptions,
       sorties, produits tracés sur un patient et produits rendus — sont enregistrés au
-      serveur. Restent dans ce navigateur : la <b>fiche d’un produit</b> modifiée depuis
+      serveur ; chaque <b>règlement</b> s’inscrit au journal de caisse, qui ne se réécrit
+      pas. Restent dans ce navigateur : la <b>fiche d’un produit</b> modifiée depuis
       l’écran Stock, et la <b>suppression d’une séance</b>.
       N’y saisissez pas de dossier réel tant que l’écriture n’est pas posée partout.` : '')
    + `</div></div>`;
@@ -22723,12 +22960,35 @@ function srvAppliquerModele(m){
  poser(ACTES,    m.actes);
  poser(DEVIS,    m.devis);
  poser(FACTURES, m.factures);
+ if(Array.isArray(m.factures)){ FACTURES.forEach(deriverFacture); avoirsDuServeur() }
  poser(MVT,      m.mouvements);
  poser(CONSO,    m.conso);
  if(Array.isArray(m.stock)){
    remplTab(STOCK, m.stock);
    STOCK.forEach(x=>{ recalcStock(x); lotsDe(x).forEach(majEpuise) });
  }
+}
+
+/* Les avoirs, en mode serveur, viennent du journal de caisse : chacun y est
+   une écriture qui porte le numéro de sa pièce. Ceux que la reprise a apportés
+   n'y sont pas — l'ancien logiciel ne les transmet qu'en cumul sur la
+   facture — : ils se montrent comme tels, sans numéro inventé. Un numéro
+   fabriqué ici finirait imprimé sur une pièce qui ne l'a jamais porté.
+   Hier, cette liste restait celle de la démonstration : un vrai dossier
+   affichait les avoirs d'un patient fictif qui portait le même numéro. */
+function avoirsDuServeur(){
+ const L=[];
+ FACTURES.forEach(f=>{
+   const J=regsDe(f).filter(e=>e.nature==='avoir');
+   const repris=Math.round(((+f.avoir||0)+J.reduce((t,e)=>t+e.montant,0))*100)/100;
+   if(repris>0.005) L.push({id:'reprise:'+f.id, reprise:true, facture:f.id, patient:f.patient,
+     date:f.date, montant:repris, motif:'Avoir repris de l’ancien logiciel',
+     praticien:f.praticien, par:null, ts:null});
+   J.forEach(e=>L.push({id:e.piece||('écriture '+e.numero), facture:f.id, patient:f.patient,
+     date:jourLocal(e.horodatage), montant:Math.abs(e.montant), motif:e.motif||'',
+     praticien:f.praticien, par:null, ts:minuteLocale(e.horodatage)}));
+ });
+ remplTab(AVOIRS, L);
 }
 
 /* Les droits ne sont plus une ligne de ce fichier : ils viennent du serveur.
